@@ -34,6 +34,10 @@ protected:
     void StartADS();
     void StopADS();
 
+    // ── 점프 / 더블점프 ──────────────────────────────────────
+    void StartJump();
+    void StopJump();
+
     // ── 카메라 보간 ───────────────────────────────────────────
     void TickCameraInterp(float DeltaTime);
 

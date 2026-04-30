@@ -41,6 +41,9 @@ ALastFPSHero::ALastFPSHero()
     GetCharacterMovement()->AirControl                = 0.4f;
     GetCharacterMovement()->GravityScale              = 1.5f;
 
+    // 더블점프: 1차 점프 + 공중에서 1회 추가 허용
+    JumpMaxCount = 2;
+
     // 보간 목표값 초기화
     TargetArmLength    = DefaultArmLength;
     TargetSocketOffset = DefaultSocketOffset;
@@ -105,6 +108,12 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
         EIC->BindAction(IA, ETriggerEvent::Started,   this, &ALastFPSHero::StartADS);
         EIC->BindAction(IA, ETriggerEvent::Completed, this, &ALastFPSHero::StopADS);
     }
+
+    if (const UInputAction* IA = InputConfig->FindNativeInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Jump")))
+    {
+        EIC->BindAction(IA, ETriggerEvent::Started,   this, &ALastFPSHero::StartJump);
+        EIC->BindAction(IA, ETriggerEvent::Completed, this, &ALastFPSHero::StopJump);
+    }
 }
 
 // ── 이동 ──────────────────────────────────────────────────────
@@ -166,4 +175,15 @@ void ALastFPSHero::StopADS()
 
     bUseControllerRotationYaw                         = false;
     GetCharacterMovement()->bOrientRotationToMovement = true;
+}
+
+// ── 점프 / 더블점프 ───────────────────────────────────────────
+void ALastFPSHero::StartJump()
+{
+    Jump();
+}
+
+void ALastFPSHero::StopJump()
+{
+    StopJumping();
 }
