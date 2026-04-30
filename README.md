@@ -135,7 +135,9 @@ ALastFPSPlayerState
         ├── GameplayEffects
         │     ├── GE_Damage              // 피해 적용
         │     ├── GE_Heal
-        │     ├── GE_SprintStaminaDrain
+        │     ├── GE_SprintSpeed         // MoveSpeed +300 (Infinite)
+        │     ├── GE_SprintStaminaDrain  // Stamina -20/s (Periodic)
+        │     ├── GE_StaminaRegen        // Stamina +5/s (Passive, always-on)
         │     └── GE_UltGaugeCharge
         └── GameplayCues                 // 이펙트·사운드 트리거
 ```
@@ -175,13 +177,13 @@ ACharacter
 - [x] 3인칭 카메라 + 스프링 암 설정 (ADS 보간 포함)
 - [x] Enhanced Input으로 이동 / 카메라 회전 연결
 - [x] GAS AttributeSet 기초 (Health, Stamina, MoveSpeed)
-- [ ] `GA_Jump` + `GA_DoubleJump` 구현 (Gameplay Ability)
-- [ ] `GA_Sprint` 스태미나 소모 구현
+- [x] `GA_Jump` + `GA_DoubleJump` 구현 (Gameplay Ability)
+- [x] `GA_Sprint` 스태미나 소모 구현
 - [ ] 기본 이동 애니메이션 블렌드스페이스 연결
 
 ### Phase 2 — 전투 시스템 기초 (목표: ~3주)
 - [ ] 무기 컴포넌트 설계 (`UWeaponComponent`)
-- [ ] `GA_BasicShoot` — 히트스캔 or 발사체 선택
+- [ ] `GA_BasicShoot` — 발사체 선택
 - [ ] `GE_Damage` — 피해 GameplayEffect + 어트리뷰션
 - [ ] 피격 반응 (히트 리액션, 사망 처리)
 - [ ] 재장전 어빌리티 구현
@@ -308,4 +310,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-04-30*
+*Last updated: 2026-05-01*

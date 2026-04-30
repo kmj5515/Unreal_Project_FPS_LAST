@@ -1,6 +1,7 @@
 #include "Character/LastFPSCharacterBase.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 ALastFPSCharacterBase::ALastFPSCharacterBase()
 {
@@ -56,8 +57,18 @@ void ALastFPSCharacterBase::InitAbilitySystem()
     if (!AbilitySystemComponent) return;
 
     AbilitySystemComponent->InitAbilityActorInfo(this, this);
+
+    AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(
+        ULastFPSAttributeSet::GetMoveSpeedAttribute())
+        .AddUObject(this, &ALastFPSCharacterBase::OnMoveSpeedChanged);
+
     GiveDefaultAbilities();
     ApplyDefaultEffects();
+}
+
+void ALastFPSCharacterBase::OnMoveSpeedChanged(const FOnAttributeChangeData& Data)
+{
+    GetCharacterMovement()->MaxWalkSpeed = Data.NewValue;
 }
 
 void ALastFPSCharacterBase::GiveDefaultAbilities()

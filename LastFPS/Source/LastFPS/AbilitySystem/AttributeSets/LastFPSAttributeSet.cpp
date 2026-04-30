@@ -12,7 +12,7 @@ ULastFPSAttributeSet::ULastFPSAttributeSet()
     InitMaxUltimateGauge(100.f);
     InitAttackDamage(10.f);
     InitDefense(0.f);
-    InitMoveSpeed(600.f);
+    InitMoveSpeed(400.f);
     InitDamage(0.f);
 }
 

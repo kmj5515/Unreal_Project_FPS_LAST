@@ -6,6 +6,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "AbilitySystemComponent.h"
 
 ALastFPSHero::ALastFPSHero()
 {
@@ -143,12 +144,22 @@ void ALastFPSHero::Look(const FInputActionValue& Value)
 // ── 달리기 ────────────────────────────────────────────────────
 void ALastFPSHero::StartSprint()
 {
-    GetCharacterMovement()->MaxWalkSpeed = 700.f;
+    if (!AbilitySystemComponent) return;
+
+    static const FGameplayTag SprintTag = FGameplayTag::RequestGameplayTag("Ability.Sprint");
+    FGameplayTagContainer SprintTags;
+    SprintTags.AddTag(SprintTag);
+    AbilitySystemComponent->TryActivateAbilitiesByTag(SprintTags);
 }
 
 void ALastFPSHero::StopSprint()
 {
-    GetCharacterMovement()->MaxWalkSpeed = 400.f;
+    if (!AbilitySystemComponent) return;
+
+    static const FGameplayTag SprintTag = FGameplayTag::RequestGameplayTag("Ability.Sprint");
+    FGameplayTagContainer SprintTags;
+    SprintTags.AddTag(SprintTag);
+    AbilitySystemComponent->CancelAbilities(&SprintTags);
 }
 
 // ── ADS ───────────────────────────────────────────────────────

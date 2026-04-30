@@ -58,14 +58,72 @@ AddMovementInput(RightDir,   MovementVector.X);
 `bOrientRotationToMovement = true` 로 캐릭터 메시가 이동 방향을 자동으로 바라본다.  
 ADS 진입 시 `bOrientRotationToMovement = false` + `bUseControllerRotationYaw = true` 로 전환해 조준 방향을 고정한다.
 
-### 달리기
+### 달리기 (GA_Sprint)
 
-```cpp
-void StartSprint() { GetCharacterMovement()->MaxWalkSpeed = 700.f; }
-void StopSprint()  { GetCharacterMovement()->MaxWalkSpeed = 400.f; }
+**관련 파일:** `AbilitySystem/Abilities/GA_Sprint.h/.cpp`, `Character/LastFPSCharacterBase.cpp`
+
+`StartSprint()` → `TryActivateAbilitiesByTag("Ability.Sprint")`, `StopSprint()` → `CancelAbilities`.  
+속도 변경은 MoveSpeed 어트리뷰트를 경유해 CMC에 반영 → 멀티플레이어 복제 안전.
+
+```
+Left Shift 누름 → TryActivateAbilitiesByTag("Ability.Sprint")
+  → GA_Sprint::ActivateAbility()
+      ├── GE_SprintSpeed 적용 → MoveSpeed +300
+      │       ↓
+      │   CharacterBase::OnMoveSpeedChanged(700) → CMC MaxWalkSpeed = 700
+      ├── GE_SprintStaminaDrain 적용 (Stamina −20/s)
+      └── Stamina 변경 델리게이트 등록
+
+Left Shift 뗌 → CancelAbilities → EndAbility 호출
+Stamina = 0   → OnStaminaChanged → EndAbility 자동 호출
+
+  → GA_Sprint::EndAbility()
+      ├── GE_SprintSpeed 제거 → MoveSpeed −300
+      │       ↓
+      │   OnMoveSpeedChanged(400) → CMC MaxWalkSpeed = 400
+      ├── GE_SprintStaminaDrain 제거
+      └── 델리게이트 해제
 ```
 
-현재는 MaxWalkSpeed 직접 변경. 추후 `GA_Sprint` + `GE_SprintStaminaDrain` 으로 GAS 이전 예정.
+**MoveSpeed → CMC 연결 (CharacterBase)**
+
+```cpp
+// InitAbilitySystem() 에서 바인딩
+ASC->GetGameplayAttributeValueChangeDelegate(GetMoveSpeedAttribute())
+    .AddUObject(this, &ALastFPSCharacterBase::OnMoveSpeedChanged);
+
+void OnMoveSpeedChanged(const FOnAttributeChangeData& Data)
+{
+    GetCharacterMovement()->MaxWalkSpeed = Data.NewValue;
+}
+```
+
+GAS GE가 MoveSpeed 어트리뷰트를 바꾸면 이 콜백이 서버/클라 모두에서 즉시 실행된다.
+
+**스태미나 자동 회복**
+
+`BP_GE_StaminaRegen`을 Hero BP `DefaultEffects`에 추가해 항시 적용.  
+스프린트 중: 드레인(−20/s) + 리젠(+5/s) = 실질 **−15/s**  
+정지 중: 리젠(+5/s)만 작동 → 천천히 회복
+
+| 설정 | 값 | 비고 |
+|------|----|------|
+| `InstancingPolicy` | InstancedPerActor | 인스턴스 상태 보존 필요 |
+| `NetExecutionPolicy` | LocalPredicted | 클라이언트 선반영 |
+| MoveSpeed 기본값 | 400 | AttributeSet 초기값, CMC 기본값과 일치 |
+
+**에디터 설정**
+
+| 에셋 | Duration | Period | Modifier |
+|------|----------|--------|----------|
+| `BP_GE_SprintSpeed` | Infinite | — | MoveSpeed Add **+300** |
+| `BP_GE_SprintStaminaDrain` | Infinite | 0.1s | Stamina Add **−2.0** (= −20/s) |
+| `BP_GE_StaminaRegen` | Infinite | 0.2s | Stamina Add **+1.0** (= +5/s) |
+
+- `BP_GA_Sprint` (Parent: GA_Sprint) → SprintSpeedEffect, StaminaDrainEffect 할당
+- Hero BP `DefaultAbilities`에 `BP_GA_Sprint` 추가
+- Hero BP `DefaultEffects`에 `BP_GE_StaminaRegen` 추가
+- GameplayTag `Ability.Sprint` 등록 필요
 
 ---
 
@@ -160,4 +218,4 @@ PossessedBy (서버) / OnRep_PlayerState (클라이언트)
 
 ---
 
-*Last updated: 2026-04-30*
+*Last updated: 2026-05-01*

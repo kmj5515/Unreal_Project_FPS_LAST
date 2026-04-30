@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
+#include "GameplayEffectTypes.h"
 #include "LastFPSCharacterBase.generated.h"
 
 class UAbilitySystemComponent;
@@ -41,6 +42,7 @@ protected:
     void InitAbilitySystem();
     void GiveDefaultAbilities();
     void ApplyDefaultEffects();
+    void OnMoveSpeedChanged(const FOnAttributeChangeData& Data);
 
     // Phase 1에서는 ASC를 캐릭터에 직접 보유
     // Phase 3에서 PlayerState로 이전 예정
