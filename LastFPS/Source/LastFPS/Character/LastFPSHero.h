@@ -8,6 +8,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
 class ULastFPSInputConfig;
+class UWeaponComponent;
 struct FInputActionValue;
 
 UCLASS()
@@ -22,6 +23,7 @@ public:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
     FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+    FORCEINLINE UWeaponComponent* GetWeaponComponent() const { return WeaponComponent; }
 
 protected:
     virtual void BeginPlay() override;
@@ -37,6 +39,10 @@ protected:
     // ── 점프 / 더블점프 ──────────────────────────────────────
     void StartJump();
     void StopJump();
+
+    // ── 사격 ─────────────────────────────────────────────────
+    void StartFire();
+    void StopFire();
 
     // ── 카메라 보간 ───────────────────────────────────────────
     void TickCameraInterp(float DeltaTime);
@@ -71,6 +77,10 @@ protected:
     // 보간 속도 (높을수록 빠르게 전환)
     UPROPERTY(EditDefaultsOnly, Category="Camera|ADS")
     float ADSInterpSpeed = 10.f;
+
+    // ── 무기 ─────────────────────────────────────────────────
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
+    TObjectPtr<UWeaponComponent> WeaponComponent;
 
     // ── 입력 설정 ─────────────────────────────────────────────
     UPROPERTY(EditDefaultsOnly, Category="Input")

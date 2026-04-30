@@ -182,9 +182,9 @@ ACharacter
 - [ ] 기본 이동 애니메이션 블렌드스페이스 연결
 
 ### Phase 2 — 전투 시스템 기초 (목표: ~3주)
-- [ ] 무기 컴포넌트 설계 (`UWeaponComponent`)
-- [ ] `GA_BasicShoot` — 발사체 선택
-- [ ] `GE_Damage` — 피해 GameplayEffect + 어트리뷰션
+- [x] 무기 컴포넌트 설계 (`UWeaponComponent`)
+- [x] `GA_BasicShoot` — 발사체 선택
+- [x] `GE_Damage` — 피해 GameplayEffect + 어트리뷰션
 - [ ] 피격 반응 (히트 리액션, 사망 처리)
 - [ ] 재장전 어빌리티 구현
 - [ ] ADS(어깨 너머 시점) 카메라 블렌딩
@@ -310,4 +310,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-01*
+*Last updated: 2026-05-02*

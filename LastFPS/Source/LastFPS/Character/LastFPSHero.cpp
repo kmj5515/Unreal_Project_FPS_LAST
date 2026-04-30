@@ -1,4 +1,5 @@
 #include "Character/LastFPSHero.h"
+#include "Character/Components/WeaponComponent.h"
 #include "Input/LastFPSInputConfig.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
@@ -44,6 +45,8 @@ ALastFPSHero::ALastFPSHero()
 
     // 더블점프: 1차 점프 + 공중에서 1회 추가 허용
     JumpMaxCount = 2;
+
+    WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
 
     // 보간 목표값 초기화
     TargetArmLength    = DefaultArmLength;
@@ -114,6 +117,12 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     {
         EIC->BindAction(IA, ETriggerEvent::Started,   this, &ALastFPSHero::StartJump);
         EIC->BindAction(IA, ETriggerEvent::Completed, this, &ALastFPSHero::StopJump);
+    }
+
+    if (const UInputAction* IA = InputConfig->FindNativeInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Fire")))
+    {
+        EIC->BindAction(IA, ETriggerEvent::Started,   this, &ALastFPSHero::StartFire);
+        EIC->BindAction(IA, ETriggerEvent::Completed, this, &ALastFPSHero::StopFire);
     }
 }
 
@@ -197,4 +206,25 @@ void ALastFPSHero::StartJump()
 void ALastFPSHero::StopJump()
 {
     StopJumping();
+}
+
+// ── 사격 ──────────────────────────────────────────────────────
+void ALastFPSHero::StartFire()
+{
+    if (!AbilitySystemComponent) return;
+
+    static const FGameplayTag FireTag = FGameplayTag::RequestGameplayTag("Ability.Fire");
+    FGameplayTagContainer FireTags;
+    FireTags.AddTag(FireTag);
+    AbilitySystemComponent->TryActivateAbilitiesByTag(FireTags);
+}
+
+void ALastFPSHero::StopFire()
+{
+    if (!AbilitySystemComponent) return;
+
+    static const FGameplayTag FireTag = FGameplayTag::RequestGameplayTag("Ability.Fire");
+    FGameplayTagContainer FireTags;
+    FireTags.AddTag(FireTag);
+    AbilitySystemComponent->CancelAbilities(&FireTags);
 }
