@@ -219,4 +219,104 @@ PossessedBy (서버) / OnRep_PlayerState (클라이언트)
 
 ---
 
-*Last updated: 2026-05-01*
+---
+
+## 6. 무기 시스템
+
+### 구조
+
+```
+ALastFPSHero
+  └── UWeaponComponent
+        ├── WeaponMesh (SkeletalMesh) → AttachSocketName 소켓에 부착
+        ├── ProjectileClass           → BP_Projectile 할당
+        ├── CurrentAmmo (Replicated)
+        ├── MaxAmmo / FireRate
+        └── GetMuzzleTransform()
+
+ALastFPSProjectile
+  ├── CollisionComp (SphereComponent) — WorldDynamic, BlockAll
+  ├── ProjectileMovementComponent    — 3000 cm/s, 중력 0.1
+  ├── ProjectileMesh (StaticMesh)
+  └── DamageEffect                   → BP_GE_Damage 할당
+```
+
+### WeaponComponent
+
+**관련 파일:** `Character/Components/WeaponComponent.h/.cpp`
+
+- `BeginPlay()`에서 `WeaponMesh`를 동적 생성해 오너 캐릭터의 `AttachSocketName` 소켓에 부착
+- `CurrentAmmo`는 `DOREPLIFETIME`으로 복제 → 모든 클라이언트가 탄약 수 공유
+- `SetIsReplicated(true)` 로 컴포넌트 자체도 복제 활성화
+
+### GA_BasicShoot
+
+**관련 파일:** `AbilitySystem/Abilities/GA_BasicShoot.h/.cpp`
+
+```
+LMB 누름 → TryActivateAbilitiesByTag("Ability.Fire")
+  → GA_BasicShoot::ActivateAbility()
+      ├── CommitAbility()
+      ├── WeaponComponent::CanFire() 확인
+      ├── Fire() 즉시 호출
+      └── bIsAutoFire == true → 타이머로 FireRate마다 Fire() 반복
+
+  → Fire()
+      ├── GetPlayerViewPoint() → 카메라 위치·방향 획득
+      ├── 카메라에서 150cm 앞 지점에 Projectile 스폰 (서버 전용)
+      └── ConsumeAmmo() → 탄약 0이면 EndAbility
+
+LMB 뗌 → CancelAbilities → EndAbility (타이머 해제)
+```
+
+**카메라 기준 발사를 사용하는 이유**
+
+MuzzleSocket 위치에서 발사하면 캐릭터 회전·메시 소켓 정확도에 의존하게 된다. 카메라(조준선) 기준으로 발사하면 플레이어가 화면에서 보는 방향과 실제 탄도가 일치한다.
+
+| 설정 | 값 | 비고 |
+|------|----|------|
+| `InstancingPolicy` | InstancedPerActor | 타이머 상태 보존 필요 |
+| `NetExecutionPolicy` | LocalPredicted | 클라이언트 선반영 |
+| `bIsAutoFire` | false (기본) | BP에서 연사로 변경 가능 |
+
+### ALastFPSProjectile 피격 → 데미지 흐름
+
+```
+OnHit() — 서버 전용
+  ├── Instigator ASC → MakeOutgoingSpec(GE_Damage)
+  └── ApplyGameplayEffectSpecToTarget(TargetASC)
+          ↓
+  AttributeSet::PostGameplayEffectExecute()
+  → Damage 값 감지 → Health -= Damage → Damage = 0 리셋
+```
+
+**콜리전 설정**
+
+기본 `"Projectile"` 프로파일은 UE5에 없으므로 코드에서 직접 설정:
+- `ObjectType`: `WorldDynamic`
+- `Response`: `BlockAll`
+- `BeginPlay`에서 `IgnoreActorWhenMoving(Instigator)` → 발사자와 자기충돌 방지
+
+### GE_Damage 세팅
+
+| 항목 | 값 |
+|------|----|
+| Duration Policy | `Instant` |
+| Attribute | `LastFPSAttributeSet.Damage` |
+| Modifier Op | `Add` |
+| Magnitude | `20.0` |
+
+`Damage`는 Meta Attribute로, `PostGameplayEffectExecute`에서 Health에 반영 후 즉시 0으로 리셋된다.
+
+### 에디터 설정
+
+- `BP_Projectile` (Parent: `LastFPSProjectile`) → `DamageEffect`, `ProjectileMesh` 할당
+- `BP_GA_BasicShoot` (Parent: `GA_BasicShoot`) → Hero BP `DefaultAbilities`에 추가
+- `BP_GE_Damage` (Parent: `GameplayEffect`) → Instant, Damage Add 20
+- GameplayTag `Ability.Fire`, `InputTag.Fire` 등록
+- `IA_Fire` InputAction → IMC에 `Left Mouse Button` 매핑
+- `DA_InputConfig` NativeInputActions에 `IA_Fire` + `InputTag.Fire` 추가
+
+---
+
+*Last updated: 2026-05-02*
