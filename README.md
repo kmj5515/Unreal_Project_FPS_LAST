@@ -171,10 +171,10 @@ ACharacter
 - [x] 기본 폴더 구조 정립
 
 ### Phase 1 — 캐릭터 & 기본 이동 (목표: ~2주)
-- [ ] `ALastFPSCharacterBase` C++ 클래스 구현
-- [ ] 3인칭 카메라 + 스프링 암 설정
-- [ ] Enhanced Input으로 이동 / 카메라 회전 연결
-- [ ] GAS AttributeSet 기초 (Health, Stamina, MoveSpeed)
+- [x] `ALastFPSCharacterBase` C++ 클래스 구현
+- [x] 3인칭 카메라 + 스프링 암 설정 (ADS 보간 포함)
+- [x] Enhanced Input으로 이동 / 카메라 회전 연결
+- [x] GAS AttributeSet 기초 (Health, Stamina, MoveSpeed)
 - [ ] `GA_Jump` + `GA_DoubleJump` 구현 (Gameplay Ability)
 - [ ] `GA_Sprint` 스태미나 소모 구현
 - [ ] 기본 이동 애니메이션 블렌드스페이스 연결
@@ -191,8 +191,9 @@ ACharacter
 - [ ] PlayerState에 ASC 이전 (멀티 표준 구조)
 - [ ] 기본 이동 및 사격 네트워크 복제 검증
 - [ ] GAS Prediction 적용 (GA_Jump, GA_Sprint)
-- [ ] GameMode / GameState 팀 관리 구현
-- [ ] 팀 배정 로직 (최대 4팀 × 3인)
+- [x] GameMode 기초 구현 (`ALastFPSGameModeBase`)
+- [x] 팀 배정 로직 (최대 4팀 × 3인, 인원 균등 배분)
+- [ ] GameState 팀 점수 관리
 - [ ] 기본 리스폰 시스템
 
 ### Phase 4 — 스킬 시스템 (목표: ~4주)
