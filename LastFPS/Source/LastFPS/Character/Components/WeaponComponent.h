@@ -15,23 +15,26 @@ class LASTFPS_API UWeaponComponent : public UActorComponent
 public:
     UWeaponComponent();
 
+    virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
     bool CanFire() const;
-    void ConsumeAmmo();
+    void AddHeat();
     FTransform GetMuzzleTransform() const;
 
-    UFUNCTION(BlueprintCallable, Category="Weapon")
-    int32 GetCurrentAmmo() const { return CurrentAmmo; }
+    UFUNCTION(BlueprintCallable, Category="Weapon|Overheat")
+    float GetCurrentHeat() const { return CurrentHeat; }
 
-    UFUNCTION(BlueprintCallable, Category="Weapon")
-    int32 GetMaxAmmo() const { return MaxAmmo; }
+    UFUNCTION(BlueprintCallable, Category="Weapon|Overheat")
+    float GetMaxHeat() const { return MaxHeat; }
+
+    UFUNCTION(BlueprintCallable, Category="Weapon|Overheat")
+    bool IsOverheated() const { return bIsOverheated; }
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
     TObjectPtr<USkeletalMeshComponent> WeaponMesh;
 
     // ── 에디터 설정 ──────────────────────────────────────────────
-    // BP에서 무기 스켈레탈 메시 에셋 지정 (BP_Hero → WeaponComponent → 여기서 설정)
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
     TObjectPtr<USkeletalMesh> WeaponSkeletalMesh;
 
@@ -41,21 +44,34 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
     FName MuzzleSocketName = TEXT("MuzzleFlash");
 
-    // 캐릭터 스켈레톤에 무기를 붙일 소켓
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
     FName AttachSocketName = TEXT("WeaponSocket");
 
-    UPROPERTY(EditDefaultsOnly, Category="Weapon")
-    int32 MaxAmmo = 30;
-
-    // 최소 연사 간격 (초) — GA_BasicShoot에서 쿨다운으로 활용
+    // 최소 연사 간격 (초)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
     float FireRate = 0.1f;
+
+    // ── 오버히트 설정 ─────────────────────────────────────────────
+    // 발사 1회당 증가하는 열량
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Overheat")
+    float HeatPerShot = 10.f;
+
+    // 최대 열량 — 도달하면 오버히트
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Overheat")
+    float MaxHeat = 100.f;
+
+    // 초당 냉각량 (쏘지 않을 때 항상 감소)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Overheat")
+    float CooldownRate = 20.f;
 
 protected:
     virtual void BeginPlay() override;
 
 private:
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Weapon", meta=(AllowPrivateAccess="true"))
-    int32 CurrentAmmo;
+    float CurrentHeat = 0.f;
+
+    // 오버히트 상태: true이면 CurrentHeat가 0이 될 때까지 발사 불가
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Weapon", meta=(AllowPrivateAccess="true"))
+    bool bIsOverheated = false;
 };

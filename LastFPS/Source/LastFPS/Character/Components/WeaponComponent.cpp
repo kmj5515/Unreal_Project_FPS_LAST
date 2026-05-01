@@ -6,22 +6,20 @@
 UWeaponComponent::UWeaponComponent()
 {
     SetIsReplicated(true);
-    PrimaryComponentTick.bCanEverTick = false;
+    PrimaryComponentTick.bCanEverTick = true;
 }
 
 void UWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-    DOREPLIFETIME(UWeaponComponent, CurrentAmmo);
+    DOREPLIFETIME(UWeaponComponent, CurrentHeat);
+    DOREPLIFETIME(UWeaponComponent, bIsOverheated);
 }
 
 void UWeaponComponent::BeginPlay()
 {
     Super::BeginPlay();
 
-    CurrentAmmo = MaxAmmo;
-
-    // 오너 캐릭터의 스켈레탈 메시 소켓에 무기 부착
     if (ACharacter* Owner = Cast<ACharacter>(GetOwner()))
     {
         WeaponMesh = NewObject<USkeletalMeshComponent>(GetOwner(), TEXT("WeaponMesh"));
@@ -36,14 +34,35 @@ void UWeaponComponent::BeginPlay()
     }
 }
 
-bool UWeaponComponent::CanFire() const
+void UWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
-    return CurrentAmmo > 0;
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+    // 열 감소는 서버에서만 처리 — 클라이언트는 Replicated 값으로 동기화
+    if (!GetOwner()->HasAuthority() || CurrentHeat <= 0.f)
+        return;
+
+    CurrentHeat = FMath::Max(0.f, CurrentHeat - CooldownRate * DeltaTime);
+
+    // 오버히트 상태에서 완전히 냉각되면 해제
+    if (bIsOverheated && CurrentHeat <= 0.f)
+        bIsOverheated = false;
 }
 
-void UWeaponComponent::ConsumeAmmo()
+bool UWeaponComponent::CanFire() const
 {
-    CurrentAmmo = FMath::Max(0, CurrentAmmo - 1);
+    return !bIsOverheated;
+}
+
+void UWeaponComponent::AddHeat()
+{
+    if (!GetOwner()->HasAuthority())
+        return;
+
+    CurrentHeat = FMath::Min(MaxHeat, CurrentHeat + HeatPerShot);
+
+    if (CurrentHeat >= MaxHeat)
+        bIsOverheated = true;
 }
 
 FTransform UWeaponComponent::GetMuzzleTransform() const
@@ -51,6 +70,5 @@ FTransform UWeaponComponent::GetMuzzleTransform() const
     if (WeaponMesh && WeaponMesh->DoesSocketExist(MuzzleSocketName))
         return WeaponMesh->GetSocketTransform(MuzzleSocketName);
 
-    // MuzzleSocket 없으면 오너 위치 반환
     return GetOwner() ? GetOwner()->GetActorTransform() : FTransform::Identity;
 }
