@@ -13,6 +13,7 @@
 5. [GAS AttributeSet](#5-gas-attributeset)
 6. [무기 시스템](#6-무기-시스템)
 7. [GAS 네트워크 & Prediction](#7-gas-네트워크--prediction)
+8. [HUD 시스템](#8-hud-시스템)
 
 ---
 
@@ -440,4 +441,72 @@ Owner/Avatar 분리 이유: GAS가 어빌리티 활성화 권한(Owner)과 물�
 
 ---
 
-*Last updated: 2026-05-02 — GA_Jump 신규, 오버히트 시스템, PlayerState ASC 이전, GAS Prediction 정리*
+---
+
+## 8. HUD 시스템
+
+**관련 파일:** `UI/LastFPSHUDWidget.h/.cpp`, `UI/LastFPSHUD.h/.cpp`
+
+### 구조
+
+```
+ALastFPSHUD (AHUD 서브클래스)
+  └── BeginPlay() → CreateWidget<ULastFPSHUDWidget> → AddToViewport()
+
+ULastFPSHUDWidget (UUserWidget C++ 베이스)
+  ├── GAS 어트리뷰트 델리게이트 구독 (Health / Stamina / UltimateGauge)
+  ├── WeaponComponent::OnHeatChanged 구독
+  └── BlueprintImplementableEvent → WBP_HUD (Blueprint 자식)에서 Progress Bar 연결
+```
+
+### 초기화 흐름 & 클라이언트 재시도
+
+멀티플레이어에서 클라이언트의 `NativeConstruct`는 `PlayerState` 복제보다 먼저 호출될 수 있다.
+
+```
+NativeConstruct()
+  → InitializeHUD()
+      ├── 성공 (PlayerState 준비됨)
+      │     ├── ASC 어트리뷰트 델리게이트 바인딩 (Health, Stamina, UltGauge)
+      │     ├── WeaponComponent::OnHeatChanged 바인딩
+      │     └── 현재값으로 바 초기화 호출
+      └── 실패 (PlayerState 미준비)
+            → SetTimer(0.1s, RetryInitialize, 반복)
+            → RetryInitialize() → InitializeHUD() 성공 시 타이머 해제
+```
+
+**서버는 즉시 성공, 클라이언트는 PlayerState 복제 완료 후 0.1~0.3초 내에 재시도 성공.**
+
+### 오버히트 게이지 — RepNotify 구조
+
+`CurrentHeat`, `bIsOverheated` 를 단순 `Replicated` → `ReplicatedUsing=OnRep_HeatState`로 변경해 클라이언트에서도 값 도착 즉시 HUD에 알린다.
+
+```
+서버: AddHeat() / TickComponent()
+  → CurrentHeat, bIsOverheated 변경
+  → OnHeatChanged.Broadcast() (서버 HUD 즉시 반영)
+  → 복제 전송
+
+클라이언트: 복제 수신
+  → OnRep_HeatState()
+  → OnHeatChanged.Broadcast() (클라 HUD 반영)
+```
+
+### Blueprint 연결 (WBP_HUD)
+
+| 이벤트 | 연결 대상 | 추가 로직 |
+|---|---|---|
+| `OnHealthChanged(Current, Max)` | `PB_Health.SetPercent(Current/Max)` | 없음 |
+| `OnStaminaChanged` | `PB_Stamina.SetPercent` | 없음 |
+| `OnUltimateGaugeChanged` | `PB_Ultimate.SetPercent` | 없음 |
+| `OnHeatChanged(Current, Max, bOverheated)` | `PB_Heat.SetPercent` | bOverheated로 Fill Color 분기 (주황↔빨강) |
+
+### 에디터 설정
+
+- `BP_HUD` (Parent: `LastFPSHUD`) → `HUD Widget Class` = `WBP_HUD`
+- `BP_GameMode` → **HUD Class** = `BP_HUD`
+- `WBP_HUD` (Parent: `LastFPSHUDWidget`) → Progress Bar 4개 배치, 각 이벤트 구현
+
+---
+
+*Last updated: 2026-05-02 — HUD 시스템 추가, 클라이언트 재시도 타이머, 오버히트 RepNotify 구조 정리*

@@ -9,6 +9,9 @@ class USkeletalMesh;
 class UParticleSystem;
 class USoundBase;
 
+// Current, Max, bIsOverheated
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnWeaponHeatChanged, float, Current, float, Max, bool, bIsOverheated);
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class LASTFPS_API UWeaponComponent : public UActorComponent
 {
@@ -33,6 +36,10 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="Weapon|Overheat")
     bool IsOverheated() const { return bIsOverheated; }
+
+    // HUD 등이 구독해 열 변화를 수신
+    UPROPERTY(BlueprintAssignable, Category="Weapon|Overheat")
+    FOnWeaponHeatChanged OnHeatChanged;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
     TObjectPtr<USkeletalMeshComponent> WeaponMesh;
@@ -62,15 +69,12 @@ public:
     TObjectPtr<UParticleSystem> MuzzleFlashEffect;
 
     // ── 오버히트 설정 ─────────────────────────────────────────────
-    // 발사 1회당 증가하는 열량
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Overheat")
     float HeatPerShot = 10.f;
 
-    // 최대 열량 — 도달하면 오버히트
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Overheat")
     float MaxHeat = 100.f;
 
-    // 초당 냉각량 (쏘지 않을 때 항상 감소)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Overheat")
     float CooldownRate = 20.f;
 
@@ -78,10 +82,13 @@ protected:
     virtual void BeginPlay() override;
 
 private:
-    UPROPERTY(Replicated, BlueprintReadOnly, Category="Weapon", meta=(AllowPrivateAccess="true"))
+    // ReplicatedUsing: 클라이언트에서 값이 복제될 때 OnRep_HeatState 호출
+    UPROPERTY(ReplicatedUsing=OnRep_HeatState, BlueprintReadOnly, Category="Weapon", meta=(AllowPrivateAccess="true"))
     float CurrentHeat = 0.f;
 
-    // 오버히트 상태: true이면 CurrentHeat가 0이 될 때까지 발사 불가
-    UPROPERTY(Replicated, BlueprintReadOnly, Category="Weapon", meta=(AllowPrivateAccess="true"))
+    UPROPERTY(ReplicatedUsing=OnRep_HeatState, BlueprintReadOnly, Category="Weapon", meta=(AllowPrivateAccess="true"))
     bool bIsOverheated = false;
+
+    UFUNCTION()
+    void OnRep_HeatState();
 };

@@ -3,6 +3,7 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
+#include "Particles/ParticleSystemComponent.h"
 
 UWeaponComponent::UWeaponComponent()
 {
@@ -39,15 +40,16 @@ void UWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-    // 열 감소는 서버에서만 처리 — 클라이언트는 Replicated 값으로 동기화
     if (!GetOwner()->HasAuthority() || CurrentHeat <= 0.f)
         return;
 
     CurrentHeat = FMath::Max(0.f, CurrentHeat - CooldownRate * DeltaTime);
 
-    // 오버히트 상태에서 완전히 냉각되면 해제
     if (bIsOverheated && CurrentHeat <= 0.f)
         bIsOverheated = false;
+
+    // 서버에서 직접 브로드캐스트 (클라이언트는 OnRep_HeatState로 처리)
+    OnHeatChanged.Broadcast(CurrentHeat, MaxHeat, bIsOverheated);
 }
 
 bool UWeaponComponent::CanFire() const
@@ -64,6 +66,14 @@ void UWeaponComponent::AddHeat()
 
     if (CurrentHeat >= MaxHeat)
         bIsOverheated = true;
+
+    OnHeatChanged.Broadcast(CurrentHeat, MaxHeat, bIsOverheated);
+}
+
+void UWeaponComponent::OnRep_HeatState()
+{
+    // 클라이언트: 복제된 값이 도착하면 HUD에 알림
+    OnHeatChanged.Broadcast(CurrentHeat, MaxHeat, bIsOverheated);
 }
 
 void UWeaponComponent::PlayFireEffects() const

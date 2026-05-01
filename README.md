@@ -211,8 +211,8 @@ ACharacter
 - [ ] GameplayCue — 스킬 이펙트 / 사운드
 
 ### Phase 5 — UI & HUD (목표: ~2주)
-- [ ] 체력바 / 스태미나바 / 궁극게이지 HUD
-- [ ] 오버히트 게이지 바 (`GetCurrentHeat() / GetMaxHeat()` 비율, 오버히트 시 색상 변화)
+- [x] 체력바 / 스태미나바 / 궁극게이지 HUD — C++ 베이스(`ULastFPSHUDWidget`) + GAS 어트리뷰트 델리게이트 바인딩, Blueprint에서 Progress Bar 연결
+- [x] 오버히트 게이지 바 — `OnHeatChanged` RepNotify + 멀티캐스트 델리게이트, 오버히트 시 색상 분기
 - [ ] 스킬 슬롯 쿨다운 아이콘 (Q / E / F)
 - [ ] 킬피드 / 팀 점수판
 - [ ] 미니맵 (팀원 위치 표시)
@@ -313,4 +313,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-02 — 발사 이펙트(머즐플래시·발사음) 및 발사체 Cascade 트레일 파티클 추가*
+*Last updated: 2026-05-02 — HUD C++ 베이스(체력·스태미나·궁극기·오버히트 게이지) 완성, 클라이언트 재시도 타이머 적용*
