@@ -2,6 +2,7 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Components/BoxComponent.h"
+#include "Particles/ParticleSystemComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 
 ALastFPSProjectile::ALastFPSProjectile()
@@ -17,13 +18,13 @@ ALastFPSProjectile::ALastFPSProjectile()
     CollisionComp->OnComponentHit.AddDynamic(this, &ALastFPSProjectile::OnHit);
     RootComponent = CollisionComp;
 
-    ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
-    ProjectileMesh->SetupAttachment(CollisionComp);
-    ProjectileMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    TrailParticle = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("TrailParticle"));
+    TrailParticle->SetupAttachment(CollisionComp);
+    TrailParticle->bAutoActivate = true;
 
     ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
-    ProjectileMovement->InitialSpeed          = 3000.f;
-    ProjectileMovement->MaxSpeed             = 3000.f;
+    ProjectileMovement->InitialSpeed          = 12000.f;
+    ProjectileMovement->MaxSpeed             = 12000.f;
     ProjectileMovement->bRotationFollowsVelocity = true;
     ProjectileMovement->ProjectileGravityScale   = 0.1f;
 
@@ -33,6 +34,9 @@ ALastFPSProjectile::ALastFPSProjectile()
 void ALastFPSProjectile::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (TrailEffect)
+        TrailParticle->SetTemplate(TrailEffect);
 
     // 발사한 캐릭터와의 충돌 무시
     if (GetInstigator())

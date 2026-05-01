@@ -6,6 +6,8 @@
 #include "LastFPSProjectile.generated.h"
 
 class UBoxComponent;
+class UParticleSystem;
+class UParticleSystemComponent;
 class UProjectileMovementComponent;
 
 UCLASS()
@@ -26,7 +28,11 @@ protected:
     TObjectPtr<UBoxComponent> CollisionComp;
 
     UPROPERTY(VisibleAnywhere, Category="Projectile")
-    TObjectPtr<UStaticMeshComponent> ProjectileMesh;
+    TObjectPtr<UParticleSystemComponent> TrailParticle;
+
+    // BP에서 할당할 총알 트레일 파티클 에셋
+    UPROPERTY(EditDefaultsOnly, Category="Projectile")
+    TObjectPtr<UParticleSystem> TrailEffect;
 
     // 피격 시 적용할 GE (에디터에서 BP_GE_Damage 할당)
     UPROPERTY(EditDefaultsOnly, Category="Damage")
