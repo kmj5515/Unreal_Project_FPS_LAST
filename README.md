@@ -192,9 +192,9 @@ ACharacter
 - [ ] ADS(어깨 너머 시점) 카메라 블렌딩
 
 ### Phase 3 — 멀티플레이어 기초 (목표: ~3주)
-- [ ] PlayerState에 ASC 이전 (멀티 표준 구조)
-- [ ] 기본 이동 및 사격 네트워크 복제 검증
-- [ ] GAS Prediction 적용 (GA_Jump, GA_Sprint)
+- [x] PlayerState에 ASC 이전 (`ALastFPSPlayerState` 신규, Owner=PlayerState / Avatar=Character)
+- [x] 기본 이동 및 사격 네트워크 복제 검증 (CharacterMovement 기본 복제 + WeaponComponent Heat/Overheat Replicated)
+- [x] GAS Prediction 적용 — GA_Jump 신규 (LocalPredicted + CMC 물리 예측), GA_Sprint 기존 LocalPredicted 확인
 - [x] GameMode 기초 구현 (`ALastFPSGameModeBase`)
 - [x] 팀 배정 로직 (최대 4팀 × 3인, 인원 균등 배분)
 - [ ] GameState 팀 점수 관리

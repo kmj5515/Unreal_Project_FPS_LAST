@@ -153,22 +153,24 @@ void ALastFPSHero::Look(const FInputActionValue& Value)
 // ── 달리기 ────────────────────────────────────────────────────
 void ALastFPSHero::StartSprint()
 {
-    if (!AbilitySystemComponent) return;
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC) return;
 
     static const FGameplayTag SprintTag = FGameplayTag::RequestGameplayTag("Ability.Sprint");
     FGameplayTagContainer SprintTags;
     SprintTags.AddTag(SprintTag);
-    AbilitySystemComponent->TryActivateAbilitiesByTag(SprintTags);
+    ASC->TryActivateAbilitiesByTag(SprintTags);
 }
 
 void ALastFPSHero::StopSprint()
 {
-    if (!AbilitySystemComponent) return;
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC) return;
 
     static const FGameplayTag SprintTag = FGameplayTag::RequestGameplayTag("Ability.Sprint");
     FGameplayTagContainer SprintTags;
     SprintTags.AddTag(SprintTag);
-    AbilitySystemComponent->CancelAbilities(&SprintTags);
+    ASC->CancelAbilities(&SprintTags);
 }
 
 // ── ADS ───────────────────────────────────────────────────────
@@ -200,31 +202,40 @@ void ALastFPSHero::StopADS()
 // ── 점프 / 더블점프 ───────────────────────────────────────────
 void ALastFPSHero::StartJump()
 {
-    Jump();
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC) return;
+
+    static const FGameplayTag JumpTag = FGameplayTag::RequestGameplayTag("Ability.Jump");
+    FGameplayTagContainer JumpTags;
+    JumpTags.AddTag(JumpTag);
+    ASC->TryActivateAbilitiesByTag(JumpTags);
 }
 
 void ALastFPSHero::StopJump()
 {
+    // GAS가 아닌 직접 호출 유지 — 버튼 해제 시 가변 점프높이 컷오프를 위해
     StopJumping();
 }
 
 // ── 사격 ──────────────────────────────────────────────────────
 void ALastFPSHero::StartFire()
 {
-    if (!AbilitySystemComponent) return;
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC) return;
 
     static const FGameplayTag FireTag = FGameplayTag::RequestGameplayTag("Ability.Fire");
     FGameplayTagContainer FireTags;
     FireTags.AddTag(FireTag);
-    AbilitySystemComponent->TryActivateAbilitiesByTag(FireTags);
+    ASC->TryActivateAbilitiesByTag(FireTags);
 }
 
 void ALastFPSHero::StopFire()
 {
-    if (!AbilitySystemComponent) return;
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC) return;
 
     static const FGameplayTag FireTag = FGameplayTag::RequestGameplayTag("Ability.Fire");
     FGameplayTagContainer FireTags;
     FireTags.AddTag(FireTag);
-    AbilitySystemComponent->CancelAbilities(&FireTags);
+    ASC->CancelAbilities(&FireTags);
 }

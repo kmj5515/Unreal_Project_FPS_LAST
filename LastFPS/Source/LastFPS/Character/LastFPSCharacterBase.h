@@ -20,7 +20,7 @@ class LASTFPS_API ALastFPSCharacterBase : public ACharacter, public IAbilitySyst
 public:
     ALastFPSCharacterBase();
 
-    // IAbilitySystemInterface
+    // IAbilitySystemInterface — PlayerState의 ASC를 반환
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
     bool IsAlive() const;
@@ -46,11 +46,7 @@ protected:
     void ApplyDefaultEffects();
     void OnMoveSpeedChanged(const FOnAttributeChangeData& Data);
 
-    // Phase 1에서는 ASC를 캐릭터에 직접 보유
-    // Phase 3에서 PlayerState로 이전 예정
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="GAS")
-    TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
-
+    // AttributeSet은 PlayerState가 소유 — InitAbilitySystem에서 캐싱
     UPROPERTY()
     TObjectPtr<ULastFPSAttributeSet> AttributeSet;
 

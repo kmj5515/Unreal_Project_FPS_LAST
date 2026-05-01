@@ -1,23 +1,20 @@
 #include "Character/LastFPSCharacterBase.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
+#include "Game/LastFPSPlayerState.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 ALastFPSCharacterBase::ALastFPSCharacterBase()
 {
     PrimaryActorTick.bCanEverTick = false;
     bReplicates = true;
-
-    AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
-    AbilitySystemComponent->SetIsReplicated(true);
-    AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
-
-    AttributeSet = CreateDefaultSubobject<ULastFPSAttributeSet>(TEXT("AttributeSet"));
 }
 
 UAbilitySystemComponent* ALastFPSCharacterBase::GetAbilitySystemComponent() const
 {
-    return AbilitySystemComponent;
+    if (const ALastFPSPlayerState* PS = GetPlayerState<ALastFPSPlayerState>())
+        return PS->GetAbilitySystemComponent();
+    return nullptr;
 }
 
 bool ALastFPSCharacterBase::IsAlive() const
@@ -54,11 +51,19 @@ void ALastFPSCharacterBase::OnRep_PlayerState()
 
 void ALastFPSCharacterBase::InitAbilitySystem()
 {
-    if (!AbilitySystemComponent) return;
+    ALastFPSPlayerState* PS = GetPlayerState<ALastFPSPlayerState>();
+    if (!PS) return;
 
-    AbilitySystemComponent->InitAbilityActorInfo(this, this);
+    UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent();
+    if (!ASC) return;
 
-    AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(
+    // PlayerState가 GAS Owner, Character가 Avatar
+    ASC->InitAbilityActorInfo(PS, this);
+
+    // AttributeSet 캐싱 — GetHealth() 등이 PlayerState 캐스팅 없이 접근 가능
+    AttributeSet = PS->GetAttributeSet();
+
+    ASC->GetGameplayAttributeValueChangeDelegate(
         ULastFPSAttributeSet::GetMoveSpeedAttribute())
         .AddUObject(this, &ALastFPSCharacterBase::OnMoveSpeedChanged);
 
@@ -73,27 +78,29 @@ void ALastFPSCharacterBase::OnMoveSpeedChanged(const FOnAttributeChangeData& Dat
 
 void ALastFPSCharacterBase::GiveDefaultAbilities()
 {
-    if (!HasAuthority() || !AbilitySystemComponent) return;
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!HasAuthority() || !ASC) return;
 
     for (const TSubclassOf<UGameplayAbility>& AbilityClass : DefaultAbilities)
     {
         if (AbilityClass)
-            AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1));
+            ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1));
     }
 }
 
 void ALastFPSCharacterBase::ApplyDefaultEffects()
 {
-    if (!HasAuthority() || !AbilitySystemComponent) return;
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!HasAuthority() || !ASC) return;
 
-    FGameplayEffectContextHandle Context = AbilitySystemComponent->MakeEffectContext();
+    FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
     Context.AddSourceObject(this);
 
     for (const TSubclassOf<UGameplayEffect>& EffectClass : DefaultEffects)
     {
         if (!EffectClass) continue;
-            FGameplayEffectSpecHandle Spec = AbilitySystemComponent->MakeOutgoingSpec(EffectClass, 1.f, Context);
+        FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(EffectClass, 1.f, Context);
         if (Spec.IsValid())
-            AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+            ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
     }
 }
