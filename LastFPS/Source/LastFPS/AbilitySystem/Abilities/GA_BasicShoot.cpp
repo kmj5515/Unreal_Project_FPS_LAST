@@ -67,11 +67,13 @@ void UGA_BasicShoot::Fire()
     ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
     if (Character && Character->HasAuthority() && Weapon->ProjectileClass)
     {
-        // 카메라 위치·방향 기준으로 발사 (MuzzleSocket 유무 무관하게 조준선 방향 보장)
-        FVector  SpawnLocation;
-        FRotator SpawnRotation;
-        Character->GetController()->GetPlayerViewPoint(SpawnLocation, SpawnRotation);
-        SpawnLocation += SpawnRotation.Vector() * 150.f; // 카메라에서 150cm 앞
+        // 총구 소켓 위치 + 카메라 조준 방향으로 발사
+        // 총구에서 나오되, 크로스헤어(카메라 중앙) 방향을 향함
+        FVector  CameraLocation;
+        FRotator AimRotation;
+        Character->GetController()->GetPlayerViewPoint(CameraLocation, AimRotation);
+
+        FVector MuzzleLocation = Weapon->GetMuzzleTransform().GetLocation();
 
         FActorSpawnParameters Params;
         Params.Instigator = Character;
@@ -81,8 +83,8 @@ void UGA_BasicShoot::Fire()
 
         GetWorld()->SpawnActor<ALastFPSProjectile>(
             Weapon->ProjectileClass,
-            SpawnLocation,
-            SpawnRotation,
+            MuzzleLocation,
+            AimRotation,
             Params);
     }
 

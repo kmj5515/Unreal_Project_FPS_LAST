@@ -5,6 +5,7 @@
 #include "WeaponComponent.generated.h"
 
 class ALastFPSProjectile;
+class USkeletalMesh;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class LASTFPS_API UWeaponComponent : public UActorComponent
@@ -30,15 +31,19 @@ public:
     TObjectPtr<USkeletalMeshComponent> WeaponMesh;
 
     // ── 에디터 설정 ──────────────────────────────────────────────
+    // BP에서 무기 스켈레탈 메시 에셋 지정 (BP_Hero → WeaponComponent → 여기서 설정)
+    UPROPERTY(EditDefaultsOnly, Category="Weapon")
+    TObjectPtr<USkeletalMesh> WeaponSkeletalMesh;
+
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
     TSubclassOf<ALastFPSProjectile> ProjectileClass;
 
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
-    FName MuzzleSocketName = TEXT("MuzzleSocket");
+    FName MuzzleSocketName = TEXT("MuzzleFlash");
 
     // 캐릭터 스켈레톤에 무기를 붙일 소켓
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
-    FName AttachSocketName = TEXT("hand_r");
+    FName AttachSocketName = TEXT("WeaponSocket");
 
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
     int32 MaxAmmo = 30;

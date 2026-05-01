@@ -26,6 +26,10 @@ void UWeaponComponent::BeginPlay()
     {
         WeaponMesh = NewObject<USkeletalMeshComponent>(GetOwner(), TEXT("WeaponMesh"));
         WeaponMesh->RegisterComponent();
+
+        if (WeaponSkeletalMesh)
+            WeaponMesh->SetSkeletalMesh(WeaponSkeletalMesh);
+
         WeaponMesh->AttachToComponent(Owner->GetMesh(),
             FAttachmentTransformRules::SnapToTargetNotIncludingScale,
             AttachSocketName);
