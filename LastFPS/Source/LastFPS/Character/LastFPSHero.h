@@ -24,6 +24,7 @@ public:
 
     FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
     FORCEINLINE UWeaponComponent* GetWeaponComponent() const { return WeaponComponent; }
+    virtual bool GetIsADS() const override { return bIsADS; }
 
 protected:
     virtual void BeginPlay() override;

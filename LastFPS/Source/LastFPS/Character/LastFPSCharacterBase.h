@@ -31,6 +31,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="LastFPS|Attributes")
     float GetMaxHealth() const;
 
+    virtual bool GetIsADS() const { return false; }
+
 protected:
     virtual void BeginPlay() override;
 
