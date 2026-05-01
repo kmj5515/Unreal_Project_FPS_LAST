@@ -5,7 +5,7 @@
 #include "GameFramework/Actor.h"
 #include "LastFPSProjectile.generated.h"
 
-class USphereComponent;
+class UBoxComponent;
 class UProjectileMovementComponent;
 
 UCLASS()
@@ -23,7 +23,7 @@ protected:
     virtual void BeginPlay() override;
 
     UPROPERTY(VisibleAnywhere, Category="Projectile")
-    TObjectPtr<USphereComponent> CollisionComp;
+    TObjectPtr<UBoxComponent> CollisionComp;
 
     UPROPERTY(VisibleAnywhere, Category="Projectile")
     TObjectPtr<UStaticMeshComponent> ProjectileMesh;

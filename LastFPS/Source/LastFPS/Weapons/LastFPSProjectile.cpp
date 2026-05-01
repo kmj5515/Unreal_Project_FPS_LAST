@@ -1,15 +1,15 @@
 #include "Weapons/LastFPSProjectile.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
-#include "Components/SphereComponent.h"
+#include "Components/BoxComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 
 ALastFPSProjectile::ALastFPSProjectile()
 {
     bReplicates = true;
 
-    CollisionComp = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionComp"));
-    CollisionComp->InitSphereRadius(8.f);
+    CollisionComp = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionComp"));
+    CollisionComp->InitBoxExtent(FVector(2.5f, 1.f, 1.f));
     CollisionComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
     CollisionComp->SetCollisionObjectType(ECC_WorldDynamic);
     CollisionComp->SetCollisionResponseToAllChannels(ECR_Block);

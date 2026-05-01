@@ -6,6 +6,8 @@
 
 class ALastFPSProjectile;
 class USkeletalMesh;
+class UParticleSystem;
+class USoundBase;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class LASTFPS_API UWeaponComponent : public UActorComponent
@@ -21,6 +23,7 @@ public:
     bool CanFire() const;
     void AddHeat();
     FTransform GetMuzzleTransform() const;
+    void PlayFireEffects() const;
 
     UFUNCTION(BlueprintCallable, Category="Weapon|Overheat")
     float GetCurrentHeat() const { return CurrentHeat; }
@@ -50,6 +53,13 @@ public:
     // 최소 연사 간격 (초)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
     float FireRate = 0.1f;
+
+    // ── 발사 이펙트 ───────────────────────────────────────────────
+    UPROPERTY(EditDefaultsOnly, Category="Weapon|Effects")
+    TObjectPtr<USoundBase> FireSound;
+
+    UPROPERTY(EditDefaultsOnly, Category="Weapon|Effects")
+    TObjectPtr<UParticleSystem> MuzzleFlashEffect;
 
     // ── 오버히트 설정 ─────────────────────────────────────────────
     // 발사 1회당 증가하는 열량

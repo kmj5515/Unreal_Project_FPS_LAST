@@ -2,6 +2,7 @@
 #include "Weapons/LastFPSProjectile.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Character.h"
+#include "Kismet/GameplayStatics.h"
 
 UWeaponComponent::UWeaponComponent()
 {
@@ -63,6 +64,21 @@ void UWeaponComponent::AddHeat()
 
     if (CurrentHeat >= MaxHeat)
         bIsOverheated = true;
+}
+
+void UWeaponComponent::PlayFireEffects() const
+{
+    if (!WeaponMesh)
+        return;
+
+    if (FireSound)
+        UGameplayStatics::SpawnSoundAttached(FireSound, WeaponMesh, MuzzleSocketName);
+
+    if (MuzzleFlashEffect)
+        UGameplayStatics::SpawnEmitterAttached(
+            MuzzleFlashEffect, WeaponMesh, MuzzleSocketName,
+            FVector::ZeroVector, FRotator::ZeroRotator,
+            EAttachLocation::SnapToTarget);
 }
 
 FTransform UWeaponComponent::GetMuzzleTransform() const

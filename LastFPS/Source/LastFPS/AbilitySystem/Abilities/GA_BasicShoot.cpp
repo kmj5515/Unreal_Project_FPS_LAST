@@ -88,6 +88,8 @@ void UGA_BasicShoot::Fire()
             Params);
     }
 
+    Weapon->PlayFireEffects();
+
     Weapon->AddHeat();
 
     // 오버히트 도달 시 어빌리티 종료 → 연사 타이머 자동 정지
