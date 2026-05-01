@@ -12,6 +12,7 @@
 4. [점프 & 더블점프](#4-점프--더블점프)
 5. [GAS AttributeSet](#5-gas-attributeset)
 6. [무기 시스템](#6-무기-시스템)
+7. [GAS 네트워크 & Prediction](#7-gas-네트워크--prediction)
 
 ---
 
@@ -161,32 +162,48 @@ StartADS() 호출
 
 ## 4. 점프 & 더블점프
 
-**관련 파일:** `Character/LastFPSHero.cpp` — `StartJump`, `StopJump`  
+**관련 파일:** `AbilitySystem/Abilities/GA_Jump.h/.cpp`, `Character/LastFPSHero.cpp`  
 **관련 설정:** `JumpMaxCount = 2` (생성자)
 
 ### 동작 원리
 
-UE5 `ACharacter` 에 내장된 멀티점프 시스템을 그대로 사용한다.
+UE5 `ACharacter` 내장 멀티점프 시스템 위에 GAS 어빌리티(`GA_Jump`)를 래핑해 예측·태그 차단을 통합한다.
 
 ```
-지상에서 Space 누름
-  → Jump() 호출 → JumpCurrentCount = 1
-  → 공중에서 Space 누름
-  → JumpCurrentCount < JumpMaxCount(2) 이므로 2차 점프 허용
-  → JumpCurrentCount = 2
-  → 착지 시 Landed() 에서 JumpCurrentCount 자동 리셋 → 0
+Space 누름
+  → TryActivateAbilitiesByTag("Ability.Jump")
+  → GA_Jump::CanActivateAbility()
+      └── Character->CanJump() 위임 (JumpCurrentCount / 공중 상태 CMC가 검사)
+  → GA_Jump::ActivateAbility()
+      └── Character->Jump() 호출
+      └── EndAbility() 즉시 (one-shot)
+
+Space 뗌
+  → LastFPSHero::StopJump() → StopJumping() 직접 호출
+     (GAS 경유 X — 버튼 해제 시 가변 점프높이 컷오프 보장)
+```
+
+**더블점프 카운트 흐름**
+```
+지상: JumpCurrentCount = 0
+  → Jump() → JumpCurrentCount = 1
+공중: JumpCurrentCount(1) < JumpMaxCount(2) → 2차 허용
+  → Jump() → JumpCurrentCount = 2
+착지: Landed() → JumpCurrentCount 자동 리셋 = 0
 ```
 
 | 변수 | 값 | 역할 |
 |------|----|------|
 | `JumpMaxCount` | 2 | 허용 점프 횟수 |
-| `JumpCurrentCount` | 0~2 (자동 관리) | 현재 누적 점프 수 |
 | `JumpZVelocity` | 700 | 점프 초속 (상향) |
-| `AirControl` | 0.4 | 공중 이동 제어력 (0=없음, 1=지상과 동일) |
-| `GravityScale` | 1.5 | 중력 배율 (높을수록 빠르게 떨어짐) |
+| `AirControl` | 0.4 | 공중 이동 제어력 |
+| `GravityScale` | 1.5 | 중력 배율 |
+| `InstancingPolicy` | NonInstanced | one-shot, 인스턴스 상태 없음 |
+| `NetExecutionPolicy` | LocalPredicted | 클라이언트 즉시 점프, CMC가 물리 예측 |
 
-`StartJump()` → `Jump()`, `StopJump()` → `StopJumping()` 으로 래핑만 함.  
-추후 더블점프 파티클/사운드 피드백을 여기에 추가할 예정.
+**에디터 설정**
+- `BP_GA_Jump` (Parent: `GA_Jump`) → Hero BP `DefaultAbilities`에 추가
+- GameplayTag `Ability.Jump` 등록
 
 ---
 
@@ -228,26 +245,62 @@ PossessedBy (서버) / OnRep_PlayerState (클라이언트)
 ```
 ALastFPSHero
   └── UWeaponComponent
-        ├── WeaponMesh (SkeletalMesh) → AttachSocketName 소켓에 부착
-        ├── ProjectileClass           → BP_Projectile 할당
-        ├── CurrentAmmo (Replicated)
-        ├── MaxAmmo / FireRate
-        └── GetMuzzleTransform()
+        ├── WeaponMesh (SkeletalMeshComponent) — BeginPlay에서 동적 생성, WeaponSocket 부착
+        ├── WeaponSkeletalMesh                 — BP에서 할당할 메시 에셋
+        ├── ProjectileClass                    — BP_Projectile 할당
+        ├── FireSound (USoundBase)             — 발사음
+        ├── MuzzleFlashEffect (UParticleSystem) — 총구 Cascade 파티클
+        ├── CurrentHeat (Replicated, float)    — 현재 열량
+        ├── bIsOverheated (Replicated, bool)   — 오버히트 상태
+        ├── MaxHeat / HeatPerShot / CooldownRate / FireRate
+        └── GetMuzzleTransform() / PlayFireEffects()
 
 ALastFPSProjectile
-  ├── CollisionComp (SphereComponent) — WorldDynamic, BlockAll
-  ├── ProjectileMovementComponent    — 3000 cm/s, 중력 0.1
-  ├── ProjectileMesh (StaticMesh)
-  └── DamageEffect                   → BP_GE_Damage 할당
+  ├── CollisionComp (BoxComponent)           — 2.5×1×1 cm, WorldDynamic, BlockAll
+  ├── ProjectileMovementComponent            — 12000 cm/s, 중력 0.1
+  ├── TrailParticle (UParticleSystemComponent) — 비행 중 Cascade 트레일
+  ├── TrailEffect (UParticleSystem)          — BP에서 할당할 트레일 에셋
+  └── DamageEffect                           — BP_GE_Damage 할당
 ```
 
-### WeaponComponent
+### WeaponComponent — 오버히트 시스템
 
 **관련 파일:** `Character/Components/WeaponComponent.h/.cpp`
 
-- `BeginPlay()`에서 `WeaponMesh`를 동적 생성해 오너 캐릭터의 `AttachSocketName` 소켓에 부착
-- `CurrentAmmo`는 `DOREPLIFETIME`으로 복제 → 모든 클라이언트가 탄약 수 공유
-- `SetIsReplicated(true)` 로 컴포넌트 자체도 복제 활성화
+탄약 대신 **열 게이지**로 발사를 제한한다. 장전 없음.
+
+```
+발사 1회 → AddHeat() → CurrentHeat += HeatPerShot
+                          ↓
+               CurrentHeat >= MaxHeat?
+                  YES → bIsOverheated = true → CanFire() = false → 발사 중단
+                  NO  → 계속 발사 가능
+
+Tick (서버 전용)
+  → CurrentHeat -= CooldownRate × DeltaTime
+  → bIsOverheated && CurrentHeat <= 0
+      → bIsOverheated = false → 발사 재개
+```
+
+| 프로퍼티 | 기본값 | 의미 |
+|---------|--------|------|
+| `HeatPerShot` | 10 | 발사 1회당 열량 (기본 10발에 오버히트) |
+| `MaxHeat` | 100 | 최대 게이지 |
+| `CooldownRate` | 20/s | 오버히트 후 5초 대기 |
+| `FireRate` | 0.1s | 연사 간격 |
+
+- `CurrentHeat`, `bIsOverheated` 모두 `DOREPLIFETIME` 복제 → HUD에서 `GetCurrentHeat() / GetMaxHeat()` 비율로 게이지 바 표시
+
+### WeaponComponent — 발사 이펙트
+
+`PlayFireEffects()` — 서버/클라 모두 호출 (코스메틱):
+
+```cpp
+UGameplayStatics::SpawnSoundAttached(FireSound, WeaponMesh, MuzzleSocketName);
+UGameplayStatics::SpawnEmitterAttached(MuzzleFlashEffect, WeaponMesh, MuzzleSocketName, ...);
+```
+
+소켓(`MuzzleFlash`)이 없으면 경고 없이 무시됨. 무기 Skeleton에 `MuzzleFlash` 소켓 추가 필요.
 
 ### GA_BasicShoot
 
@@ -257,21 +310,23 @@ ALastFPSProjectile
 LMB 누름 → TryActivateAbilitiesByTag("Ability.Fire")
   → GA_BasicShoot::ActivateAbility()
       ├── CommitAbility()
-      ├── WeaponComponent::CanFire() 확인
+      ├── WeaponComponent::CanFire() 확인 (오버히트 여부)
       ├── Fire() 즉시 호출
       └── bIsAutoFire == true → 타이머로 FireRate마다 Fire() 반복
 
   → Fire()
-      ├── GetPlayerViewPoint() → 카메라 위치·방향 획득
-      ├── 카메라에서 150cm 앞 지점에 Projectile 스폰 (서버 전용)
-      └── ConsumeAmmo() → 탄약 0이면 EndAbility
+      ├── GetPlayerViewPoint() → 카메라 조준 방향(AimRotation) 획득
+      ├── GetMuzzleTransform() → MuzzleFlash 소켓 위치(MuzzleLocation) 획득
+      ├── Projectile 스폰: 위치=MuzzleLocation, 방향=AimRotation (서버 전용)
+      ├── PlayFireEffects() → 사운드 + 머즐플래시 (서버/클라 모두)
+      └── AddHeat() → 오버히트 도달 시 EndAbility
 
 LMB 뗌 → CancelAbilities → EndAbility (타이머 해제)
 ```
 
-**카메라 기준 발사를 사용하는 이유**
+**총구 위치 + 카메라 방향을 함께 쓰는 이유**
 
-MuzzleSocket 위치에서 발사하면 캐릭터 회전·메시 소켓 정확도에 의존하게 된다. 카메라(조준선) 기준으로 발사하면 플레이어가 화면에서 보는 방향과 실제 탄도가 일치한다.
+총구 소켓에서 발사해야 시각적으로 자연스럽고, 방향은 카메라(크로스헤어) 기준이어야 플레이어가 보는 방향과 실제 탄도가 일치한다.
 
 | 설정 | 값 | 비고 |
 |------|----|------|
@@ -279,7 +334,9 @@ MuzzleSocket 위치에서 발사하면 캐릭터 회전·메시 소켓 정확도
 | `NetExecutionPolicy` | LocalPredicted | 클라이언트 선반영 |
 | `bIsAutoFire` | false (기본) | BP에서 연사로 변경 가능 |
 
-### ALastFPSProjectile 피격 → 데미지 흐름
+### ALastFPSProjectile
+
+**관련 파일:** `Weapons/LastFPSProjectile.h/.cpp`
 
 ```
 OnHit() — 서버 전용
@@ -290,12 +347,13 @@ OnHit() — 서버 전용
   → Damage 값 감지 → Health -= Damage → Damage = 0 리셋
 ```
 
-**콜리전 설정**
+**콜리전**
+- `BoxComponent` (2.5×1×1 cm) — 총알 형태에 맞는 얇은 박스
+- `ObjectType`: `WorldDynamic` / `Response`: `BlockAll`
+- `BeginPlay`에서 `IgnoreActorWhenMoving(Instigator)` → 발사자 자기충돌 방지
 
-기본 `"Projectile"` 프로파일은 UE5에 없으므로 코드에서 직접 설정:
-- `ObjectType`: `WorldDynamic`
-- `Response`: `BlockAll`
-- `BeginPlay`에서 `IgnoreActorWhenMoving(Instigator)` → 발사자와 자기충돌 방지
+**비주얼**
+- `UParticleSystemComponent TrailParticle` — `BeginPlay`에서 `TrailEffect` 에셋을 `SetTemplate`으로 연결, 스폰 즉시 자동 재생
 
 ### GE_Damage 세팅
 
@@ -306,17 +364,80 @@ OnHit() — 서버 전용
 | Modifier Op | `Add` |
 | Magnitude | `20.0` |
 
-`Damage`는 Meta Attribute로, `PostGameplayEffectExecute`에서 Health에 반영 후 즉시 0으로 리셋된다.
-
 ### 에디터 설정
 
-- `BP_Projectile` (Parent: `LastFPSProjectile`) → `DamageEffect`, `ProjectileMesh` 할당
-- `BP_GA_BasicShoot` (Parent: `GA_BasicShoot`) → Hero BP `DefaultAbilities`에 추가
-- `BP_GE_Damage` (Parent: `GameplayEffect`) → Instant, Damage Add 20
+- `BP_Projectile` — `DamageEffect` = `BP_GE_Damage`, `TrailEffect` = 트레일 파티클 에셋
+- `BP_GA_BasicShoot` — `bIsAutoFire`, Hero BP `DefaultAbilities`에 추가
+- `BP_GE_Damage` — Instant, Damage Add 20
+- Hero BP → WeaponComponent: `WeaponSkeletalMesh`, `FireSound`, `MuzzleFlashEffect`, `ProjectileClass` 할당
 - GameplayTag `Ability.Fire`, `InputTag.Fire` 등록
-- `IA_Fire` InputAction → IMC에 `Left Mouse Button` 매핑
-- `DA_InputConfig` NativeInputActions에 `IA_Fire` + `InputTag.Fire` 추가
 
 ---
 
-*Last updated: 2026-05-02*
+---
+
+## 7. GAS 네트워크 & Prediction
+
+### PlayerState ASC 이전
+
+**관련 파일:** `Game/LastFPSPlayerState.h/.cpp`, `Character/LastFPSCharacterBase.h/.cpp`
+
+GAS 멀티플레이어 표준 구조: ASC와 AttributeSet을 **PlayerState**가 소유한다.
+
+```
+Before (Phase 1):
+  ALastFPSCharacterBase
+    └── UAbilitySystemComponent  ← 캐릭터 소유, 리스폰 시 소멸
+
+After (Phase 3):
+  ALastFPSPlayerState
+    ├── UAbilitySystemComponent  ← PlayerState 소유, 리스폰 후에도 유지
+    └── ULastFPSAttributeSet
+
+  ALastFPSCharacterBase
+    └── GetAbilitySystemComponent()
+          → GetPlayerState<ALastFPSPlayerState>()->GetAbilitySystemComponent()
+    └── AttributeSet (캐시 포인터 — InitAbilitySystem에서 PlayerState에서 가져와 저장)
+```
+
+**InitAbilityActorInfo 호출 시점**
+
+| 시점 | 함수 | 대상 |
+|------|------|------|
+| 서버 빙의 시 | `PossessedBy()` | 서버 |
+| 클라이언트 복제 완료 시 | `OnRep_PlayerState()` | 클라이언트 |
+
+```cpp
+// Owner = PlayerState, Avatar = Character
+ASC->InitAbilityActorInfo(PS, this);
+```
+
+Owner/Avatar 분리 이유: GAS가 어빌리티 활성화 권한(Owner)과 물리적 실체(Avatar)를 구분해 리스폰 후에도 어빌리티/어트리뷰트 상태를 유지할 수 있다.
+
+**에디터 설정**
+- `BP_GameMode` → Player State Class = `LastFPSPlayerState`
+
+---
+
+### GAS Prediction
+
+**관련 어빌리티:** `GA_Jump`, `GA_Sprint`, `GA_BasicShoot`
+
+`LocalPredicted` 정책 시 클라이언트가 서버 응답을 기다리지 않고 즉시 실행한다.
+
+| 어빌리티 | 예측 방식 |
+|---------|---------|
+| `GA_Jump` | `LocalPredicted` + CMC 자체 물리 예측 — 클라에서 즉시 `Jump()`, 서버가 검증 |
+| `GA_Sprint` | `LocalPredicted` — `GE_SprintSpeed`(Infinite) 즉시 적용 → `OnMoveSpeedChanged` 콜백으로 CMC 속도 즉시 반영 |
+| `GA_BasicShoot` | `LocalPredicted` — 이펙트는 클라/서버 모두, Projectile 스폰은 서버 전용 |
+
+**롤백 조건**
+
+서버가 어빌리티를 거부하면 GAS가 클라이언트에서 적용한 GE를 자동 롤백한다:
+- Stamina 부족 → Sprint 롤백
+- `CanActivateAbility()` false → Jump 롤백
+- 오버히트 상태 → Fire 롤백 (Heat는 서버 권한)
+
+---
+
+*Last updated: 2026-05-02 — GA_Jump 신규, 오버히트 시스템, PlayerState ASC 이전, GAS Prediction 정리*
