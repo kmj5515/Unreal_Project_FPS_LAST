@@ -182,10 +182,12 @@ ACharacter
 - [ ] 기본 이동 애니메이션 블렌드스페이스 연결
 
 ### Phase 2 — 전투 시스템 기초 (목표: ~3주)
-- [x] 무기 컴포넌트 설계 (`UWeaponComponent`)
-- [x] `GA_BasicShoot` — 발사체 발사 (총구 소켓 위치 + 카메라 조준 방향)
+- [x] 무기 컴포넌트 설계 (`UWeaponComponent`) — 기본 무기 BP 장착, WeaponSocket 부착
+- [x] `GA_BasicShoot` — 발사체 발사 (MuzzleFlash 소켓 위치 + 카메라 조준 방향)
 - [x] `GE_Damage` — 피해 GameplayEffect + 어트리뷰션
 - [x] 오버히트 시스템 — 열 게이지 누적/냉각, 오버히트 시 발사 잠금
+- [x] 발사 이펙트 — 머즐플래시 Cascade 파티클 + 발사음 (MuzzleFlash 소켓 기준)
+- [x] 발사체 비주얼 — 스태틱 메시 대신 Cascade 트레일 파티클 (`UParticleSystemComponent`)
 - [ ] 피격 반응 — 피격 시 사운드 재생 / 공격자 크로스헤어에 히트마커 UI 표시
 - [ ] ADS(어깨 너머 시점) 카메라 블렌딩
 
@@ -311,4 +313,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-02 — 오버히트 시스템으로 재장전 대체, 피격 반응 계획 업데이트*
+*Last updated: 2026-05-02 — 발사 이펙트(머즐플래시·발사음) 및 발사체 Cascade 트레일 파티클 추가*
