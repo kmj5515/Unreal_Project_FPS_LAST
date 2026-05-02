@@ -61,6 +61,14 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
     float FireRate = 0.1f;
 
+    // ── 애니메이션 레이어 ──────────────────────────────────────────
+    // 에디터에서 무기별 Layer ABP 클래스 할당 (ABP_Rifle_Layers 등)
+    UPROPERTY(EditDefaultsOnly, Category="Weapon|Animation")
+    TSubclassOf<UAnimInstance> WeaponAnimLayerClass;
+
+    void ApplyAnimLayer();
+    void RemoveAnimLayer();
+
     // ── 발사 이펙트 ───────────────────────────────────────────────
     UPROPERTY(EditDefaultsOnly, Category="Weapon|Effects")
     TObjectPtr<USoundBase> FireSound;

@@ -33,6 +33,9 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="Combat")
     bool bIsADS = false;
 
+    UPROPERTY(BlueprintReadOnly, Category="Combat")
+    bool bIsDead = false;
+
 private:
     UPROPERTY()
     TObjectPtr<ACharacter> OwnerCharacter;

@@ -33,7 +33,27 @@ void UWeaponComponent::BeginPlay()
         WeaponMesh->AttachToComponent(Owner->GetMesh(),
             FAttachmentTransformRules::SnapToTargetNotIncludingScale,
             AttachSocketName);
+
+        ApplyAnimLayer();
     }
+}
+
+void UWeaponComponent::ApplyAnimLayer()
+{
+    if (!WeaponAnimLayerClass)
+        return;
+
+    if (ACharacter* Owner = Cast<ACharacter>(GetOwner()))
+        Owner->GetMesh()->LinkAnimClassLayers(WeaponAnimLayerClass);
+}
+
+void UWeaponComponent::RemoveAnimLayer()
+{
+    if (!WeaponAnimLayerClass)
+        return;
+
+    if (ACharacter* Owner = Cast<ACharacter>(GetOwner()))
+        Owner->GetMesh()->UnlinkAnimClassLayers(WeaponAnimLayerClass);
 }
 
 void UWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

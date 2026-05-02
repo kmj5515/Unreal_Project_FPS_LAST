@@ -44,5 +44,6 @@ void ULastFPSAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     if (ALastFPSCharacterBase* Base = Cast<ALastFPSCharacterBase>(OwnerCharacter))
     {
         bIsADS = Base->GetIsADS();
+        bIsDead = !Base->IsAlive();
     }
 }
