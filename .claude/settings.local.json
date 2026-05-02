@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(Get-ChildItem -Path \"C:\\\\UnrealProject\\\\Unreal_Project_FPS_LAST\\\\Source\" -Recurse -Filter \"*.h\" -o File)",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Epic Games\\\\UE_5.7\\\\Engine\\\\Build\\\\BatchFiles\\\\Build.bat\" LastFPS Win64 Development -Project=\"C:\\\\UnrealProject\\\\Unreal_Project_FPS_LAST\\\\LastFPS\\\\LastFPS.uproject\" 2>&1 | Select-Object -Last 8)",
+      "Bash(git checkout *)"
     ]
   }
 }

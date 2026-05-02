@@ -179,7 +179,7 @@ ACharacter
 - [x] GAS AttributeSet 기초 (Health, Stamina, MoveSpeed)
 - [x] `GA_Jump` + `GA_DoubleJump` 구현 (Gameplay Ability)
 - [x] `GA_Sprint` 스태미나 소모 구현
-- [ ] 기본 이동 애니메이션 블렌드스페이스 연결
+- [x] 기본 이동 애니메이션 블렌드스페이스 연결 (Speed / Direction BlendSpace)
 
 ### Phase 2 — 전투 시스템 기초 (목표: ~3주)
 - [x] 무기 컴포넌트 설계 (`UWeaponComponent`) — 기본 무기 BP 장착, WeaponSocket 부착
@@ -188,6 +188,8 @@ ACharacter
 - [x] 오버히트 시스템 — 열 게이지 누적/냉각, 오버히트 시 발사 잠금
 - [x] 발사 이펙트 — 머즐플래시 Cascade 파티클 + 발사음 (MuzzleFlash 소켓 기준)
 - [x] 발사체 비주얼 — 스태틱 메시 대신 Cascade 트레일 파티클 (`UParticleSystemComponent`)
+- [x] 무기별 애니메이션 레이어 — `ALI_AnimLayerBase` 인터페이스 + `ABP_Rifle_Layers` / `ABP_Pistol_Layers`, `WeaponAnimLayerClass` 장착 시 `LinkAnimClassLayers` 적용
+- [x] 사망 애니메이션 레이어 — `bIsDead` 감지 → `UpperBody_Death` 레이어로 전환 (Blend Poses by bool)
 - [ ] 피격 반응 — 피격 시 사운드 재생 / 공격자 크로스헤어에 히트마커 UI 표시
 - [ ] ADS(어깨 너머 시점) 카메라 블렌딩
 
@@ -313,4 +315,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-02 — HUD C++ 베이스(체력·스태미나·궁극기·오버히트 게이지) 완성, 클라이언트 재시도 타이머 적용*
+*Last updated: 2026-05-02 — 무기별 애니메이션 레이어 시스템 구축 (ALI_AnimLayerBase + Rifle/Pistol Layers), 사망 애니메이션 레이어 전환 추가*
