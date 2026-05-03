@@ -1,6 +1,7 @@
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Net/UnrealNetwork.h"
 #include "GameplayEffectExtension.h"
+#include "Character/LastFPSCharacterBase.h"
 
 ULastFPSAttributeSet::ULastFPSAttributeSet()
 {
@@ -52,6 +53,12 @@ void ULastFPSAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
         const float Applied = GetDamage();
         SetDamage(0.f);
         SetHealth(FMath::Clamp(GetHealth() - Applied, 0.f, GetMaxHealth()));
+
+        if (Applied > 0.f)
+        {
+            if (ALastFPSCharacterBase* Target = Cast<ALastFPSCharacterBase>(Data.Target.GetAvatarActor()))
+                Target->Multicast_PlayHitSound();
+        }
     }
 }
 

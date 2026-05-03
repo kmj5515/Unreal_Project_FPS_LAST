@@ -50,7 +50,7 @@ bool ULastFPSHUDWidget::InitializeHUD()
     OnStaminaChanged(AS->GetStamina(), AS->GetMaxStamina());
     OnUltimateGaugeChanged(AS->GetUltimateGauge(), AS->GetMaxUltimateGauge());
 
-    // ── WeaponComponent 오버히트 델리게이트 바인딩 ───────────────
+    // ── WeaponComponent 오버히트 / 크로스헤어 델리게이트 바인딩 ─────
     // Pawn도 아직 빙의 안 됐을 수 있으므로 실패해도 ASC 바인딩은 유지
     if (ALastFPSHero* Hero = Cast<ALastFPSHero>(PC->GetPawn()))
     {
@@ -58,6 +58,9 @@ bool ULastFPSHUDWidget::InitializeHUD()
         {
             Weapon->OnHeatChanged.AddDynamic(this, &ULastFPSHUDWidget::HandleHeatChanged);
             OnHeatChanged(Weapon->GetCurrentHeat(), Weapon->GetMaxHeat(), Weapon->IsOverheated());
+
+            Weapon->OnWeaponEquippedChanged.AddDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
+            OnCrosshairVisibilityChanged(Weapon->HasWeapon());
         }
     }
 
@@ -91,4 +94,9 @@ void ULastFPSHUDWidget::HandleUltimateGaugeChanged(const FOnAttributeChangeData&
 void ULastFPSHUDWidget::HandleHeatChanged(float Current, float Max, bool bIsOverheated)
 {
     OnHeatChanged(Current, Max, bIsOverheated);
+}
+
+void ULastFPSHUDWidget::HandleWeaponEquippedChanged(bool bEquipped)
+{
+    OnCrosshairVisibilityChanged(bEquipped);
 }

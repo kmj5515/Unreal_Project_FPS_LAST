@@ -11,6 +11,7 @@ class UAbilitySystemComponent;
 class ULastFPSAttributeSet;
 class UGameplayEffect;
 class UGameplayAbility;
+class USoundBase;
 
 UCLASS(Abstract)
 class LASTFPS_API ALastFPSCharacterBase : public ACharacter, public IAbilitySystemInterface
@@ -33,6 +34,9 @@ public:
 
     virtual bool GetIsADS() const { return false; }
 
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_PlayHitSound();
+
 protected:
     virtual void BeginPlay() override;
 
@@ -49,6 +53,9 @@ protected:
     // AttributeSet은 PlayerState가 소유 — InitAbilitySystem에서 캐싱
     UPROPERTY()
     TObjectPtr<ULastFPSAttributeSet> AttributeSet;
+
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Sound")
+    TObjectPtr<USoundBase> HitSound;
 
     // 기본 어빌리티 목록 (에디터에서 할당)
     UPROPERTY(EditDefaultsOnly, Category="GAS")

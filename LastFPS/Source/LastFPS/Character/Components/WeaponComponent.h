@@ -12,6 +12,8 @@ class USoundBase;
 // Current, Max, bIsOverheated
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnWeaponHeatChanged, float, Current, float, Max, bool, bIsOverheated);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponEquippedChanged, bool, bEquipped);
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class LASTFPS_API UWeaponComponent : public UActorComponent
 {
@@ -40,6 +42,13 @@ public:
     // HUD 등이 구독해 열 변화를 수신
     UPROPERTY(BlueprintAssignable, Category="Weapon|Overheat")
     FOnWeaponHeatChanged OnHeatChanged;
+
+    // 무기 장착/해제 시 HUD에 알림
+    UPROPERTY(BlueprintAssignable, Category="Weapon")
+    FOnWeaponEquippedChanged OnWeaponEquippedChanged;
+
+    UFUNCTION(BlueprintCallable, Category="Weapon")
+    bool HasWeapon() const { return WeaponSkeletalMesh != nullptr; }
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
     TObjectPtr<USkeletalMeshComponent> WeaponMesh;

@@ -29,6 +29,9 @@ protected:
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
     void OnHeatChanged(float Current, float Max, bool bIsOverheated);
 
+    UFUNCTION(BlueprintImplementableEvent, Category="HUD")
+    void OnCrosshairVisibilityChanged(bool bVisible);
+
 private:
     // 성공 시 true 반환. PlayerState 미준비면 false → 타이머 재시도
     bool InitializeHUD();
@@ -42,6 +45,9 @@ private:
 
     UFUNCTION()
     void HandleHeatChanged(float Current, float Max, bool bIsOverheated);
+
+    UFUNCTION()
+    void HandleWeaponEquippedChanged(bool bEquipped);
 
     FTimerHandle RetryTimerHandle;
 };

@@ -35,6 +35,7 @@ void UWeaponComponent::BeginPlay()
             AttachSocketName);
 
         ApplyAnimLayer();
+        OnWeaponEquippedChanged.Broadcast(WeaponSkeletalMesh != nullptr);
     }
 }
 

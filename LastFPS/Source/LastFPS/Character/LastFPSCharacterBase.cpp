@@ -3,6 +3,7 @@
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Game/LastFPSPlayerState.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 ALastFPSCharacterBase::ALastFPSCharacterBase()
 {
@@ -30,6 +31,12 @@ float ALastFPSCharacterBase::GetHealth() const
 float ALastFPSCharacterBase::GetMaxHealth() const
 {
     return AttributeSet ? AttributeSet->GetMaxHealth() : 0.f;
+}
+
+void ALastFPSCharacterBase::Multicast_PlayHitSound_Implementation()
+{
+    if (HitSound)
+        UGameplayStatics::PlaySoundAtLocation(this, HitSound, GetActorLocation());
 }
 
 void ALastFPSCharacterBase::BeginPlay()

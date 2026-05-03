@@ -190,7 +190,9 @@ ACharacter
 - [x] 발사체 비주얼 — 스태틱 메시 대신 Cascade 트레일 파티클 (`UParticleSystemComponent`)
 - [x] 무기별 애니메이션 레이어 — `ALI_AnimLayerBase` 인터페이스 + `ABP_Rifle_Layers` / `ABP_Pistol_Layers`, `WeaponAnimLayerClass` 장착 시 `LinkAnimClassLayers` 적용
 - [x] 사망 애니메이션 레이어 — `bIsDead` 감지 → `UpperBody_Death` 레이어로 전환 (Blend Poses by bool)
-- [ ] 피격 반응 — 피격 시 사운드 재생 / 공격자 크로스헤어에 히트마커 UI 표시
+- [x] 피격 반응 — 피격 시 사운드 재생
+- [x] 크로스헤어 — 무기 장착 시 화면 중앙 크로스헤어 표시
+- [ ] 히트마커 — 적 명중 시 공격자 크로스헤어에 히트마커 UI 표시
 - [ ] ADS(어깨 너머 시점) 카메라 블렌딩
 
 ### Phase 3 — 멀티플레이어 기초 (목표: ~3주)
@@ -315,4 +317,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-02 — 무기별 애니메이션 레이어 시스템 구축 (ALI_AnimLayerBase + Rifle/Pistol Layers), 사망 애니메이션 레이어 전환 추가*
+*Last updated: 2026-05-03 — 무기별 애니메이션 레이어 시스템 구축 완료, 다음 목표: 피격 사운드 / 크로스헤어 / 히트마커*
