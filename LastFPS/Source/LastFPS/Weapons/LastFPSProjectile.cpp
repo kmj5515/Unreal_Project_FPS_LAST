@@ -1,10 +1,13 @@
 #include "Weapons/LastFPSProjectile.h"
+#include "AbilitySystem/Effects/GE_DamageInstant.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Character/LastFPSCharacterBase.h"
 #include "Components/BoxComponent.h"
+#include "GameplayEffectTypes.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "GameFramework/Pawn.h"
 
 ALastFPSProjectile::ALastFPSProjectile()
 {
@@ -30,6 +33,9 @@ ALastFPSProjectile::ALastFPSProjectile()
     ProjectileMovement->ProjectileGravityScale   = 0.1f;
 
     InitialLifeSpan = 3.f;
+
+    // BP에서 덮어쓰지 않으면 네이티브 피해 GE (DamageEffect 미할당 시)
+    DamageEffect = ULastFPSGE_DamageInstant::StaticClass();
 }
 
 void ALastFPSProjectile::BeginPlay()
@@ -39,7 +45,6 @@ void ALastFPSProjectile::BeginPlay()
     if (TrailEffect)
         TrailParticle->SetTemplate(TrailEffect);
 
-    // 발사한 캐릭터와의 충돌 무시
     if (GetInstigator())
         CollisionComp->IgnoreActorWhenMoving(GetInstigator(), true);
 }
@@ -63,11 +68,13 @@ void ALastFPSProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor,
         {
             FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
             Context.AddSourceObject(this);
+            if (APawn* Shooter = Cast<APawn>(GetInstigator()))
+                Context.AddInstigator(Shooter, this);
 
             FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(DamageEffect, 1.f, Context);
             if (Spec.IsValid())
             {
-                SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
+                TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 
                 if (ALastFPSCharacterBase* Shooter = Cast<ALastFPSCharacterBase>(GetInstigator()))
                     Shooter->Client_NotifyHitMarker();

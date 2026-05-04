@@ -1,7 +1,10 @@
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Net/UnrealNetwork.h"
 #include "GameplayEffectExtension.h"
+#include "GameplayEffectTypes.h"
 #include "Character/LastFPSCharacterBase.h"
+#include "Game/LastFPSPlayerState.h"
+#include "GameFramework/Pawn.h"
 
 ULastFPSAttributeSet::ULastFPSAttributeSet()
 {
@@ -48,16 +51,79 @@ void ULastFPSAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 {
     Super::PostGameplayEffectExecute(Data);
 
+    UAbilitySystemComponent* Asc = GetOwningAbilitySystemComponent();
+    if (!Asc)
+        return;
+
+    auto ResolveInstigatorPlayerState = [&Data]() -> ALastFPSPlayerState*
+    {
+        const FGameplayEffectContextHandle& Ctx = Data.EffectSpec.GetEffectContext();
+        if (APawn* P = Cast<APawn>(Ctx.GetInstigator()))
+            if (ALastFPSPlayerState* PS = P->GetPlayerState<ALastFPSPlayerState>())
+                return PS;
+        if (AActor* Causer = Ctx.GetEffectCauser())
+            if (APawn* P2 = Cast<APawn>(Causer))
+                return P2->GetPlayerState<ALastFPSPlayerState>();
+        return nullptr;
+    };
+
     if (Data.EvaluatedData.Attribute == GetDamageAttribute())
     {
         const float Applied = GetDamage();
         SetDamage(0.f);
-        SetHealth(FMath::Clamp(GetHealth() - Applied, 0.f, GetMaxHealth()));
 
-        if (Applied > 0.f)
+        const float OldHealth = GetHealth();
+        const float NewHealth = FMath::Clamp(OldHealth - Applied, 0.f, GetMaxHealth());
+        const float ActualDamage = OldHealth - NewHealth;
+        SetHealth(NewHealth);
+
+        if (Applied > 0.f && ActualDamage > 0.f)
         {
             if (ALastFPSCharacterBase* Target = Cast<ALastFPSCharacterBase>(Data.Target.GetAvatarActor()))
                 Target->Multicast_PlayHitSound();
+        }
+
+        if (AActor* OwnerActor = Asc->GetOwnerActor(); OwnerActor && OwnerActor->HasAuthority())
+        {
+            ALastFPSPlayerState* VictimPS = Cast<ALastFPSPlayerState>(OwnerActor);
+            ALastFPSPlayerState* AttackerPS = ResolveInstigatorPlayerState();
+            if (VictimPS)
+            {
+                VictimPS->Auth_AddDamageTaken(ActualDamage);
+                if (AttackerPS && AttackerPS != VictimPS)
+                    AttackerPS->Auth_AddDamageDealt(ActualDamage);
+
+                if (NewHealth <= KINDA_SMALL_NUMBER && ActualDamage > 0.f)
+                {
+                    VictimPS->Auth_AddDeath();
+                    if (AttackerPS && AttackerPS != VictimPS)
+                        AttackerPS->Auth_AddKill();
+                }
+            }
+        }
+        return;
+    }
+
+    if (Data.EvaluatedData.Attribute == GetHealthAttribute())
+    {
+        const float Mag = Data.EvaluatedData.Magnitude;
+        if (Mag <= 0.f)
+            return;
+
+        AActor* OwnerActor = Asc->GetOwnerActor();
+        if (!OwnerActor || !OwnerActor->HasAuthority())
+            return;
+
+        ALastFPSPlayerState* TargetPS = Cast<ALastFPSPlayerState>(OwnerActor);
+        if (!TargetPS)
+            return;
+
+        TargetPS->Auth_AddHealingReceived(Mag);
+
+        if (ALastFPSPlayerState* HealerPS = ResolveInstigatorPlayerState())
+        {
+            if (HealerPS != TargetPS)
+                HealerPS->Auth_AddHealingGiven(Mag);
         }
     }
 }

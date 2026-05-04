@@ -34,7 +34,7 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Projectile")
     TObjectPtr<UParticleSystem> TrailEffect;
 
-    // 피격 시 적용할 GE (에디터에서 BP_GE_Damage 할당)
+    // 피격 시 적용할 GE (에디터에서 BP_GE_Damage 등 할당; 비어 있으면 C++ 생성자 기본값)
     UPROPERTY(EditDefaultsOnly, Category="Damage")
     TSubclassOf<UGameplayEffect> DamageEffect;
 

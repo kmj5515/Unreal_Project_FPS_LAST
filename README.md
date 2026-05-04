@@ -10,7 +10,7 @@
 1. [게임 개요](#게임-개요)
 2. [핵심 기능 목록](#핵심-기능-목록)
 3. [기술 스택](#기술-스택)
-4. [아키텍처 설계](#아키텍처-설계)
+4. [아키텍처 설계](#아키텍처-설계) — GAS, 피해 파이프라인, 매치 통계, 사망 애니
 5. [개발 로드맵](#개발-로드맵)
 6. [폴더 구조 계획](#폴더-구조-계획)
 7. [빌드 및 실행](#빌드-및-실행)
@@ -54,6 +54,7 @@ Time Takers의 빠른 템포와 팀 시너지 메카닉을 참고하여, 각 플
 
 ### 어트리뷰트 (GAS AttributeSet)
 - **Health** — 최대 체력 / 현재 체력
+- **Damage** — 메타 어트리뷰트: GE가 여기에 가산한 뒤 `PostGameplayEffectExecute`에서 **Health**를 깎는 방식으로 소비됨
 - **Stamina** — 달리기·특수 이동 소모 자원
 - **UltimateGauge** — 궁극기 차징 게이지 (전투 참여 시 누적)
 - **AttackDamage** — 기본 공격력 (무기 별 계수)
@@ -133,7 +134,8 @@ ALastFPSPlayerState
         │     ├── GA_Skill2 (E)
         │     └── GA_Ultimate (F)
         ├── GameplayEffects
-        │     ├── GE_Damage              // 피해 적용
+        │     ├── ULastFPSGE_DamageInstant  // 네이티브 즉시 피해 (Damage 메타 +Additive, 기본 15)
+        │     ├── (선택) BP 피해 GE — 발사체 `DamageEffect`로 지정 가능, **Damage** 메타에 Additive 양수 권장
         │     ├── GE_Heal
         │     ├── GE_SprintSpeed         // MoveSpeed +300 (Infinite)
         │     ├── GE_SprintStaminaDrain  // Stamina -20/s (Periodic)
@@ -141,6 +143,23 @@ ALastFPSPlayerState
         │     └── GE_UltGaugeCharge
         └── GameplayCues                 // 이펙트·사운드 트리거
 ```
+
+### 피해 파이프라인 (총알 → GAS)
+
+- **UE 기본 `ApplyDamage` / `TakeDamage`는 사용하지 않음.** 피해는 전부 **GameplayEffect**로만 들어간다.
+- 서버에서 `ALastFPSProjectile::OnHit`: 명중 대상이 `IAbilitySystemInterface`이면, 발사자 ASC로 `MakeOutgoingSpec` → `AddInstigator` → 대상 ASC에 `ApplyGameplayEffectSpecToSelf`.
+- 발사체 **`DamageEffect`** 미지정 시 생성자 기본값은 **`ULastFPSGE_DamageInstant`** (C++). 블루프린트 발사체에서는 동일 슬롯에 커스텀 GE를 넣을 수 있다. **GE는 `Damage` 메타 어트리뷰트에 Additive**로 magnitude를 넣는 형태가 맞다 (`AttackDamage`만 수정하는 GE는 체력 감소로 이어지지 않음).
+- `ULastFPSAttributeSet::PostGameplayEffectExecute`에서 **Damage** 처리 시 **Health** 감소, 피격 사운드, **`ALastFPSPlayerState` 매치 통계**(딜 넣음/받음, 킬/데스, 힐 주고받음) 갱신.
+
+### 매치 통계 (`ALastFPSPlayerState`)
+
+- **서버 전용** `Auth_*`로 누적 후 **복제**: 킬, 데스, 딜 줌, 딜 받음, 힐 받음, 힐 줌.
+- GAS Owner가 `PlayerState`이므로 ASC Owner와 일치할 때 통계가 올라간다. **게임 모드 / 월드 세팅에서 `PlayerState` 클래스가 `ALastFPSPlayerState`인지** 확인할 것 (기본 `APlayerState`면 GAS·통계가 붙지 않음).
+
+### 애니메이션 — 사망
+
+- **`ULastFPSAnimInstance`** (`Animation/LastFPSAnimInstance.*`)의 `NativeUpdateAnimation`에서 `bIsDead = !Cast<ALastFPSCharacterBase>(OwnerCharacter)->IsAlive()` (**체력 기준**).
+- 실제 쓰러지는 포즈·레이어 전환은 **AnimBP**에서 `bIsDead`를 읽어 처리 (문서화 기준: `UpperBody_Death` 레이어, Blend Poses by bool).
 
 ### 네트워크 구조
 ```
@@ -184,7 +203,7 @@ ACharacter
 ### Phase 2 — 전투 시스템 기초 (목표: ~3주)
 - [x] 무기 컴포넌트 설계 (`UWeaponComponent`) — 기본 무기 BP 장착, WeaponSocket 부착
 - [x] `GA_BasicShoot` — 발사체 발사 (MuzzleFlash 소켓 위치 + 카메라 조준 방향)
-- [x] `GE_Damage` — 피해 GameplayEffect + 어트리뷰션
+- [x] `ULastFPSGE_DamageInstant` + 발사체 적용 — **Damage** 메타에 즉시 가산 → AttributeSet에서 Health 반영 (선택 BP GE 동일 규칙)
 - [x] 오버히트 시스템 — 열 게이지 누적/냉각, 오버히트 시 발사 잠금
 - [x] 발사 이펙트 — 머즐플래시 Cascade 파티클 + 발사음 (MuzzleFlash 소켓 기준)
 - [x] 발사체 비주얼 — 스태틱 메시 대신 Cascade 트레일 파티클 (`UParticleSystemComponent`)
@@ -197,6 +216,7 @@ ACharacter
 
 ### Phase 3 — 멀티플레이어 기초 (목표: ~3주)
 - [x] PlayerState에 ASC 이전 (`ALastFPSPlayerState` 신규, Owner=PlayerState / Avatar=Character)
+- [x] **FFA 스타일 매치 통계** — `ALastFPSPlayerState`에 킬/데스/딜/힐 카운터 복제, `LastFPSAttributeSet::PostGameplayEffectExecute`에서 서버 갱신
 - [x] 기본 이동 및 사격 네트워크 복제 검증 (CharacterMovement 기본 복제 + WeaponComponent Heat/Overheat Replicated)
 - [x] GAS Prediction 적용 — GA_Jump 신규 (LocalPredicted + CMC 물리 예측), GA_Sprint 기존 LocalPredicted 확인
 - [x] GameMode 기초 구현 (`ALastFPSGameModeBase`)
@@ -261,6 +281,8 @@ LastFPS/
 │   │   ├── Effects/            # GE_* C++ 클래스
 │   │   ├── AttributeSets/      # ULastFPSAttributeSet
 │   │   └── GameplayCues/
+│   ├── Animation/
+│   │   └── LastFPSAnimInstance.h/.cpp   # Speed/Direction/bIsADS/bIsDead 등 AnimBP용 변수
 │   ├── Character/
 │   │   ├── LastFPSCharacterBase.h/.cpp
 │   │   ├── LastFPSHero.h/.cpp
@@ -317,4 +339,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-03 — 무기별 애니메이션 레이어 시스템 구축 완료, 다음 목표: 피격 사운드 / 크로스헤어 / 히트마커*
+*Last updated: 2026-05-04 — 피해 GAS 파이프라인(`GE_DamageInstant`·발사체)·`PlayerState` 매치 통계·README 동기화. 피격 사운드·크로스헤어·히트마커는 Phase 2 체크 완료 상태.*
