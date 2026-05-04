@@ -205,11 +205,11 @@ ACharacter
 - [ ] 기본 리스폰 시스템
 
 ### Phase 4 — 스킬 시스템 (목표: ~4주)
-- [ ] 스킬 슬롯 아키텍처 확정 (Q / E / F 바인딩)
-- [ ] 프로토타입 스킬 3종 세트 구현
-  - [ ] Q: 예) 섬광탄 or 순간이동 대시
-  - [ ] E: 예) 실드 배리어 or 회복 필드
-  - [ ] F: 예) 광역 공격 궁극기
+- [x] 스킬 슬롯 아키텍처 — `InputTag.Skill1/2/Ultimate` → `ULastFPSInputConfig::AbilityInputActions` → `ALastFPSHero`에서 `TryActivateAbilitiesByTag` (`Ability.Skill1` / `Skill2` / `Ultimate`). Q/E/F는 **Started**만 사용 (홀드 취소 없음)
+- [x] 프로토타입 스킬 2종 (C++ GA + C++ 기본 GE, BP에서 `DefaultAbilities`·수치 튜닝 가능)
+  - [x] Q: `GA_SkillMoveBoost` — 3초 이속 증가 (`ULastFPSGE_MoveSpeedBuff`)
+  - [x] E: `GA_SkillHeal` — 즉시 체력 회복 (`ULastFPSGE_HealInstant`)
+  - [ ] F: 궁극기 GA 및 연출 (태그·입력만 준비됨)
 - [ ] `UltimateGauge` 충전 및 임계값 트리거
 - [ ] 쿨다운 UI 표시 (HUD)
 - [ ] GameplayCue — 스킬 이펙트 / 사운드
