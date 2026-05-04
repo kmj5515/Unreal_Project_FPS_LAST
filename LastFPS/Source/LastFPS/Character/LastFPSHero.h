@@ -45,6 +45,11 @@ protected:
     void StartFire();
     void StopFire();
 
+    // ── 스킬 슬롯 (Q/E/F → Ability.Skill1·Skill2·Ultimate) ───
+    void StartSkill1();
+    void StartSkill2();
+    void StartUltimate();
+
     // ── 카메라 보간 ───────────────────────────────────────────
     void TickCameraInterp(float DeltaTime);
 

@@ -54,6 +54,20 @@ void ALastFPSCharacterBase::BeginPlay()
     Super::BeginPlay();
 }
 
+void ALastFPSCharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (MoveSpeedDelegateHandle.IsValid())
+    {
+        if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+        {
+            ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetMoveSpeedAttribute())
+                .Remove(MoveSpeedDelegateHandle);
+        }
+        MoveSpeedDelegateHandle.Reset();
+    }
+    Super::EndPlay(EndPlayReason);
+}
+
 void ALastFPSCharacterBase::PossessedBy(AController* NewController)
 {
     Super::PossessedBy(NewController);
@@ -80,12 +94,22 @@ void ALastFPSCharacterBase::InitAbilitySystem()
     // AttributeSet 캐싱 — GetHealth() 등이 PlayerState 캐스팅 없이 접근 가능
     AttributeSet = PS->GetAttributeSet();
 
-    ASC->GetGameplayAttributeValueChangeDelegate(
-        ULastFPSAttributeSet::GetMoveSpeedAttribute())
-        .AddUObject(this, &ALastFPSCharacterBase::OnMoveSpeedChanged);
+    if (!MoveSpeedDelegateHandle.IsValid())
+    {
+        MoveSpeedDelegateHandle = ASC->GetGameplayAttributeValueChangeDelegate(
+            ULastFPSAttributeSet::GetMoveSpeedAttribute())
+            .AddUObject(this, &ALastFPSCharacterBase::OnMoveSpeedChanged);
+    }
 
-    GiveDefaultAbilities();
-    ApplyDefaultEffects();
+    if (HasAuthority() && !PS->HasGrantedGASDefaults())
+    {
+        GiveDefaultAbilities();
+        ApplyDefaultEffects();
+        PS->MarkGASDefaultsGranted();
+    }
+
+    if (AttributeSet && GetCharacterMovement())
+        GetCharacterMovement()->MaxWalkSpeed = AttributeSet->GetMoveSpeed();
 }
 
 void ALastFPSCharacterBase::OnMoveSpeedChanged(const FOnAttributeChangeData& Data)

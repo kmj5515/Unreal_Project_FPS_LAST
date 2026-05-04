@@ -124,6 +124,13 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
         EIC->BindAction(IA, ETriggerEvent::Started,   this, &ALastFPSHero::StartFire);
         EIC->BindAction(IA, ETriggerEvent::Completed, this, &ALastFPSHero::StopFire);
     }
+
+    if (const UInputAction* IA = InputConfig->FindAbilityInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Skill1")))
+        EIC->BindAction(IA, ETriggerEvent::Started, this, &ALastFPSHero::StartSkill1);
+    if (const UInputAction* IA = InputConfig->FindAbilityInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Skill2")))
+        EIC->BindAction(IA, ETriggerEvent::Started, this, &ALastFPSHero::StartSkill2);
+    if (const UInputAction* IA = InputConfig->FindAbilityInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Ultimate")))
+        EIC->BindAction(IA, ETriggerEvent::Started, this, &ALastFPSHero::StartUltimate);
 }
 
 // ── 이동 ──────────────────────────────────────────────────────
@@ -238,4 +245,38 @@ void ALastFPSHero::StopFire()
     FGameplayTagContainer FireTags;
     FireTags.AddTag(FireTag);
     ASC->CancelAbilities(&FireTags);
+}
+
+// ── 스킬 슬롯 ─────────────────────────────────────────────────
+void ALastFPSHero::StartSkill1()
+{
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC) return;
+
+    static const FGameplayTag Tag = FGameplayTag::RequestGameplayTag("Ability.Skill1");
+    FGameplayTagContainer Skill1Tags;
+    Skill1Tags.AddTag(Tag);
+    ASC->TryActivateAbilitiesByTag(Skill1Tags);
+}
+
+void ALastFPSHero::StartSkill2()
+{
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC) return;
+
+    static const FGameplayTag Tag = FGameplayTag::RequestGameplayTag("Ability.Skill2");
+    FGameplayTagContainer Skill2Tags;
+    Skill2Tags.AddTag(Tag);
+    ASC->TryActivateAbilitiesByTag(Skill2Tags);
+}
+
+void ALastFPSHero::StartUltimate()
+{
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC) return;
+
+    static const FGameplayTag Tag = FGameplayTag::RequestGameplayTag("Ability.Ultimate");
+    FGameplayTagContainer UltimateTags;
+    UltimateTags.AddTag(Tag);
+    ASC->TryActivateAbilitiesByTag(UltimateTags);
 }

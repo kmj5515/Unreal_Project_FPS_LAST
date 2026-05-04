@@ -3,9 +3,7 @@
 
 UGA_Jump::UGA_Jump()
 {
-    // Jump는 one-shot이므로 NonInstanced로 충분
-    InstancingPolicy   = EGameplayAbilityInstancingPolicy::NonInstanced;
-    // LocalPredicted: 클라이언트에서 즉시 Jump() 호출 → CMC가 물리 예측 처리
+    InstancingPolicy   = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
     PRAGMA_DISABLE_DEPRECATION_WARNINGS
@@ -40,6 +38,5 @@ void UGA_Jump::ActivateAbility(
     if (Character)
         Character->Jump();
 
-    // Jump는 즉시 종료 — 가변 점프높이(StopJumping)는 Hero가 직접 처리
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }

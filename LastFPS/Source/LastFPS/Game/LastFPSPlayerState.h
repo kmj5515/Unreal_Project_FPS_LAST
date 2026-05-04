@@ -20,7 +20,11 @@ public:
 
     FORCEINLINE ULastFPSAttributeSet* GetAttributeSet() const { return AttributeSet; }
 
+    bool HasGrantedGASDefaults() const { return bGASDefaultsGranted; }
+    void MarkGASDefaultsGranted() { bGASDefaultsGranted = true; }
+
 private:
+    bool bGASDefaultsGranted = false;
     UPROPERTY(VisibleAnywhere, Category="GAS")
     TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 

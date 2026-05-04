@@ -43,6 +43,7 @@ public:
 
 protected:
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
     // 서버: Pawn 빙의 시 ASC 초기화
     virtual void PossessedBy(AController* NewController) override;
@@ -68,4 +69,6 @@ protected:
     // 스폰 시 즉시 적용할 기본 Effect (초기 스탯 세팅용)
     UPROPERTY(EditDefaultsOnly, Category="GAS")
     TArray<TSubclassOf<UGameplayEffect>> DefaultEffects;
+
+    FDelegateHandle MoveSpeedDelegateHandle;
 };
