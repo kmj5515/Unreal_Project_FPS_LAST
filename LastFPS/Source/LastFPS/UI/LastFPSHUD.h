@@ -14,6 +14,8 @@ class LASTFPS_API ALastFPSHUD : public AHUD
 public:
     virtual void BeginPlay() override;
 
+    void ShowHitMarker();
+
 protected:
     // BP_HUD에서 WBP_HUD 클래스를 할당
     UPROPERTY(EditDefaultsOnly, Category="HUD")

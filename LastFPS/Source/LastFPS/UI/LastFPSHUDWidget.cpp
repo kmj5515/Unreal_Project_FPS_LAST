@@ -4,10 +4,14 @@
 #include "Game/LastFPSPlayerState.h"
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
+#include "TimerManager.h"
 
 void ULastFPSHUDWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+
+    if (HitMarkerImage)
+        HitMarkerImage->SetVisibility(ESlateVisibility::Collapsed);
 
     if (!InitializeHUD())
     {
@@ -99,4 +103,28 @@ void ULastFPSHUDWidget::HandleHeatChanged(float Current, float Max, bool bIsOver
 void ULastFPSHUDWidget::HandleWeaponEquippedChanged(bool bEquipped)
 {
     OnCrosshairVisibilityChanged(bEquipped);
+}
+
+void ULastFPSHUDWidget::ShowHitMarker()
+{
+    if (!HitMarkerImage)
+        return;
+
+    HitMarkerImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(HitMarkerTimerHandle);
+        World->GetTimerManager().SetTimer(
+            HitMarkerTimerHandle,
+            FTimerDelegate::CreateUObject(this, &ULastFPSHUDWidget::HideHitMarker),
+            HitMarkerDisplayDuration,
+            false);
+    }
+}
+
+void ULastFPSHUDWidget::HideHitMarker()
+{
+    if (HitMarkerImage)
+        HitMarkerImage->SetVisibility(ESlateVisibility::Collapsed);
 }

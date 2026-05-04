@@ -11,3 +11,9 @@ void ALastFPSHUD::BeginPlay()
     if (HUDWidget)
         HUDWidget->AddToViewport();
 }
+
+void ALastFPSHUD::ShowHitMarker()
+{
+    if (HUDWidget)
+        HUDWidget->ShowHitMarker();
+}

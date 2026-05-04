@@ -37,6 +37,10 @@ public:
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayHitSound();
 
+    /** 서버: 명중 처리 후 발사자 클라이언트에서만 히트마커 표시 */
+    UFUNCTION(Client, Reliable)
+    void Client_NotifyHitMarker();
+
 protected:
     virtual void BeginPlay() override;
 

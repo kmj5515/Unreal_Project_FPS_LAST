@@ -1,6 +1,7 @@
 #include "Weapons/LastFPSProjectile.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "Character/LastFPSCharacterBase.h"
 #include "Components/BoxComponent.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
@@ -65,7 +66,12 @@ void ALastFPSProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor,
 
             FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(DamageEffect, 1.f, Context);
             if (Spec.IsValid())
+            {
                 SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
+
+                if (ALastFPSCharacterBase* Shooter = Cast<ALastFPSCharacterBase>(GetInstigator()))
+                    Shooter->Client_NotifyHitMarker();
+            }
         }
     }
 

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/Image.h"
 #include "GameplayEffectTypes.h"
 #include "LastFPSHUDWidget.generated.h"
 
@@ -15,6 +16,9 @@ class LASTFPS_API ULastFPSHUDWidget : public UUserWidget
 
 public:
     virtual void NativeConstruct() override;
+
+    UFUNCTION(BlueprintCallable, Category="HUD|HitMarker")
+    void ShowHitMarker();
 
 protected:
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
@@ -31,6 +35,12 @@ protected:
 
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
     void OnCrosshairVisibilityChanged(bool bVisible);
+
+    UPROPERTY(BlueprintReadOnly, Category="HUD|HitMarker", meta=(BindWidgetOptional))
+    TObjectPtr<UImage> HitMarkerImage;
+
+    UPROPERTY(EditDefaultsOnly, Category="HUD|HitMarker", meta=(ClampMin="0.01", ClampMax="2.0"))
+    float HitMarkerDisplayDuration = 0.15f;
 
 private:
     // 성공 시 true 반환. PlayerState 미준비면 false → 타이머 재시도
@@ -50,4 +60,7 @@ private:
     void HandleWeaponEquippedChanged(bool bEquipped);
 
     FTimerHandle RetryTimerHandle;
+    FTimerHandle HitMarkerTimerHandle;
+
+    void HideHitMarker();
 };

@@ -3,7 +3,9 @@
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Game/LastFPSPlayerState.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "UI/LastFPSHUD.h"
 
 ALastFPSCharacterBase::ALastFPSCharacterBase()
 {
@@ -37,6 +39,14 @@ void ALastFPSCharacterBase::Multicast_PlayHitSound_Implementation()
 {
     if (HitSound)
         UGameplayStatics::PlaySoundAtLocation(this, HitSound, GetActorLocation());
+}
+
+void ALastFPSCharacterBase::Client_NotifyHitMarker_Implementation()
+{
+    APlayerController* PC = GetController<APlayerController>();
+    if (!PC) return;
+    if (ALastFPSHUD* FPSHUD = Cast<ALastFPSHUD>(PC->GetHUD()))
+        FPSHUD->ShowHitMarker();
 }
 
 void ALastFPSCharacterBase::BeginPlay()
