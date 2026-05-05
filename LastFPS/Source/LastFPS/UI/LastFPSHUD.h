@@ -5,6 +5,7 @@
 #include "LastFPSHUD.generated.h"
 
 class ULastFPSHUDWidget;
+class ULastFPSScoreboardWidget;
 
 UCLASS()
 class LASTFPS_API ALastFPSHUD : public AHUD
@@ -15,13 +16,21 @@ public:
     virtual void BeginPlay() override;
 
     void ShowHitMarker();
+    void ShowScoreboard();
+    void HideScoreboard();
 
 protected:
-    // BP_HUD에서 WBP_HUD 클래스를 할당
     UPROPERTY(EditDefaultsOnly, Category="HUD")
     TSubclassOf<ULastFPSHUDWidget> HUDWidgetClass;
+
+    // BP_HUD에서 WBP_Scoreboard 클래스를 할당
+    UPROPERTY(EditDefaultsOnly, Category="HUD")
+    TSubclassOf<ULastFPSScoreboardWidget> ScoreboardWidgetClass;
 
 private:
     UPROPERTY()
     TObjectPtr<ULastFPSHUDWidget> HUDWidget;
+
+    UPROPERTY()
+    TObjectPtr<ULastFPSScoreboardWidget> ScoreboardWidget;
 };

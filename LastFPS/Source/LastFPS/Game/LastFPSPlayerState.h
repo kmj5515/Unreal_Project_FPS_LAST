@@ -28,6 +28,7 @@ public:
 
     FORCEINLINE int32 GetStatKills() const { return StatKills; }
     FORCEINLINE int32 GetStatDeaths() const { return StatDeaths; }
+    FORCEINLINE int32 GetStatAssists() const { return StatAssists; }
     FORCEINLINE float GetStatDamageDealt() const { return StatDamageDealt; }
     FORCEINLINE float GetStatDamageTaken() const { return StatDamageTaken; }
     FORCEINLINE float GetStatHealingReceived() const { return StatHealingReceived; }
@@ -40,6 +41,7 @@ public:
     void Auth_AddHealingGiven(float Amount);
     void Auth_AddKill();
     void Auth_AddDeath();
+    void Auth_AddAssist();
 
 protected:
     UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Stats")
@@ -47,6 +49,9 @@ protected:
 
     UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Stats")
     int32 StatDeaths = 0;
+
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Stats")
+    int32 StatAssists = 0;
 
     UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Stats")
     float StatDamageDealt = 0.f;

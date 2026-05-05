@@ -50,6 +50,10 @@ protected:
     void StartSkill2();
     void StartUltimate();
 
+    // ── 스코어보드 (Tab) ──────────────────────────────────────
+    void StartScoreboard();
+    void StopScoreboard();
+
     // ── 카메라 보간 ───────────────────────────────────────────
     void TickCameraInterp(float DeltaTime);
 

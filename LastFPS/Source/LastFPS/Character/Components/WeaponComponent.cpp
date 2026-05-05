@@ -9,6 +9,8 @@ UWeaponComponent::UWeaponComponent()
 {
     SetIsReplicated(true);
     PrimaryComponentTick.bCanEverTick = true;
+
+    WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
 }
 
 void UWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -22,11 +24,11 @@ void UWeaponComponent::BeginPlay()
 {
     Super::BeginPlay();
 
+    // 초기에는 열이 없으므로 Tick 꺼둠 — AddHeat 호출 시 켜짐
+    SetComponentTickEnabled(false);
+
     if (ACharacter* Owner = Cast<ACharacter>(GetOwner()))
     {
-        WeaponMesh = NewObject<USkeletalMeshComponent>(GetOwner(), TEXT("WeaponMesh"));
-        WeaponMesh->RegisterComponent();
-
         if (WeaponSkeletalMesh)
             WeaponMesh->SetSkeletalMesh(WeaponSkeletalMesh);
 
@@ -61,8 +63,7 @@ void UWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-    if (!GetOwner()->HasAuthority() || CurrentHeat <= 0.f)
-        return;
+    if (!GetOwner()->HasAuthority()) return;
 
     CurrentHeat = FMath::Max(0.f, CurrentHeat - CooldownRate * DeltaTime);
 
@@ -71,6 +72,10 @@ void UWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 
     // 서버에서 직접 브로드캐스트 (클라이언트는 OnRep_HeatState로 처리)
     OnHeatChanged.Broadcast(CurrentHeat, MaxHeat, bIsOverheated);
+
+    // 완전히 냉각되면 Tick 중단 — 다음 발사 시 AddHeat에서 다시 켜짐
+    if (CurrentHeat <= 0.f)
+        SetComponentTickEnabled(false);
 }
 
 bool UWeaponComponent::CanFire() const
@@ -88,6 +93,7 @@ void UWeaponComponent::AddHeat()
     if (CurrentHeat >= MaxHeat)
         bIsOverheated = true;
 
+    SetComponentTickEnabled(true); // 냉각 Tick 활성화
     OnHeatChanged.Broadcast(CurrentHeat, MaxHeat, bIsOverheated);
 }
 

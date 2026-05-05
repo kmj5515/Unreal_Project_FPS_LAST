@@ -130,17 +130,18 @@ ALastFPSPlayerState
         │     ├── GA_BasicShoot          // 기본 사격
         │     ├── GA_Sprint              // 달리기
         │     ├── GA_Jump / GA_DoubleJump
-        │     ├── GA_Skill1 (Q)
-        │     ├── GA_Skill2 (E)
-        │     └── GA_Ultimate (F)
+        │     ├── GA_SkillMoveBoost (Q)  // 3초 이동속도 증가
+        │     ├── GA_SkillHeal (E)       // 즉시 체력 회복
+        │     └── GA_Ultimate (F)        // 태그·입력 준비, GA 미구현
         ├── GameplayEffects
         │     ├── ULastFPSGE_DamageInstant  // 네이티브 즉시 피해 (Damage 메타 +Additive, 기본 15)
         │     ├── (선택) BP 피해 GE — 발사체 `DamageEffect`로 지정 가능, **Damage** 메타에 Additive 양수 권장
-        │     ├── GE_Heal
-        │     ├── GE_SprintSpeed         // MoveSpeed +300 (Infinite)
-        │     ├── GE_SprintStaminaDrain  // Stamina -20/s (Periodic)
-        │     ├── GE_StaminaRegen        // Stamina +5/s (Passive, always-on)
-        │     └── GE_UltGaugeCharge
+        │     ├── ULastFPSGE_HealInstant       // E 스킬: 즉시 체력 회복
+        │     ├── ULastFPSGE_MoveSpeedBuff    // Q 스킬: 3초간 이동속도 증가 (Duration)
+        │     ├── GE_SprintSpeed              // 달리기: MoveSpeed +300 (Infinite, GA_Sprint 내부)
+        │     ├── GE_SprintStaminaDrain       // 달리기: Stamina -20/s (Periodic, GA_Sprint 내부)
+        │     ├── GE_StaminaRegen             // Stamina +5/s (Passive, always-on) — 미구현
+        │     └── GE_UltGaugeCharge           // 궁극기 게이지 충전 — 미구현
         └── GameplayCues                 // 이펙트·사운드 트리거
 ```
 
@@ -212,7 +213,7 @@ ACharacter
 - [x] 피격 반응 — 피격 시 사운드 재생
 - [x] 크로스헤어 — 무기 장착 시 화면 중앙 크로스헤어 표시
 - [x] 히트마커 — 적 명중 시 공격자 크로스헤어에 히트마커 UI 표시
-- [ ] ADS(어깨 너머 시점) 카메라 블렌딩
+- [x] ADS(어깨 너머 시점) 카메라 블렌딩
 
 ### Phase 3 — 멀티플레이어 기초 (목표: ~3주)
 - [x] PlayerState에 ASC 이전 (`ALastFPSPlayerState` 신규, Owner=PlayerState / Avatar=Character)
@@ -288,11 +289,13 @@ LastFPS/
 │   │   ├── LastFPSHero.h/.cpp
 │   │   └── Components/         # WeaponComponent, etc.
 │   ├── Game/
-│   │   ├── LastFPSGameMode.h/.cpp
-│   │   ├── LastFPSGameState.h/.cpp
+│   │   ├── LastFPSGameModeBase.h/.cpp
+│   │   ├── LastFPSGameState.h/.cpp    # 미구현 (팀 점수 관리 예정)
 │   │   └── LastFPSPlayerState.h/.cpp
 │   ├── Input/                  # InputConfig DataAsset, IMC
-│   ├── UI/                     # UMG 위젯 C++ 베이스
+│   ├── UI/
+│   │   ├── LastFPSHUD.h/.cpp          # HUD 기본 클래스 (히트마커 표시)
+│   │   └── LastFPSHUDWidget.h/.cpp    # UMG 위젯 C++ 베이스 (GAS 델리게이트 바인딩)
 │   └── Weapons/
 │
 └── Content/
@@ -339,4 +342,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-04 — 피해 GAS 파이프라인(`GE_DamageInstant`·발사체)·`PlayerState` 매치 통계·README 동기화. 피격 사운드·크로스헤어·히트마커는 Phase 2 체크 완료 상태.*
+*Last updated: 2026-05-04 — GAS 구성도 GE 클래스명 실제 코드(`ULastFPSGE_HealInstant`·`ULastFPSGE_MoveSpeedBuff`) 동기화. ADS 카메라 블렌딩 구현 완료로 Phase 2 전체 체크. 폴더 구조 실제 파일명(`LastFPSGameModeBase`, `LastFPSHUD/Widget`) 및 `Game/UI` 디렉토리 반영. 스킬 GA 실제 클래스명(`GA_SkillMoveBoost`·`GA_SkillHeal`) 반영.*

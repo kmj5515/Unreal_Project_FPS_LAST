@@ -2,15 +2,16 @@
 #include "Character/Components/WeaponComponent.h"
 #include "Character/LastFPSHero.h"
 #include "Weapons/LastFPSProjectile.h"
+#include "NativeGameplayTags.h"
+
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Fire, "Ability.Fire")
 
 UGA_BasicShoot::UGA_BasicShoot()
 {
     InstancingPolicy   = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    PRAGMA_DISABLE_DEPRECATION_WARNINGS
-    AbilityTags.AddTag(FGameplayTag::RequestGameplayTag("Ability.Fire"));
-    PRAGMA_ENABLE_DEPRECATION_WARNINGS
+    AbilityTags.AddTag(TAG_Ability_Fire);
 }
 
 void UGA_BasicShoot::ActivateAbility(
@@ -27,17 +28,13 @@ void UGA_BasicShoot::ActivateAbility(
         return;
     }
 
-    UWeaponComponent* Weapon = GetWeaponComponent();
+    CachedWeapon = GetWeaponComponent();
+    UWeaponComponent* Weapon = CachedWeapon.Get();
     if (!Weapon || !Weapon->CanFire())
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
-
-    // 파라미터 캐싱 (타이머 콜백에서 EndAbility 호출 시 필요)
-    CachedHandle         = Handle;
-    CachedActorInfo      = ActorInfo;
-    CachedActivationInfo = ActivationInfo;
 
     Fire();
 
@@ -56,10 +53,10 @@ void UGA_BasicShoot::ActivateAbility(
 
 void UGA_BasicShoot::Fire()
 {
-    UWeaponComponent* Weapon = GetWeaponComponent();
+    UWeaponComponent* Weapon = CachedWeapon.Get();
     if (!Weapon || !Weapon->CanFire())
     {
-        EndAbility(CachedHandle, CachedActorInfo, CachedActivationInfo, true, false);
+        EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
         return;
     }
 
@@ -67,11 +64,12 @@ void UGA_BasicShoot::Fire()
     ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
     if (Character && Character->HasAuthority() && Weapon->ProjectileClass)
     {
-        // 총구 소켓 위치 + 카메라 조준 방향으로 발사
-        // 총구에서 나오되, 크로스헤어(카메라 중앙) 방향을 향함
+        AController* Controller = Character->GetController();
+        if (!Controller) return;
+
         FVector  CameraLocation;
         FRotator AimRotation;
-        Character->GetController()->GetPlayerViewPoint(CameraLocation, AimRotation);
+        Controller->GetPlayerViewPoint(CameraLocation, AimRotation);
 
         FVector MuzzleLocation = Weapon->GetMuzzleTransform().GetLocation();
 
@@ -94,7 +92,7 @@ void UGA_BasicShoot::Fire()
 
     // 오버히트 도달 시 어빌리티 종료 → 연사 타이머 자동 정지
     if (!Weapon->CanFire())
-        EndAbility(CachedHandle, CachedActorInfo, CachedActivationInfo, true, false);
+        EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
 }
 
 void UGA_BasicShoot::EndAbility(

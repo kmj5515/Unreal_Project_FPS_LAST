@@ -1,9 +1,11 @@
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Input/LastFPSInputConfig.h"
+#include "UI/LastFPSHUD.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
@@ -131,6 +133,12 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
         EIC->BindAction(IA, ETriggerEvent::Started, this, &ALastFPSHero::StartSkill2);
     if (const UInputAction* IA = InputConfig->FindAbilityInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Ultimate")))
         EIC->BindAction(IA, ETriggerEvent::Started, this, &ALastFPSHero::StartUltimate);
+
+    if (const UInputAction* IA = InputConfig->FindNativeInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Scoreboard")))
+    {
+        EIC->BindAction(IA, ETriggerEvent::Started,   this, &ALastFPSHero::StartScoreboard);
+        EIC->BindAction(IA, ETriggerEvent::Completed, this, &ALastFPSHero::StopScoreboard);
+    }
 }
 
 // ── 이동 ──────────────────────────────────────────────────────
@@ -279,4 +287,21 @@ void ALastFPSHero::StartUltimate()
     FGameplayTagContainer UltimateTags;
     UltimateTags.AddTag(Tag);
     ASC->TryActivateAbilitiesByTag(UltimateTags);
+}
+
+// ── 스코어보드 ─────────────────────────────────────────────────
+void ALastFPSHero::StartScoreboard()
+{
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC) return;
+    if (ALastFPSHUD* HUD = Cast<ALastFPSHUD>(PC->GetHUD()))
+        HUD->ShowScoreboard();
+}
+
+void ALastFPSHero::StopScoreboard()
+{
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC) return;
+    if (ALastFPSHUD* HUD = Cast<ALastFPSHUD>(PC->GetHUD()))
+        HUD->HideScoreboard();
 }

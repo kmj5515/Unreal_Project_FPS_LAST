@@ -49,6 +49,21 @@ void ALastFPSCharacterBase::Client_NotifyHitMarker_Implementation()
         FPSHUD->ShowHitMarker();
 }
 
+void ALastFPSCharacterBase::RecordAttacker(APlayerState* Attacker)
+{
+    if (!Attacker) return;
+    const float Now = GetWorld()->GetTimeSeconds();
+    for (auto It = RecentAttackers.CreateIterator(); It; ++It)
+        if (Now - It->Value > AssistTimeWindow)
+            It.RemoveCurrent();
+    RecentAttackers.Add(TWeakObjectPtr<APlayerState>(Attacker), Now);
+}
+
+void ALastFPSCharacterBase::ClearRecentAttackers()
+{
+    RecentAttackers.Reset();
+}
+
 void ALastFPSCharacterBase::BeginPlay()
 {
     Super::BeginPlay();

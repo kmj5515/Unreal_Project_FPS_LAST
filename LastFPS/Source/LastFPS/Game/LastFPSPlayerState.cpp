@@ -22,6 +22,7 @@ void ALastFPSPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 
     DOREPLIFETIME(ALastFPSPlayerState, StatKills);
     DOREPLIFETIME(ALastFPSPlayerState, StatDeaths);
+    DOREPLIFETIME(ALastFPSPlayerState, StatAssists);
     DOREPLIFETIME(ALastFPSPlayerState, StatDamageDealt);
     DOREPLIFETIME(ALastFPSPlayerState, StatDamageTaken);
     DOREPLIFETIME(ALastFPSPlayerState, StatHealingReceived);
@@ -74,3 +75,11 @@ void ALastFPSPlayerState::Auth_AddDeath()
         return;
     ++StatDeaths;
 }
+
+void ALastFPSPlayerState::Auth_AddAssist()
+{
+    if (!HasAuthority())
+        return;
+    ++StatAssists;
+}
+

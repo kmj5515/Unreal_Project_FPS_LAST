@@ -77,16 +77,20 @@ void ULastFPSAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
         const float ActualDamage = OldHealth - NewHealth;
         SetHealth(NewHealth);
 
-        if (Applied > 0.f && ActualDamage > 0.f)
-        {
-            if (ALastFPSCharacterBase* Target = Cast<ALastFPSCharacterBase>(Data.Target.GetAvatarActor()))
-                Target->Multicast_PlayHitSound();
-        }
+        ALastFPSCharacterBase* TargetChar = Cast<ALastFPSCharacterBase>(Data.Target.GetAvatarActor());
+
+        if (Applied > 0.f && ActualDamage > 0.f && TargetChar)
+            TargetChar->Multicast_PlayHitSound();
 
         if (AActor* OwnerActor = Asc->GetOwnerActor(); OwnerActor && OwnerActor->HasAuthority())
         {
-            ALastFPSPlayerState* VictimPS = Cast<ALastFPSPlayerState>(OwnerActor);
+            ALastFPSPlayerState* VictimPS   = Cast<ALastFPSPlayerState>(OwnerActor);
             ALastFPSPlayerState* AttackerPS = ResolveInstigatorPlayerState();
+
+            // 이번 피해 기록 (어시스트 판정용)
+            if (TargetChar && AttackerPS && AttackerPS != VictimPS && ActualDamage > 0.f)
+                TargetChar->RecordAttacker(AttackerPS);
+
             if (VictimPS)
             {
                 VictimPS->Auth_AddDamageTaken(ActualDamage);
@@ -98,6 +102,20 @@ void ULastFPSAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
                     VictimPS->Auth_AddDeath();
                     if (AttackerPS && AttackerPS != VictimPS)
                         AttackerPS->Auth_AddKill();
+
+                    if (TargetChar)
+                    {
+                        const float Now = GetWorld()->GetTimeSeconds();
+                        for (const auto& Pair : TargetChar->GetRecentAttackers())
+                        {
+                            if (!Pair.Key.IsValid()) continue;
+                            ALastFPSPlayerState* AssistPS = Cast<ALastFPSPlayerState>(Pair.Key.Get());
+                            if (!AssistPS || AssistPS == AttackerPS || AssistPS == VictimPS) continue;
+                            if (Now - Pair.Value <= ALastFPSCharacterBase::AssistTimeWindow)
+                                AssistPS->Auth_AddAssist();
+                        }
+                        TargetChar->ClearRecentAttackers();
+                    }
                 }
             }
         }

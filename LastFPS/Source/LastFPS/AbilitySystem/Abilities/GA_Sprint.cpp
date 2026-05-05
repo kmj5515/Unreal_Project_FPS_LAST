@@ -1,15 +1,16 @@
 #include "AbilitySystem/Abilities/GA_Sprint.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
+#include "NativeGameplayTags.h"
+
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Sprint, "Ability.Sprint")
 
 UGA_Sprint::UGA_Sprint()
 {
     InstancingPolicy   = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    PRAGMA_DISABLE_DEPRECATION_WARNINGS
-    AbilityTags.AddTag(FGameplayTag::RequestGameplayTag("Ability.Sprint"));
-    PRAGMA_ENABLE_DEPRECATION_WARNINGS
+    AbilityTags.AddTag(TAG_Ability_Sprint);
 }
 
 void UGA_Sprint::ActivateAbility(
@@ -47,10 +48,14 @@ void UGA_Sprint::ActivateAbility(
         DrainEffectHandle = ApplyGameplayEffectSpecToOwner(Handle, ActorInfo, ActivationInfo, Spec);
     }
 
+    // 혹시 이전 핸들이 남아있으면 먼저 제거 (중복 바인딩 방지)
+    auto& StaminaDelegate = ASC->GetGameplayAttributeValueChangeDelegate(
+        ULastFPSAttributeSet::GetStaminaAttribute());
+    if (StaminaDelegateHandle.IsValid())
+        StaminaDelegate.Remove(StaminaDelegateHandle);
+
     // Stamina 0 → 어빌리티 자동 종료
-    StaminaDelegateHandle = ASC->GetGameplayAttributeValueChangeDelegate(
-        ULastFPSAttributeSet::GetStaminaAttribute())
-        .AddUObject(this, &UGA_Sprint::OnStaminaChanged);
+    StaminaDelegateHandle = StaminaDelegate.AddUObject(this, &UGA_Sprint::OnStaminaChanged);
 }
 
 void UGA_Sprint::OnStaminaChanged(const FOnAttributeChangeData& Data)

@@ -1,14 +1,15 @@
 #include "AbilitySystem/Abilities/GA_Jump.h"
 #include "GameFramework/Character.h"
+#include "NativeGameplayTags.h"
+
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Jump, "Ability.Jump")
 
 UGA_Jump::UGA_Jump()
 {
     InstancingPolicy   = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    PRAGMA_DISABLE_DEPRECATION_WARNINGS
-    AbilityTags.AddTag(FGameplayTag::RequestGameplayTag("Ability.Jump"));
-    PRAGMA_ENABLE_DEPRECATION_WARNINGS
+    AbilityTags.AddTag(TAG_Ability_Jump);
 }
 
 bool UGA_Jump::CanActivateAbility(

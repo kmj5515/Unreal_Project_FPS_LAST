@@ -12,6 +12,7 @@ class ULastFPSAttributeSet;
 class UGameplayEffect;
 class UGameplayAbility;
 class USoundBase;
+class APlayerState;
 
 UCLASS(Abstract)
 class LASTFPS_API ALastFPSCharacterBase : public ACharacter, public IAbilitySystemInterface
@@ -40,6 +41,13 @@ public:
     /** 서버: 명중 처리 후 발사자 클라이언트에서만 히트마커 표시 */
     UFUNCTION(Client, Reliable)
     void Client_NotifyHitMarker();
+
+    // ── 어시스트 추적 (서버 전용) ──────────────────────────────
+    static constexpr float AssistTimeWindow = 10.f;
+
+    void RecordAttacker(APlayerState* Attacker);
+    void ClearRecentAttackers();
+    const TMap<TWeakObjectPtr<APlayerState>, float>& GetRecentAttackers() const { return RecentAttackers; }
 
 protected:
     virtual void BeginPlay() override;
@@ -71,4 +79,7 @@ protected:
     TArray<TSubclassOf<UGameplayEffect>> DefaultEffects;
 
     FDelegateHandle MoveSpeedDelegateHandle;
+
+private:
+    TMap<TWeakObjectPtr<APlayerState>, float> RecentAttackers;
 };

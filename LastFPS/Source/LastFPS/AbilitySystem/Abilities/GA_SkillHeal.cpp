@@ -2,6 +2,9 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "AbilitySystem/Effects/GE_HealInstant.h"
+#include "NativeGameplayTags.h"
+
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Skill2, "Ability.Skill2")
 
 UGA_SkillHeal::UGA_SkillHeal()
 {
@@ -10,9 +13,7 @@ UGA_SkillHeal::UGA_SkillHeal()
 
     HealEffect = ULastFPSGE_HealInstant::StaticClass();
 
-    PRAGMA_DISABLE_DEPRECATION_WARNINGS
-    AbilityTags.AddTag(FGameplayTag::RequestGameplayTag("Ability.Skill2"));
-    PRAGMA_ENABLE_DEPRECATION_WARNINGS
+    AbilityTags.AddTag(TAG_Ability_Skill2);
 }
 
 bool UGA_SkillHeal::CanActivateAbility(

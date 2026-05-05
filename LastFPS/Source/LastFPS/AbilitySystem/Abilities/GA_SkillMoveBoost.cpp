@@ -1,6 +1,9 @@
 #include "AbilitySystem/Abilities/GA_SkillMoveBoost.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/Effects/GE_MoveSpeedBuff.h"
+#include "NativeGameplayTags.h"
+
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Skill1, "Ability.Skill1")
 
 UGA_SkillMoveBoost::UGA_SkillMoveBoost()
 {
@@ -9,9 +12,7 @@ UGA_SkillMoveBoost::UGA_SkillMoveBoost()
 
     SpeedBoostEffect = ULastFPSGE_MoveSpeedBuff::StaticClass();
 
-    PRAGMA_DISABLE_DEPRECATION_WARNINGS
-    AbilityTags.AddTag(FGameplayTag::RequestGameplayTag("Ability.Skill1"));
-    PRAGMA_ENABLE_DEPRECATION_WARNINGS
+    AbilityTags.AddTag(TAG_Ability_Skill1);
 }
 
 void UGA_SkillMoveBoost::ActivateAbility(

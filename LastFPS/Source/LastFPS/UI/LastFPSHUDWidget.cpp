@@ -49,10 +49,14 @@ bool ULastFPSHUDWidget::InitializeHUD()
     ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetUltimateGaugeAttribute())
         .AddUObject(this, &ULastFPSHUDWidget::HandleUltimateGaugeChanged);
 
+    CachedMaxHealth        = AS->GetMaxHealth();
+    CachedMaxStamina       = AS->GetMaxStamina();
+    CachedMaxUltimateGauge = AS->GetMaxUltimateGauge();
+
     // 바인딩 직후 현재값으로 바 초기화
-    OnHealthChanged(AS->GetHealth(), AS->GetMaxHealth());
-    OnStaminaChanged(AS->GetStamina(), AS->GetMaxStamina());
-    OnUltimateGaugeChanged(AS->GetUltimateGauge(), AS->GetMaxUltimateGauge());
+    OnHealthChanged(AS->GetHealth(), CachedMaxHealth);
+    OnStaminaChanged(AS->GetStamina(), CachedMaxStamina);
+    OnUltimateGaugeChanged(AS->GetUltimateGauge(), CachedMaxUltimateGauge);
 
     // ── WeaponComponent 오버히트 / 크로스헤어 델리게이트 바인딩 ─────
     // Pawn도 아직 빙의 안 됐을 수 있으므로 실패해도 ASC 바인딩은 유지
@@ -73,26 +77,17 @@ bool ULastFPSHUDWidget::InitializeHUD()
 
 void ULastFPSHUDWidget::HandleHealthChanged(const FOnAttributeChangeData& Data)
 {
-    APlayerController* PC = GetOwningPlayer();
-    if (!PC) return;
-    if (const ALastFPSPlayerState* PS = PC->GetPlayerState<ALastFPSPlayerState>())
-        OnHealthChanged(Data.NewValue, PS->GetAttributeSet()->GetMaxHealth());
+    OnHealthChanged(Data.NewValue, CachedMaxHealth);
 }
 
 void ULastFPSHUDWidget::HandleStaminaChanged(const FOnAttributeChangeData& Data)
 {
-    APlayerController* PC = GetOwningPlayer();
-    if (!PC) return;
-    if (const ALastFPSPlayerState* PS = PC->GetPlayerState<ALastFPSPlayerState>())
-        OnStaminaChanged(Data.NewValue, PS->GetAttributeSet()->GetMaxStamina());
+    OnStaminaChanged(Data.NewValue, CachedMaxStamina);
 }
 
 void ULastFPSHUDWidget::HandleUltimateGaugeChanged(const FOnAttributeChangeData& Data)
 {
-    APlayerController* PC = GetOwningPlayer();
-    if (!PC) return;
-    if (const ALastFPSPlayerState* PS = PC->GetPlayerState<ALastFPSPlayerState>())
-        OnUltimateGaugeChanged(Data.NewValue, PS->GetAttributeSet()->GetMaxUltimateGauge());
+    OnUltimateGaugeChanged(Data.NewValue, CachedMaxUltimateGauge);
 }
 
 void ULastFPSHUDWidget::HandleHeatChanged(float Current, float Max, bool bIsOverheated)

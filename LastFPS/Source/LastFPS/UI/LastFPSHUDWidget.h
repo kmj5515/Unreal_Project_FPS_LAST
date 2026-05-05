@@ -63,4 +63,8 @@ private:
     FTimerHandle HitMarkerTimerHandle;
 
     void HideHitMarker();
+
+    float CachedMaxHealth        = 0.f;
+    float CachedMaxStamina       = 0.f;
+    float CachedMaxUltimateGauge = 0.f;
 };

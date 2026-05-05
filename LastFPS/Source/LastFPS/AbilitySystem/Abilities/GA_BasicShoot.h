@@ -34,9 +34,5 @@ private:
     UWeaponComponent* GetWeaponComponent() const;
 
     FTimerHandle FireTimerHandle;
-
-    // ActivateAbility 파라미터를 EndAbility 호출에 재사용
-    FGameplayAbilitySpecHandle     CachedHandle;
-    const FGameplayAbilityActorInfo* CachedActorInfo  = nullptr;
-    FGameplayAbilityActivationInfo CachedActivationInfo;
+    TWeakObjectPtr<UWeaponComponent> CachedWeapon;
 };
