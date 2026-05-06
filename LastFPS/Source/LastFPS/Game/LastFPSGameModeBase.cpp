@@ -57,6 +57,24 @@ bool ALastFPSGameModeBase::IsTeamFull(ELastFPSTeam Team) const
     return GetTeamPlayerCount(Team) >= MaxPlayersPerTeam;
 }
 
+int32 ALastFPSGameModeBase::GetTotalConnectedPlayers() const
+{
+    int32 TotalCount = 0;
+
+    for (const auto& Pair : TeamRoster)
+    {
+        for (const TWeakObjectPtr<AController>& Controller : Pair.Value)
+        {
+            if (Controller.IsValid())
+            {
+                ++TotalCount;
+            }
+        }
+    }
+
+    return TotalCount;
+}
+
 ELastFPSTeam ALastFPSGameModeBase::AssignTeam() const
 {
     ELastFPSTeam BestTeam  = ELastFPSTeam::None;

@@ -33,6 +33,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="LastFPS|Teams")
     bool IsTeamFull(ELastFPSTeam Team) const;
 
+    UFUNCTION(BlueprintCallable, Category="LastFPS|Teams")
+    int32 GetTotalConnectedPlayers() const;
+
     // 팀 스폰 포인트 — 에디터에서 팀별 위치를 할당
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Teams")
     TMap<ELastFPSTeam, TSoftObjectPtr<AActor>> TeamSpawnPoints;
