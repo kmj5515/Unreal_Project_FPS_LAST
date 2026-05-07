@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Game/LastFPSGameModeBase.h"
+#include "TimerManager.h"
 #include "LastFPSLobbyGameMode.generated.h"
 
 UCLASS()
@@ -15,6 +16,9 @@ public:
 
 protected:
     void TryStartMatchFromLobby();
+    void StartMatchCountdown();
+    void TickMatchCountdown();
+    void ExecuteMatchTravel();
     void DebugLobbyFlow(const FString& Message, FColor Color = FColor::Green) const;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Lobby")
@@ -23,5 +27,11 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Lobby")
     FString MatchMapURL;
 
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Lobby")
+    int32 MatchStartCountdownSeconds = 3;
+
     bool bLobbyMatchStartTriggered = false;
+    bool bCountdownInProgress = false;
+    int32 RemainingCountdownSeconds = 0;
+    FTimerHandle MatchStartCountdownTimerHandle;
 };

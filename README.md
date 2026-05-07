@@ -244,7 +244,7 @@ ACharacter
 - [ ] 게임 종료 스코어보드
 
 ### Phase 6 — 게임 흐름 & 연출 (목표: ~3주)
-- [ ] 로비 / 매치 시작 흐름
+- [x] 로비 / 매치 시작 흐름 (프로토타입) — `ALastFPSLobbyGameMode`에서 3명 입장 시 `ServerTravel(MatchMapURL)`로 게임 맵 이동, `ALastFPSMatchGameMode`로 인게임 흐름 분리 및 온스크린 디버그 로그 추가
 - [ ] 팀 데스매치 규칙 완성 (타이머, 킬 리밋)
 - [ ] **[팀 인트로]** 매치 시작 시 팀별 캐릭터 소개 UI 연출
   - UMG 팀 소개 위젯 (팀 컬러, 닉네임, 캐릭터 포즈)
@@ -290,6 +290,8 @@ LastFPS/
 │   │   └── Components/         # WeaponComponent, etc.
 │   ├── Game/
 │   │   ├── LastFPSGameModeBase.h/.cpp
+│   │   ├── LastFPSLobbyGameMode.h/.cpp   # 로비: 인원 대기, 시작 조건, 맵 이동
+│   │   ├── LastFPSMatchGameMode.h/.cpp   # 인게임: 매치 시작/입장 흐름
 │   │   ├── LastFPSGameState.h/.cpp    # 미구현 (팀 점수 관리 예정)
 │   │   └── LastFPSPlayerState.h/.cpp
 │   ├── Input/                  # InputConfig DataAsset, IMC
@@ -342,4 +344,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-04 — GAS 구성도 GE 클래스명 실제 코드(`ULastFPSGE_HealInstant`·`ULastFPSGE_MoveSpeedBuff`) 동기화. ADS 카메라 블렌딩 구현 완료로 Phase 2 전체 체크. 폴더 구조 실제 파일명(`LastFPSGameModeBase`, `LastFPSHUD/Widget`) 및 `Game/UI` 디렉토리 반영. 스킬 GA 실제 클래스명(`GA_SkillMoveBoost`·`GA_SkillHeal`) 반영.*
+*Last updated: 2026-05-07 — Phase 6 프로토타입 반영: `ALastFPSLobbyGameMode`/`ALastFPSMatchGameMode` 분리, 로비 3인 충족 시 `ServerTravel(MatchMapURL)` 기반 맵 전환 및 디버그 로그 흐름 추가. 폴더 구조 `Game/`에 신규 GameMode 파일 반영.*
