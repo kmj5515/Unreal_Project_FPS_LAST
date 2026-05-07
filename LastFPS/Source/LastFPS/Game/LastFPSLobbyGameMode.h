@@ -11,13 +11,37 @@ class LASTFPS_API ALastFPSLobbyGameMode : public ALastFPSGameModeBase
     GENERATED_BODY()
 
 public:
+    ALastFPSLobbyGameMode();
     virtual void PostLogin(APlayerController* NewPlayer) override;
     virtual void Logout(AController* Exiting) override;
 
+    UFUNCTION(BlueprintCallable, Category="LastFPS|Lobby")
+    void SetPlayerReady(AController* PlayerController, bool bReady);
+
+    UFUNCTION(BlueprintCallable, Category="LastFPS|Lobby")
+    int32 GetRemainingCharacterSelectSeconds() const { return RemainingCharacterSelectSeconds; }
+
+    UFUNCTION(BlueprintCallable, Category="LastFPS|Lobby")
+    bool IsCharacterSelectInProgress() const { return bCharacterSelectInProgress; }
+
+    UFUNCTION(BlueprintCallable, Category="LastFPS|Lobby")
+    bool IsTeamIntroInProgress() const { return bTeamIntroInProgress; }
+
+    UFUNCTION(BlueprintCallable, Category="LastFPS|Lobby")
+    bool IsTravelTriggered() const { return bLobbyMatchStartTriggered; }
+
+    UFUNCTION(BlueprintCallable, Category="LastFPS|Lobby")
+    int32 GetLobbyStartPlayerCount() const { return LobbyStartPlayerCount; }
+
 protected:
     void TryStartMatchFromLobby();
-    void StartMatchCountdown();
-    void TickMatchCountdown();
+    void SyncLobbyStateToGameState();
+    void StartCharacterSelectPhase();
+    void TickCharacterSelectPhase();
+    bool AreAllPlayersReady() const;
+    int32 GetValidLobbyPlayerCount() const;
+    void StartTeamIntroPhase();
+    void FinishTeamIntroPhase();
     void ExecuteMatchTravel();
     void DebugLobbyFlow(const FString& Message, FColor Color = FColor::Green) const;
 
@@ -28,10 +52,17 @@ protected:
     FString MatchMapURL;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Lobby")
-    int32 MatchStartCountdownSeconds = 3;
+    int32 CharacterSelectSeconds = 30;
 
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Lobby")
+    float TeamIntroSeconds = 3.0f;
+
+    bool bCharacterSelectInProgress = false;
+    bool bTeamIntroInProgress = false;
     bool bLobbyMatchStartTriggered = false;
-    bool bCountdownInProgress = false;
-    int32 RemainingCountdownSeconds = 0;
-    FTimerHandle MatchStartCountdownTimerHandle;
+
+    int32 RemainingCharacterSelectSeconds = 0;
+    FTimerHandle CharacterSelectTimerHandle;
+    FTimerHandle TeamIntroTimerHandle;
+    TMap<TWeakObjectPtr<AController>, bool> PlayerReadyMap;
 };
