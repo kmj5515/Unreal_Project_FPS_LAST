@@ -23,8 +23,12 @@ protected:
     void FinishDropIntroPhase();
     void TickMatchRuleCheck();
     void ScheduleRespawnForDeadPlayers();
+    void UpdateRespawnSchedule(UWorld* World);
+    void ProcessReadyRespawns(UWorld* World);
     void RespawnController(AController* ControllerToRespawn);
     bool IsMatchEndConditionMet(FString& OutReason) const;
+    bool CheckTimeLimit(FString& OutReason) const;
+    bool CheckKillLimit(FString& OutReason) const;
     void EndMatchAndReturnToLobby(const FString& Reason);
     void DebugMatchFlow(const FString& Message, FColor Color = FColor::Green) const;
 

@@ -45,15 +45,7 @@ void ALastFPSLobbyGameMode::Logout(AController* Exiting)
 
     if (bCharacterSelectInProgress && GetTotalConnectedPlayers() < LobbyStartPlayerCount)
     {
-        if (UWorld* World = GetWorld())
-        {
-            World->GetTimerManager().ClearTimer(CharacterSelectTimerHandle);
-        }
-
-        bCharacterSelectInProgress = false;
-        bLobbyMatchStartTriggered = false;
-        RemainingCharacterSelectSeconds = 0;
-
+        CancelCharacterSelectPhase();
         DebugLobbyFlow(TEXT("[Lobby] Character select cancelled. Not enough players."), FColor::Orange);
     }
 }
@@ -188,14 +180,7 @@ void ALastFPSLobbyGameMode::TickCharacterSelectPhase()
     const int32 CurrentPlayers = GetTotalConnectedPlayers();
     if (CurrentPlayers < LobbyStartPlayerCount)
     {
-        if (UWorld* World = GetWorld())
-        {
-            World->GetTimerManager().ClearTimer(CharacterSelectTimerHandle);
-        }
-
-        bCharacterSelectInProgress = false;
-        bLobbyMatchStartTriggered = false;
-        RemainingCharacterSelectSeconds = 0;
+        CancelCharacterSelectPhase();
         DebugLobbyFlow(TEXT("[Lobby] Character select cancelled. Not enough players."), FColor::Orange);
         return;
     }
@@ -253,6 +238,32 @@ int32 ALastFPSLobbyGameMode::GetValidLobbyPlayerCount() const
     return Count;
 }
 
+void ALastFPSLobbyGameMode::ClearLobbyTimers()
+{
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(CharacterSelectTimerHandle);
+        World->GetTimerManager().ClearTimer(TeamIntroTimerHandle);
+    }
+}
+
+void ALastFPSLobbyGameMode::ResetLobbyFlowState()
+{
+    bCharacterSelectInProgress = false;
+    bTeamIntroInProgress = false;
+    bLobbyMatchStartTriggered = false;
+    RemainingCharacterSelectSeconds = 0;
+}
+
+void ALastFPSLobbyGameMode::CancelCharacterSelectPhase()
+{
+    ClearLobbyTimers();
+    bCharacterSelectInProgress = false;
+    bLobbyMatchStartTriggered = false;
+    RemainingCharacterSelectSeconds = 0;
+    SyncLobbyStateToGameState();
+}
+
 void ALastFPSLobbyGameMode::StartTeamIntroPhase()
 {
     if (bTeamIntroInProgress || bLobbyMatchStartTriggered)
@@ -260,10 +271,7 @@ void ALastFPSLobbyGameMode::StartTeamIntroPhase()
         return;
     }
 
-    if (UWorld* World = GetWorld())
-    {
-        World->GetTimerManager().ClearTimer(CharacterSelectTimerHandle);
-    }
+    ClearLobbyTimers();
     bCharacterSelectInProgress = false;
     bTeamIntroInProgress = true;
     SyncLobbyStateToGameState();
@@ -307,14 +315,8 @@ void ALastFPSLobbyGameMode::ExecuteMatchTravel()
 
     if (MatchMapURL.IsEmpty())
     {
-        if (UWorld* World = GetWorld())
-        {
-            World->GetTimerManager().ClearTimer(CharacterSelectTimerHandle);
-            World->GetTimerManager().ClearTimer(TeamIntroTimerHandle);
-        }
-        bCharacterSelectInProgress = false;
-        bTeamIntroInProgress = false;
-        bLobbyMatchStartTriggered = false;
+        ClearLobbyTimers();
+        ResetLobbyFlowState();
         SyncLobbyStateToGameState();
         DebugLobbyFlow(TEXT("[Lobby] MatchMapURL is empty. Travel aborted."), FColor::Red);
         return;
@@ -322,8 +324,7 @@ void ALastFPSLobbyGameMode::ExecuteMatchTravel()
 
     if (UWorld* World = GetWorld())
     {
-        World->GetTimerManager().ClearTimer(CharacterSelectTimerHandle);
-        World->GetTimerManager().ClearTimer(TeamIntroTimerHandle);
+        ClearLobbyTimers();
         bCharacterSelectInProgress = false;
         bTeamIntroInProgress = false;
         bLobbyMatchStartTriggered = true;
@@ -332,9 +333,7 @@ void ALastFPSLobbyGameMode::ExecuteMatchTravel()
     }
     else
     {
-        bCharacterSelectInProgress = false;
-        bTeamIntroInProgress = false;
-        bLobbyMatchStartTriggered = false;
+        ResetLobbyFlowState();
         SyncLobbyStateToGameState();
         DebugLobbyFlow(TEXT("[Lobby] World is null. Travel aborted."), FColor::Red);
     }

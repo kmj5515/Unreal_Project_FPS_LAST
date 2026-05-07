@@ -13,6 +13,32 @@ void ALastFPSPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProper
     DOREPLIFETIME(ALastFPSPlayerController, SelectedCharacterIndex);
 }
 
+void ALastFPSPlayerController::BeginPlay()
+{
+    Super::BeginPlay();
+    OnSelectedCharacterIndexChanged(SelectedCharacterIndex);
+}
+
+int32 ALastFPSPlayerController::ClampSelectedCharacterIndex(int32 NewIndex) const
+{
+    const int32 MaxIndex = SelectableCharacterClasses.Num() > 0 ? (SelectableCharacterClasses.Num() - 1) : NewIndex;
+    return FMath::Clamp(NewIndex, 0, MaxIndex);
+}
+
+void ALastFPSPlayerController::SyncSelectedCharacterState(int32 CharacterIndex)
+{
+    if (ALastFPSPlayerState* LastPS = GetPlayerState<ALastFPSPlayerState>())
+    {
+        LastPS->Auth_SetSelectedCharacterIndex(CharacterIndex);
+
+        if (ULastFPSGameInstance* LastGI = GetGameInstance<ULastFPSGameInstance>())
+        {
+            const FString PlayerKey = LastPS->GetPlayerName();
+            LastGI->SaveSelectedCharacterIndex(PlayerKey, CharacterIndex);
+        }
+    }
+}
+
 void ALastFPSPlayerController::SetLobbyReady(bool bReady)
 {
     bLobbyReady = bReady;
@@ -34,10 +60,10 @@ void ALastFPSPlayerController::ServerSetLobbyReady_Implementation(bool bReady)
 
 void ALastFPSPlayerController::SetSelectedCharacterIndex(int32 NewIndex)
 {
-    const int32 MaxIndex = SelectableCharacterClasses.Num() > 0 ? (SelectableCharacterClasses.Num() - 1) : NewIndex;
-    const int32 ClampedIndex = FMath::Clamp(NewIndex, 0, MaxIndex);
+    const int32 ClampedIndex = ClampSelectedCharacterIndex(NewIndex);
     SelectedCharacterIndex = ClampedIndex;
     ServerSetSelectedCharacterIndex(ClampedIndex);
+    OnSelectedCharacterIndexChanged(SelectedCharacterIndex);
 }
 
 TSubclassOf<APawn> ALastFPSPlayerController::GetSelectedCharacterClass() const
@@ -52,38 +78,14 @@ TSubclassOf<APawn> ALastFPSPlayerController::GetSelectedCharacterClass() const
 
 void ALastFPSPlayerController::ServerSetSelectedCharacterIndex_Implementation(int32 NewIndex)
 {
-    const int32 MaxIndex = SelectableCharacterClasses.Num() > 0 ? (SelectableCharacterClasses.Num() - 1) : NewIndex;
-    const int32 ClampedIndex = FMath::Clamp(NewIndex, 0, MaxIndex);
-
-    if (SelectedCharacterIndex == ClampedIndex)
-    {
-        if (ALastFPSPlayerState* LastPS = GetPlayerState<ALastFPSPlayerState>())
-        {
-            LastPS->Auth_SetSelectedCharacterIndex(ClampedIndex);
-
-            if (ULastFPSGameInstance* LastGI = GetGameInstance<ULastFPSGameInstance>())
-            {
-                const FString PlayerKey = LastPS->GetPlayerName();
-                LastGI->SaveSelectedCharacterIndex(PlayerKey, ClampedIndex);
-            }
-        }
-        return;
-    }
+    const int32 ClampedIndex = ClampSelectedCharacterIndex(NewIndex);
 
     SelectedCharacterIndex = ClampedIndex;
-
-    if (ALastFPSPlayerState* LastPS = GetPlayerState<ALastFPSPlayerState>())
-    {
-        LastPS->Auth_SetSelectedCharacterIndex(ClampedIndex);
-
-        if (ULastFPSGameInstance* LastGI = GetGameInstance<ULastFPSGameInstance>())
-        {
-            const FString PlayerKey = LastPS->GetPlayerName();
-            LastGI->SaveSelectedCharacterIndex(PlayerKey, ClampedIndex);
-        }
-    }
+    SyncSelectedCharacterState(ClampedIndex);
+    OnSelectedCharacterIndexChanged(SelectedCharacterIndex);
 }
 
 void ALastFPSPlayerController::OnRep_SelectedCharacterIndex()
 {
+    OnSelectedCharacterIndexChanged(SelectedCharacterIndex);
 }

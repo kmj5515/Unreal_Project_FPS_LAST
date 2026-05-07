@@ -165,27 +165,43 @@ void ALastFPSHero::Look(const FInputActionValue& Value)
     AddControllerPitchInput(LookVector.Y);
 }
 
+void ALastFPSHero::TryActivateAbilityByTag(const FGameplayTag& AbilityTag)
+{
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC)
+    {
+        return;
+    }
+
+    FGameplayTagContainer AbilityTags;
+    AbilityTags.AddTag(AbilityTag);
+    ASC->TryActivateAbilitiesByTag(AbilityTags);
+}
+
+void ALastFPSHero::CancelAbilityByTag(const FGameplayTag& AbilityTag)
+{
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC)
+    {
+        return;
+    }
+
+    FGameplayTagContainer AbilityTags;
+    AbilityTags.AddTag(AbilityTag);
+    ASC->CancelAbilities(&AbilityTags);
+}
+
 // ── 달리기 ────────────────────────────────────────────────────
 void ALastFPSHero::StartSprint()
 {
-    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-    if (!ASC) return;
-
     static const FGameplayTag SprintTag = FGameplayTag::RequestGameplayTag("Ability.Sprint");
-    FGameplayTagContainer SprintTags;
-    SprintTags.AddTag(SprintTag);
-    ASC->TryActivateAbilitiesByTag(SprintTags);
+    TryActivateAbilityByTag(SprintTag);
 }
 
 void ALastFPSHero::StopSprint()
 {
-    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-    if (!ASC) return;
-
     static const FGameplayTag SprintTag = FGameplayTag::RequestGameplayTag("Ability.Sprint");
-    FGameplayTagContainer SprintTags;
-    SprintTags.AddTag(SprintTag);
-    ASC->CancelAbilities(&SprintTags);
+    CancelAbilityByTag(SprintTag);
 }
 
 // ── ADS ───────────────────────────────────────────────────────
@@ -217,13 +233,8 @@ void ALastFPSHero::StopADS()
 // ── 점프 / 더블점프 ───────────────────────────────────────────
 void ALastFPSHero::StartJump()
 {
-    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-    if (!ASC) return;
-
     static const FGameplayTag JumpTag = FGameplayTag::RequestGameplayTag("Ability.Jump");
-    FGameplayTagContainer JumpTags;
-    JumpTags.AddTag(JumpTag);
-    ASC->TryActivateAbilitiesByTag(JumpTags);
+    TryActivateAbilityByTag(JumpTag);
 }
 
 void ALastFPSHero::StopJump()
@@ -237,58 +248,33 @@ void ALastFPSHero::StartFire()
 {
     if (!IsAlive()) return;
 
-    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-    if (!ASC) return;
-
     static const FGameplayTag FireTag = FGameplayTag::RequestGameplayTag("Ability.Fire");
-    FGameplayTagContainer FireTags;
-    FireTags.AddTag(FireTag);
-    ASC->TryActivateAbilitiesByTag(FireTags);
+    TryActivateAbilityByTag(FireTag);
 }
 
 void ALastFPSHero::StopFire()
 {
-    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-    if (!ASC) return;
-
     static const FGameplayTag FireTag = FGameplayTag::RequestGameplayTag("Ability.Fire");
-    FGameplayTagContainer FireTags;
-    FireTags.AddTag(FireTag);
-    ASC->CancelAbilities(&FireTags);
+    CancelAbilityByTag(FireTag);
 }
 
 // ── 스킬 슬롯 ─────────────────────────────────────────────────
 void ALastFPSHero::StartSkill1()
 {
-    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-    if (!ASC) return;
-
     static const FGameplayTag Tag = FGameplayTag::RequestGameplayTag("Ability.Skill1");
-    FGameplayTagContainer Skill1Tags;
-    Skill1Tags.AddTag(Tag);
-    ASC->TryActivateAbilitiesByTag(Skill1Tags);
+    TryActivateAbilityByTag(Tag);
 }
 
 void ALastFPSHero::StartSkill2()
 {
-    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-    if (!ASC) return;
-
     static const FGameplayTag Tag = FGameplayTag::RequestGameplayTag("Ability.Skill2");
-    FGameplayTagContainer Skill2Tags;
-    Skill2Tags.AddTag(Tag);
-    ASC->TryActivateAbilitiesByTag(Skill2Tags);
+    TryActivateAbilityByTag(Tag);
 }
 
 void ALastFPSHero::StartUltimate()
 {
-    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-    if (!ASC) return;
-
     static const FGameplayTag Tag = FGameplayTag::RequestGameplayTag("Ability.Ultimate");
-    FGameplayTagContainer UltimateTags;
-    UltimateTags.AddTag(Tag);
-    ASC->TryActivateAbilitiesByTag(UltimateTags);
+    TryActivateAbilityByTag(Tag);
 }
 
 // ── 스코어보드 ─────────────────────────────────────────────────

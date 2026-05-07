@@ -6,6 +6,31 @@
 #include "Game/LastFPSPlayerState.h"
 #include "GameFramework/Pawn.h"
 
+namespace
+{
+ALastFPSPlayerState* ResolveInstigatorPlayerState(const FGameplayEffectModCallbackData& Data)
+{
+    const FGameplayEffectContextHandle& Ctx = Data.EffectSpec.GetEffectContext();
+    if (APawn* PawnInstigator = Cast<APawn>(Ctx.GetInstigator()))
+    {
+        if (ALastFPSPlayerState* PS = PawnInstigator->GetPlayerState<ALastFPSPlayerState>())
+        {
+            return PS;
+        }
+    }
+
+    if (AActor* Causer = Ctx.GetEffectCauser())
+    {
+        if (APawn* PawnCauser = Cast<APawn>(Causer))
+        {
+            return PawnCauser->GetPlayerState<ALastFPSPlayerState>();
+        }
+    }
+
+    return nullptr;
+}
+}
+
 ULastFPSAttributeSet::ULastFPSAttributeSet()
 {
     InitHealth(100.f);
@@ -55,18 +80,6 @@ void ULastFPSAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
     if (!Asc)
         return;
 
-    auto ResolveInstigatorPlayerState = [&Data]() -> ALastFPSPlayerState*
-    {
-        const FGameplayEffectContextHandle& Ctx = Data.EffectSpec.GetEffectContext();
-        if (APawn* P = Cast<APawn>(Ctx.GetInstigator()))
-            if (ALastFPSPlayerState* PS = P->GetPlayerState<ALastFPSPlayerState>())
-                return PS;
-        if (AActor* Causer = Ctx.GetEffectCauser())
-            if (APawn* P2 = Cast<APawn>(Causer))
-                return P2->GetPlayerState<ALastFPSPlayerState>();
-        return nullptr;
-    };
-
     if (Data.EvaluatedData.Attribute == GetDamageAttribute())
     {
         const float Applied = GetDamage();
@@ -85,7 +98,7 @@ void ULastFPSAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
         if (AActor* OwnerActor = Asc->GetOwnerActor(); OwnerActor && OwnerActor->HasAuthority())
         {
             ALastFPSPlayerState* VictimPS   = Cast<ALastFPSPlayerState>(OwnerActor);
-            ALastFPSPlayerState* AttackerPS = ResolveInstigatorPlayerState();
+            ALastFPSPlayerState* AttackerPS = ResolveInstigatorPlayerState(Data);
 
             // 이번 피해 기록 (어시스트 판정용)
             if (TargetChar && AttackerPS && AttackerPS != VictimPS && ActualDamage > 0.f)
@@ -138,7 +151,7 @@ void ULastFPSAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 
         TargetPS->Auth_AddHealingReceived(Mag);
 
-        if (ALastFPSPlayerState* HealerPS = ResolveInstigatorPlayerState())
+        if (ALastFPSPlayerState* HealerPS = ResolveInstigatorPlayerState(Data))
         {
             if (HealerPS != TargetPS)
                 HealerPS->Auth_AddHealingGiven(Mag);

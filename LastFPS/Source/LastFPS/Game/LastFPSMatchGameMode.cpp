@@ -144,6 +144,12 @@ void ALastFPSMatchGameMode::ScheduleRespawnForDeadPlayers()
         return;
     }
 
+    UpdateRespawnSchedule(World);
+    ProcessReadyRespawns(World);
+}
+
+void ALastFPSMatchGameMode::UpdateRespawnSchedule(UWorld* World)
+{
     for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
     {
         APlayerController* PC = It->Get();
@@ -172,7 +178,10 @@ void ALastFPSMatchGameMode::ScheduleRespawnForDeadPlayers()
                 FColor::Yellow);
         }
     }
+}
 
+void ALastFPSMatchGameMode::ProcessReadyRespawns(UWorld* World)
+{
     TArray<TWeakObjectPtr<AController>> ReadyToRespawn;
     for (const auto& Pair : PendingRespawnControllers)
     {
@@ -226,8 +235,13 @@ void ALastFPSMatchGameMode::RespawnController(AController* ControllerToRespawn)
 
 bool ALastFPSMatchGameMode::IsMatchEndConditionMet(FString& OutReason) const
 {
+    return CheckTimeLimit(OutReason) || CheckKillLimit(OutReason);
+}
+
+bool ALastFPSMatchGameMode::CheckTimeLimit(FString& OutReason) const
+{
     UWorld* World = GetWorld();
-    if (!World || !GameState)
+    if (!World)
     {
         return false;
     }
@@ -237,6 +251,16 @@ bool ALastFPSMatchGameMode::IsMatchEndConditionMet(FString& OutReason) const
     {
         OutReason = FString::Printf(TEXT("Time limit reached (%d sec)"), MatchDurationSeconds);
         return true;
+    }
+
+    return false;
+}
+
+bool ALastFPSMatchGameMode::CheckKillLimit(FString& OutReason) const
+{
+    if (!GameState)
+    {
+        return false;
     }
 
     for (APlayerState* PS : GameState->PlayerArray)

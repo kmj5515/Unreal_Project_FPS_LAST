@@ -80,16 +80,32 @@ UClass* ALastFPSGameModeBase::GetDefaultPawnClassForController_Implementation(AC
     return Super::GetDefaultPawnClassForController_Implementation(InController);
 }
 
-int32 ALastFPSGameModeBase::GetTeamPlayerCount(ELastFPSTeam Team) const
+int32 ALastFPSGameModeBase::GetValidTeamPlayerCount(ELastFPSTeam Team) const
 {
     if (const TArray<TWeakObjectPtr<AController>>* Roster = TeamRoster.Find(Team))
-        return Roster->Num();
+    {
+        int32 Count = 0;
+        for (const TWeakObjectPtr<AController>& Controller : *Roster)
+        {
+            if (Controller.IsValid())
+            {
+                ++Count;
+            }
+        }
+        return Count;
+    }
+
     return 0;
+}
+
+int32 ALastFPSGameModeBase::GetTeamPlayerCount(ELastFPSTeam Team) const
+{
+    return GetValidTeamPlayerCount(Team);
 }
 
 bool ALastFPSGameModeBase::IsTeamFull(ELastFPSTeam Team) const
 {
-    return GetTeamPlayerCount(Team) >= MaxPlayersPerTeam;
+    return GetValidTeamPlayerCount(Team) >= MaxPlayersPerTeam;
 }
 
 int32 ALastFPSGameModeBase::GetTotalConnectedPlayers() const

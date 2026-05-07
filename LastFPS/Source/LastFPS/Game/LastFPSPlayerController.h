@@ -13,6 +13,7 @@ class LASTFPS_API ALastFPSPlayerController : public APlayerController
 
 public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void BeginPlay() override;
 
     UFUNCTION(BlueprintCallable, Category="LastFPS|Lobby")
     void SetLobbyReady(bool bReady);
@@ -32,7 +33,13 @@ public:
     UFUNCTION(BlueprintPure, Category="LastFPS|Lobby")
     const TArray<TSubclassOf<APawn>>& GetSelectableCharacterClasses() const { return SelectableCharacterClasses; }
 
+    UFUNCTION(BlueprintImplementableEvent, Category="LastFPS|Lobby")
+    void OnSelectedCharacterIndexChanged(int32 NewSelectedCharacterIndex);
+
 protected:
+    int32 ClampSelectedCharacterIndex(int32 NewIndex) const;
+    void SyncSelectedCharacterState(int32 CharacterIndex);
+
     UFUNCTION(Server, Reliable)
     void ServerSetLobbyReady(bool bReady);
 

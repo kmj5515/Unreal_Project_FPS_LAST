@@ -46,6 +46,8 @@ public:
     TArray<TSubclassOf<APawn>> CharacterPawnClasses;
 
 protected:
+    int32 GetValidTeamPlayerCount(ELastFPSTeam Team) const;
+
     // 팀당 최대 인원 (기본 3)
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Teams")
     int32 MaxPlayersPerTeam = 3;

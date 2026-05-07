@@ -53,6 +53,8 @@ protected:
     // ── 스코어보드 (Tab) ──────────────────────────────────────
     void StartScoreboard();
     void StopScoreboard();
+    void TryActivateAbilityByTag(const FGameplayTag& AbilityTag);
+    void CancelAbilityByTag(const FGameplayTag& AbilityTag);
 
     // ── 카메라 보간 ───────────────────────────────────────────
     void TickCameraInterp(float DeltaTime);

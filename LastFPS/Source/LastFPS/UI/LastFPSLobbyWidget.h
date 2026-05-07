@@ -50,6 +50,10 @@ protected:
     TObjectPtr<UTextBlock> Text_TimeRemaining;
 
 private:
+    FString BuildPhaseText(bool bTravelTriggered, bool bTeamIntroInProgress, bool bCharacterSelectInProgress) const;
+    FString BuildLobbyStatusText(int32 CurrentPlayers, int32 NeededPlayers, bool bTravelTriggered, bool bTeamIntroInProgress, bool bCharacterSelectInProgress) const;
+    void UpdateRemainingTimeText(bool bCharacterSelectInProgress, int32 RemainingSeconds);
+
     UFUNCTION()
     void HandleReadyClicked();
 

@@ -41,6 +41,9 @@ protected:
     void TickCharacterSelectPhase();
     bool AreAllPlayersReady() const;
     int32 GetValidLobbyPlayerCount() const;
+    void ClearLobbyTimers();
+    void ResetLobbyFlowState();
+    void CancelCharacterSelectPhase();
     void StartTeamIntroPhase();
     void FinishTeamIntroPhase();
     void ExecuteMatchTravel();

@@ -51,86 +51,33 @@ void ULastFPSLobbyWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaT
         return;
     }
 
-    if (ALastFPSLobbyGameMode* LobbyGM = Cast<ALastFPSLobbyGameMode>(World->GetAuthGameMode()))
-    {
-        if (Text_Status)
-        {
-            const int32 CurrentPlayers = LobbyGM->GetTotalConnectedPlayers();
-            const int32 NeededPlayers = LobbyGM->GetLobbyStartPlayerCount();
-
-            FString PhaseText = TEXT("대기");
-            if (LobbyGM->IsTravelTriggered())
-            {
-                PhaseText = TEXT("이동 중");
-            }
-            else if (LobbyGM->IsTeamIntroInProgress())
-            {
-                PhaseText = TEXT("팀 인트로");
-            }
-            else if (LobbyGM->IsCharacterSelectInProgress())
-            {
-                PhaseText = TEXT("캐릭터 선택");
-            }
-
-            const FString ReadyText = bIsReady ? TEXT("Ready") : TEXT("Not Ready");
-            UpdateStatusText(FString::Printf(TEXT("%s | 인원 %d/%d | %s"), *PhaseText, CurrentPlayers, NeededPlayers, *ReadyText));
-        }
-
-        if (LobbyGM->IsCharacterSelectInProgress())
-        {
-            const int32 Remaining = LobbyGM->GetRemainingCharacterSelectSeconds();
-            if (Text_TimeRemaining)
-            {
-                Text_TimeRemaining->SetText(
-                    FText::FromString(FString::Printf(TEXT("남은 시간: %d"), Remaining)));
-            }
-        }
-        else
-        {
-            if (Text_TimeRemaining)
-            {
-                Text_TimeRemaining->SetText(FText::FromString(TEXT("")));
-            }
-        }
-    }
-
     if (ALastFPSLobbyGameState* LobbyGS = World->GetGameState<ALastFPSLobbyGameState>())
     {
         if (Text_Status)
         {
-            const int32 CurrentPlayers = LobbyGS->PlayerArray.Num();
-            const int32 NeededPlayers = LobbyGS->LobbyStartPlayerCount;
-
-            FString PhaseText = TEXT("대기");
-            if (LobbyGS->bTravelTriggered)
-            {
-                PhaseText = TEXT("이동 중");
-            }
-            else if (LobbyGS->bTeamIntroInProgress)
-            {
-                PhaseText = TEXT("팀 인트로");
-            }
-            else if (LobbyGS->bCharacterSelectInProgress)
-            {
-                PhaseText = TEXT("캐릭터 선택");
-            }
-
-            const FString ReadyText = bIsReady ? TEXT("Ready") : TEXT("Not Ready");
-            UpdateStatusText(FString::Printf(TEXT("%s | 인원 %d/%d | %s"), *PhaseText, CurrentPlayers, NeededPlayers, *ReadyText));
+            UpdateStatusText(BuildLobbyStatusText(
+                LobbyGS->PlayerArray.Num(),
+                LobbyGS->LobbyStartPlayerCount,
+                LobbyGS->bTravelTriggered,
+                LobbyGS->bTeamIntroInProgress,
+                LobbyGS->bCharacterSelectInProgress));
         }
 
-        if (Text_TimeRemaining)
+        UpdateRemainingTimeText(LobbyGS->bCharacterSelectInProgress, LobbyGS->RemainingCharacterSelectSeconds);
+    }
+    else if (ALastFPSLobbyGameMode* LobbyGM = Cast<ALastFPSLobbyGameMode>(World->GetAuthGameMode()))
+    {
+        if (Text_Status)
         {
-            if (LobbyGS->bCharacterSelectInProgress)
-            {
-                Text_TimeRemaining->SetText(
-                    FText::FromString(FString::Printf(TEXT("남은 시간: %d"), LobbyGS->RemainingCharacterSelectSeconds)));
-            }
-            else
-            {
-                Text_TimeRemaining->SetText(FText::FromString(TEXT("")));
-            }
+            UpdateStatusText(BuildLobbyStatusText(
+                LobbyGM->GetTotalConnectedPlayers(),
+                LobbyGM->GetLobbyStartPlayerCount(),
+                LobbyGM->IsTravelTriggered(),
+                LobbyGM->IsTeamIntroInProgress(),
+                LobbyGM->IsCharacterSelectInProgress()));
         }
+
+        UpdateRemainingTimeText(LobbyGM->IsCharacterSelectInProgress(), LobbyGM->GetRemainingCharacterSelectSeconds());
     }
 
     const int32 CurrentSelectedIndex = GetSelectedCharacterIndex();
@@ -142,6 +89,52 @@ void ULastFPSLobbyWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaT
             OnSelectedCharacterChanged(PC->GetSelectedCharacterClass(), CurrentSelectedIndex);
         }
     }
+}
+
+FString ULastFPSLobbyWidget::BuildPhaseText(bool bTravelTriggered, bool bTeamIntroInProgress, bool bCharacterSelectInProgress) const
+{
+    if (bTravelTriggered)
+    {
+        return TEXT("이동 중");
+    }
+    if (bTeamIntroInProgress)
+    {
+        return TEXT("팀 인트로");
+    }
+    if (bCharacterSelectInProgress)
+    {
+        return TEXT("캐릭터 선택");
+    }
+
+    return TEXT("대기");
+}
+
+FString ULastFPSLobbyWidget::BuildLobbyStatusText(
+    int32 CurrentPlayers,
+    int32 NeededPlayers,
+    bool bTravelTriggered,
+    bool bTeamIntroInProgress,
+    bool bCharacterSelectInProgress) const
+{
+    const FString PhaseText = BuildPhaseText(bTravelTriggered, bTeamIntroInProgress, bCharacterSelectInProgress);
+    const FString ReadyText = bIsReady ? TEXT("Ready") : TEXT("Not Ready");
+    return FString::Printf(TEXT("%s | 인원 %d/%d | %s"), *PhaseText, CurrentPlayers, NeededPlayers, *ReadyText);
+}
+
+void ULastFPSLobbyWidget::UpdateRemainingTimeText(bool bCharacterSelectInProgress, int32 RemainingSeconds)
+{
+    if (!Text_TimeRemaining)
+    {
+        return;
+    }
+
+    if (bCharacterSelectInProgress)
+    {
+        Text_TimeRemaining->SetText(FText::FromString(FString::Printf(TEXT("남은 시간: %d"), RemainingSeconds)));
+        return;
+    }
+
+    Text_TimeRemaining->SetText(FText::GetEmpty());
 }
 
 void ULastFPSLobbyWidget::HandleReadyClicked()
