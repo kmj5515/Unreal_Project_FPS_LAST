@@ -14,8 +14,26 @@ void ULastFPSLobbyWidget::NativeConstruct()
     {
         Button_Ready->OnClicked.AddDynamic(this, &ULastFPSLobbyWidget::HandleReadyClicked);
     }
+    if (Button_C1)
+    {
+        Button_C1->OnClicked.AddDynamic(this, &ULastFPSLobbyWidget::HandleCharacter1Clicked);
+    }
+    if (Button_C2)
+    {
+        Button_C2->OnClicked.AddDynamic(this, &ULastFPSLobbyWidget::HandleCharacter2Clicked);
+    }
+    if (Button_C3)
+    {
+        Button_C3->OnClicked.AddDynamic(this, &ULastFPSLobbyWidget::HandleCharacter3Clicked);
+    }
 
     UpdateStatusText(TEXT("로비"));
+
+    CachedSelectedCharacterIndex = GetSelectedCharacterIndex();
+    if (ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>())
+    {
+        OnSelectedCharacterChanged(PC->GetSelectedCharacterClass(), CachedSelectedCharacterIndex);
+    }
 }
 
 void ULastFPSLobbyWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -114,6 +132,16 @@ void ULastFPSLobbyWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaT
             }
         }
     }
+
+    const int32 CurrentSelectedIndex = GetSelectedCharacterIndex();
+    if (CurrentSelectedIndex != CachedSelectedCharacterIndex)
+    {
+        CachedSelectedCharacterIndex = CurrentSelectedIndex;
+        if (ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>())
+        {
+            OnSelectedCharacterChanged(PC->GetSelectedCharacterClass(), CurrentSelectedIndex);
+        }
+    }
 }
 
 void ULastFPSLobbyWidget::HandleReadyClicked()
@@ -144,5 +172,48 @@ void ULastFPSLobbyWidget::UpdateStatusText(const FString& InText)
     {
         Text_Status->SetText(FText::FromString(InText));
     }
+}
+
+void ULastFPSLobbyWidget::SelectCharacterByIndex(int32 CharacterIndex)
+{
+    if (ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>())
+    {
+        PC->SetSelectedCharacterIndex(CharacterIndex);
+    }
+}
+
+int32 ULastFPSLobbyWidget::GetSelectedCharacterIndex() const
+{
+    if (const ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>())
+    {
+        return PC->GetSelectedCharacterIndex();
+    }
+
+    return INDEX_NONE;
+}
+
+TArray<TSubclassOf<APawn>> ULastFPSLobbyWidget::GetSelectableCharacterClasses() const
+{
+    if (const ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>())
+    {
+        return PC->GetSelectableCharacterClasses();
+    }
+
+    return {};
+}
+
+void ULastFPSLobbyWidget::HandleCharacter1Clicked()
+{
+    SelectCharacterByIndex(0);
+}
+
+void ULastFPSLobbyWidget::HandleCharacter2Clicked()
+{
+    SelectCharacterByIndex(1);
+}
+
+void ULastFPSLobbyWidget::HandleCharacter3Clicked()
+{
+    SelectCharacterByIndex(2);
 }
 

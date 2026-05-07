@@ -11,6 +11,7 @@ class LASTFPS_API ALastFPSMatchGameMode : public ALastFPSGameModeBase
     GENERATED_BODY()
 
 public:
+    ALastFPSMatchGameMode();
     virtual void PostLogin(APlayerController* NewPlayer) override;
     virtual void Logout(AController* Exiting) override;
 

@@ -3,6 +3,7 @@
 #include "Character/LastFPSHero.h"
 #include "Weapons/LastFPSProjectile.h"
 #include "NativeGameplayTags.h"
+#include "Engine/World.h"
 
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Fire, "Ability.Fire")
 
@@ -86,6 +87,21 @@ void UGA_BasicShoot::Fire()
         Controller->GetPlayerViewPoint(CameraLocation, AimRotation);
 
         FVector MuzzleLocation = Weapon->GetMuzzleTransform().GetLocation();
+        const FVector CameraTraceEnd = CameraLocation + (AimRotation.Vector() * 10000.f);
+
+        FHitResult CameraHitResult;
+        FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WeaponTrace), false, Character);
+        QueryParams.AddIgnoredActor(Character);
+
+        const bool bHasCameraHit = GetWorld()->LineTraceSingleByChannel(
+            CameraHitResult,
+            CameraLocation,
+            CameraTraceEnd,
+            ECC_Visibility,
+            QueryParams);
+
+        const FVector AimTarget = bHasCameraHit ? CameraHitResult.ImpactPoint : CameraTraceEnd;
+        const FRotator ProjectileRotation = (AimTarget - MuzzleLocation).Rotation();
 
         FActorSpawnParameters Params;
         Params.Instigator = Character;
@@ -96,7 +112,7 @@ void UGA_BasicShoot::Fire()
         GetWorld()->SpawnActor<ALastFPSProjectile>(
             Weapon->ProjectileClass,
             MuzzleLocation,
-            AimRotation,
+            ProjectileRotation,
             Params);
     }
 

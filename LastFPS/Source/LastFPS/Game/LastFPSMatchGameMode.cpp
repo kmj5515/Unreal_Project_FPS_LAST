@@ -11,6 +11,11 @@
 #include "Game/LastFPSPlayerState.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
+ALastFPSMatchGameMode::ALastFPSMatchGameMode()
+{
+    bUseSeamlessTravel = true;
+}
+
 void ALastFPSMatchGameMode::BeginPlay()
 {
     Super::BeginPlay();

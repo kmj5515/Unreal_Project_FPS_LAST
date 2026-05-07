@@ -1,4 +1,8 @@
 #include "Game/LastFPSGameModeBase.h"
+#include "Engine/GameInstance.h"
+#include "Game/LastFPSGameInstance.h"
+#include "Game/LastFPSPlayerController.h"
+#include "Game/LastFPSPlayerState.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/PlayerController.h"
 
@@ -43,6 +47,37 @@ void ALastFPSGameModeBase::Logout(AController* Exiting)
             return !Weak.IsValid() || Weak.Get() == Exiting;
         });
     }
+}
+
+UClass* ALastFPSGameModeBase::GetDefaultPawnClassForController_Implementation(AController* InController)
+{
+    if (const ALastFPSPlayerState* LastPS = InController ? InController->GetPlayerState<ALastFPSPlayerState>() : nullptr)
+    {
+        int32 SelectedIndex = LastPS->GetSelectedCharacterIndex();
+        if (ULastFPSGameInstance* LastGI = GetGameInstance<ULastFPSGameInstance>())
+        {
+            int32 RestoredIndex = 0;
+            if (LastGI->TryGetSelectedCharacterIndex(LastPS->GetPlayerName(), RestoredIndex))
+            {
+                SelectedIndex = RestoredIndex;
+            }
+        }
+
+        if (CharacterPawnClasses.IsValidIndex(SelectedIndex) && CharacterPawnClasses[SelectedIndex])
+        {
+            return CharacterPawnClasses[SelectedIndex];
+        }
+    }
+
+    if (const ALastFPSPlayerController* LastPC = Cast<ALastFPSPlayerController>(InController))
+    {
+        if (TSubclassOf<APawn> SelectedClass = LastPC->GetSelectedCharacterClass())
+        {
+            return SelectedClass;
+        }
+    }
+
+    return Super::GetDefaultPawnClassForController_Implementation(InController);
 }
 
 int32 ALastFPSGameModeBase::GetTeamPlayerCount(ELastFPSTeam Team) const

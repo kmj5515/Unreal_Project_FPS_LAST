@@ -27,11 +27,32 @@ void ALastFPSPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
     DOREPLIFETIME(ALastFPSPlayerState, StatDamageTaken);
     DOREPLIFETIME(ALastFPSPlayerState, StatHealingReceived);
     DOREPLIFETIME(ALastFPSPlayerState, StatHealingGiven);
+    DOREPLIFETIME(ALastFPSPlayerState, SelectedCharacterIndex);
 }
 
 UAbilitySystemComponent* ALastFPSPlayerState::GetAbilitySystemComponent() const
 {
     return AbilitySystemComponent;
+}
+
+void ALastFPSPlayerState::CopyProperties(APlayerState* PlayerState)
+{
+    Super::CopyProperties(PlayerState);
+
+    if (ALastFPSPlayerState* LastPlayerState = Cast<ALastFPSPlayerState>(PlayerState))
+    {
+        LastPlayerState->SelectedCharacterIndex = SelectedCharacterIndex;
+    }
+}
+
+void ALastFPSPlayerState::OverrideWith(APlayerState* PlayerState)
+{
+    Super::OverrideWith(PlayerState);
+
+    if (const ALastFPSPlayerState* LastPlayerState = Cast<ALastFPSPlayerState>(PlayerState))
+    {
+        SelectedCharacterIndex = LastPlayerState->SelectedCharacterIndex;
+    }
 }
 
 void ALastFPSPlayerState::Auth_AddDamageDealt(float Amount)
@@ -81,5 +102,13 @@ void ALastFPSPlayerState::Auth_AddAssist()
     if (!HasAuthority())
         return;
     ++StatAssists;
+}
+
+void ALastFPSPlayerState::Auth_SetSelectedCharacterIndex(int32 NewIndex)
+{
+    if (!HasAuthority())
+        return;
+
+    SelectedCharacterIndex = FMath::Max(0, NewIndex);
 }
 

@@ -9,6 +9,7 @@
 ALastFPSLobbyGameMode::ALastFPSLobbyGameMode()
 {
     GameStateClass = ALastFPSLobbyGameState::StaticClass();
+    bUseSeamlessTravel = true;
 }
 
 void ALastFPSLobbyGameMode::PostLogin(APlayerController* NewPlayer)
@@ -55,6 +56,16 @@ void ALastFPSLobbyGameMode::Logout(AController* Exiting)
 
         DebugLobbyFlow(TEXT("[Lobby] Character select cancelled. Not enough players."), FColor::Orange);
     }
+}
+
+UClass* ALastFPSLobbyGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
+{
+    if (LobbyPawnClass)
+    {
+        return LobbyPawnClass;
+    }
+
+    return Super::GetDefaultPawnClassForController_Implementation(InController);
 }
 
 void ALastFPSLobbyGameMode::TryStartMatchFromLobby()

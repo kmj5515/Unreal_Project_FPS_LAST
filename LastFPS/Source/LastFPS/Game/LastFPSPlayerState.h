@@ -18,6 +18,8 @@ public:
     ALastFPSPlayerState();
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void CopyProperties(APlayerState* PlayerState) override;
+    virtual void OverrideWith(APlayerState* PlayerState) override;
 
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
@@ -33,6 +35,7 @@ public:
     FORCEINLINE float GetStatDamageTaken() const { return StatDamageTaken; }
     FORCEINLINE float GetStatHealingReceived() const { return StatHealingReceived; }
     FORCEINLINE float GetStatHealingGiven() const { return StatHealingGiven; }
+    FORCEINLINE int32 GetSelectedCharacterIndex() const { return SelectedCharacterIndex; }
 
     /** GAS AttributeSet 등 서버 전용 — 권한 없으면 무시 */
     void Auth_AddDamageDealt(float Amount);
@@ -42,6 +45,7 @@ public:
     void Auth_AddKill();
     void Auth_AddDeath();
     void Auth_AddAssist();
+    void Auth_SetSelectedCharacterIndex(int32 NewIndex);
 
 protected:
     UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Stats")
@@ -64,6 +68,9 @@ protected:
 
     UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Stats")
     float StatHealingGiven = 0.f;
+
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Lobby")
+    int32 SelectedCharacterIndex = 0;
 
 private:
     bool bGASDefaultsGranted = false;

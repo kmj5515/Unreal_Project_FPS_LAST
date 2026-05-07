@@ -14,6 +14,7 @@ public:
     ALastFPSLobbyGameMode();
     virtual void PostLogin(APlayerController* NewPlayer) override;
     virtual void Logout(AController* Exiting) override;
+    virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
 
     UFUNCTION(BlueprintCallable, Category="LastFPS|Lobby")
     void SetPlayerReady(AController* PlayerController, bool bReady);
@@ -56,6 +57,9 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Lobby")
     float TeamIntroSeconds = 3.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Lobby")
+    TSubclassOf<APawn> LobbyPawnClass;
 
     bool bCharacterSelectInProgress = false;
     bool bTeamIntroInProgress = false;
