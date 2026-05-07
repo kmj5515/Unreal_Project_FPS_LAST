@@ -235,6 +235,8 @@ void ALastFPSHero::StopJump()
 // ── 사격 ──────────────────────────────────────────────────────
 void ALastFPSHero::StartFire()
 {
+    if (!IsAlive()) return;
+
     UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
     if (!ASC) return;
 

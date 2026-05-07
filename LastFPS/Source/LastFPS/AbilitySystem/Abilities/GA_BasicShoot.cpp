@@ -22,6 +22,13 @@ void UGA_BasicShoot::ActivateAbility(
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
+    const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+    if (!Hero || !Hero->IsAlive())
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return;
+    }
+
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
@@ -53,6 +60,13 @@ void UGA_BasicShoot::ActivateAbility(
 
 void UGA_BasicShoot::Fire()
 {
+    const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+    if (!Hero || !Hero->IsAlive())
+    {
+        EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, true);
+        return;
+    }
+
     UWeaponComponent* Weapon = CachedWeapon.Get();
     if (!Weapon || !Weapon->CanFire())
     {

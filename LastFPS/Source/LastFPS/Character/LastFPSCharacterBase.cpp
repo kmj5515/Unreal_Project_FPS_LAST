@@ -2,6 +2,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Game/LastFPSPlayerState.h"
+#include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
@@ -71,6 +72,16 @@ void ALastFPSCharacterBase::BeginPlay()
 
 void ALastFPSCharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    if (HealthDelegateHandle.IsValid())
+    {
+        if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+        {
+            ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetHealthAttribute())
+                .Remove(HealthDelegateHandle);
+        }
+        HealthDelegateHandle.Reset();
+    }
+
     if (MoveSpeedDelegateHandle.IsValid())
     {
         if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
@@ -116,6 +127,13 @@ void ALastFPSCharacterBase::InitAbilitySystem()
             .AddUObject(this, &ALastFPSCharacterBase::OnMoveSpeedChanged);
     }
 
+    if (!HealthDelegateHandle.IsValid())
+    {
+        HealthDelegateHandle = ASC->GetGameplayAttributeValueChangeDelegate(
+            ULastFPSAttributeSet::GetHealthAttribute())
+            .AddUObject(this, &ALastFPSCharacterBase::OnHealthChanged);
+    }
+
     if (HasAuthority() && !PS->HasGrantedGASDefaults())
     {
         GiveDefaultAbilities();
@@ -125,6 +143,26 @@ void ALastFPSCharacterBase::InitAbilitySystem()
 
     if (AttributeSet && GetCharacterMovement())
         GetCharacterMovement()->MaxWalkSpeed = AttributeSet->GetMoveSpeed();
+
+    UpdateAliveCollisionState(IsAlive());
+}
+
+void ALastFPSCharacterBase::OnHealthChanged(const FOnAttributeChangeData& Data)
+{
+    UpdateAliveCollisionState(Data.NewValue > 0.f);
+}
+
+void ALastFPSCharacterBase::UpdateAliveCollisionState(bool bAlive)
+{
+    if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+    {
+        Capsule->SetCollisionEnabled(bAlive ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+    }
+
+    if (USkeletalMeshComponent* MeshComp = GetMesh())
+    {
+        MeshComp->SetCollisionEnabled(bAlive ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+    }
 }
 
 void ALastFPSCharacterBase::OnMoveSpeedChanged(const FOnAttributeChangeData& Data)

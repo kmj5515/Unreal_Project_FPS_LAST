@@ -61,6 +61,8 @@ protected:
     void InitAbilitySystem();
     void GiveDefaultAbilities();
     void ApplyDefaultEffects();
+    void OnHealthChanged(const FOnAttributeChangeData& Data);
+    void UpdateAliveCollisionState(bool bAlive);
     void OnMoveSpeedChanged(const FOnAttributeChangeData& Data);
 
     // AttributeSet은 PlayerState가 소유 — InitAbilitySystem에서 캐싱
@@ -79,6 +81,7 @@ protected:
     TArray<TSubclassOf<UGameplayEffect>> DefaultEffects;
 
     FDelegateHandle MoveSpeedDelegateHandle;
+    FDelegateHandle HealthDelegateHandle;
 
 private:
     TMap<TWeakObjectPtr<APlayerState>, float> RecentAttackers;
