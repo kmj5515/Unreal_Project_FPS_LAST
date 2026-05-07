@@ -164,6 +164,15 @@ ALastFPSPlayerState
 
 ### 네트워크 구조
 ```
+
+### 로비 캐릭터 선택 → 매치 스폰
+
+- 로비 UI(`ULastFPSLobbyWidget`)에서 `Button_C1/C2/C3` 클릭 시 `SelectCharacterByIndex(0/1/2)` 호출
+- 선택 인덱스는 서버 `ALastFPSPlayerController`에서 처리되어 `ALastFPSPlayerState`와 `ULastFPSGameInstance`에 저장
+- 매치 스폰 시 `ALastFPSGameModeBase::GetDefaultPawnClassForController`가  
+  `PlayerState` 인덱스를 우선 사용하고, 필요 시 `GameInstance` 저장값으로 보정
+- `CharacterPawnClasses` 배열 인덱스(0-based)와 UI 버튼 인덱스가 동일해야 원하는 캐릭터가 스폰됨
+- 로비 전용 폰은 `ALastFPSLobbyGameMode::LobbyPawnClass`로 분리하여 전투 입력/사격을 차단
 Dedicated Server
   ├── ALastFPSGameMode        // 규칙 관리 (서버 전용)
   ├── ALastFPSGameState        // 팀 점수, 타이머 (모든 클라 복제)
@@ -223,7 +232,7 @@ ACharacter
 - [x] GameMode 기초 구현 (`ALastFPSGameModeBase`)
 - [x] 팀 배정 로직 (최대 4팀 × 3인, 인원 균등 배분)
 - [ ] GameState 팀 점수 관리
-- [ ] 기본 리스폰 시스템
+- [x] 기본 리스폰 시스템
 
 ### Phase 4 — 스킬 시스템 (목표: ~4주)
 - [x] 스킬 슬롯 아키텍처 — `InputTag.Skill1/2/Ultimate` → `ULastFPSInputConfig::AbilityInputActions` → `ALastFPSHero`에서 `TryActivateAbilitiesByTag` (`Ability.Skill1` / `Skill2` / `Ultimate`). Q/E/F는 **Started**만 사용 (홀드 취소 없음)
@@ -244,8 +253,10 @@ ACharacter
 - [ ] 게임 종료 스코어보드
 
 ### Phase 6 — 게임 흐름 & 연출 (목표: ~3주)
-- [x] 로비 / 매치 시작 흐름 (프로토타입) — `ALastFPSLobbyGameMode`에서 3명 입장 시 `ServerTravel(MatchMapURL)`로 게임 맵 이동, `ALastFPSMatchGameMode`로 인게임 흐름 분리 및 온스크린 디버그 로그 추가
-- [ ] 팀 데스매치 규칙 완성 (타이머, 킬 리밋)
+- [x] 로비 / 매치 시작 흐름 (프로토타입) — `ALastFPSLobbyGameMode`에서 3명 입장 시 `ServerTravel(MatchMapURL)`로 게임 맵 이동, `ALastFPSMatchGameMode`로 인게임 흐름 분리
+- [x] 로비 캐릭터 선택/확정 스폰 (프로토타입) — 로비 선택 인덱스 저장(`PlayerState` + `GameInstance`), 매치 첫 스폰 시 인덱스 기반 `CharacterPawnClasses` 적용
+- [x] 로비 전용 폰 분리 — 로비에서는 `LobbyPawnClass` 사용, 매치에서는 전투 Pawn 스폰
+- [x] 드랍 인트로 보정 — 드랍 진행 중 후속 접속 플레이어도 `PostLogin`에서 동일 낙하 연출 적용
 - [ ] **[팀 인트로]** 매치 시작 시 팀별 캐릭터 소개 UI 연출
   - UMG 팀 소개 위젯 (팀 컬러, 닉네임, 캐릭터 포즈)
   - 멀티에서 모든 클라이언트 동기화 (RPC 또는 GameState 플래그)
@@ -290,6 +301,7 @@ LastFPS/
 │   │   └── Components/         # WeaponComponent, etc.
 │   ├── Game/
 │   │   ├── LastFPSGameModeBase.h/.cpp
+│   │   ├── LastFPSGameInstance.h/.cpp  # 로비 캐릭터 선택 인덱스 저장/복원
 │   │   ├── LastFPSLobbyGameMode.h/.cpp   # 로비: 인원 대기, 시작 조건, 맵 이동
 │   │   ├── LastFPSMatchGameMode.h/.cpp   # 인게임: 매치 시작/입장 흐름
 │   │   ├── LastFPSGameState.h/.cpp    # 미구현 (팀 점수 관리 예정)
@@ -344,4 +356,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-07 — Phase 6 프로토타입 반영: `ALastFPSLobbyGameMode`/`ALastFPSMatchGameMode` 분리, 로비 3인 충족 시 `ServerTravel(MatchMapURL)` 기반 맵 전환 및 디버그 로그 흐름 추가. 폴더 구조 `Game/`에 신규 GameMode 파일 반영.*
+*Last updated: 2026-05-07 — Phase 6 프로토타입 업데이트: 로비 캐릭터 선택 인덱스 저장(`PlayerState`+`GameInstance`) 및 매치 스폰 반영, 로비 전용 Pawn 분리, 드랍 인트로 후속 접속 보정 적용. 문서의 흐름/폴더 구조를 최신 코드 기준으로 정리.*

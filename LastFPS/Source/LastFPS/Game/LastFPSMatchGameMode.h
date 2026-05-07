@@ -18,6 +18,7 @@ public:
 protected:
     virtual void BeginPlay() override;
 
+    void ApplyDropIntroToController(APlayerController* PlayerController) const;
     void StartDropIntroPhase();
     void FinishDropIntroPhase();
     void TickMatchRuleCheck();

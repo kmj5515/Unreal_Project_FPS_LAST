@@ -28,6 +28,11 @@ void ALastFPSMatchGameMode::PostLogin(APlayerController* NewPlayer)
 {
     Super::PostLogin(NewPlayer);
 
+    if (bDropIntroInProgress)
+    {
+        ApplyDropIntroToController(NewPlayer);
+    }
+
     DebugMatchFlow(FString::Printf(
         TEXT("[Match] Player Joined: %s (Total: %d)"),
         *NewPlayer->GetName(),
@@ -57,21 +62,7 @@ void ALastFPSMatchGameMode::StartDropIntroPhase()
     {
         for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
         {
-            APlayerController* PC = It->Get();
-            APawn* Pawn = PC ? PC->GetPawn() : nullptr;
-            if (!Pawn)
-            {
-                continue;
-            }
-
-            FVector DropLocation = Pawn->GetActorLocation();
-            DropLocation.Z += DropHeightOffset;
-            Pawn->SetActorLocation(DropLocation);
-
-            if (UCharacterMovementComponent* MoveComp = Pawn->FindComponentByClass<UCharacterMovementComponent>())
-            {
-                MoveComp->SetMovementMode(MOVE_Falling);
-            }
+            ApplyDropIntroToController(It->Get());
         }
 
         World->GetTimerManager().SetTimer(
@@ -80,6 +71,24 @@ void ALastFPSMatchGameMode::StartDropIntroPhase()
             &ALastFPSMatchGameMode::FinishDropIntroPhase,
             FMath::Max(0.1f, DropIntroSeconds),
             false);
+    }
+}
+
+void ALastFPSMatchGameMode::ApplyDropIntroToController(APlayerController* PlayerController) const
+{
+    APawn* Pawn = PlayerController ? PlayerController->GetPawn() : nullptr;
+    if (!Pawn)
+    {
+        return;
+    }
+
+    FVector DropLocation = Pawn->GetActorLocation();
+    DropLocation.Z += DropHeightOffset;
+    Pawn->SetActorLocation(DropLocation);
+
+    if (UCharacterMovementComponent* MoveComp = Pawn->FindComponentByClass<UCharacterMovementComponent>())
+    {
+        MoveComp->SetMovementMode(MOVE_Falling);
     }
 }
 

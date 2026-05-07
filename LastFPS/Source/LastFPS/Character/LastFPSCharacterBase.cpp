@@ -163,6 +163,20 @@ void ALastFPSCharacterBase::UpdateAliveCollisionState(bool bAlive)
     {
         MeshComp->SetCollisionEnabled(bAlive ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
     }
+
+    if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+    {
+        if (bAlive)
+        {
+            MoveComp->SetMovementMode(MOVE_Walking);
+        }
+        else
+        {
+            // 사망 시 이동/중력 업데이트를 멈춰 시체가 바닥 아래로 내려가지 않게 고정
+            MoveComp->StopMovementImmediately();
+            MoveComp->DisableMovement();
+        }
+    }
 }
 
 void ALastFPSCharacterBase::OnMoveSpeedChanged(const FOnAttributeChangeData& Data)
