@@ -76,86 +76,96 @@ void ULastFPSAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 {
     Super::PostGameplayEffectExecute(Data);
 
-    UAbilitySystemComponent* Asc = GetOwningAbilitySystemComponent();
-    if (!Asc)
+    if (!GetOwningAbilitySystemComponent())
         return;
 
     if (Data.EvaluatedData.Attribute == GetDamageAttribute())
     {
-        const float Applied = GetDamage();
-        SetDamage(0.f);
-
-        const float OldHealth = GetHealth();
-        const float NewHealth = FMath::Clamp(OldHealth - Applied, 0.f, GetMaxHealth());
-        const float ActualDamage = OldHealth - NewHealth;
-        SetHealth(NewHealth);
-
-        ALastFPSCharacterBase* TargetChar = Cast<ALastFPSCharacterBase>(Data.Target.GetAvatarActor());
-
-        if (Applied > 0.f && ActualDamage > 0.f && TargetChar)
-            TargetChar->Multicast_PlayHitSound();
-
-        if (AActor* OwnerActor = Asc->GetOwnerActor(); OwnerActor && OwnerActor->HasAuthority())
-        {
-            ALastFPSPlayerState* VictimPS   = Cast<ALastFPSPlayerState>(OwnerActor);
-            ALastFPSPlayerState* AttackerPS = ResolveInstigatorPlayerState(Data);
-
-            // 이번 피해 기록 (어시스트 판정용)
-            if (TargetChar && AttackerPS && AttackerPS != VictimPS && ActualDamage > 0.f)
-                TargetChar->RecordAttacker(AttackerPS);
-
-            if (VictimPS)
-            {
-                VictimPS->Auth_AddDamageTaken(ActualDamage);
-                if (AttackerPS && AttackerPS != VictimPS)
-                    AttackerPS->Auth_AddDamageDealt(ActualDamage);
-
-                if (NewHealth <= KINDA_SMALL_NUMBER && ActualDamage > 0.f)
-                {
-                    VictimPS->Auth_AddDeath();
-                    if (AttackerPS && AttackerPS != VictimPS)
-                        AttackerPS->Auth_AddKill();
-
-                    if (TargetChar)
-                    {
-                        const float Now = GetWorld()->GetTimeSeconds();
-                        for (const auto& Pair : TargetChar->GetRecentAttackers())
-                        {
-                            if (!Pair.Key.IsValid()) continue;
-                            ALastFPSPlayerState* AssistPS = Cast<ALastFPSPlayerState>(Pair.Key.Get());
-                            if (!AssistPS || AssistPS == AttackerPS || AssistPS == VictimPS) continue;
-                            if (Now - Pair.Value <= ALastFPSCharacterBase::AssistTimeWindow)
-                                AssistPS->Auth_AddAssist();
-                        }
-                        TargetChar->ClearRecentAttackers();
-                    }
-                }
-            }
-        }
+        HandleDamageEffect(Data);
         return;
     }
 
     if (Data.EvaluatedData.Attribute == GetHealthAttribute())
+        HandleHealEffect(Data);
+}
+
+void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackData& Data)
+{
+    const float Applied      = GetDamage();
+    SetDamage(0.f);
+
+    const float OldHealth    = GetHealth();
+    const float NewHealth    = FMath::Clamp(OldHealth - Applied, 0.f, GetMaxHealth());
+    const float ActualDamage = OldHealth - NewHealth;
+    SetHealth(NewHealth);
+
+    ALastFPSCharacterBase* TargetChar = Cast<ALastFPSCharacterBase>(Data.Target.GetAvatarActor());
+    if (Applied > 0.f && ActualDamage > 0.f && TargetChar)
+        TargetChar->Multicast_PlayHitSound();
+
+    UAbilitySystemComponent* Asc = GetOwningAbilitySystemComponent();
+    AActor* OwnerActor = Asc ? Asc->GetOwnerActor() : nullptr;
+    if (!OwnerActor || !OwnerActor->HasAuthority())
+        return;
+
+    ALastFPSPlayerState* VictimPS   = Cast<ALastFPSPlayerState>(OwnerActor);
+    ALastFPSPlayerState* AttackerPS = ResolveInstigatorPlayerState(Data);
+
+    if (TargetChar && AttackerPS && AttackerPS != VictimPS && ActualDamage > 0.f)
+        TargetChar->RecordAttacker(AttackerPS);
+
+    if (!VictimPS)
+        return;
+
+    VictimPS->Auth_AddDamageTaken(ActualDamage);
+    if (AttackerPS && AttackerPS != VictimPS)
+        AttackerPS->Auth_AddDamageDealt(ActualDamage);
+
+    if (NewHealth > KINDA_SMALL_NUMBER || ActualDamage <= 0.f)
+        return;
+
+    VictimPS->Auth_AddDeath();
+    if (AttackerPS && AttackerPS != VictimPS)
+        AttackerPS->Auth_AddKill();
+
+    if (!TargetChar)
+        return;
+
+    const float Now = GetWorld()->GetTimeSeconds();
+    // 스냅샷: 이터레이션 중 ClearRecentAttackers 호출로 인한 데이터 유실 방지
+    const TMap<TWeakObjectPtr<APlayerState>, float> AttackersCopy = TargetChar->GetRecentAttackers();
+    for (const auto& Pair : AttackersCopy)
     {
-        const float Mag = Data.EvaluatedData.Magnitude;
-        if (Mag <= 0.f)
-            return;
+        if (!Pair.Key.IsValid()) continue;
+        ALastFPSPlayerState* AssistPS = Cast<ALastFPSPlayerState>(Pair.Key.Get());
+        if (!AssistPS || AssistPS == AttackerPS || AssistPS == VictimPS) continue;
+        if (Now - Pair.Value <= ALastFPSCharacterBase::AssistTimeWindow)
+            AssistPS->Auth_AddAssist();
+    }
+    TargetChar->ClearRecentAttackers();
+}
 
-        AActor* OwnerActor = Asc->GetOwnerActor();
-        if (!OwnerActor || !OwnerActor->HasAuthority())
-            return;
+void ULastFPSAttributeSet::HandleHealEffect(const FGameplayEffectModCallbackData& Data)
+{
+    const float Mag = Data.EvaluatedData.Magnitude;
+    if (Mag <= 0.f)
+        return;
 
-        ALastFPSPlayerState* TargetPS = Cast<ALastFPSPlayerState>(OwnerActor);
-        if (!TargetPS)
-            return;
+    UAbilitySystemComponent* Asc = GetOwningAbilitySystemComponent();
+    AActor* OwnerActor = Asc ? Asc->GetOwnerActor() : nullptr;
+    if (!OwnerActor || !OwnerActor->HasAuthority())
+        return;
 
-        TargetPS->Auth_AddHealingReceived(Mag);
+    ALastFPSPlayerState* TargetPS = Cast<ALastFPSPlayerState>(OwnerActor);
+    if (!TargetPS)
+        return;
 
-        if (ALastFPSPlayerState* HealerPS = ResolveInstigatorPlayerState(Data))
-        {
-            if (HealerPS != TargetPS)
-                HealerPS->Auth_AddHealingGiven(Mag);
-        }
+    TargetPS->Auth_AddHealingReceived(Mag);
+
+    if (ALastFPSPlayerState* HealerPS = ResolveInstigatorPlayerState(Data))
+    {
+        if (HealerPS != TargetPS)
+            HealerPS->Auth_AddHealingGiven(Mag);
     }
 }
 

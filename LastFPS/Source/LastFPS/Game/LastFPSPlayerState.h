@@ -73,6 +73,8 @@ protected:
     int32 SelectedCharacterIndex = 0;
 
 private:
+    void Auth_AddFloatStat(float& Stat, float Amount);
+
     bool bGASDefaultsGranted = false;
     UPROPERTY(VisibleAnywhere, Category="GAS")
     TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;

@@ -55,33 +55,16 @@ void ALastFPSPlayerState::OverrideWith(APlayerState* PlayerState)
     }
 }
 
-void ALastFPSPlayerState::Auth_AddDamageDealt(float Amount)
+void ALastFPSPlayerState::Auth_AddFloatStat(float& Stat, float Amount)
 {
-    if (!HasAuthority() || Amount <= 0.f)
-        return;
-    StatDamageDealt += Amount;
+    if (!HasAuthority() || Amount <= 0.f) return;
+    Stat += Amount;
 }
 
-void ALastFPSPlayerState::Auth_AddDamageTaken(float Amount)
-{
-    if (!HasAuthority() || Amount <= 0.f)
-        return;
-    StatDamageTaken += Amount;
-}
-
-void ALastFPSPlayerState::Auth_AddHealingReceived(float Amount)
-{
-    if (!HasAuthority() || Amount <= 0.f)
-        return;
-    StatHealingReceived += Amount;
-}
-
-void ALastFPSPlayerState::Auth_AddHealingGiven(float Amount)
-{
-    if (!HasAuthority() || Amount <= 0.f)
-        return;
-    StatHealingGiven += Amount;
-}
+void ALastFPSPlayerState::Auth_AddDamageDealt(float Amount)   { Auth_AddFloatStat(StatDamageDealt,     Amount); }
+void ALastFPSPlayerState::Auth_AddDamageTaken(float Amount)   { Auth_AddFloatStat(StatDamageTaken,     Amount); }
+void ALastFPSPlayerState::Auth_AddHealingReceived(float Amount) { Auth_AddFloatStat(StatHealingReceived, Amount); }
+void ALastFPSPlayerState::Auth_AddHealingGiven(float Amount)  { Auth_AddFloatStat(StatHealingGiven,    Amount); }
 
 void ALastFPSPlayerState::Auth_AddKill()
 {

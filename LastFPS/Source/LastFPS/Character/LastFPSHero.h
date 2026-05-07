@@ -90,6 +90,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Camera|ADS")
     float ADSInterpSpeed = 10.f;
 
+    UPROPERTY(EditDefaultsOnly, Category="Camera")
+    float CameraLagSpeed = 15.f;
+
     // ── 무기 ─────────────────────────────────────────────────
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
     TObjectPtr<UWeaponComponent> WeaponComponent;
@@ -108,4 +111,12 @@ private:
     float TargetArmLength;
     FVector TargetSocketOffset;
     float TargetFOV;
+
+    // 입력 바인딩 헬퍼
+    void TryBindNativeTriggered(UEnhancedInputComponent* EIC, const FGameplayTag& Tag,
+        void(ALastFPSHero::*Func)(const FInputActionValue&));
+    void TryBindNativeStartStop(UEnhancedInputComponent* EIC, const FGameplayTag& Tag,
+        void(ALastFPSHero::*StartFunc)(), void(ALastFPSHero::*StopFunc)());
+    void TryBindAbilityStart(UEnhancedInputComponent* EIC, const FGameplayTag& Tag,
+        void(ALastFPSHero::*Func)());
 };

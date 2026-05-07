@@ -26,12 +26,14 @@ void UGA_BasicShoot::ActivateAbility(
     const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
     if (!Hero || !Hero->IsAlive())
     {
+        UE_LOG(LogTemp, Warning, TEXT("GA_BasicShoot: 사망 상태에서 발사 시도됨"));
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
 
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
+        UE_LOG(LogTemp, Warning, TEXT("GA_BasicShoot: CommitAbility 실패 (쿨다운/비용)"));
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
@@ -40,6 +42,7 @@ void UGA_BasicShoot::ActivateAbility(
     UWeaponComponent* Weapon = CachedWeapon.Get();
     if (!Weapon || !Weapon->CanFire())
     {
+        UE_LOG(LogTemp, Warning, TEXT("GA_BasicShoot: 무기 없음 또는 오버히트 상태"));
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
@@ -48,10 +51,13 @@ void UGA_BasicShoot::ActivateAbility(
 
     if (bIsAutoFire)
     {
-        GetWorld()->GetTimerManager().SetTimer(
-            FireTimerHandle,
-            this, &UGA_BasicShoot::Fire,
-            Weapon->FireRate, true);
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().SetTimer(
+                FireTimerHandle,
+                this, &UGA_BasicShoot::Fire,
+                Weapon->FireRate, true);
+        }
     }
     else
     {
@@ -61,6 +67,9 @@ void UGA_BasicShoot::ActivateAbility(
 
 void UGA_BasicShoot::Fire()
 {
+    UWorld* World = GetWorld();
+    if (!World) return;
+
     const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
     if (!Hero || !Hero->IsAlive())
     {
@@ -86,38 +95,32 @@ void UGA_BasicShoot::Fire()
         FRotator AimRotation;
         Controller->GetPlayerViewPoint(CameraLocation, AimRotation);
 
-        FVector MuzzleLocation = Weapon->GetMuzzleTransform().GetLocation();
+        const FVector MuzzleLocation = Weapon->GetMuzzleTransform().GetLocation();
         const FVector CameraTraceEnd = CameraLocation + (AimRotation.Vector() * 10000.f);
 
         FHitResult CameraHitResult;
         FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WeaponTrace), false, Character);
         QueryParams.AddIgnoredActor(Character);
 
-        const bool bHasCameraHit = GetWorld()->LineTraceSingleByChannel(
+        const bool bHasCameraHit = World->LineTraceSingleByChannel(
             CameraHitResult,
             CameraLocation,
             CameraTraceEnd,
             ECC_Visibility,
             QueryParams);
 
-        const FVector AimTarget = bHasCameraHit ? CameraHitResult.ImpactPoint : CameraTraceEnd;
-        const FRotator ProjectileRotation = (AimTarget - MuzzleLocation).Rotation();
+        const FVector   AimTarget           = bHasCameraHit ? CameraHitResult.ImpactPoint : CameraTraceEnd;
+        const FRotator  ProjectileRotation  = (AimTarget - MuzzleLocation).Rotation();
 
         FActorSpawnParameters Params;
         Params.Instigator = Character;
         Params.Owner      = Character;
-        Params.SpawnCollisionHandlingOverride =
-            ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-        GetWorld()->SpawnActor<ALastFPSProjectile>(
-            Weapon->ProjectileClass,
-            MuzzleLocation,
-            ProjectileRotation,
-            Params);
+        World->SpawnActor<ALastFPSProjectile>(Weapon->ProjectileClass, MuzzleLocation, ProjectileRotation, Params);
     }
 
     Weapon->PlayFireEffects();
-
     Weapon->AddHeat();
 
     // 오버히트 도달 시 어빌리티 종료 → 연사 타이머 자동 정지

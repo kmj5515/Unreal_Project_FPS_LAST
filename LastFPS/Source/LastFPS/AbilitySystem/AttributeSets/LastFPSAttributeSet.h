@@ -78,4 +78,8 @@ protected:
     UFUNCTION() void OnRep_AttackDamage(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_Defense(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_MoveSpeed(const FGameplayAttributeData& Old);
+
+private:
+    void HandleDamageEffect(const FGameplayEffectModCallbackData& Data);
+    void HandleHealEffect(const FGameplayEffectModCallbackData& Data);
 };

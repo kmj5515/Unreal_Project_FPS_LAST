@@ -23,7 +23,7 @@ ALastFPSHero::ALastFPSHero()
     CameraBoom->SocketOffset             = DefaultSocketOffset;
     CameraBoom->bUsePawnControlRotation  = true;
     CameraBoom->bEnableCameraLag         = true;
-    CameraBoom->CameraLagSpeed           = 15.f;
+    CameraBoom->CameraLagSpeed           = CameraLagSpeed;
     CameraBoom->bEnableCameraRotationLag = false;
 
     // ── 카메라 ────────────────────────────────────────────────
@@ -97,48 +97,50 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent);
     if (!EIC || !InputConfig) return;
 
-    if (const UInputAction* IA = InputConfig->FindNativeInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Move")))
-        EIC->BindAction(IA, ETriggerEvent::Triggered, this, &ALastFPSHero::Move);
+    TryBindNativeTriggered(EIC, FGameplayTag::RequestGameplayTag("InputTag.Move"), &ALastFPSHero::Move);
+    TryBindNativeTriggered(EIC, FGameplayTag::RequestGameplayTag("InputTag.Look"), &ALastFPSHero::Look);
 
-    if (const UInputAction* IA = InputConfig->FindNativeInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Look")))
-        EIC->BindAction(IA, ETriggerEvent::Triggered, this, &ALastFPSHero::Look);
+    TryBindNativeStartStop(EIC, FGameplayTag::RequestGameplayTag("InputTag.Sprint"),
+        &ALastFPSHero::StartSprint,     &ALastFPSHero::StopSprint);
+    TryBindNativeStartStop(EIC, FGameplayTag::RequestGameplayTag("InputTag.ADS"),
+        &ALastFPSHero::StartADS,        &ALastFPSHero::StopADS);
+    TryBindNativeStartStop(EIC, FGameplayTag::RequestGameplayTag("InputTag.Jump"),
+        &ALastFPSHero::StartJump,       &ALastFPSHero::StopJump);
+    TryBindNativeStartStop(EIC, FGameplayTag::RequestGameplayTag("InputTag.Fire"),
+        &ALastFPSHero::StartFire,       &ALastFPSHero::StopFire);
+    TryBindNativeStartStop(EIC, FGameplayTag::RequestGameplayTag("InputTag.Scoreboard"),
+        &ALastFPSHero::StartScoreboard, &ALastFPSHero::StopScoreboard);
 
-    if (const UInputAction* IA = InputConfig->FindNativeInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Sprint")))
+    TryBindAbilityStart(EIC, FGameplayTag::RequestGameplayTag("InputTag.Skill1"),   &ALastFPSHero::StartSkill1);
+    TryBindAbilityStart(EIC, FGameplayTag::RequestGameplayTag("InputTag.Skill2"),   &ALastFPSHero::StartSkill2);
+    TryBindAbilityStart(EIC, FGameplayTag::RequestGameplayTag("InputTag.Ultimate"), &ALastFPSHero::StartUltimate);
+}
+
+void ALastFPSHero::TryBindNativeTriggered(
+    UEnhancedInputComponent* EIC, const FGameplayTag& Tag,
+    void(ALastFPSHero::*Func)(const FInputActionValue&))
+{
+    if (const UInputAction* IA = InputConfig->FindNativeInputActionByTag(Tag))
+        EIC->BindAction(IA, ETriggerEvent::Triggered, this, Func);
+}
+
+void ALastFPSHero::TryBindNativeStartStop(
+    UEnhancedInputComponent* EIC, const FGameplayTag& Tag,
+    void(ALastFPSHero::*StartFunc)(), void(ALastFPSHero::*StopFunc)())
+{
+    if (const UInputAction* IA = InputConfig->FindNativeInputActionByTag(Tag))
     {
-        EIC->BindAction(IA, ETriggerEvent::Started,   this, &ALastFPSHero::StartSprint);
-        EIC->BindAction(IA, ETriggerEvent::Completed, this, &ALastFPSHero::StopSprint);
+        EIC->BindAction(IA, ETriggerEvent::Started,   this, StartFunc);
+        EIC->BindAction(IA, ETriggerEvent::Completed, this, StopFunc);
     }
+}
 
-    if (const UInputAction* IA = InputConfig->FindNativeInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.ADS")))
-    {
-        EIC->BindAction(IA, ETriggerEvent::Started,   this, &ALastFPSHero::StartADS);
-        EIC->BindAction(IA, ETriggerEvent::Completed, this, &ALastFPSHero::StopADS);
-    }
-
-    if (const UInputAction* IA = InputConfig->FindNativeInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Jump")))
-    {
-        EIC->BindAction(IA, ETriggerEvent::Started,   this, &ALastFPSHero::StartJump);
-        EIC->BindAction(IA, ETriggerEvent::Completed, this, &ALastFPSHero::StopJump);
-    }
-
-    if (const UInputAction* IA = InputConfig->FindNativeInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Fire")))
-    {
-        EIC->BindAction(IA, ETriggerEvent::Started,   this, &ALastFPSHero::StartFire);
-        EIC->BindAction(IA, ETriggerEvent::Completed, this, &ALastFPSHero::StopFire);
-    }
-
-    if (const UInputAction* IA = InputConfig->FindAbilityInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Skill1")))
-        EIC->BindAction(IA, ETriggerEvent::Started, this, &ALastFPSHero::StartSkill1);
-    if (const UInputAction* IA = InputConfig->FindAbilityInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Skill2")))
-        EIC->BindAction(IA, ETriggerEvent::Started, this, &ALastFPSHero::StartSkill2);
-    if (const UInputAction* IA = InputConfig->FindAbilityInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Ultimate")))
-        EIC->BindAction(IA, ETriggerEvent::Started, this, &ALastFPSHero::StartUltimate);
-
-    if (const UInputAction* IA = InputConfig->FindNativeInputActionByTag(FGameplayTag::RequestGameplayTag("InputTag.Scoreboard")))
-    {
-        EIC->BindAction(IA, ETriggerEvent::Started,   this, &ALastFPSHero::StartScoreboard);
-        EIC->BindAction(IA, ETriggerEvent::Completed, this, &ALastFPSHero::StopScoreboard);
-    }
+void ALastFPSHero::TryBindAbilityStart(
+    UEnhancedInputComponent* EIC, const FGameplayTag& Tag,
+    void(ALastFPSHero::*Func)())
+{
+    if (const UInputAction* IA = InputConfig->FindAbilityInputActionByTag(Tag))
+        EIC->BindAction(IA, ETriggerEvent::Started, this, Func);
 }
 
 // ── 이동 ──────────────────────────────────────────────────────

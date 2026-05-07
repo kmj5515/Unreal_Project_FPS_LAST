@@ -10,7 +10,11 @@
       "Bash(Get-ChildItem -Path \"C:\\\\UnrealProject\\\\Unreal_Project_FPS_LAST\" -Directory)",
       "Bash(Select-Object Name)",
       "Bash(Get-ChildItem -Path \"C:\\\\UnrealProject\\\\Unreal_Project_FPS_LAST\\\\LastFPS\\\\Source\\\\LastFPS\" -Recurse -Filter \"*.h\" -File)",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Path \"C:\\\\UnrealProject\\\\Unreal_Project_FPS_LAST\" -Recurse -Filter \"*.h\")",
+      "Bash(Sort-Object)",
+      "Bash(Get-ChildItem -Path \"C:\\\\UnrealProject\\\\Unreal_Project_FPS_LAST\" -Recurse -Include \"*.h\",\"*.cpp\")",
+      "Bash(Sort-Object FullName)"
     ]
   }
 }
