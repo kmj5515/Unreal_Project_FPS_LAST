@@ -213,13 +213,12 @@ void ALastFPSMatchGameMode::RespawnController(AController* ControllerToRespawn)
         return;
     }
 
-    APawn* OldPawn = ControllerToRespawn->GetPawn();
-    RestartPlayer(ControllerToRespawn);
-
-    if (OldPawn)
+    if (APawn* OldPawn = ControllerToRespawn->GetPawn())
     {
         OldPawn->Destroy();
     }
+
+    RestartPlayer(ControllerToRespawn);
 
     if (ALastFPSPlayerState* PS = ControllerToRespawn->GetPlayerState<ALastFPSPlayerState>())
     {
