@@ -1,4 +1,5 @@
 #include "Game/LastFPSGameModeBase.h"
+#include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
@@ -80,7 +81,7 @@ UClass* ALastFPSGameModeBase::GetDefaultPawnClassForController_Implementation(AC
     return Super::GetDefaultPawnClassForController_Implementation(InController);
 }
 
-int32 ALastFPSGameModeBase::GetValidTeamPlayerCount(ELastFPSTeam Team) const
+int32 ALastFPSGameModeBase::GetTeamPlayerCount(ELastFPSTeam Team) const
 {
     if (const TArray<TWeakObjectPtr<AController>>* Roster = TeamRoster.Find(Team))
     {
@@ -98,14 +99,9 @@ int32 ALastFPSGameModeBase::GetValidTeamPlayerCount(ELastFPSTeam Team) const
     return 0;
 }
 
-int32 ALastFPSGameModeBase::GetTeamPlayerCount(ELastFPSTeam Team) const
-{
-    return GetValidTeamPlayerCount(Team);
-}
-
 bool ALastFPSGameModeBase::IsTeamFull(ELastFPSTeam Team) const
 {
-    return GetValidTeamPlayerCount(Team) >= MaxPlayersPerTeam;
+    return GetTeamPlayerCount(Team) >= MaxPlayersPerTeam;
 }
 
 int32 ALastFPSGameModeBase::GetTotalConnectedPlayers() const
@@ -124,6 +120,16 @@ int32 ALastFPSGameModeBase::GetTotalConnectedPlayers() const
     }
 
     return TotalCount;
+}
+
+void ALastFPSGameModeBase::DebugFlow(const FString& Message, FColor Color) const
+{
+    UE_LOG(LogTemp, Log, TEXT("%s"), *Message);
+
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 4.0f, Color, Message);
+    }
 }
 
 ELastFPSTeam ALastFPSGameModeBase::AssignTeam() const

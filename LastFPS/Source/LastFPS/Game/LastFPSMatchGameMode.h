@@ -30,7 +30,6 @@ protected:
     bool CheckTimeLimit(FString& OutReason) const;
     bool CheckKillLimit(FString& OutReason) const;
     void EndMatchAndReturnToLobby(const FString& Reason);
-    void DebugMatchFlow(const FString& Message, FColor Color = FColor::Green) const;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Match")
     int32 MatchDurationSeconds = 180;

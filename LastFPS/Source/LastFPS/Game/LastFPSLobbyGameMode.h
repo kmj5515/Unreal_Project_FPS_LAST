@@ -47,7 +47,6 @@ protected:
     void StartTeamIntroPhase();
     void FinishTeamIntroPhase();
     void ExecuteMatchTravel();
-    void DebugLobbyFlow(const FString& Message, FColor Color = FColor::Green) const;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Lobby")
     int32 LobbyStartPlayerCount = 3;

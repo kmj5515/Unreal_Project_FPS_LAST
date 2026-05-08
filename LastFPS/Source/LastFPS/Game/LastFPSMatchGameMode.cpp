@@ -2,7 +2,6 @@
 
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Character/LastFPSCharacterBase.h"
-#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/GameStateBase.h"
@@ -20,7 +19,7 @@ void ALastFPSMatchGameMode::BeginPlay()
 {
     Super::BeginPlay();
 
-    DebugMatchFlow(TEXT("[Match] MatchGameMode BeginPlay"));
+    DebugFlow(TEXT("[Match] MatchGameMode BeginPlay"));
     StartDropIntroPhase();
 }
 
@@ -33,7 +32,7 @@ void ALastFPSMatchGameMode::PostLogin(APlayerController* NewPlayer)
         ApplyDropIntroToController(NewPlayer);
     }
 
-    DebugMatchFlow(FString::Printf(
+    DebugFlow(FString::Printf(
         TEXT("[Match] Player Joined: %s (Total: %d)"),
         *NewPlayer->GetName(),
         GetTotalConnectedPlayers()),
@@ -54,7 +53,7 @@ void ALastFPSMatchGameMode::StartDropIntroPhase()
     }
 
     bDropIntroInProgress = true;
-    DebugMatchFlow(
+    DebugFlow(
         FString::Printf(TEXT("[Match] Drop intro started (%.1f second(s))."), DropIntroSeconds),
         FColor::Blue);
 
@@ -102,7 +101,7 @@ void ALastFPSMatchGameMode::FinishDropIntroPhase()
     bDropIntroInProgress = false;
     MatchStartServerTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 
-    DebugMatchFlow(
+    DebugFlow(
         FString::Printf(
             TEXT("[Match] Drop intro finished. Match started (%d sec, kill limit %d)."),
             MatchDurationSeconds,
@@ -170,7 +169,7 @@ void ALastFPSMatchGameMode::UpdateRespawnSchedule(UWorld* World)
             const float RespawnAt = World->GetTimeSeconds() + RespawnDelaySeconds;
             PendingRespawnControllers.Add(PC, RespawnAt);
 
-            DebugMatchFlow(
+            DebugFlow(
                 FString::Printf(
                     TEXT("[Match] Respawn scheduled: %s in %.1f second(s)."),
                     *PC->GetName(),
@@ -229,7 +228,7 @@ void ALastFPSMatchGameMode::RespawnController(AController* ControllerToRespawn)
         }
     }
 
-    DebugMatchFlow(FString::Printf(TEXT("[Match] Respawned: %s"), *ControllerToRespawn->GetName()), FColor::Cyan);
+    DebugFlow(FString::Printf(TEXT("[Match] Respawned: %s"), *ControllerToRespawn->GetName()), FColor::Cyan);
 }
 
 bool ALastFPSMatchGameMode::IsMatchEndConditionMet(FString& OutReason) const
@@ -293,27 +292,17 @@ void ALastFPSMatchGameMode::EndMatchAndReturnToLobby(const FString& Reason)
         World->GetTimerManager().ClearTimer(MatchRuleTimerHandle);
     }
 
-    DebugMatchFlow(FString::Printf(TEXT("[Match] Deathmatch ended. Reason: %s"), *Reason), FColor::Red);
+    DebugFlow(FString::Printf(TEXT("[Match] Deathmatch ended. Reason: %s"), *Reason), FColor::Red);
 
     if (LobbyMapURL.IsEmpty())
     {
-        DebugMatchFlow(TEXT("[Match] LobbyMapURL is empty. Return-to-lobby aborted."), FColor::Red);
+        DebugFlow(TEXT("[Match] LobbyMapURL is empty. Return-to-lobby aborted."), FColor::Red);
         return;
     }
 
     if (UWorld* World = GetWorld())
     {
-        DebugMatchFlow(FString::Printf(TEXT("[Match] Returning to lobby: %s"), *LobbyMapURL), FColor::Green);
+        DebugFlow(FString::Printf(TEXT("[Match] Returning to lobby: %s"), *LobbyMapURL), FColor::Green);
         World->ServerTravel(LobbyMapURL);
-    }
-}
-
-void ALastFPSMatchGameMode::DebugMatchFlow(const FString& Message, FColor Color) const
-{
-    UE_LOG(LogTemp, Log, TEXT("%s"), *Message);
-
-    if (GEngine)
-    {
-        GEngine->AddOnScreenDebugMessage(-1, 4.0f, Color, Message);
     }
 }

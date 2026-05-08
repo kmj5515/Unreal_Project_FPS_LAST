@@ -1,7 +1,6 @@
 #include "Game/LastFPSLobbyGameMode.h"
 
 #include "Game/LastFPSLobbyGameState.h"
-#include "Engine/Engine.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
@@ -19,7 +18,7 @@ void ALastFPSLobbyGameMode::PostLogin(APlayerController* NewPlayer)
     PlayerReadyMap.Add(NewPlayer, false);
     SyncLobbyStateToGameState();
 
-    DebugLobbyFlow(
+    DebugFlow(
         FString::Printf(
             TEXT("[Lobby] Player Joined: %s (%d / %d)"),
             *NewPlayer->GetName(),
@@ -35,7 +34,7 @@ void ALastFPSLobbyGameMode::Logout(AController* Exiting)
     PlayerReadyMap.Remove(Exiting);
     SyncLobbyStateToGameState();
 
-    DebugLobbyFlow(
+    DebugFlow(
         FString::Printf(
             TEXT("[Lobby] Player Left: %s (%d / %d)"),
             Exiting ? *Exiting->GetName() : TEXT("Unknown"),
@@ -46,7 +45,7 @@ void ALastFPSLobbyGameMode::Logout(AController* Exiting)
     if (bCharacterSelectInProgress && GetTotalConnectedPlayers() < LobbyStartPlayerCount)
     {
         CancelCharacterSelectPhase();
-        DebugLobbyFlow(TEXT("[Lobby] Character select cancelled. Not enough players."), FColor::Orange);
+        DebugFlow(TEXT("[Lobby] Character select cancelled. Not enough players."), FColor::Orange);
     }
 }
 
@@ -70,7 +69,7 @@ void ALastFPSLobbyGameMode::TryStartMatchFromLobby()
     const int32 CurrentPlayers = GetTotalConnectedPlayers();
     if (CurrentPlayers < LobbyStartPlayerCount)
     {
-        DebugLobbyFlow(
+        DebugFlow(
             FString::Printf(
                 TEXT("[Lobby] Waiting for players... (%d / %d)"),
                 CurrentPlayers,
@@ -116,7 +115,7 @@ void ALastFPSLobbyGameMode::SetPlayerReady(AController* PlayerController, bool b
 
     PlayerReadyMap[PlayerController] = bReady;
 
-    DebugLobbyFlow(
+    DebugFlow(
         FString::Printf(
             TEXT("[Lobby] Ready changed: %s -> %s"),
             *PlayerController->GetName(),
@@ -148,7 +147,7 @@ void ALastFPSLobbyGameMode::StartCharacterSelectPhase()
         }
     }
 
-    DebugLobbyFlow(
+    DebugFlow(
         FString::Printf(
             TEXT("[Lobby] Character select started (%d second(s))."),
             RemainingCharacterSelectSeconds),
@@ -166,7 +165,7 @@ void ALastFPSLobbyGameMode::StartCharacterSelectPhase()
     else
     {
         bCharacterSelectInProgress = false;
-        DebugLobbyFlow(TEXT("[Lobby] World is null. Character select aborted."), FColor::Red);
+        DebugFlow(TEXT("[Lobby] World is null. Character select aborted."), FColor::Red);
     }
 }
 
@@ -181,7 +180,7 @@ void ALastFPSLobbyGameMode::TickCharacterSelectPhase()
     if (CurrentPlayers < LobbyStartPlayerCount)
     {
         CancelCharacterSelectPhase();
-        DebugLobbyFlow(TEXT("[Lobby] Character select cancelled. Not enough players."), FColor::Orange);
+        DebugFlow(TEXT("[Lobby] Character select cancelled. Not enough players."), FColor::Orange);
         return;
     }
 
@@ -196,7 +195,7 @@ void ALastFPSLobbyGameMode::TickCharacterSelectPhase()
 
     if (RemainingCharacterSelectSeconds > 0)
     {
-        DebugLobbyFlow(
+        DebugFlow(
             FString::Printf(TEXT("[Lobby] Character select remaining: %d"), RemainingCharacterSelectSeconds),
             FColor::Green);
         return;
@@ -276,7 +275,7 @@ void ALastFPSLobbyGameMode::StartTeamIntroPhase()
     bTeamIntroInProgress = true;
     SyncLobbyStateToGameState();
 
-    DebugLobbyFlow(
+    DebugFlow(
         FString::Printf(
             TEXT("[Lobby] Team intro started (%.1f second(s))."),
             TeamIntroSeconds),
@@ -294,7 +293,7 @@ void ALastFPSLobbyGameMode::StartTeamIntroPhase()
     else
     {
         bTeamIntroInProgress = false;
-        DebugLobbyFlow(TEXT("[Lobby] World is null. Team intro aborted."), FColor::Red);
+        DebugFlow(TEXT("[Lobby] World is null. Team intro aborted."), FColor::Red);
     }
 }
 
@@ -307,7 +306,7 @@ void ALastFPSLobbyGameMode::FinishTeamIntroPhase()
 
 void ALastFPSLobbyGameMode::ExecuteMatchTravel()
 {
-    DebugLobbyFlow(
+    DebugFlow(
         FString::Printf(
             TEXT("[Lobby] Requirement met. Start match and travel: %s"),
             MatchMapURL.IsEmpty() ? TEXT("(empty map url)") : *MatchMapURL),
@@ -318,7 +317,7 @@ void ALastFPSLobbyGameMode::ExecuteMatchTravel()
         ClearLobbyTimers();
         ResetLobbyFlowState();
         SyncLobbyStateToGameState();
-        DebugLobbyFlow(TEXT("[Lobby] MatchMapURL is empty. Travel aborted."), FColor::Red);
+        DebugFlow(TEXT("[Lobby] MatchMapURL is empty. Travel aborted."), FColor::Red);
         return;
     }
 
@@ -335,20 +334,6 @@ void ALastFPSLobbyGameMode::ExecuteMatchTravel()
     {
         ResetLobbyFlowState();
         SyncLobbyStateToGameState();
-        DebugLobbyFlow(TEXT("[Lobby] World is null. Travel aborted."), FColor::Red);
-    }
-}
-
-void ALastFPSLobbyGameMode::DebugLobbyFlow(const FString& Message, FColor Color) const
-{
-    UE_LOG(LogTemp, Log, TEXT("%s"), *Message);
-
-    if (GEngine)
-    {
-        GEngine->AddOnScreenDebugMessage(
-            -1,
-            4.0f,
-            Color,
-            Message);
+        DebugFlow(TEXT("[Lobby] World is null. Travel aborted."), FColor::Red);
     }
 }

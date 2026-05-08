@@ -37,16 +37,13 @@ public:
     UFUNCTION(BlueprintCallable, Category="LastFPS|Teams")
     int32 GetTotalConnectedPlayers() const;
 
-    // 팀 스폰 포인트 — 에디터에서 팀별 위치를 할당
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Teams")
-    TMap<ELastFPSTeam, TSoftObjectPtr<AActor>> TeamSpawnPoints;
-
     // 캐릭터 선택 인덱스별 Pawn 클래스 목록 (로비/매치 GM에서 동일 순서로 세팅)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
     TArray<TSubclassOf<APawn>> CharacterPawnClasses;
 
 protected:
-    int32 GetValidTeamPlayerCount(ELastFPSTeam Team) const;
+    // 화면 디버그 + 로그를 한 번에 — 파생 GameMode들의 공용 헬퍼
+    void DebugFlow(const FString& Message, FColor Color = FColor::Green) const;
 
     // 팀당 최대 인원 (기본 3)
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Teams")
