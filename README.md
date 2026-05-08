@@ -1,7 +1,7 @@
 # LastFPS — 포트폴리오 멀티플레이어 TPS/FPS 프로젝트
 
 > Unreal Engine 5.7 + GAS(Gameplay Ability System) 기반  
-> Time Takers에서 영감을 받은 팀 기반 경쟁 슈팅 게임
+> Time Takers에서 영감을 받은 **개인전(FFA)** 경쟁 슈팅 게임 (동시 입장 최대 3명)
 
 ---
 
@@ -19,16 +19,16 @@
 
 ## 게임 개요
 
-**장르:** 3인칭 기반 멀티플레이어 팀 배틀 슈팅  
+**장르:** 3인칭 기반 멀티플레이어 개인전(FFA) 슈팅  
 **플랫폼:** PC (Windows)  
 **네트워크:** 멀티플레이어 전용 (Dedicated Server 목표)  
-**최대 인원:** 12명 (4팀 × 3인 1팀)
+**동시 입장:** 최대 **3명** (팀 없음, 모두 적대)
 
 ### 컨셉
 
-Time Takers의 빠른 템포와 팀 시너지 메카닉을 참고하여, 각 플레이어가 고유한 스킬셋을 가지고 팀원과 협력해 상대 팀을 제압하는 경쟁 슈팅 게임.
+Time Takers의 빠른 템포와 스킬 기반 전투를 참고하여, 각 플레이어가 고유한 스킬셋으로 **다른 모든 참가자와 개인전**을 벌이는 경쟁 슈팅 게임.
 
-단순 DPS 경쟁이 아닌 **역할 분담 + 스킬 조합**이 승리 핵심인 게임을 목표로 한다.
+단순 DPS 경쟁이 아닌 **캐릭터별 스킬 운용과 판단**이 승부를 가르는 것을 목표로 한다. (팀 협력·팀 점수 없음)
 
 ---
 
@@ -62,42 +62,37 @@ Time Takers의 빠른 템포와 팀 시너지 메카닉을 참고하여, 각 플
 - **MoveSpeed** — 기본 이동속도 배율
 
 ### 게임 모드
-- **팀 데스매치 (TDM):** 4팀 3인, 제한 시간 내 최다 킬 팀 승리
-- (추후 확장) 점령전, 폭탄 설치전 등
+- **데스매치 (FFA):** 동시 입장 최대 3명, 제한 시간 내 **개인 킬 수** 등으로 순위 결정 (승자 1명 또는 상위 랭킹)
+- (추후 확장) 다른 규칙·맵 변형 등은 규모에 맞게 검토
 
-### 팀 구성
-```
-Team A (3명)  |  Team B (3명)
-Team C (3명)  |  Team D (3명)
-```
-- 팀당 최소 1명 ~ 최대 3명
-- 팀 간 FF(아군 피격) 없음
-- 개인 점수 + 팀 점수 이중 집계
+### 세션 구성
+- **로비 → 매치:** 최대 3명이 모이면 시작하는 흐름 유지 (코드·문서의 “3명 입장” 조건과 일치)
+- 팀 없음 → 아군 구분·FF 처리 불필요
+- 집계는 **개인 킬/데스·딜 등** 중심 (팀 점수 없음)
 
 ### 게임 흐름 연출
 
-#### 1. 팀 인트로 시퀀스 (Match Start)
-매치 시작 직전 **팀 소개 화면** 표시:
-- 화면이 팀별로 나뉘어 각 팀의 캐릭터 3인이 포즈를 취하며 등장
-- 팀 이름 / 팀 컬러 / 멤버 닉네임 표시
+#### 1. 매치 인트로 시퀀스 (Match Start)
+매치 시작 직전 **참가자 소개 화면** 표시 (최대 3명, 팀 개념 없음):
+- 이번 매치에 입장한 플레이어(최대 3명)와 캐릭터가 포즈를 취하며 등장
+- 닉네임 / 캐릭터 / 구분용 컬러 등 표시 (팀명·팀 컬러 없음)
 - Sequencer 또는 UMG 애니메이션으로 연출 (2~3초)
 - 이후 **낙하 인트로**로 자연스럽게 전환
 
 #### 2. 낙하 & 착지 인트로 (Drop Intro)
-팀 소개 후 전투 개시 전 **하늘에서 낙하하는 연출**:
+매치 인트로 후 전투 개시 전 **하늘에서 낙하하는 연출**:
 - 모든 플레이어가 공중 고고도 지점에서 스폰
 - 낙하 중 캐릭터 낙하 애니메이션 재생 (팔다리 펼침 → 수직 다이브)
-- 맵 특정 착지 포인트(팀 스폰존)로 낙하
+- 맵 특정 착지 포인트(스폰존)로 낙하
 - 착지 시 **임팩트 이펙트 + 카메라 셰이크** 연출
 - 착지 완료 후 전투 입력 활성화 (착지 전 이동 입력 차단)
 - 구현 방식: `GA_DropIntro` GameplayAbility로 관리, 착지 판정은 `OnLanded` 오버라이드
 
 #### 3. MVP 결과 화면 (Match End)
-게임 종료 후 **MVP 캐릭터 하이라이트**:
-- 1위 팀 + 개인 MVP(최다 킬 or 최고 점수) 선정
-- MVP 캐릭터가 화면 중앙에서 **Victory 포즈 애니메이션** 재생
-- 뒤에 팀원들이 함께 등장하는 그룹 연출
-- 패배팀은 화면 한편에 흐릿하게 표시
+게임 종료 후 **MVP / 우승자 하이라이트**:
+- **1위(우승)** 기준: 최다 킬 또는 종합 점수 규칙에 따른 1명 선정
+- 우승 캐릭터가 화면 중앙에서 **Victory 포즈 애니메이션** 재생
+- 나머지 참가자(2명 이하)는 스코어보드·부차 연출로 표시 (팀 단위 연출 없음)
 - 개인 스탯 (킬/데스/어시스트/딜량) 스코어보드 오버레이
 - 구현 방식: 전용 MVP 레벨 또는 GameState → Level Sequence 트리거
 
@@ -145,22 +140,21 @@ ALastFPSPlayerState
         └── GameplayCues                 // 이펙트·사운드 트리거
 ```
 
-### 피해 파이프라인 (총알 → GAS)
+**사망 애니:** `LastFPSAnimInstance`에서 `bIsDead` → AnimBP 레이어 전환.
 
-- **UE 기본 `ApplyDamage` / `TakeDamage`는 사용하지 않음.** 피해는 전부 **GameplayEffect**로만 들어간다.
-- 서버에서 `ALastFPSProjectile::OnHit`: 명중 대상이 `IAbilitySystemInterface`이면, 발사자 ASC로 `MakeOutgoingSpec` → `AddInstigator` → 대상 ASC에 `ApplyGameplayEffectSpecToSelf`.
-- 발사체 **`DamageEffect`** 미지정 시 생성자 기본값은 **`ULastFPSGE_DamageInstant`** (C++). 블루프린트 발사체에서는 동일 슬롯에 커스텀 GE를 넣을 수 있다. **GE는 `Damage` 메타 어트리뷰트에 Additive**로 magnitude를 넣는 형태가 맞다 (`AttackDamage`만 수정하는 GE는 체력 감소로 이어지지 않음).
-- `ULastFPSAttributeSet::PostGameplayEffectExecute`에서 **Damage** 처리 시 **Health** 감소, 피격 사운드, **`ALastFPSPlayerState` 매치 통계**(딜 넣음/받음, 킬/데스, 힐 주고받음) 갱신.
+- 이 프로젝트의 피해 처리는 UE 기본 `ApplyDamage`가 아니라 **GameplayEffect 기반**으로 통일되어 있다.
+- 발사체 명중 시 서버에서 대상 ASC에 피해 GE를 적용한다.
+- 피해 적용 결과(체력 감소, 피격 반응, 매치 통계 갱신)는 AttributeSet/PlayerState 흐름에서 처리된다.
 
 ### 매치 통계 (`ALastFPSPlayerState`)
 
-- **서버 전용** `Auth_*`로 누적 후 **복제**: 킬, 데스, 딜 줌, 딜 받음, 힐 받음, 힐 줌.
-- GAS Owner가 `PlayerState`이므로 ASC Owner와 일치할 때 통계가 올라간다. **게임 모드 / 월드 세팅에서 `PlayerState` 클래스가 `ALastFPSPlayerState`인지** 확인할 것 (기본 `APlayerState`면 GAS·통계가 붙지 않음).
+- 매치 통계(킬/데스/딜·힐)는 서버에서 누적하고 클라이언트로 복제한다.
+- `PlayerState` 클래스가 `ALastFPSPlayerState`로 설정되어 있어야 통계/GAS 연동이 정상 동작한다.
 
 ### 애니메이션 — 사망
 
-- **`ULastFPSAnimInstance`** (`Animation/LastFPSAnimInstance.*`)의 `NativeUpdateAnimation`에서 `bIsDead = !Cast<ALastFPSCharacterBase>(OwnerCharacter)->IsAlive()` (**체력 기준**).
-- 실제 쓰러지는 포즈·레이어 전환은 **AnimBP**에서 `bIsDead`를 읽어 처리 (문서화 기준: `UpperBody_Death` 레이어, Blend Poses by bool).
+- 사망 판정은 캐릭터 생존 상태를 기준으로 `bIsDead`에 반영된다.
+- 실제 사망 포즈/레이어 전환은 AnimBP에서 `bIsDead`를 사용해 처리한다.
 
 ### 네트워크 구조
 ```
@@ -175,7 +169,7 @@ ALastFPSPlayerState
 - 로비 전용 폰은 `ALastFPSLobbyGameMode::LobbyPawnClass`로 분리하여 전투 입력/사격을 차단
 Dedicated Server
   ├── ALastFPSGameMode        // 규칙 관리 (서버 전용)
-  ├── ALastFPSGameState        // 팀 점수, 타이머 (모든 클라 복제)
+  ├── ALastFPSGameState        // 매치 타이머·(필요 시) 개인/매치 상태 (모든 클라 복제)
   ├── ALastFPSPlayerState × N  // 개인 스탯, ASC 보유
   └── ALastFPSCharacter × N    // 폰, 이동·애니 복제
         └── ALastFPSPlayerController × N  // 입력, HUD
@@ -230,8 +224,8 @@ ACharacter
 - [x] 기본 이동 및 사격 네트워크 복제 검증 (CharacterMovement 기본 복제 + WeaponComponent Heat/Overheat Replicated)
 - [x] GAS Prediction 적용 — GA_Jump 신규 (LocalPredicted + CMC 물리 예측), GA_Sprint 기존 LocalPredicted 확인
 - [x] GameMode 기초 구현 (`ALastFPSGameModeBase`)
-- [x] 팀 배정 로직 (최대 4팀 × 3인, 인원 균등 배분)
-- [ ] GameState 팀 점수 관리
+- [ ] **FFA 정비:** 팀 배정 제거·개인전 규칙에 맞게 GameMode/GameState 정리 (README 방향: 최대 3명)
+- [ ] GameState — 매치 타이머·(선택) 라운드 종료 조건 (팀 점수 불필요)
 - [x] 기본 리스폰 시스템
 
 ### Phase 4 — 스킬 시스템 (목표: ~4주)
@@ -248,8 +242,8 @@ ACharacter
 - [x] 체력바 / 스태미나바 / 궁극게이지 HUD — C++ 베이스(`ULastFPSHUDWidget`) + GAS 어트리뷰트 델리게이트 바인딩, Blueprint에서 Progress Bar 연결
 - [x] 오버히트 게이지 바 — `OnHeatChanged` RepNotify + 멀티캐스트 델리게이트, 오버히트 시 색상 분기
 - [ ] 스킬 슬롯 쿨다운 아이콘 (Q / E / F)
-- [ ] 킬피드 / 팀 점수판
-- [ ] 미니맵 (팀원 위치 표시)
+- [ ] 킬피드 / 개인 점수판
+- [ ] 미니맵 (참가자 위치 표시, 최대 3명)
 - [ ] 게임 종료 스코어보드
 
 ### Phase 6 — 게임 흐름 & 연출 (목표: ~3주)
@@ -257,16 +251,16 @@ ACharacter
 - [x] 로비 캐릭터 선택/확정 스폰 (프로토타입) — 로비 선택 인덱스 저장(`PlayerState` + `GameInstance`), 매치 첫 스폰 시 인덱스 기반 `CharacterPawnClasses` 적용
 - [x] 로비 전용 폰 분리 — 로비에서는 `LobbyPawnClass` 사용, 매치에서는 전투 Pawn 스폰
 - [x] 드랍 인트로 보정 — 드랍 진행 중 후속 접속 플레이어도 `PostLogin`에서 동일 낙하 연출 적용
-- [ ] **[팀 인트로]** 매치 시작 시 팀별 캐릭터 소개 UI 연출
-  - UMG 팀 소개 위젯 (팀 컬러, 닉네임, 캐릭터 포즈)
+- [ ] **[매치 인트로]** 매치 시작 시 참가자(최대 3명) 소개 UI 연출
+  - UMG 참가자 소개 위젯 (닉네임, 캐릭터, 구분 컬러, 포즈)
   - 멀티에서 모든 클라이언트 동기화 (RPC 또는 GameState 플래그)
 - [ ] **[낙하 인트로]** 하늘 스폰 → 착지 연출
   - `GA_DropIntro` Gameplay Ability 구현
   - 낙하 애니메이션 + 착지 임팩트 카메라 셰이크
   - 착지 완료 전 전투 입력 잠금
 - [ ] **[MVP 결과 화면]** 게임 종료 후 MVP 하이라이트
-  - GameState에서 MVP 선정 로직 (킬/딜/어시 가중치)
-  - MVP Victory 포즈 Montage + 팀원 그룹 연출
+  - GameState에서 우승/MVP 선정 로직 (킬/딜/어시 가중치)
+  - 우승자 Victory 포즈 Montage + 나머지 참가자 스코어보드 연출
   - 개인 스탯 스코어보드 오버레이 (K/D/A/딜량)
   - Level Sequence 또는 전용 MVP 레벨 전환
 - [ ] 히트마커, 피격 방향 표시기
@@ -304,7 +298,7 @@ LastFPS/
 │   │   ├── LastFPSGameInstance.h/.cpp  # 로비 캐릭터 선택 인덱스 저장/복원
 │   │   ├── LastFPSLobbyGameMode.h/.cpp   # 로비: 인원 대기, 시작 조건, 맵 이동
 │   │   ├── LastFPSMatchGameMode.h/.cpp   # 인게임: 매치 시작/입장 흐름
-│   │   ├── LastFPSGameState.h/.cpp    # 미구현 (팀 점수 관리 예정)
+│   │   ├── LastFPSGameState.h/.cpp    # 미구현 (매치 상태·타이머 등, FFA 기준)
 │   │   └── LastFPSPlayerState.h/.cpp
 │   ├── Input/                  # InputConfig DataAsset, IMC
 │   ├── UI/
@@ -356,4 +350,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-07 — Phase 6 프로토타입 업데이트: 로비 캐릭터 선택 인덱스 저장(`PlayerState`+`GameInstance`) 및 매치 스폰 반영, 로비 전용 Pawn 분리, 드랍 인트로 후속 접속 보정 적용. 문서의 흐름/폴더 구조를 최신 코드 기준으로 정리.*
+*Last updated: 2026-05-08 — **게임 방향 문서 정리:** 팀전(4팀×3인) 설명을 제거하고 **개인전(FFA)·동시 입장 최대 3명** 기준으로 개요·모드·인트로/MVP·로드맵을 정렬. 인트로 흐름(매치 시작 연출 → 낙하 → 전투 / 종료 MVP)은 유지하되, 팀 인트로는 참가자 소개로 단순화.*
