@@ -30,6 +30,12 @@ void ALastFPSGameModeBase::PostLogin(APlayerController* NewPlayer)
 
     TeamRoster[AssignedTeam].Add(NewPlayer);
 
+    // 클라이언트가 자기 팀을 알고 점수판/UI에서 사용할 수 있도록 PlayerState에도 복제
+    if (ALastFPSPlayerState* LastPS = NewPlayer->GetPlayerState<ALastFPSPlayerState>())
+    {
+        LastPS->Auth_SetTeam(AssignedTeam);
+    }
+
     UE_LOG(LogTemp, Log, TEXT("GameMode: %s → Team %d 배정 (현재 %d명)"),
         *NewPlayer->GetName(),
         static_cast<int32>(AssignedTeam),

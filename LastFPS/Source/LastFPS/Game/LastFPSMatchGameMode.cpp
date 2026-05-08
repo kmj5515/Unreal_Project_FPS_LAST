@@ -7,12 +7,14 @@
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/PlayerStart.h"
+#include "Game/LastFPSMatchGameState.h"
 #include "Game/LastFPSPlayerState.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 ALastFPSMatchGameMode::ALastFPSMatchGameMode()
 {
     bUseSeamlessTravel = true;
+    GameStateClass = ALastFPSMatchGameState::StaticClass();
 }
 
 void ALastFPSMatchGameMode::BeginPlay()

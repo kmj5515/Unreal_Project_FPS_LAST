@@ -35,7 +35,7 @@ protected:
     int32 MatchDurationSeconds = 180;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Match")
-    int32 MatchKillLimit = 10;
+    int32 MatchKillLimit = 3;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Match")
     float RespawnDelaySeconds = 6.0f;

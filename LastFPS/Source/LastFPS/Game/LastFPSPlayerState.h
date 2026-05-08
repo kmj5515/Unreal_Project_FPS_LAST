@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemInterface.h"
+#include "Game/LastFPSGameModeBase.h"
 #include "LastFPSPlayerState.generated.h"
 
 class UAbilitySystemComponent;
@@ -36,6 +37,7 @@ public:
     FORCEINLINE float GetStatHealingReceived() const { return StatHealingReceived; }
     FORCEINLINE float GetStatHealingGiven() const { return StatHealingGiven; }
     FORCEINLINE int32 GetSelectedCharacterIndex() const { return SelectedCharacterIndex; }
+    FORCEINLINE ELastFPSTeam GetTeam() const { return Team; }
 
     /** GAS AttributeSet 등 서버 전용 — 권한 없으면 무시 */
     void Auth_AddDamageDealt(float Amount);
@@ -46,6 +48,7 @@ public:
     void Auth_AddDeath();
     void Auth_AddAssist();
     void Auth_SetSelectedCharacterIndex(int32 NewIndex);
+    void Auth_SetTeam(ELastFPSTeam NewTeam);
 
 protected:
     UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Stats")
@@ -71,6 +74,9 @@ protected:
 
     UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Lobby")
     int32 SelectedCharacterIndex = 0;
+
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Teams")
+    ELastFPSTeam Team = ELastFPSTeam::None;
 
 private:
     void Auth_AddFloatStat(float& Stat, float Amount);
