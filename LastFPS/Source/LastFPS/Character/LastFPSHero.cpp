@@ -33,11 +33,14 @@ ALastFPSHero::ALastFPSHero()
     FollowCamera->FieldOfView             = DefaultFOV;
 
     // ── 캐릭터 회전 설정 ──────────────────────────────────────
+    // 항상 컨트롤러 Yaw를 따라 몸이 돌아야 다른 클라이언트에 회전이 복제됨
     bUseControllerRotationPitch = false;
-    bUseControllerRotationYaw   = false;
+    bUseControllerRotationYaw   = true;
     bUseControllerRotationRoll  = false;
 
-    GetCharacterMovement()->bOrientRotationToMovement = true;
+    // bOrientRotationToMovement와 bUseControllerRotationYaw는 동시에 쓰면 충돌 —
+    // 컨트롤러 Yaw 고정 방식이므로 이동 방향 자동 회전은 끔
+    GetCharacterMovement()->bOrientRotationToMovement = false;
     GetCharacterMovement()->RotationRate              = FRotator(0.f, 500.f, 0.f);
     GetCharacterMovement()->MaxWalkSpeed              = 400.f;
     GetCharacterMovement()->MaxWalkSpeedCrouched      = 200.f;
@@ -215,9 +218,6 @@ void ALastFPSHero::StartADS()
     TargetArmLength    = ADSArmLength;
     TargetSocketOffset = ADSSocketOffset;
     TargetFOV          = ADSFOV;
-
-    bUseControllerRotationYaw                         = true;
-    GetCharacterMovement()->bOrientRotationToMovement = false;
 }
 
 void ALastFPSHero::StopADS()
@@ -227,9 +227,6 @@ void ALastFPSHero::StopADS()
     TargetArmLength    = DefaultArmLength;
     TargetSocketOffset = DefaultSocketOffset;
     TargetFOV          = DefaultFOV;
-
-    bUseControllerRotationYaw                         = false;
-    GetCharacterMovement()->bOrientRotationToMovement = true;
 }
 
 // ── 점프 / 더블점프 ───────────────────────────────────────────
