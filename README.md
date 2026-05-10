@@ -130,7 +130,7 @@ ALastFPSPlayerState
         │     └── GA_Ultimate (F)        // 태그·입력 준비, GA 미구현
         ├── GameplayEffects
         │     ├── ULastFPSGE_DamageInstant  // 네이티브 즉시 피해 (Damage 메타 +Additive, 기본 15)
-        │     ├── (선택) BP 피해 GE — 발사체 `DamageEffect`로 지정 가능, **Damage** 메타에 Additive 양수 권장
+        │     ├── (선택) BP 피해 GE — GA_BasicShoot `DamageEffectClass`로 지정, **Damage** 메타에 Additive 양수 권장
         │     ├── ULastFPSGE_HealInstant       // E 스킬: 즉시 체력 회복
         │     ├── ULastFPSGE_MoveSpeedBuff    // Q 스킬: 3초간 이동속도 증가 (Duration)
         │     ├── GE_SprintSpeed              // 달리기: MoveSpeed +300 (Infinite, GA_Sprint 내부)
@@ -143,7 +143,8 @@ ALastFPSPlayerState
 **사망 애니:** `LastFPSAnimInstance`에서 `bIsDead` → AnimBP 레이어 전환.
 
 - 이 프로젝트의 피해 처리는 UE 기본 `ApplyDamage`가 아니라 **GameplayEffect 기반**으로 통일되어 있다.
-- 발사체 명중 시 서버에서 대상 ASC에 피해 GE를 적용한다.
+- 발사 시 **Hitscan(LineTrace) 방식**으로 서버에서 즉시 히트 판정 후 대상 ASC에 피해 GE를 적용한다.
+- `ALastFPSProjectile`은 VFX 전용(충돌 없음, 탄도 트레일 표시)이며 데미지 역할을 하지 않는다.
 - 피해 적용 결과(체력 감소, 피격 반응, 매치 통계 갱신)는 AttributeSet/PlayerState 흐름에서 처리된다.
 
 ### 매치 통계 (`ALastFPSPlayerState`)
@@ -206,8 +207,8 @@ ACharacter
 
 ### Phase 2 — 전투 시스템 기초 (목표: ~3주)
 - [x] 무기 컴포넌트 설계 (`UWeaponComponent`) — 기본 무기 BP 장착, WeaponSocket 부착
-- [x] `GA_BasicShoot` — 발사체 발사 (MuzzleFlash 소켓 위치 + 카메라 조준 방향)
-- [x] `ULastFPSGE_DamageInstant` + 발사체 적용 — **Damage** 메타에 즉시 가산 → AttributeSet에서 Health 반영 (선택 BP GE 동일 규칙)
+- [x] `GA_BasicShoot` — Hitscan 발사: `LocalFire`(즉시 이펙트) + `ServerFire`(LineTrace 히트 판정 + 데미지 GE 적용 + VFX 투사체 스폰)
+- [x] `ULastFPSGE_DamageInstant` — **Damage** 메타에 즉시 가산 → AttributeSet에서 Health 반영; `DamageEffectClass`는 GA_BasicShoot에서 관리
 - [x] 오버히트 시스템 — 열 게이지 누적/냉각, 오버히트 시 발사 잠금
 - [x] 발사 이펙트 — 머즐플래시 Cascade 파티클 + 발사음 (MuzzleFlash 소켓 기준)
 - [x] 발사체 비주얼 — 스태틱 메시 대신 Cascade 트레일 파티클 (`UParticleSystemComponent`)
@@ -350,4 +351,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-08 — **게임 방향 문서 정리:** 팀전(4팀×3인) 설명을 제거하고 **개인전(FFA)·동시 입장 최대 3명** 기준으로 개요·모드·인트로/MVP·로드맵을 정렬. 인트로 흐름(매치 시작 연출 → 낙하 → 전투 / 종료 MVP)은 유지하되, 팀 인트로는 참가자 소개로 단순화.*
+*Last updated: 2026-05-11 — **발사 구조 Hitscan 전환:** GA_BasicShoot을 LocalFire+ServerFire로 분리, 투사체를 VFX 전용(30,000 cm/s·충돌 없음)으로 변환. DamageEffectClass를 GA_BasicShoot으로 이동. 캐릭터 회전 동기화 수정(bUseControllerRotationYaw=true 항상, bOrientRotationToMovement=false).*

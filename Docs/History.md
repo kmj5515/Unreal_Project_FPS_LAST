@@ -58,8 +58,9 @@ AddMovementInput(ForwardDir, MovementVector.Y);
 AddMovementInput(RightDir,   MovementVector.X);
 ```
 
-`bOrientRotationToMovement = true` 로 캐릭터 메시가 이동 방향을 자동으로 바라본다.  
-ADS 진입 시 `bOrientRotationToMovement = false` + `bUseControllerRotationYaw = true` 로 전환해 조준 방향을 고정한다.
+`bUseControllerRotationYaw = true` (항상) — 캐릭터 몸이 컨트롤러 Yaw를 따라 회전하며, 이 값이 다른 클라이언트에 복제된다.  
+`bOrientRotationToMovement = false` — 이동 방향 자동 회전을 끄고 스트라이프 애니메이션으로 대신 처리한다.  
+두 플래그는 동시에 활성화하면 충돌하므로 반드시 하나만 사용해야 한다.
 
 ### 달리기 (GA_Sprint)
 
@@ -153,6 +154,8 @@ StartADS() 호출
 ```
 
 `ADSInterpSpeed` 값이 높을수록 전환이 빠르다. 기본 10.f.
+
+> **회전 설정은 ADS와 무관하다.** `bUseControllerRotationYaw = true`가 항상 켜져 있으므로 ADS 진입/해제 시 회전 플래그를 토글하지 않는다. 이전 구현에서 ADS 토글로 회전 방식을 전환하던 코드는 멀티플레이어 회전 동기화 문제를 일으켜 제거됐다.
 
 | 상태 | ArmLength | SocketOffset | FOV |
 |------|-----------|--------------|-----|
@@ -248,7 +251,7 @@ ALastFPSHero
   └── UWeaponComponent
         ├── WeaponMesh (SkeletalMeshComponent) — BeginPlay에서 동적 생성, WeaponSocket 부착
         ├── WeaponSkeletalMesh                 — BP에서 할당할 메시 에셋
-        ├── ProjectileClass                    — BP_Projectile 할당
+        ├── ProjectileClass                    — BP_Projectile 할당 (VFX 전용)
         ├── FireSound (USoundBase)             — 발사음
         ├── MuzzleFlashEffect (UParticleSystem) — 총구 Cascade 파티클
         ├── CurrentHeat (Replicated, float)    — 현재 열량
@@ -256,12 +259,11 @@ ALastFPSHero
         ├── MaxHeat / HeatPerShot / CooldownRate / FireRate
         └── GetMuzzleTransform() / PlayFireEffects()
 
-ALastFPSProjectile
-  ├── CollisionComp (BoxComponent)           — 2.5×1×1 cm, WorldDynamic, BlockAll
-  ├── ProjectileMovementComponent            — 12000 cm/s, 중력 0.1
+ALastFPSProjectile  ← VFX 전용, 데미지 없음
+  ├── CollisionComp (BoxComponent)             — 2.5×1×1 cm, NoCollision (충돌 비활성화)
+  ├── ProjectileMovementComponent              — 30000 cm/s (300 m/s), 중력 0
   ├── TrailParticle (UParticleSystemComponent) — 비행 중 Cascade 트레일
-  ├── TrailEffect (UParticleSystem)          — BP에서 할당할 트레일 에셋
-  └── DamageEffect                           — BP_GE_Damage 할당
+  └── TrailEffect (UParticleSystem)            — BP에서 할당할 트레일 에셋
 ```
 
 ### WeaponComponent — 오버히트 시스템
@@ -303,9 +305,11 @@ UGameplayStatics::SpawnEmitterAttached(MuzzleFlashEffect, WeaponMesh, MuzzleSock
 
 소켓(`MuzzleFlash`)이 없으면 경고 없이 무시됨. 무기 Skeleton에 `MuzzleFlash` 소켓 추가 필요.
 
-### GA_BasicShoot
+### GA_BasicShoot — Hitscan + LocalFire/ServerFire
 
 **관련 파일:** `AbilitySystem/Abilities/GA_BasicShoot.h/.cpp`
+
+발사 판정은 **LineTrace(Hitscan)** 로 처리하고, 투사체는 순수 VFX(탄도 트레일)로만 사용한다.
 
 ```
 LMB 누름 → TryActivateAbilitiesByTag("Ability.Fire")
@@ -316,42 +320,52 @@ LMB 누름 → TryActivateAbilitiesByTag("Ability.Fire")
       └── bIsAutoFire == true → 타이머로 FireRate마다 Fire() 반복
 
   → Fire()
-      ├── GetPlayerViewPoint() → 카메라 조준 방향(AimRotation) 획득
-      ├── GetMuzzleTransform() → MuzzleFlash 소켓 위치(MuzzleLocation) 획득
-      ├── Projectile 스폰: 위치=MuzzleLocation, 방향=AimRotation (서버 전용)
-      ├── PlayFireEffects() → 사운드 + 머즐플래시 (서버/클라 모두)
+      ├── [IsLocallyControlled] LocalFire()
+      │     └── PlayFireEffects() — 사운드 + 머즐플래시 즉시 재생 (레이턴시 0, 클라이언트 예측)
+      ├── [HasAuthority] ServerFire()
+      │     ├── GetPlayerViewPoint() → 카메라 조준 방향 획득
+      │     ├── LineTraceSingleByObjectType(WorldStatic+WorldDynamic+Pawn+PhysicsBody)
+      │     ├── VFX 투사체 스폰 (서버 스폰 → bReplicates로 모든 클라이언트 복제)
+      │     ├── 히트 대상 ASC에 DamageEffectClass 적용
+      │     └── Client_NotifyHitMarker() — 발사자 클라이언트에만 히트마커 표시
       └── AddHeat() → 오버히트 도달 시 EndAbility
 
 LMB 뗌 → CancelAbilities → EndAbility (타이머 해제)
 ```
 
-**총구 위치 + 카메라 방향을 함께 쓰는 이유**
+**LocalFire / ServerFire 분리 이유**
 
-총구 소켓에서 발사해야 시각적으로 자연스럽고, 방향은 카메라(크로스헤어) 기준이어야 플레이어가 보는 방향과 실제 탄도가 일치한다.
+| 역할 | 실행 위치 | 내용 |
+|------|---------|------|
+| `LocalFire` | `IsLocallyControlled()` | 사운드·머즐플래시 즉시 재생 — 레이턴시 없는 클라이언트 예측 |
+| `ServerFire` | `HasAuthority()` | LineTrace 히트 판정 → 데미지 GE → VFX 투사체 스폰 |
+
+`LocalPredicted` 어빌리티는 소유 클라이언트와 서버 양쪽에서 모두 실행된다. `IsLocallyControlled()`는 클라이언트(+리슨서버 호스트)에서 참이고, `HasAuthority()`는 서버에서만 참이므로 두 조건으로 역할을 나눌 수 있다.
 
 | 설정 | 값 | 비고 |
 |------|----|------|
 | `InstancingPolicy` | InstancedPerActor | 타이머 상태 보존 필요 |
 | `NetExecutionPolicy` | LocalPredicted | 클라이언트 선반영 |
 | `bIsAutoFire` | false (기본) | BP에서 연사로 변경 가능 |
+| `DamageEffectClass` | (BP에서 할당) | 기존 투사체의 DamageEffect를 이쪽으로 이전 |
 
-### ALastFPSProjectile
+### ALastFPSProjectile — VFX 전용
 
 **관련 파일:** `Weapons/LastFPSProjectile.h/.cpp`
 
-```
-OnHit() — 서버 전용
-  ├── Instigator ASC → MakeOutgoingSpec(GE_Damage)
-  └── ApplyGameplayEffectSpecToTarget(TargetASC)
-          ↓
-  AttributeSet::PostGameplayEffectExecute()
-  → Damage 값 감지 → Health -= Damage → Damage = 0 리셋
-```
+데미지 로직이 완전히 제거된 순수 시각 연출용 액터.
 
-**콜리전**
-- `BoxComponent` (2.5×1×1 cm) — 총알 형태에 맞는 얇은 박스
-- `ObjectType`: `WorldDynamic` / `Response`: `BlockAll`
-- `BeginPlay`에서 `IgnoreActorWhenMoving(Instigator)` → 발사자 자기충돌 방지
+**충돌 없음 (`NoCollision`)**  
+- `BoxComponent` (2.5×1×1 cm) — 루트 컴포넌트 역할만, 충돌 비활성화
+- `OnHit` 바인딩 없음 — 아무것도 막지 않음
+
+**이동**
+- 속도: 30,000 cm/s (300 m/s) — 눈으로 트레일을 볼 수 있는 속도
+- 중력: 0 — 데미지가 LineTrace에서 나오므로 중력 시뮬레이션 불필요
+- 수명: 1.5초 (최대 비행 거리 약 450 m)
+
+**복제**  
+`bReplicates = true` — 서버에서 스폰 후 모든 클라이언트에 자동 복제됨
 
 **비주얼**
 - `UParticleSystemComponent TrailParticle` — `BeginPlay`에서 `TrailEffect` 에셋을 `SetTemplate`으로 연결, 스폰 즉시 자동 재생
@@ -367,8 +381,8 @@ OnHit() — 서버 전용
 
 ### 에디터 설정
 
-- `BP_Projectile` — `DamageEffect` = `BP_GE_Damage`, `TrailEffect` = 트레일 파티클 에셋
-- `BP_GA_BasicShoot` — `bIsAutoFire`, Hero BP `DefaultAbilities`에 추가
+- `BP_Projectile` — `TrailEffect` = 트레일 파티클 에셋 (DamageEffect 항목 없어짐)
+- `BP_GA_BasicShoot` — `DamageEffectClass` = `BP_GE_Damage`, `bIsAutoFire`, Hero BP `DefaultAbilities`에 추가
 - `BP_GE_Damage` — Instant, Damage Add 20
 - Hero BP → WeaponComponent: `WeaponSkeletalMesh`, `FireSound`, `MuzzleFlashEffect`, `ProjectileClass` 할당
 - GameplayTag `Ability.Fire`, `InputTag.Fire` 등록
@@ -430,7 +444,7 @@ Owner/Avatar 분리 이유: GAS가 어빌리티 활성화 권한(Owner)과 물�
 |---------|---------|
 | `GA_Jump` | `LocalPredicted` + CMC 자체 물리 예측 — 클라에서 즉시 `Jump()`, 서버가 검증 |
 | `GA_Sprint` | `LocalPredicted` — `GE_SprintSpeed`(Infinite) 즉시 적용 → `OnMoveSpeedChanged` 콜백으로 CMC 속도 즉시 반영 |
-| `GA_BasicShoot` | `LocalPredicted` — 이펙트는 클라/서버 모두, Projectile 스폰은 서버 전용 |
+| `GA_BasicShoot` | `LocalPredicted` — `LocalFire`(이펙트)는 `IsLocallyControlled()`, `ServerFire`(LineTrace+데미지+VFX투사체)는 `HasAuthority()` |
 
 **롤백 조건**
 
@@ -509,4 +523,4 @@ NativeConstruct()
 
 ---
 
-*Last updated: 2026-05-02 — HUD 시스템 추가, 클라이언트 재시도 타이머, 오버히트 RepNotify 구조 정리*
+*Last updated: 2026-05-11 — 발사 구조 Hitscan 전환(LocalFire+ServerFire), 투사체 VFX 전용 전환(30,000 cm/s·충돌 없음), DamageEffectClass GA_BasicShoot으로 이동, 캐릭터 회전 동기화 수정(bUseControllerRotationYaw 항시 활성화)*
