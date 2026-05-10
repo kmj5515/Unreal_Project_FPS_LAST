@@ -1,7 +1,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameplayEffect.h"
 #include "GameFramework/Actor.h"
 #include "LastFPSProjectile.generated.h"
 
@@ -10,6 +9,7 @@ class UParticleSystem;
 class UParticleSystemComponent;
 class UProjectileMovementComponent;
 
+// VFX 전용 투사체 — 데미지는 GA_BasicShoot의 LineTrace가 처리
 UCLASS()
 class LASTFPS_API ALastFPSProjectile : public AActor
 {
@@ -30,16 +30,6 @@ protected:
     UPROPERTY(VisibleAnywhere, Category="Projectile")
     TObjectPtr<UParticleSystemComponent> TrailParticle;
 
-    // BP에서 할당할 총알 트레일 파티클 에셋
     UPROPERTY(EditDefaultsOnly, Category="Projectile")
     TObjectPtr<UParticleSystem> TrailEffect;
-
-    // 피격 시 적용할 GE (에디터에서 BP_GE_Damage 등 할당; 비어 있으면 C++ 생성자 기본값)
-    UPROPERTY(EditDefaultsOnly, Category="Damage")
-    TSubclassOf<UGameplayEffect> DamageEffect;
-
-    UFUNCTION()
-    void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor,
-               UPrimitiveComponent* OtherComp, FVector NormalImpulse,
-               const FHitResult& Hit);
 };

@@ -1,13 +1,7 @@
 #include "Weapons/LastFPSProjectile.h"
-#include "AbilitySystem/Effects/GE_DamageInstant.h"
-#include "AbilitySystemInterface.h"
-#include "AbilitySystemComponent.h"
-#include "Character/LastFPSCharacterBase.h"
 #include "Components/BoxComponent.h"
-#include "GameplayEffectTypes.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
-#include "GameFramework/Pawn.h"
 
 ALastFPSProjectile::ALastFPSProjectile()
 {
@@ -15,11 +9,7 @@ ALastFPSProjectile::ALastFPSProjectile()
 
     CollisionComp = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionComp"));
     CollisionComp->InitBoxExtent(FVector(2.5f, 1.f, 1.f));
-    CollisionComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-    CollisionComp->SetCollisionObjectType(ECC_WorldDynamic);
-    CollisionComp->SetCollisionResponseToAllChannels(ECR_Block);
-    CollisionComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
-    CollisionComp->OnComponentHit.AddDynamic(this, &ALastFPSProjectile::OnHit);
+    CollisionComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);  // VFX 전용, 충돌 없음
     RootComponent = CollisionComp;
 
     TrailParticle = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("TrailParticle"));
@@ -27,15 +17,12 @@ ALastFPSProjectile::ALastFPSProjectile()
     TrailParticle->bAutoActivate = true;
 
     ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
-    ProjectileMovement->InitialSpeed          = 12000.f;
-    ProjectileMovement->MaxSpeed             = 12000.f;
+    ProjectileMovement->InitialSpeed             = 30000.f;  // 300 m/s — 트레일 가시성 확보
+    ProjectileMovement->MaxSpeed                 = 30000.f;
     ProjectileMovement->bRotationFollowsVelocity = true;
-    ProjectileMovement->ProjectileGravityScale   = 0.1f;
+    ProjectileMovement->ProjectileGravityScale   = 0.f;      // 데미지는 LineTrace로 처리하므로 중력 불필요
 
-    InitialLifeSpan = 3.f;
-
-    // BP에서 덮어쓰지 않으면 네이티브 피해 GE (DamageEffect 미할당 시)
-    DamageEffect = ULastFPSGE_DamageInstant::StaticClass();
+    InitialLifeSpan = 1.5f;  // 1.5초에 450m 이동 후 소멸
 }
 
 void ALastFPSProjectile::BeginPlay()
@@ -44,43 +31,4 @@ void ALastFPSProjectile::BeginPlay()
 
     if (TrailEffect)
         TrailParticle->SetTemplate(TrailEffect);
-
-    if (GetInstigator())
-        CollisionComp->IgnoreActorWhenMoving(GetInstigator(), true);
-}
-
-void ALastFPSProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor,
-                                UPrimitiveComponent* OtherComp, FVector NormalImpulse,
-                                const FHitResult& Hit)
-{
-    if (!HasAuthority()) return;
-    if (!OtherActor || OtherActor == GetInstigator() || !DamageEffect) { Destroy(); return; }
-
-    IAbilitySystemInterface* InstigatorASI = Cast<IAbilitySystemInterface>(GetInstigator());
-    IAbilitySystemInterface* TargetASI     = Cast<IAbilitySystemInterface>(OtherActor);
-
-    if (InstigatorASI && TargetASI)
-    {
-        UAbilitySystemComponent* SourceASC = InstigatorASI->GetAbilitySystemComponent();
-        UAbilitySystemComponent* TargetASC = TargetASI->GetAbilitySystemComponent();
-
-        if (SourceASC && TargetASC)
-        {
-            FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
-            Context.AddSourceObject(this);
-            if (APawn* Shooter = Cast<APawn>(GetInstigator()))
-                Context.AddInstigator(Shooter, this);
-
-            FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(DamageEffect, 1.f, Context);
-            if (Spec.IsValid())
-            {
-                TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
-
-                if (ALastFPSCharacterBase* Shooter = Cast<ALastFPSCharacterBase>(GetInstigator()))
-                    Shooter->Client_NotifyHitMarker();
-            }
-        }
-    }
-
-    Destroy();
 }

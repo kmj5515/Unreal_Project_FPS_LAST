@@ -1,9 +1,13 @@
 #include "AbilitySystem/Abilities/GA_BasicShoot.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Character/LastFPSHero.h"
+#include "Character/LastFPSCharacterBase.h"
 #include "Weapons/LastFPSProjectile.h"
+#include "AbilitySystemInterface.h"
+#include "AbilitySystemComponent.h"
 #include "NativeGameplayTags.h"
 #include "Engine/World.h"
+#include "GameFramework/Pawn.h"
 
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Fire, "Ability.Fire")
 
@@ -67,8 +71,7 @@ void UGA_BasicShoot::ActivateAbility(
 
 void UGA_BasicShoot::Fire()
 {
-    UWorld* World = GetWorld();
-    if (!World) return;
+    if (!GetWorld()) return;
 
     const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
     if (!Hero || !Hero->IsAlive())
@@ -84,48 +87,96 @@ void UGA_BasicShoot::Fire()
         return;
     }
 
-    // 발사체 스폰은 서버 전용 (클라이언트는 이후 GameplayCue로 이펙트 처리)
     ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
-    if (Character && Character->HasAuthority() && Weapon->ProjectileClass)
-    {
-        AController* Controller = Character->GetController();
-        if (!Controller) return;
+    if (!Character) return;
 
-        FVector  CameraLocation;
-        FRotator AimRotation;
-        Controller->GetPlayerViewPoint(CameraLocation, AimRotation);
+    // 로컬 클라이언트: 사운드 + 머즐플래시 즉시 재생 (레이턴시 없는 클라이언트 예측)
+    if (Character->IsLocallyControlled())
+        LocalFire(Weapon);
 
-        const FVector MuzzleLocation = Weapon->GetMuzzleTransform().GetLocation();
-        const FVector CameraTraceEnd = CameraLocation + (AimRotation.Vector() * 10000.f);
+    // 서버: LineTrace 히트 판정 + 데미지 GE 적용 + VFX 투사체 스폰
+    if (Character->HasAuthority())
+        ServerFire(Character, Weapon);
 
-        FHitResult CameraHitResult;
-        FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WeaponTrace), false, Character);
-        QueryParams.AddIgnoredActor(Character);
-
-        const bool bHasCameraHit = World->LineTraceSingleByChannel(
-            CameraHitResult,
-            CameraLocation,
-            CameraTraceEnd,
-            ECC_Visibility,
-            QueryParams);
-
-        const FVector   AimTarget           = bHasCameraHit ? CameraHitResult.ImpactPoint : CameraTraceEnd;
-        const FRotator  ProjectileRotation  = (AimTarget - MuzzleLocation).Rotation();
-
-        FActorSpawnParameters Params;
-        Params.Instigator = Character;
-        Params.Owner      = Character;
-        Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-        World->SpawnActor<ALastFPSProjectile>(Weapon->ProjectileClass, MuzzleLocation, ProjectileRotation, Params);
-    }
-
-    Weapon->PlayFireEffects();
     Weapon->AddHeat();
 
-    // 오버히트 도달 시 어빌리티 종료 → 연사 타이머 자동 정지
     if (!Weapon->CanFire())
         EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
+}
+
+void UGA_BasicShoot::LocalFire(UWeaponComponent* Weapon)
+{
+    Weapon->PlayFireEffects();
+}
+
+void UGA_BasicShoot::ServerFire(ACharacter* Character, UWeaponComponent* Weapon)
+{
+    UWorld* World = GetWorld();
+    if (!World) return;
+
+    AController* Controller = Character->GetController();
+    if (!Controller) return;
+
+    FVector  CameraLocation;
+    FRotator AimRotation;
+    Controller->GetPlayerViewPoint(CameraLocation, AimRotation);
+
+    const FVector MuzzleLocation = Weapon->GetMuzzleTransform().GetLocation();
+    const FVector TraceEnd       = CameraLocation + AimRotation.Vector() * 10000.f;
+
+    FHitResult HitResult;
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WeaponTrace), false, Character);
+    QueryParams.AddIgnoredActor(Character);
+
+    // ECC_Visibility만으로는 캐릭터 캡슐을 인식 못할 수 있으므로
+    // WorldStatic/Dynamic + Pawn 오브젝트 타입을 모두 포함해 트레이스
+    FCollisionObjectQueryParams ObjectParams;
+    ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
+    ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+    ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
+    ObjectParams.AddObjectTypesToQuery(ECC_PhysicsBody);
+
+    const bool bHit = World->LineTraceSingleByObjectType(
+        HitResult, CameraLocation, TraceEnd, ObjectParams, QueryParams);
+
+    // VFX 전용 투사체 스폰 (서버 스폰 → bReplicates로 모든 클라이언트에 복제됨)
+    if (Weapon->ProjectileClass)
+    {
+        const FVector  AimTarget          = bHit ? HitResult.ImpactPoint : TraceEnd;
+        const FRotator ProjectileRotation = (AimTarget - MuzzleLocation).Rotation();
+
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.Instigator = Character;
+        SpawnParams.Owner      = Character;
+        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+        World->SpawnActor<ALastFPSProjectile>(
+            Weapon->ProjectileClass, MuzzleLocation, ProjectileRotation, SpawnParams);
+    }
+
+    if (!bHit || !HitResult.GetActor() || !DamageEffectClass) return;
+
+    IAbilitySystemInterface* SourceASI = Cast<IAbilitySystemInterface>(Character);
+    IAbilitySystemInterface* TargetASI = Cast<IAbilitySystemInterface>(HitResult.GetActor());
+    if (!SourceASI || !TargetASI) return;
+
+    UAbilitySystemComponent* SourceASC = SourceASI->GetAbilitySystemComponent();
+    UAbilitySystemComponent* TargetASC = TargetASI->GetAbilitySystemComponent();
+    if (!SourceASC || !TargetASC) return;
+
+    FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
+    Context.AddSourceObject(Character);
+    if (APawn* Pawn = Cast<APawn>(Character))
+        Context.AddInstigator(Pawn, Character);
+
+    FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.f, Context);
+    if (Spec.IsValid())
+    {
+        TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+
+        if (ALastFPSCharacterBase* ShooterChar = Cast<ALastFPSCharacterBase>(Character))
+            ShooterChar->Client_NotifyHitMarker();
+    }
 }
 
 void UGA_BasicShoot::EndAbility(

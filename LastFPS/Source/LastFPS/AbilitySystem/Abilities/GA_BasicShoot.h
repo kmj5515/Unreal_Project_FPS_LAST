@@ -5,6 +5,8 @@
 #include "GA_BasicShoot.generated.h"
 
 class UWeaponComponent;
+class ACharacter;
+class UGameplayEffect;
 
 UCLASS()
 class LASTFPS_API UGA_BasicShoot : public UGameplayAbility
@@ -29,8 +31,19 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Shoot")
     bool bIsAutoFire = false;
 
+    // 피격 시 적용할 데미지 GE (에디터에서 할당)
+    UPROPERTY(EditDefaultsOnly, Category="Shoot")
+    TSubclassOf<UGameplayEffect> DamageEffectClass;
+
 private:
     void Fire();
+
+    // 로컬 클라이언트: 사운드 + 머즐플래시 즉시 재생 (클라이언트 예측)
+    void LocalFire(UWeaponComponent* Weapon);
+
+    // 서버 전용: LineTrace 히트 판정 + 데미지 GE 적용 + VFX 투사체 스폰
+    void ServerFire(ACharacter* Character, UWeaponComponent* Weapon);
+
     UWeaponComponent* GetWeaponComponent() const;
 
     FTimerHandle FireTimerHandle;
