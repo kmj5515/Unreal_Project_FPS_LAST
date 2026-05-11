@@ -225,8 +225,8 @@ ACharacter
 - [x] 기본 이동 및 사격 네트워크 복제 검증 (CharacterMovement 기본 복제 + WeaponComponent Heat/Overheat Replicated)
 - [x] GAS Prediction 적용 — GA_Jump 신규 (LocalPredicted + CMC 물리 예측), GA_Sprint 기존 LocalPredicted 확인
 - [x] GameMode 기초 구현 (`ALastFPSGameModeBase`)
-- [ ] **FFA 정비:** 팀 배정 제거·개인전 규칙에 맞게 GameMode/GameState 정리 (README 방향: 최대 3명)
-- [ ] GameState — 매치 타이머·(선택) 라운드 종료 조건 (팀 점수 불필요)
+- [x] **FFA 정비** — `ELastFPSTeam`/팀 로스터/팀 점수 코드 일괄 제거, `PostLogin` 팀 배정 제거, FF 자동 허용. 매치 종료는 시간 만료 또는 개인 킬(`MatchKillLimit=3`) 단일 기준
+- [x] GameState — 매치 타이머 노출 (`ALastFPSMatchGameState::MatchTimeRemaining` Replicated, 서버 0.25s 주기 갱신; 라운드 종료 조건은 보류)
 - [x] 기본 리스폰 시스템
 
 ### Phase 4 — 스킬 시스템 (목표: ~4주)
@@ -298,8 +298,9 @@ LastFPS/
 │   │   ├── LastFPSGameModeBase.h/.cpp
 │   │   ├── LastFPSGameInstance.h/.cpp  # 로비 캐릭터 선택 인덱스 저장/복원
 │   │   ├── LastFPSLobbyGameMode.h/.cpp   # 로비: 인원 대기, 시작 조건, 맵 이동
-│   │   ├── LastFPSMatchGameMode.h/.cpp   # 인게임: 매치 시작/입장 흐름
-│   │   ├── LastFPSGameState.h/.cpp    # 미구현 (매치 상태·타이머 등, FFA 기준)
+│   │   ├── LastFPSLobbyGameState.h/.cpp  # 로비 상태 복제 (입장 인원·시작 트리거)
+│   │   ├── LastFPSMatchGameMode.h/.cpp   # 인게임: 매치 시작/종료/리스폰
+│   │   ├── LastFPSMatchGameState.h/.cpp  # 매치 타이머(MatchTimeRemaining) 복제
 │   │   └── LastFPSPlayerState.h/.cpp
 │   ├── Input/                  # InputConfig DataAsset, IMC
 │   ├── UI/
@@ -351,4 +352,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-11 — **발사 구조 Hitscan 전환:** GA_BasicShoot을 LocalFire+ServerFire로 분리, 투사체를 VFX 전용(30,000 cm/s·충돌 없음)으로 변환. DamageEffectClass를 GA_BasicShoot으로 이동. 캐릭터 회전 동기화 수정(bUseControllerRotationYaw=true 항상, bOrientRotationToMovement=false).*
+*Last updated: 2026-05-11 — **FFA 정비 + 매치 타이머 GameState 노출:** `ELastFPSTeam`/팀 로스터/팀 점수/`Auth_SetTeam`/`Auth_AddTeamScore` 일괄 제거, `PostLogin` 팀 배정 제거(FF 자동 허용). `ALastFPSMatchGameState`는 `MatchTimeRemaining`(Replicated)만 노출, `TickMatchRuleCheck`(0.25s)에서 서버 갱신. 매치 종료는 시간 만료 또는 개인 킬 한도 도달 시 `ServerTravel(LobbyMapURL)`로 즉시 트래블.*
