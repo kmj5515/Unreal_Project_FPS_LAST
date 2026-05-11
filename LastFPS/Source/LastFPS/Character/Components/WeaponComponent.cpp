@@ -32,9 +32,7 @@ void UWeaponComponent::BeginPlay()
         if (WeaponSkeletalMesh)
             WeaponMesh->SetSkeletalMesh(WeaponSkeletalMesh);
 
-        WeaponMesh->AttachToComponent(Owner->GetMesh(),
-            FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-            AttachSocketName);
+        WeaponMesh->AttachToComponent(Owner->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, AttachSocketName);
 
         ApplyAnimLayer();
         OnWeaponEquippedChanged.Broadcast(WeaponSkeletalMesh != nullptr);
@@ -93,13 +91,12 @@ void UWeaponComponent::AddHeat()
     if (CurrentHeat >= MaxHeat)
         bIsOverheated = true;
 
-    SetComponentTickEnabled(true); // 냉각 Tick 활성화
+    SetComponentTickEnabled(true);
     OnHeatChanged.Broadcast(CurrentHeat, MaxHeat, bIsOverheated);
 }
 
 void UWeaponComponent::OnRep_HeatState()
 {
-    // 클라이언트: 복제된 값이 도착하면 HUD에 알림
     OnHeatChanged.Broadcast(CurrentHeat, MaxHeat, bIsOverheated);
 }
 
