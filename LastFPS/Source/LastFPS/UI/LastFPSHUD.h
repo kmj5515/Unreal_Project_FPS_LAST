@@ -48,4 +48,7 @@ private:
     FTimerHandle BindRetryTimerHandle;
     TWeakObjectPtr<ALastFPSMatchGameState> BoundMatchGameState;
     FDelegateHandle MatchEndedHandle;
+
+    /** true면 HideScoreboard 호출을 무시 — 결과 화면을 강제 유지. */
+    bool bMatchEnded = false;
 };

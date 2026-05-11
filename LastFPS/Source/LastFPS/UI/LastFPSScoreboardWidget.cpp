@@ -1,7 +1,10 @@
 #include "UI/LastFPSScoreboardWidget.h"
+#include "UI/LastFPSScoreRowWidget.h"
 #include "Game/LastFPSMatchGameState.h"
 #include "Game/LastFPSPlayerState.h"
 #include "GameFramework/PlayerController.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 namespace
 {
@@ -12,36 +15,21 @@ struct FRowEntry
     int32   Deaths          = 0;
     int32   Assists         = 0;
     int32   DamageDealt     = 0;
+    int32   DamageTaken     = 0;
+    int32   HealingReceived = 0;
     bool    bIsLocalPlayer  = false;
 };
 }
 
 void ULastFPSScoreboardWidget::RefreshScoreboard()
 {
-    // [TEMP DIAG] 실제 GameState 클래스명까지 출력 → BP가 GameStateClass를 다른 클래스로 오버라이드했는지 식별
-    {
-        AGameStateBase* AnyGS = GetWorld() ? GetWorld()->GetGameState() : nullptr;
-        UE_LOG(LogTemp, Warning,
-            TEXT("[Scoreboard] Refresh — MatchResultText=%s ScoreboardText=%s | AnyGS=%s GSClass=%s"),
-            MatchResultText ? TEXT("OK") : TEXT("NULL"),
-            ScoreboardText  ? TEXT("OK") : TEXT("NULL"),
-            AnyGS ? TEXT("OK") : TEXT("NULL"),
-            AnyGS ? *AnyGS->GetClass()->GetName() : TEXT("-"));
-    }
-
     const UWorld* World = GetWorld();
     const ALastFPSMatchGameState* MGS = World ? World->GetGameState<ALastFPSMatchGameState>() : nullptr;
-    if (!MGS)
-    {
-        if (MatchResultText) MatchResultText->SetText(FText::GetEmpty());
-        if (ScoreboardText)  ScoreboardText->SetText(FText::GetEmpty());
-        return;
-    }
 
-    // 결과 헤더 — 매치 종료 시점에만 채워짐
+    // 매치 결과 헤더 (매치 종료 전에는 빈 텍스트)
     if (MatchResultText)
     {
-        if (MGS->IsMatchEnded())
+        if (MGS && MGS->IsMatchEnded())
         {
             const APlayerState* Winner = MGS->GetWinnerPlayerState();
             const FString WinnerLine = Winner
@@ -56,12 +44,27 @@ void ULastFPSScoreboardWidget::RefreshScoreboard()
         }
     }
 
-    if (!ScoreboardText)
+    // 행 컨테이너가 없거나 행 위젯 클래스가 미설정이면 더 진행 불가 (BP에서 RowsContainer / RowWidgetClass 설정 필요)
+    if (!RowsContainer || !RowWidgetClass)
     {
         return;
     }
 
-    // 행 수집 → 정렬 → 단일 문자열로 결합
+    RowsContainer->ClearChildren();
+
+    // 1) 헤더 행 — 데이터 행과 동일 클래스/컬럼 폭으로 정렬
+    if (ULastFPSScoreRowWidget* HeaderRow = CreateWidget<ULastFPSScoreRowWidget>(this, RowWidgetClass))
+    {
+        HeaderRow->SetHeader();
+        RowsContainer->AddChild(HeaderRow);
+    }
+
+    // 2) 플레이어 행 — GameState 부재 시 빈 목록만 표시 (헤더는 그대로 보임)
+    if (!MGS)
+    {
+        return;
+    }
+
     const APlayerController* LocalPC = GetOwningPlayer();
     TArray<FRowEntry> Rows;
     Rows.Reserve(MGS->PlayerArray.Num());
@@ -72,12 +75,14 @@ void ULastFPSScoreboardWidget::RefreshScoreboard()
         if (!LFPS) continue;
 
         FRowEntry Row;
-        Row.PlayerName     = LFPS->GetPlayerName();
-        Row.Kills          = LFPS->GetStatKills();
-        Row.Deaths         = LFPS->GetStatDeaths();
-        Row.Assists        = LFPS->GetStatAssists();
-        Row.DamageDealt    = FMath::RoundToInt(LFPS->GetStatDamageDealt());
-        Row.bIsLocalPlayer = (LocalPC && LFPS == LocalPC->PlayerState);
+        Row.PlayerName      = LFPS->GetPlayerName();
+        Row.Kills           = LFPS->GetStatKills();
+        Row.Deaths          = LFPS->GetStatDeaths();
+        Row.Assists         = LFPS->GetStatAssists();
+        Row.DamageDealt     = FMath::RoundToInt(LFPS->GetStatDamageDealt());
+        Row.DamageTaken     = FMath::RoundToInt(LFPS->GetStatDamageTaken());
+        Row.HealingReceived = FMath::RoundToInt(LFPS->GetStatHealingReceived());
+        Row.bIsLocalPlayer  = (LocalPC && LFPS == LocalPC->PlayerState);
         Rows.Add(Row);
     }
 
@@ -86,18 +91,39 @@ void ULastFPSScoreboardWidget::RefreshScoreboard()
         return A.Kills != B.Kills ? A.Kills > B.Kills : A.Deaths < B.Deaths;
     });
 
-    // Monospace 폰트 가정 — 컬럼 폭 고정
-    FString Out = FString::Printf(TEXT("%-16s %3s %3s %3s %5s\n"),
-        TEXT("Player"), TEXT("K"), TEXT("D"), TEXT("A"), TEXT("DMG"));
-
     for (const FRowEntry& R : Rows)
     {
-        const TCHAR* Marker = R.bIsLocalPlayer ? TEXT("> ") : TEXT("  ");
-        // 이름이 길면 14자로 자름 (Marker 2자 + 이름 14자 = 16자)
-        FString Name = R.PlayerName.Left(14);
-        Out += FString::Printf(TEXT("%s%-14s %3d %3d %3d %5d\n"),
-            Marker, *Name, R.Kills, R.Deaths, R.Assists, R.DamageDealt);
+        if (ULastFPSScoreRowWidget* RowW = CreateWidget<ULastFPSScoreRowWidget>(this, RowWidgetClass))
+        {
+            RowW->SetRow(R.PlayerName, R.Kills, R.Deaths, R.Assists, R.DamageDealt, R.DamageTaken, R.HealingReceived, R.bIsLocalPlayer);
+            RowsContainer->AddChild(RowW);
+        }
     }
+}
 
-    ScoreboardText->SetText(FText::FromString(Out));
+void ULastFPSScoreboardWidget::StartAutoRefresh()
+{
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().SetTimer(
+            AutoRefreshTimerHandle,
+            this,
+            &ULastFPSScoreboardWidget::RefreshScoreboard,
+            FMath::Max(0.5f, AutoRefreshInterval),
+            /*bLoop=*/true);
+    }
+}
+
+void ULastFPSScoreboardWidget::StopAutoRefresh()
+{
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(AutoRefreshTimerHandle);
+    }
+}
+
+void ULastFPSScoreboardWidget::NativeDestruct()
+{
+    StopAutoRefresh();
+    Super::NativeDestruct();
 }

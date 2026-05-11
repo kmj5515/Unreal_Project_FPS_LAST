@@ -95,9 +95,12 @@ void ALastFPSHUD::RetryBindMatchGameState()
 
 void ALastFPSHUD::HandleMatchEnded()
 {
+    // ClearAllMappings가 활성 IA의 Completed 콜백을 발동시켜 HideScoreboard가
+    // 호출되는 경로를 막기 위해, Show보다 먼저 가드를 켠다.
+    bMatchEnded = true;
+
     ShowScoreboard();
 
-    // 결과 화면 동안 게임 입력 차단 — 매핑을 비우면 모든 IA가 무효화됨
     APlayerController* PC = GetOwningPlayerController();
     ULocalPlayer* LP = PC ? PC->GetLocalPlayer() : nullptr;
     if (UEnhancedInputLocalPlayerSubsystem* Sub =
@@ -117,11 +120,14 @@ void ALastFPSHUD::ShowScoreboard()
 {
     if (!ScoreboardWidget) return;
     ScoreboardWidget->RefreshScoreboard();
+    ScoreboardWidget->StartAutoRefresh();
     ScoreboardWidget->SetVisibility(ESlateVisibility::Visible);
 }
 
 void ALastFPSHUD::HideScoreboard()
 {
-    if (ScoreboardWidget)
-        ScoreboardWidget->SetVisibility(ESlateVisibility::Collapsed);
+    if (bMatchEnded) return;
+    if (!ScoreboardWidget) return;
+    ScoreboardWidget->StopAutoRefresh();
+    ScoreboardWidget->SetVisibility(ESlateVisibility::Collapsed);
 }
