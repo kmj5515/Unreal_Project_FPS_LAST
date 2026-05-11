@@ -89,12 +89,12 @@ Time Takers의 빠른 템포와 스킬 기반 전투를 참고하여, 각 플레
 - 구현 방식: `GA_DropIntro` GameplayAbility로 관리, 착지 판정은 `OnLanded` 오버라이드
 
 #### 3. MVP 결과 화면 (Match End)
-게임 종료 후 **MVP / 우승자 하이라이트**:
-- **1위(우승)** 기준: 최다 킬 또는 종합 점수 규칙에 따른 1명 선정
-- 우승 캐릭터가 화면 중앙에서 **Victory 포즈 애니메이션** 재생
-- 나머지 참가자(2명 이하)는 스코어보드·부차 연출로 표시 (팀 단위 연출 없음)
-- 개인 스탯 (킬/데스/어시스트/딜량) 스코어보드 오버레이
-- 구현 방식: 전용 MVP 레벨 또는 GameState → Level Sequence 트리거
+게임 종료 후 **결과 스코어보드 오버레이**:
+- **1위(우승)** 기준: 최다 킬, 동률 시 데스 적은 사람, 그래도 동률이면 무승부(DRAW)
+- 모든 클라에서 스코어보드 자동 표시 + 상단에 `WINNER: 이름` / `Reason: 사유` 헤더
+- 개인 스탯(킬/데스/어시스트/딜량/피격량/힐량) 스코어 행으로 표시
+- 일정 시간(`MatchResultDisplaySeconds`, 기본 8초) 후 자동으로 로비 맵으로 ServerTravel
+- 구현 방식: `ALastFPSMatchGameState::bMatchEnded` RepNotify + `OnMatchEnded` 델리게이트 → `ALastFPSHUD::HandleMatchEnded`에서 처리
 
 ---
 
@@ -260,11 +260,10 @@ ACharacter
   - `GA_DropIntro` Gameplay Ability 구현
   - 낙하 애니메이션 + 착지 임팩트 카메라 셰이크
   - 착지 완료 전 전투 입력 잠금
-- [~] **[MVP 결과 화면]** 게임 종료 후 결과 화면 (C++ 데이터/흐름 완료, BP 비주얼은 작업 중)
+- [x] **[MVP 결과 화면]** 게임 종료 후 결과 스코어보드 오버레이 (Victory 포즈/Level Sequence는 범위에서 제외)
   - [x] GameState 기반 종료(`bMatchEnded` RepNotify, `WinnerPlayerState`, `EndReason`) + MVP 선정(최다 킬, 동률 시 데스 적은 사람, 동률 시 무승부)
   - [x] 종료 시 모든 클라에 자동 스코어보드 표시 + Enhanced Input `ClearAllMappings()`로 입력 차단
   - [x] `MatchResultDisplaySeconds`(기본 8초) 후 `ServerTravel(LobbyMapURL)`
-  - [ ] BP: Victory 포즈 Montage / Level Sequence 등 비주얼 폴리싱
 - [ ] 히트마커, 피격 방향 표시기
 - [ ] 발소리 / 총소리 3D 사운드
 - [ ] 포스트 프로세싱 (피격 화면 효과)
@@ -353,4 +352,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-11 — **종료 UX 한 사이클 완성:** ① HUD 매치 타이머(`OnMatchTimeChanged`, 1초 단위) ② 매치 종료 자동 스코어보드(`ALastFPSMatchGameState::OnMatchEnded` 델리게이트 + RepNotify, 모든 클라 자동) ③ MVP 선정(최다 킬·동률 무승부) + 입력 차단(`ClearAllMappings`) + `MatchResultDisplaySeconds`(8s) 후 `ServerTravel(LobbyMapURL)`. 전 단계 FFA 정비/매치 타이머 노출 흐름 위에 누적.*
+*Last updated: 2026-05-11 — **MVP 결과 화면 closure:** Victory 포즈/Level Sequence는 범위에서 제외하고, 결과 스코어보드 오버레이(`WINNER: 이름` / `Reason: 사유` 헤더 + 개인 스탯 행) + 8초 후 자동 ServerTravel로 한 사이클 완결. 전 단계의 HUD 매치 타이머 / `OnMatchEnded` RepNotify / 입력 차단(`ClearAllMappings`) 흐름 위에 누적.*
