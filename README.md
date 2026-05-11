@@ -245,7 +245,8 @@ ACharacter
 - [ ] 스킬 슬롯 쿨다운 아이콘 (Q / E / F)
 - [ ] 킬피드 / 개인 점수판
 - [ ] 미니맵 (참가자 위치 표시, 최대 3명)
-- [ ] 게임 종료 스코어보드
+- [x] 게임 종료 스코어보드 — `ALastFPSHUD`가 `ALastFPSMatchGameState::OnMatchEnded` 바인딩 후 자동 표시
+- [x] HUD 매치 타이머 — `ULastFPSHUDWidget::OnMatchTimeChanged(float)` BP 이벤트 (1초 단위 갱신)
 
 ### Phase 6 — 게임 흐름 & 연출 (목표: ~3주)
 - [x] 로비 / 매치 시작 흐름 (프로토타입) — `ALastFPSLobbyGameMode`에서 3명 입장 시 `ServerTravel(MatchMapURL)`로 게임 맵 이동, `ALastFPSMatchGameMode`로 인게임 흐름 분리
@@ -259,11 +260,11 @@ ACharacter
   - `GA_DropIntro` Gameplay Ability 구현
   - 낙하 애니메이션 + 착지 임팩트 카메라 셰이크
   - 착지 완료 전 전투 입력 잠금
-- [ ] **[MVP 결과 화면]** 게임 종료 후 MVP 하이라이트
-  - GameState에서 우승/MVP 선정 로직 (킬/딜/어시 가중치)
-  - 우승자 Victory 포즈 Montage + 나머지 참가자 스코어보드 연출
-  - 개인 스탯 스코어보드 오버레이 (K/D/A/딜량)
-  - Level Sequence 또는 전용 MVP 레벨 전환
+- [~] **[MVP 결과 화면]** 게임 종료 후 결과 화면 (C++ 데이터/흐름 완료, BP 비주얼은 작업 중)
+  - [x] GameState 기반 종료(`bMatchEnded` RepNotify, `WinnerPlayerState`, `EndReason`) + MVP 선정(최다 킬, 동률 시 데스 적은 사람, 동률 시 무승부)
+  - [x] 종료 시 모든 클라에 자동 스코어보드 표시 + Enhanced Input `ClearAllMappings()`로 입력 차단
+  - [x] `MatchResultDisplaySeconds`(기본 8초) 후 `ServerTravel(LobbyMapURL)`
+  - [ ] BP: Victory 포즈 Montage / Level Sequence 등 비주얼 폴리싱
 - [ ] 히트마커, 피격 방향 표시기
 - [ ] 발소리 / 총소리 3D 사운드
 - [ ] 포스트 프로세싱 (피격 화면 효과)
@@ -352,4 +353,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-11 — **FFA 정비 + 매치 타이머 GameState 노출:** `ELastFPSTeam`/팀 로스터/팀 점수/`Auth_SetTeam`/`Auth_AddTeamScore` 일괄 제거, `PostLogin` 팀 배정 제거(FF 자동 허용). `ALastFPSMatchGameState`는 `MatchTimeRemaining`(Replicated)만 노출, `TickMatchRuleCheck`(0.25s)에서 서버 갱신. 매치 종료는 시간 만료 또는 개인 킬 한도 도달 시 `ServerTravel(LobbyMapURL)`로 즉시 트래블.*
+*Last updated: 2026-05-11 — **종료 UX 한 사이클 완성:** ① HUD 매치 타이머(`OnMatchTimeChanged`, 1초 단위) ② 매치 종료 자동 스코어보드(`ALastFPSMatchGameState::OnMatchEnded` 델리게이트 + RepNotify, 모든 클라 자동) ③ MVP 선정(최다 킬·동률 무승부) + 입력 차단(`ClearAllMappings`) + `MatchResultDisplaySeconds`(8s) 후 `ServerTravel(LobbyMapURL)`. 전 단계 FFA 정비/매치 타이머 노출 흐름 위에 누적.*

@@ -6,6 +6,7 @@
 
 class ULastFPSHUDWidget;
 class ULastFPSScoreboardWidget;
+class ALastFPSMatchGameState;
 
 UCLASS()
 class LASTFPS_API ALastFPSHUD : public AHUD
@@ -14,6 +15,7 @@ class LASTFPS_API ALastFPSHUD : public AHUD
 
 public:
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
     void ShowHitMarker();
     void ShowScoreboard();
@@ -33,4 +35,17 @@ private:
 
     UPROPERTY()
     TObjectPtr<ULastFPSScoreboardWidget> ScoreboardWidget;
+
+    /** GameState 복제가 늦을 수 있어 BeginPlay에서 한 번 시도 후 실패 시 재시도 */
+    void TryBindMatchGameState();
+
+    UFUNCTION()
+    void RetryBindMatchGameState();
+
+    /** 매치 종료 시 호출: 스코어보드 표시 + 입력 매핑 클리어 */
+    void HandleMatchEnded();
+
+    FTimerHandle BindRetryTimerHandle;
+    TWeakObjectPtr<ALastFPSMatchGameState> BoundMatchGameState;
+    FDelegateHandle MatchEndedHandle;
 };

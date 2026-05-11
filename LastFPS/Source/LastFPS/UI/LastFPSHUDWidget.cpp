@@ -1,9 +1,11 @@
 #include "UI/LastFPSHUDWidget.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
+#include "Game/LastFPSMatchGameState.h"
 #include "Game/LastFPSPlayerState.h"
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
+#include "Engine/World.h"
 #include "TimerManager.h"
 
 void ULastFPSHUDWidget::NativeConstruct()
@@ -25,6 +27,28 @@ void ULastFPSHUDWidget::RetryInitialize()
 {
     if (InitializeHUD())
         GetWorld()->GetTimerManager().ClearTimer(RetryTimerHandle);
+}
+
+void ULastFPSHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+    Super::NativeTick(MyGeometry, InDeltaTime);
+
+    if (!MatchTimerText) return;
+
+    UWorld* World = GetWorld();
+    if (!World) return;
+
+    const ALastFPSMatchGameState* MGS = World->GetGameState<ALastFPSMatchGameState>();
+    if (!MGS) return;
+
+    const int32 TotalSec = FMath::Max(0, FMath::CeilToInt(MGS->GetMatchTimeRemaining()));
+    if (TotalSec == CachedMatchTimeIntSec) return;
+
+    CachedMatchTimeIntSec = TotalSec;
+
+    const int32 Min = TotalSec / 60;
+    const int32 Sec = TotalSec % 60;
+    MatchTimerText->SetText(FText::FromString(FString::Printf(TEXT("%02d:%02d"), Min, Sec)));
 }
 
 bool ULastFPSHUDWidget::InitializeHUD()

@@ -140,9 +140,10 @@ void ALastFPSMatchGameMode::TickMatchRuleCheck()
     }
 
     FString EndReason;
-    if (IsMatchEndConditionMet(EndReason))
+    APlayerState* Winner = nullptr;
+    if (IsMatchEndConditionMet(EndReason, Winner))
     {
-        EndMatchAndReturnToLobby(EndReason);
+        EndMatch(EndReason, Winner);
     }
 }
 
@@ -242,12 +243,12 @@ void ALastFPSMatchGameMode::RespawnController(AController* ControllerToRespawn)
     DebugFlow(FString::Printf(TEXT("[Match] Respawned: %s"), *ControllerToRespawn->GetName()), FColor::Cyan);
 }
 
-bool ALastFPSMatchGameMode::IsMatchEndConditionMet(FString& OutReason) const
+bool ALastFPSMatchGameMode::IsMatchEndConditionMet(FString& OutReason, APlayerState*& OutWinner) const
 {
-    return CheckTimeLimit(OutReason) || CheckKillLimit(OutReason);
+    return CheckTimeLimit(OutReason, OutWinner) || CheckKillLimit(OutReason, OutWinner);
 }
 
-bool ALastFPSMatchGameMode::CheckTimeLimit(FString& OutReason) const
+bool ALastFPSMatchGameMode::CheckTimeLimit(FString& OutReason, APlayerState*& OutWinner) const
 {
     UWorld* World = GetWorld();
     if (!World)
@@ -259,13 +260,14 @@ bool ALastFPSMatchGameMode::CheckTimeLimit(FString& OutReason) const
     if (ElapsedSeconds >= MatchDurationSeconds)
     {
         OutReason = FString::Printf(TEXT("Time limit reached (%d sec)"), MatchDurationSeconds);
+        OutWinner = DetermineLeadingPlayer();
         return true;
     }
 
     return false;
 }
 
-bool ALastFPSMatchGameMode::CheckKillLimit(FString& OutReason) const
+bool ALastFPSMatchGameMode::CheckKillLimit(FString& OutReason, APlayerState*& OutWinner) const
 {
     if (!GameState)
     {
@@ -281,6 +283,7 @@ bool ALastFPSMatchGameMode::CheckKillLimit(FString& OutReason) const
                 TEXT("Kill limit reached by %s (%d kills)"),
                 *LastPS->GetPlayerName(),
                 LastPS->GetStatKills());
+            OutWinner = PS;
             return true;
         }
     }
@@ -288,7 +291,51 @@ bool ALastFPSMatchGameMode::CheckKillLimit(FString& OutReason) const
     return false;
 }
 
-void ALastFPSMatchGameMode::EndMatchAndReturnToLobby(const FString& Reason)
+APlayerState* ALastFPSMatchGameMode::DetermineLeadingPlayer() const
+{
+    if (!GameState)
+    {
+        return nullptr;
+    }
+
+    APlayerState* Best         = nullptr;
+    int32         BestKills    = -1;
+    int32         BestDeaths   = INT32_MAX;
+    bool          bTie         = false;
+
+    for (APlayerState* PS : GameState->PlayerArray)
+    {
+        const ALastFPSPlayerState* LastPS = Cast<ALastFPSPlayerState>(PS);
+        if (!LastPS)
+        {
+            continue;
+        }
+
+        const int32 Kills  = LastPS->GetStatKills();
+        const int32 Deaths = LastPS->GetStatDeaths();
+
+        if (Kills > BestKills || (Kills == BestKills && Deaths < BestDeaths))
+        {
+            Best       = PS;
+            BestKills  = Kills;
+            BestDeaths = Deaths;
+            bTie       = false;
+        }
+        else if (Kills == BestKills && Deaths == BestDeaths)
+        {
+            bTie = true;
+        }
+    }
+
+    // 0킬 전원 또는 동률이면 무승부 처리
+    if (BestKills <= 0 || bTie)
+    {
+        return nullptr;
+    }
+    return Best;
+}
+
+void ALastFPSMatchGameMode::EndMatch(const FString& Reason, APlayerState* Winner)
 {
     if (bMatchEnded)
     {
@@ -297,14 +344,38 @@ void ALastFPSMatchGameMode::EndMatchAndReturnToLobby(const FString& Reason)
 
     bMatchEnded = true;
 
-    if (UWorld* World = GetWorld())
+    UWorld* World = GetWorld();
+    if (World)
     {
         World->GetTimerManager().ClearTimer(DropIntroTimerHandle);
         World->GetTimerManager().ClearTimer(MatchRuleTimerHandle);
     }
 
-    DebugFlow(FString::Printf(TEXT("[Match] Deathmatch ended. Reason: %s"), *Reason), FColor::Red);
+    if (ALastFPSMatchGameState* MGS = World ? World->GetGameState<ALastFPSMatchGameState>() : nullptr)
+    {
+        MGS->Auth_SetMatchResult(Winner, Reason);
+    }
 
+    DebugFlow(
+        FString::Printf(
+            TEXT("[Match] Deathmatch ended. Winner=%s | Reason: %s"),
+            Winner ? *Winner->GetPlayerName() : TEXT("(none/draw)"),
+            *Reason),
+        FColor::Red);
+
+    if (World)
+    {
+        World->GetTimerManager().SetTimer(
+            ResultDisplayTimerHandle,
+            this,
+            &ALastFPSMatchGameMode::TravelToLobby,
+            FMath::Max(0.1f, MatchResultDisplaySeconds),
+            false);
+    }
+}
+
+void ALastFPSMatchGameMode::TravelToLobby()
+{
     if (LobbyMapURL.IsEmpty())
     {
         DebugFlow(TEXT("[Match] LobbyMapURL is empty. Return-to-lobby aborted."), FColor::Red);
