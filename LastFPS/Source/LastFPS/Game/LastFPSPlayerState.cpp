@@ -28,7 +28,6 @@ void ALastFPSPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
     DOREPLIFETIME(ALastFPSPlayerState, StatHealingReceived);
     DOREPLIFETIME(ALastFPSPlayerState, StatHealingGiven);
     DOREPLIFETIME(ALastFPSPlayerState, SelectedCharacterIndex);
-    DOREPLIFETIME(ALastFPSPlayerState, Team);
 }
 
 UAbilitySystemComponent* ALastFPSPlayerState::GetAbilitySystemComponent() const
@@ -43,7 +42,6 @@ void ALastFPSPlayerState::CopyProperties(APlayerState* PlayerState)
     if (ALastFPSPlayerState* LastPlayerState = Cast<ALastFPSPlayerState>(PlayerState))
     {
         LastPlayerState->SelectedCharacterIndex = SelectedCharacterIndex;
-        LastPlayerState->Team = Team;
     }
 }
 
@@ -54,7 +52,6 @@ void ALastFPSPlayerState::OverrideWith(APlayerState* PlayerState)
     if (const ALastFPSPlayerState* LastPlayerState = Cast<ALastFPSPlayerState>(PlayerState))
     {
         SelectedCharacterIndex = LastPlayerState->SelectedCharacterIndex;
-        Team = LastPlayerState->Team;
     }
 }
 
@@ -97,12 +94,3 @@ void ALastFPSPlayerState::Auth_SetSelectedCharacterIndex(int32 NewIndex)
 
     SelectedCharacterIndex = FMath::Max(0, NewIndex);
 }
-
-void ALastFPSPlayerState::Auth_SetTeam(ELastFPSTeam NewTeam)
-{
-    if (!HasAuthority())
-        return;
-
-    Team = NewTeam;
-}
-

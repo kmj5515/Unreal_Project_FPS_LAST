@@ -4,7 +4,6 @@
 #include "GameplayEffectTypes.h"
 #include "Character/LastFPSCharacterBase.h"
 #include "Engine/World.h"
-#include "Game/LastFPSMatchGameState.h"
 #include "Game/LastFPSPlayerState.h"
 #include "GameFramework/Pawn.h"
 
@@ -130,19 +129,6 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
     if (AttackerPS && AttackerPS != VictimPS)
     {
         AttackerPS->Auth_AddKill();
-
-        // 다른 팀을 처치했을 때만 팀 점수 가산 (자살/팀킬 제외)
-        const ELastFPSTeam AttackerTeam = AttackerPS->GetTeam();
-        if (AttackerTeam != ELastFPSTeam::None && AttackerTeam != VictimPS->GetTeam())
-        {
-            if (UWorld* World = GetWorld())
-            {
-                if (ALastFPSMatchGameState* MatchGS = World->GetGameState<ALastFPSMatchGameState>())
-                {
-                    MatchGS->Auth_AddTeamScore(AttackerTeam, 1);
-                }
-            }
-        }
     }
 
     if (!TargetChar)

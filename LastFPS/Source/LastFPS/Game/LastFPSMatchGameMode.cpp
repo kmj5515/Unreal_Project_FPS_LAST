@@ -130,6 +130,15 @@ void ALastFPSMatchGameMode::TickMatchRuleCheck()
 
     ScheduleRespawnForDeadPlayers();
 
+    if (UWorld* World = GetWorld())
+    {
+        if (ALastFPSMatchGameState* MatchGS = World->GetGameState<ALastFPSMatchGameState>())
+        {
+            const float Elapsed = World->GetTimeSeconds() - MatchStartServerTimeSeconds;
+            MatchGS->Auth_SetMatchTimeRemaining(MatchDurationSeconds - Elapsed);
+        }
+    }
+
     FString EndReason;
     if (IsMatchEndConditionMet(EndReason))
     {
