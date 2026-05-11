@@ -154,6 +154,9 @@ void UGA_BasicShoot::ServerFire(ACharacter* Character, UWeaponComponent* Weapon)
             Weapon->ProjectileClass, MuzzleLocation, ProjectileRotation, SpawnParams);
     }
 
+    if (ALastFPSHero* Hero = Cast<ALastFPSHero>(Character))
+        Hero->Multicast_PlayWeaponFireEffects();
+
     if (!bHit || !HitResult.GetActor() || !DamageEffectClass) return;
 
     IAbilitySystemInterface* SourceASI = Cast<IAbilitySystemInterface>(Character);

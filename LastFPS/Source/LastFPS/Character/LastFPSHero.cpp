@@ -292,3 +292,13 @@ void ALastFPSHero::StopScoreboard()
     if (ALastFPSHUD* HUD = Cast<ALastFPSHUD>(PC->GetHUD()))
         HUD->HideScoreboard();
 }
+
+void ALastFPSHero::Multicast_PlayWeaponFireEffects_Implementation()
+{
+    if (GetNetMode() == NM_DedicatedServer)
+        return;
+    if (IsLocallyControlled())
+        return;
+    if (WeaponComponent)
+        WeaponComponent->PlayFireEffects();
+}

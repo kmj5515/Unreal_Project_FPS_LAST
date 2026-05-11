@@ -19,6 +19,9 @@ class LASTFPS_API ALastFPSHero : public ALastFPSCharacterBase
 public:
     ALastFPSHero();
 
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_PlayWeaponFireEffects();
+
     virtual void Tick(float DeltaTime) override;
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
