@@ -9,6 +9,8 @@ class UCameraComponent;
 class UInputMappingContext;
 class ULastFPSInputConfig;
 class UWeaponComponent;
+class UAnimMontage;
+class UCameraShakeBase;
 struct FInputActionValue;
 
 UCLASS()
@@ -32,7 +34,6 @@ public:
 protected:
     virtual void BeginPlay() override;
 
-    // ── 이동 / 시점 ──────────────────────────────────────────
     void Move(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
     void StartSprint();
@@ -40,36 +41,29 @@ protected:
     void StartADS();
     void StopADS();
 
-    // ── 점프 / 더블점프 ──────────────────────────────────────
     void StartJump();
     void StopJump();
 
-    // ── 사격 ─────────────────────────────────────────────────
     void StartFire();
     void StopFire();
 
-    // ── 스킬 슬롯 (Q/E/F → Ability.Skill1·Skill2·Ultimate) ───
     void StartSkill1();
     void StartSkill2();
     void StartUltimate();
 
-    // ── 스코어보드 (Tab) ──────────────────────────────────────
     void StartScoreboard();
     void StopScoreboard();
     void TryActivateAbilityByTag(const FGameplayTag& AbilityTag);
     void CancelAbilityByTag(const FGameplayTag& AbilityTag);
 
-    // ── 카메라 보간 ───────────────────────────────────────────
     void TickCameraInterp(float DeltaTime);
 
-    // ── 카메라 컴포넌트 ───────────────────────────────────────
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera")
     TObjectPtr<USpringArmComponent> CameraBoom;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera")
     TObjectPtr<UCameraComponent> FollowCamera;
 
-    // 기본 시점 설정
     UPROPERTY(EditDefaultsOnly, Category="Camera|Default")
     float DefaultArmLength = 300.f;
 
@@ -79,7 +73,6 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Camera|Default")
     float DefaultFOV = 90.f;
 
-    // ADS 시점 설정 — 카메라가 어깨 쪽으로 당겨져 허리 위만 보임
     UPROPERTY(EditDefaultsOnly, Category="Camera|ADS")
     float ADSArmLength = 120.f;
 
@@ -89,37 +82,46 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Camera|ADS")
     float ADSFOV = 75.f;
 
-    // 보간 속도 (높을수록 빠르게 전환)
     UPROPERTY(EditDefaultsOnly, Category="Camera|ADS")
     float ADSInterpSpeed = 10.f;
 
     UPROPERTY(EditDefaultsOnly, Category="Camera")
     float CameraLagSpeed = 15.f;
 
-    // ── 무기 ─────────────────────────────────────────────────
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
     TObjectPtr<UWeaponComponent> WeaponComponent;
 
-    // ── 입력 설정 ─────────────────────────────────────────────
     UPROPERTY(EditDefaultsOnly, Category="Input")
     TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
     UPROPERTY(EditDefaultsOnly, Category="Input")
     TObjectPtr<ULastFPSInputConfig> InputConfig;
 
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|MatchIntro")
+    TObjectPtr<UAnimMontage> MatchIntroMontage;
+
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|MatchIntro")
+    TSubclassOf<UCameraShakeBase> MatchIntroCameraShake;
+
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|MatchIntro")
+    float MatchIntroCameraShakeScale = 1.f;
+
 private:
     bool bIsADS = false;
 
-    // 현재 보간 중인 목표값
     float TargetArmLength;
     FVector TargetSocketOffset;
     float TargetFOV;
 
-    // 입력 바인딩 헬퍼
     void TryBindNativeTriggered(UEnhancedInputComponent* EIC, const FGameplayTag& Tag,
         void(ALastFPSHero::*Func)(const FInputActionValue&));
     void TryBindNativeStartStop(UEnhancedInputComponent* EIC, const FGameplayTag& Tag,
         void(ALastFPSHero::*StartFunc)(), void(ALastFPSHero::*StopFunc)());
     void TryBindAbilityStart(UEnhancedInputComponent* EIC, const FGameplayTag& Tag,
         void(ALastFPSHero::*Func)());
+
+    void TickLocalMatchIntro();
+
+    bool bLocalMatchIntroInputDisabled = false;
+    bool bLocalMatchIntroFxStarted = false;
 };

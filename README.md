@@ -252,14 +252,14 @@ ACharacter
 - [x] 로비 / 매치 시작 흐름 (프로토타입) — `ALastFPSLobbyGameMode`에서 3명 입장 시 `ServerTravel(MatchMapURL)`로 게임 맵 이동, `ALastFPSMatchGameMode`로 인게임 흐름 분리
 - [x] 로비 캐릭터 선택/확정 스폰 (프로토타입) — 로비 선택 인덱스 저장(`PlayerState` + `GameInstance`), 매치 첫 스폰 시 인덱스 기반 `CharacterPawnClasses` 적용
 - [x] 로비 전용 폰 분리 — 로비에서는 `LobbyPawnClass` 사용, 매치에서는 전투 Pawn 스폰
-- [x] 드랍 인트로 보정 — 드랍 진행 중 후속 접속 플레이어도 `PostLogin`에서 동일 낙하 연출 적용
+- [x] 매치 인트로 동기화 — `ALastFPSMatchGameState::bDropIntroActive` 복제로 후속 접속 포함, 소유 클라이언트만 몽타주·셰이크·입력 잠금 (`ALastFPSHero::TickLocalMatchIntro`)
 - [ ] **[매치 인트로]** 매치 시작 시 참가자(최대 3명) 소개 UI 연출
   - UMG 참가자 소개 위젯 (닉네임, 캐릭터, 구분 컬러, 포즈)
   - 멀티에서 모든 클라이언트 동기화 (RPC 또는 GameState 플래그)
-- [ ] **[낙하 인트로]** 하늘 스폰 → 착지 연출
-  - `GA_DropIntro` Gameplay Ability 구현
-  - 낙하 애니메이션 + 착지 임팩트 카메라 셰이크
-  - 착지 완료 전 전투 입력 잠금
+- [x] **[매치 착지 인트로]** 지상 스폰 + 로컬 연출 (하늘 스폰 없음)
+  - `ALastFPSMatchGameMode::ChoosePlayerStart_Implementation` — 맵의 `APlayerStart`를 셔플한 덱에서 순서대로 배정(덱 소진 시 재셔플). 동시 스폰 구간에서 같은 스타트 중복 없음. `PlayerStart` 수 < 동시 입장 인원이면 이후 스폰에서 재사용됨.
+  - `ALastFPSHero` — BP에서 `MatchIntroMontage` / `MatchIntroCameraShake` 지정, `bDropIntroActive` 동안 소유 클라만 `DisableInput`
+  - `DropIntroSeconds`를 몽타주 길이와 맞출 것(짧으면 입력만 먼저 풀림)
 - [x] **[MVP 결과 화면]** 게임 종료 후 결과 스코어보드 오버레이 (Victory 포즈/Level Sequence는 범위에서 제외)
   - [x] GameState 기반 종료(`bMatchEnded` RepNotify, `WinnerPlayerState`, `EndReason`) + MVP 선정(최다 킬, 동률 시 데스 적은 사람, 동률 시 무승부)
   - [x] 종료 시 모든 클라에 자동 스코어보드 표시 + Enhanced Input `ClearAllMappings()`로 입력 차단

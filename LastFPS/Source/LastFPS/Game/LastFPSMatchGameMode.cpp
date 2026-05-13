@@ -3,13 +3,13 @@
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Character/LastFPSCharacterBase.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/GameStateBase.h"
-#include "GameFramework/PlayerState.h"
 #include "GameFramework/PlayerStart.h"
+#include "GameFramework/PlayerState.h"
 #include "Game/LastFPSMatchGameState.h"
 #include "Game/LastFPSPlayerState.h"
-#include "GameFramework/CharacterMovementComponent.h"
 
 ALastFPSMatchGameMode::ALastFPSMatchGameMode()
 {
@@ -17,9 +17,78 @@ ALastFPSMatchGameMode::ALastFPSMatchGameMode()
     GameStateClass = ALastFPSMatchGameState::StaticClass();
 }
 
+void ALastFPSMatchGameMode::RefillMatchPlayerStartDeck(UWorld* World)
+{
+    MatchPlayerStartDeck.Empty();
+
+    TArray<APlayerStart*> Starts;
+    for (TActorIterator<APlayerStart> It(World); It; ++It)
+    {
+        Starts.Add(*It);
+    }
+
+    for (APlayerStart* PS : Starts)
+    {
+        if (PS)
+        {
+            MatchPlayerStartDeck.Add(PS);
+        }
+    }
+
+    for (int32 i = MatchPlayerStartDeck.Num() - 1; i > 0; --i)
+    {
+        const int32 j = FMath::RandRange(0, i);
+        MatchPlayerStartDeck.Swap(i, j);
+    }
+}
+
+AActor* ALastFPSMatchGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return Super::ChoosePlayerStart_Implementation(Player);
+    }
+
+    TArray<APlayerStart*> AllStarts;
+    for (TActorIterator<APlayerStart> It(World); It; ++It)
+    {
+        AllStarts.Add(*It);
+    }
+
+    if (AllStarts.Num() == 0)
+    {
+        return Super::ChoosePlayerStart_Implementation(Player);
+    }
+
+    MatchPlayerStartDeck.RemoveAll(
+        [&AllStarts](const TWeakObjectPtr<APlayerStart>& Ptr)
+        {
+            return !Ptr.IsValid() || !AllStarts.Contains(Ptr.Get());
+        });
+
+    if (MatchPlayerStartDeck.Num() == 0)
+    {
+        RefillMatchPlayerStartDeck(World);
+    }
+
+    while (MatchPlayerStartDeck.Num() > 0)
+    {
+        const TWeakObjectPtr<APlayerStart> Back = MatchPlayerStartDeck.Pop(false);
+        if (APlayerStart* Chosen = Back.Get())
+        {
+            return Chosen;
+        }
+    }
+
+    return Super::ChoosePlayerStart_Implementation(Player);
+}
+
 void ALastFPSMatchGameMode::BeginPlay()
 {
     Super::BeginPlay();
+
+    MatchPlayerStartDeck.Empty();
 
     DebugFlow(TEXT("[Match] MatchGameMode BeginPlay"));
     StartDropIntroPhase();
@@ -28,11 +97,6 @@ void ALastFPSMatchGameMode::BeginPlay()
 void ALastFPSMatchGameMode::PostLogin(APlayerController* NewPlayer)
 {
     Super::PostLogin(NewPlayer);
-
-    if (bDropIntroInProgress)
-    {
-        ApplyDropIntroToController(NewPlayer);
-    }
 
     DebugFlow(FString::Printf(
         TEXT("[Match] Player Joined: %s (Total: %d)"),
@@ -55,41 +119,24 @@ void ALastFPSMatchGameMode::StartDropIntroPhase()
     }
 
     bDropIntroInProgress = true;
+
+    if (ALastFPSMatchGameState* MGS = GetGameState<ALastFPSMatchGameState>())
+    {
+        MGS->Auth_SetDropIntroActive(true);
+    }
+
     DebugFlow(
         FString::Printf(TEXT("[Match] Drop intro started (%.1f second(s))."), DropIntroSeconds),
         FColor::Blue);
 
     if (UWorld* World = GetWorld())
     {
-        for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
-        {
-            ApplyDropIntroToController(It->Get());
-        }
-
         World->GetTimerManager().SetTimer(
             DropIntroTimerHandle,
             this,
             &ALastFPSMatchGameMode::FinishDropIntroPhase,
             FMath::Max(0.1f, DropIntroSeconds),
             false);
-    }
-}
-
-void ALastFPSMatchGameMode::ApplyDropIntroToController(APlayerController* PlayerController) const
-{
-    APawn* Pawn = PlayerController ? PlayerController->GetPawn() : nullptr;
-    if (!Pawn)
-    {
-        return;
-    }
-
-    FVector DropLocation = Pawn->GetActorLocation();
-    DropLocation.Z += DropHeightOffset;
-    Pawn->SetActorLocation(DropLocation);
-
-    if (UCharacterMovementComponent* MoveComp = Pawn->FindComponentByClass<UCharacterMovementComponent>())
-    {
-        MoveComp->SetMovementMode(MOVE_Falling);
     }
 }
 
@@ -101,6 +148,12 @@ void ALastFPSMatchGameMode::FinishDropIntroPhase()
     }
 
     bDropIntroInProgress = false;
+
+    if (ALastFPSMatchGameState* MGS = GetGameState<ALastFPSMatchGameState>())
+    {
+        MGS->Auth_SetDropIntroActive(false);
+    }
+
     MatchStartServerTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 
     DebugFlow(
@@ -327,7 +380,6 @@ APlayerState* ALastFPSMatchGameMode::DetermineLeadingPlayer() const
         }
     }
 
-    // 0킬 전원 또는 동률이면 무승부 처리
     if (BestKills <= 0 || bTie)
     {
         return nullptr;
@@ -343,6 +395,7 @@ void ALastFPSMatchGameMode::EndMatch(const FString& Reason, APlayerState* Winner
     }
 
     bMatchEnded = true;
+    bDropIntroInProgress = false;
 
     UWorld* World = GetWorld();
     if (World)
@@ -353,6 +406,7 @@ void ALastFPSMatchGameMode::EndMatch(const FString& Reason, APlayerState* Winner
 
     if (ALastFPSMatchGameState* MGS = World ? World->GetGameState<ALastFPSMatchGameState>() : nullptr)
     {
+        MGS->Auth_SetDropIntroActive(false);
         MGS->Auth_SetMatchResult(Winner, Reason);
     }
 

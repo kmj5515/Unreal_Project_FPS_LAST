@@ -2,6 +2,11 @@
 #include "Character/Components/WeaponComponent.h"
 #include "Input/LastFPSInputConfig.h"
 #include "UI/LastFPSHUD.h"
+#include "Game/LastFPSMatchGameState.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Camera/CameraShakeBase.h"
+#include "Camera/PlayerCameraManager.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -15,7 +20,6 @@ ALastFPSHero::ALastFPSHero()
 {
     PrimaryActorTick.bCanEverTick = true;
 
-    // ── 스프링 암 ──────────────────────────────────────────────
     CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
     CameraBoom->SetupAttachment(RootComponent);
     CameraBoom->SetRelativeLocation(FVector(0.f, 0.f, 50.f));
@@ -26,20 +30,15 @@ ALastFPSHero::ALastFPSHero()
     CameraBoom->CameraLagSpeed           = CameraLagSpeed;
     CameraBoom->bEnableCameraRotationLag = false;
 
-    // ── 카메라 ────────────────────────────────────────────────
     FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
     FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
     FollowCamera->bUsePawnControlRotation = false;
     FollowCamera->FieldOfView             = DefaultFOV;
 
-    // ── 캐릭터 회전 설정 ──────────────────────────────────────
-    // 항상 컨트롤러 Yaw를 따라 몸이 돌아야 다른 클라이언트에 회전이 복제됨
+    // Yaw만 컨트롤러 따라가야 다른 클라에 회전 복제됨. bOrientRotationToMovement와 동시 사용 금지.
     bUseControllerRotationPitch = false;
     bUseControllerRotationYaw   = true;
     bUseControllerRotationRoll  = false;
-
-    // bOrientRotationToMovement와 bUseControllerRotationYaw는 동시에 쓰면 충돌 —
-    // 컨트롤러 Yaw 고정 방식이므로 이동 방향 자동 회전은 끔
     GetCharacterMovement()->bOrientRotationToMovement = false;
     GetCharacterMovement()->RotationRate              = FRotator(0.f, 500.f, 0.f);
     GetCharacterMovement()->MaxWalkSpeed              = 400.f;
@@ -48,12 +47,10 @@ ALastFPSHero::ALastFPSHero()
     GetCharacterMovement()->AirControl                = 0.4f;
     GetCharacterMovement()->GravityScale              = 1.5f;
 
-    // 더블점프: 1차 점프 + 공중에서 1회 추가 허용
     JumpMaxCount = 2;
 
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
 
-    // 보간 목표값 초기화
     TargetArmLength    = DefaultArmLength;
     TargetSocketOffset = DefaultSocketOffset;
     TargetFOV          = DefaultFOV;
@@ -77,10 +74,85 @@ void ALastFPSHero::BeginPlay()
 void ALastFPSHero::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
+    TickLocalMatchIntro();
     TickCameraInterp(DeltaTime);
 }
 
-// ── 카메라 보간 ────────────────────────────────────────────────
+void ALastFPSHero::TickLocalMatchIntro()
+{
+    if (!IsLocallyControlled())
+    {
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    ALastFPSMatchGameState* MatchGS = World->GetGameState<ALastFPSMatchGameState>();
+    if (!MatchGS)
+    {
+        if (bLocalMatchIntroInputDisabled)
+        {
+            if (APlayerController* PC = Cast<APlayerController>(GetController()))
+            {
+                EnableInput(PC);
+            }
+            bLocalMatchIntroInputDisabled = false;
+        }
+        bLocalMatchIntroFxStarted = false;
+        return;
+    }
+
+    const bool bIntro = MatchGS->IsDropIntroActive();
+
+    if (bIntro && !bLocalMatchIntroFxStarted)
+    {
+        bLocalMatchIntroFxStarted = true;
+
+        if (MatchIntroMontage && GetMesh())
+        {
+            if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
+            {
+                AnimInst->Montage_Play(MatchIntroMontage);
+            }
+        }
+
+        if (MatchIntroCameraShake)
+        {
+            if (APlayerController* PC = Cast<APlayerController>(GetController()))
+            {
+                if (APlayerCameraManager* PCM = PC->PlayerCameraManager)
+                {
+                    PCM->StartCameraShake(MatchIntroCameraShake, MatchIntroCameraShakeScale);
+                }
+            }
+        }
+
+        if (APlayerController* PC = Cast<APlayerController>(GetController()))
+        {
+            DisableInput(PC);
+            bLocalMatchIntroInputDisabled = true;
+        }
+    }
+
+    if (!bIntro && bLocalMatchIntroInputDisabled)
+    {
+        if (APlayerController* PC = Cast<APlayerController>(GetController()))
+        {
+            EnableInput(PC);
+        }
+        bLocalMatchIntroInputDisabled = false;
+    }
+
+    if (!bIntro)
+    {
+        bLocalMatchIntroFxStarted = false;
+    }
+}
+
 void ALastFPSHero::TickCameraInterp(float DeltaTime)
 {
     CameraBoom->TargetArmLength = FMath::FInterpTo(
@@ -146,7 +218,6 @@ void ALastFPSHero::TryBindAbilityStart(
         EIC->BindAction(IA, ETriggerEvent::Started, this, Func);
 }
 
-// ── 이동 ──────────────────────────────────────────────────────
 void ALastFPSHero::Move(const FInputActionValue& Value)
 {
     const FVector2D MovementVector = Value.Get<FVector2D>();
@@ -162,7 +233,6 @@ void ALastFPSHero::Move(const FInputActionValue& Value)
     AddMovementInput(RightDir,   MovementVector.X);
 }
 
-// ── 시점 ──────────────────────────────────────────────────────
 void ALastFPSHero::Look(const FInputActionValue& Value)
 {
     const FVector2D LookVector = Value.Get<FVector2D>();
@@ -196,7 +266,6 @@ void ALastFPSHero::CancelAbilityByTag(const FGameplayTag& AbilityTag)
     ASC->CancelAbilities(&AbilityTags);
 }
 
-// ── 달리기 ────────────────────────────────────────────────────
 void ALastFPSHero::StartSprint()
 {
     static const FGameplayTag SprintTag = FGameplayTag::RequestGameplayTag("Ability.Sprint");
@@ -209,12 +278,10 @@ void ALastFPSHero::StopSprint()
     CancelAbilityByTag(SprintTag);
 }
 
-// ── ADS ───────────────────────────────────────────────────────
 void ALastFPSHero::StartADS()
 {
     bIsADS = true;
 
-    // 목표값만 바꾸면 Tick에서 부드럽게 보간됨
     TargetArmLength    = ADSArmLength;
     TargetSocketOffset = ADSSocketOffset;
     TargetFOV          = ADSFOV;
@@ -229,7 +296,6 @@ void ALastFPSHero::StopADS()
     TargetFOV          = DefaultFOV;
 }
 
-// ── 점프 / 더블점프 ───────────────────────────────────────────
 void ALastFPSHero::StartJump()
 {
     static const FGameplayTag JumpTag = FGameplayTag::RequestGameplayTag("Ability.Jump");
@@ -238,11 +304,10 @@ void ALastFPSHero::StartJump()
 
 void ALastFPSHero::StopJump()
 {
-    // GAS가 아닌 직접 호출 유지 — 버튼 해제 시 가변 점프높이 컷오프를 위해
+    // 가변 점프 높이: GAS 경유 없이 StopJumping 직접 호출
     StopJumping();
 }
 
-// ── 사격 ──────────────────────────────────────────────────────
 void ALastFPSHero::StartFire()
 {
     if (!IsAlive()) return;
@@ -257,7 +322,6 @@ void ALastFPSHero::StopFire()
     CancelAbilityByTag(FireTag);
 }
 
-// ── 스킬 슬롯 ─────────────────────────────────────────────────
 void ALastFPSHero::StartSkill1()
 {
     static const FGameplayTag Tag = FGameplayTag::RequestGameplayTag("Ability.Skill1");
@@ -276,7 +340,6 @@ void ALastFPSHero::StartUltimate()
     TryActivateAbilityByTag(Tag);
 }
 
-// ── 스코어보드 ─────────────────────────────────────────────────
 void ALastFPSHero::StartScoreboard()
 {
     APlayerController* PC = Cast<APlayerController>(GetController());
