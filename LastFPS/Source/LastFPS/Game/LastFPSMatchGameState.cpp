@@ -1,5 +1,6 @@
 #include "Game/LastFPSMatchGameState.h"
 
+#include "Game/LastFPSPlayerState.h"
 #include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 
@@ -58,4 +59,21 @@ void ALastFPSMatchGameState::OnRep_MatchEnded()
     {
         OnMatchEnded.Broadcast();
     }
+}
+
+void ALastFPSMatchGameState::Auth_BroadcastKillFeed(
+    ALastFPSPlayerState* KillerPS,
+    ALastFPSPlayerState* VictimPS)
+{
+    if (!HasAuthority() || !KillerPS || !VictimPS)
+        return;
+
+    Multicast_KillFeed(KillerPS->GetPlayerName(), VictimPS->GetPlayerName());
+}
+
+void ALastFPSMatchGameState::Multicast_KillFeed_Implementation(
+    const FString& KillerName,
+    const FString& VictimName)
+{
+    OnKillFeed.Broadcast(KillerName, VictimName);
 }

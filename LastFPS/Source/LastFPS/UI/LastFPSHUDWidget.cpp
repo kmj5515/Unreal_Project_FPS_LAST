@@ -5,6 +5,8 @@
 #include "Game/LastFPSPlayerState.h"
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
+#include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 
@@ -21,12 +23,84 @@ void ULastFPSHUDWidget::NativeConstruct()
         GetWorld()->GetTimerManager().SetTimer(
             RetryTimerHandle, this, &ULastFPSHUDWidget::RetryInitialize, 0.1f, true);
     }
+
+    TryBindKillFeed();
+}
+
+void ULastFPSHUDWidget::NativeDestruct()
+{
+    if (ALastFPSMatchGameState* MGS = BoundMatchGameState.Get())
+    {
+        MGS->OnKillFeed.Remove(KillFeedHandle);
+    }
+    BoundMatchGameState.Reset();
+    KillFeedHandle.Reset();
+    KillFeedLines.Empty();
+
+    Super::NativeDestruct();
 }
 
 void ULastFPSHUDWidget::RetryInitialize()
 {
     if (InitializeHUD())
         GetWorld()->GetTimerManager().ClearTimer(RetryTimerHandle);
+
+    TryBindKillFeed();
+}
+
+void ULastFPSHUDWidget::TryBindKillFeed()
+{
+    if (BoundMatchGameState.IsValid())
+        return;
+
+    UWorld* World = GetWorld();
+    if (!World)
+        return;
+
+    ALastFPSMatchGameState* MGS = World->GetGameState<ALastFPSMatchGameState>();
+    if (!MGS)
+        return;
+
+    BoundMatchGameState = MGS;
+    KillFeedHandle      = MGS->OnKillFeed.AddUObject(this, &ULastFPSHUDWidget::HandleKillFeed);
+}
+
+void ULastFPSHUDWidget::HandleKillFeed(const FString& KillerName, const FString& VictimName)
+{
+    AddKillFeedLine(KillerName, VictimName);
+    OnKillFeedEntry(KillerName, VictimName);
+}
+
+void ULastFPSHUDWidget::AddKillFeedLine(const FString& KillerName, const FString& VictimName)
+{
+    if (!KillFeedContainer)
+        return;
+
+    UTextBlock* Line = NewObject<UTextBlock>(this);
+    if (!Line)
+        return;
+
+    Line->SetText(FText::FromString(FString::Printf(TEXT("%s  →  %s"), *KillerName, *VictimName)));
+
+    if (UVerticalBox* VBox = Cast<UVerticalBox>(KillFeedContainer))
+    {
+        VBox->AddChildToVerticalBox(Line);
+    }
+    else
+    {
+        KillFeedContainer->AddChild(Line);
+    }
+
+    KillFeedLines.Add(Line);
+
+    while (KillFeedLines.Num() > MaxKillFeedEntries)
+    {
+        if (UTextBlock* Oldest = KillFeedLines[0])
+        {
+            Oldest->RemoveFromParent();
+        }
+        KillFeedLines.RemoveAt(0);
+    }
 }
 
 void ULastFPSHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)

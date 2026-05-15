@@ -15,6 +15,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GA_Ultimate.h"
 
 ALastFPSHero::ALastFPSHero()
 {
@@ -54,6 +55,17 @@ ALastFPSHero::ALastFPSHero()
     TargetArmLength    = DefaultArmLength;
     TargetSocketOffset = DefaultSocketOffset;
     TargetFOV          = DefaultFOV;
+}
+
+void ALastFPSHero::GiveDefaultAbilities()
+{
+    Super::GiveDefaultAbilities();
+
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!HasAuthority() || !ASC)
+        return;
+
+    ASC->GiveAbility(FGameplayAbilitySpec(UGA_Ultimate::StaticClass(), 1));
 }
 
 void ALastFPSHero::BeginPlay()

@@ -7,6 +7,7 @@
 class APlayerState;
 
 DECLARE_MULTICAST_DELEGATE(FOnLastFPSMatchEnded);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnLastFPSKillFeed, const FString&, /*Killer*/ const FString& /*Victim*/);
 
 UCLASS()
 class LASTFPS_API ALastFPSMatchGameState : public AGameStateBase
@@ -34,8 +35,10 @@ public:
     const FString& GetEndReason() const { return EndReason; }
 
     FOnLastFPSMatchEnded OnMatchEnded;
+    FOnLastFPSKillFeed OnKillFeed;
 
     void Auth_SetMatchTimeRemaining(float NewSeconds);
+    void Auth_BroadcastKillFeed(class ALastFPSPlayerState* KillerPS, class ALastFPSPlayerState* VictimPS);
     void Auth_SetMatchResult(APlayerState* InWinner, const FString& InReason);
     void Auth_SetDropIntroActive(bool bActive);
 
@@ -57,4 +60,7 @@ protected:
 
     UFUNCTION()
     void OnRep_MatchEnded();
+
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_KillFeed(const FString& KillerName, const FString& VictimName);
 };

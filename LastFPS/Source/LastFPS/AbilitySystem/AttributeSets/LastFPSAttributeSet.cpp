@@ -5,6 +5,7 @@
 #include "Character/LastFPSCharacterBase.h"
 #include "Engine/World.h"
 #include "Game/LastFPSPlayerState.h"
+#include "Game/LastFPSMatchGameState.h"
 #include "GameFramework/Pawn.h"
 
 namespace
@@ -39,7 +40,7 @@ ULastFPSAttributeSet::ULastFPSAttributeSet()
     InitStamina(100.f);
     InitMaxStamina(100.f);
     InitUltimateGauge(0.f);
-    InitMaxUltimateGauge(100.f);
+    InitMaxUltimateGauge(static_cast<float>(ALastFPSPlayerState::UltimateKillsRequired));
     InitAttackDamage(10.f);
     InitDefense(0.f);
     InitMoveSpeed(400.f);
@@ -129,6 +130,12 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
     if (AttackerPS && AttackerPS != VictimPS)
     {
         AttackerPS->Auth_AddKill();
+        AttackerPS->Auth_OnScoredKill(VictimPS);
+
+        if (ALastFPSMatchGameState* MatchGS = GetWorld()->GetGameState<ALastFPSMatchGameState>())
+        {
+            MatchGS->Auth_BroadcastKillFeed(AttackerPS, VictimPS);
+        }
     }
 
     if (!TargetChar)

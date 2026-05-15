@@ -56,7 +56,7 @@ Time Takers의 빠른 템포와 스킬 기반 전투를 참고하여, 각 플레
 - **Health** — 최대 체력 / 현재 체력
 - **Damage** — 메타 어트리뷰트: GE가 여기에 가산한 뒤 `PostGameplayEffectExecute`에서 **Health**를 깎는 방식으로 소비됨
 - **Stamina** — 달리기·특수 이동 소모 자원
-- **UltimateGauge** — 궁극기 차징 게이지 (전투 참여 시 누적)
+- **UltimateGauge** — 궁극기 충전 (킬 2회로 F 사용 가능, 사용 후 0부터 재충전)
 - **AttackDamage** — 기본 공격력 (무기 별 계수)
 - **Defense** — 피해 감소 수치
 - **MoveSpeed** — 기본 이동속도 배율
@@ -127,7 +127,7 @@ ALastFPSPlayerState
         │     ├── GA_Jump / GA_DoubleJump
         │     ├── GA_SkillMoveBoost (Q)  // 3초 이동속도 증가
         │     ├── GA_SkillHeal (E)       // 즉시 체력 회복
-        │     └── GA_Ultimate (F)        // 태그·입력 준비, GA 미구현
+        │     └── GA_Ultimate (F)        // 2킬 충전 후 사용, 8초간 킬 시 +100 HP
         ├── GameplayEffects
         │     ├── ULastFPSGE_DamageInstant  // 네이티브 즉시 피해 (Damage 메타 +Additive, 기본 15)
         │     ├── (선택) BP 피해 GE — GA_BasicShoot `DamageEffectClass`로 지정, **Damage** 메타에 Additive 양수 권장
@@ -234,8 +234,8 @@ ACharacter
 - [x] 프로토타입 스킬 2종 (C++ GA + C++ 기본 GE, BP에서 `DefaultAbilities`·수치 튜닝 가능)
   - [x] Q: `GA_SkillMoveBoost` — 3초 이속 증가 (`ULastFPSGE_MoveSpeedBuff`)
   - [x] E: `GA_SkillHeal` — 즉시 체력 회복 (`ULastFPSGE_HealInstant`)
-  - [ ] F: 궁극기 GA 및 연출 (태그·입력만 준비됨)
-- [ ] `UltimateGauge` 충전 및 임계값 트리거
+  - [x] F: `GA_Ultimate` — 2킬 충전(`UltimateGauge` 0~2), 사용 시 게이지 0, 8초간 킬 시 `GE_UltimateKillHeal` +100 HP
+- [x] `UltimateGauge` 충전 및 임계값 트리거 (킬 1회당 +1, 2 도달 시 F 사용 가능)
 - [ ] 쿨다운 UI 표시 (HUD)
 - [ ] GameplayCue — 스킬 이펙트 / 사운드
 
@@ -243,7 +243,8 @@ ACharacter
 - [x] 체력바 / 스태미나바 / 궁극게이지 HUD — C++ 베이스(`ULastFPSHUDWidget`) + GAS 어트리뷰트 델리게이트 바인딩, Blueprint에서 Progress Bar 연결
 - [x] 오버히트 게이지 바 — `OnHeatChanged` RepNotify + 멀티캐스트 델리게이트, 오버히트 시 색상 분기
 - [ ] 스킬 슬롯 쿨다운 아이콘 (Q / E / F)
-- [ ] 킬피드 / 개인 점수판
+- [x] 개인 점수판 — Tab 홀드 `ShowScoreboard` / `ULastFPSScoreboardWidget` (매치 중·종료 시)
+- [x] 킬피드 — `ALastFPSMatchGameState::Multicast_KillFeed` → `ULastFPSHUDWidget` (`KillFeedContainer` 또는 `OnKillFeedEntry` BP)
 - [ ] 미니맵 (참가자 위치 표시, 최대 3명)
 - [x] 게임 종료 스코어보드 — `ALastFPSHUD`가 `ALastFPSMatchGameState::OnMatchEnded` 바인딩 후 자동 표시
 - [x] HUD 매치 타이머 — `ULastFPSHUDWidget::OnMatchTimeChanged(float)` BP 이벤트 (1초 단위 갱신)

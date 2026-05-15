@@ -59,7 +59,7 @@ protected:
     virtual void OnRep_PlayerState() override;
 
     void InitAbilitySystem();
-    void GiveDefaultAbilities();
+    virtual void GiveDefaultAbilities();
     void ApplyDefaultEffects();
     void OnHealthChanged(const FOnAttributeChangeData& Data);
     void UpdateAliveCollisionState(bool bAlive);

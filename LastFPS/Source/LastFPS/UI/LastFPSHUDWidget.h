@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Image.h"
+#include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
 #include "GameplayEffectTypes.h"
 #include "LastFPSHUDWidget.generated.h"
@@ -17,6 +18,7 @@ class LASTFPS_API ULastFPSHUDWidget : public UUserWidget
 
 public:
     virtual void NativeConstruct() override;
+    virtual void NativeDestruct() override;
     virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
     UFUNCTION(BlueprintCallable, Category="HUD|HitMarker")
@@ -38,6 +40,9 @@ protected:
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
     void OnCrosshairVisibilityChanged(bool bVisible);
 
+    UFUNCTION(BlueprintImplementableEvent, Category="HUD|KillFeed")
+    void OnKillFeedEntry(const FString& KillerName, const FString& VictimName);
+
     UPROPERTY(BlueprintReadOnly, Category="HUD|HitMarker", meta=(BindWidgetOptional))
     TObjectPtr<UImage> HitMarkerImage;
 
@@ -47,6 +52,13 @@ protected:
     /** WBP_HUD에서 동일 이름 TextBlock을 만들면 자동 바인딩되어 매치 남은 시간(MM:SS)이 표시됨 */
     UPROPERTY(BlueprintReadOnly, Category="HUD|Match", meta=(BindWidgetOptional))
     TObjectPtr<UTextBlock> MatchTimerText;
+
+    /** WBP_HUD에 Vertical Box 이름 KillFeedContainer — 없으면 BP 이벤트만 호출 */
+    UPROPERTY(BlueprintReadOnly, Category="HUD|KillFeed", meta=(BindWidgetOptional))
+    TObjectPtr<UPanelWidget> KillFeedContainer;
+
+    UPROPERTY(EditDefaultsOnly, Category="HUD|KillFeed", meta=(ClampMin="1", ClampMax="10"))
+    int32 MaxKillFeedEntries = 5;
 
 private:
     // 성공 시 true 반환. PlayerState 미준비면 false → 타이머 재시도
@@ -58,6 +70,9 @@ private:
     void HandleHealthChanged(const FOnAttributeChangeData& Data);
     void HandleStaminaChanged(const FOnAttributeChangeData& Data);
     void HandleUltimateGaugeChanged(const FOnAttributeChangeData& Data);
+    void HandleKillFeed(const FString& KillerName, const FString& VictimName);
+    void TryBindKillFeed();
+    void AddKillFeedLine(const FString& KillerName, const FString& VictimName);
 
     UFUNCTION()
     void HandleHeatChanged(float Current, float Max, bool bIsOverheated);
@@ -76,4 +91,8 @@ private:
 
     // 1초 단위로 1번만 BP에 통지하기 위한 캐시 (-1: 아직 미통지)
     int32 CachedMatchTimeIntSec  = -1;
+
+    TWeakObjectPtr<class ALastFPSMatchGameState> BoundMatchGameState;
+    FDelegateHandle KillFeedHandle;
+    TArray<TObjectPtr<UTextBlock>> KillFeedLines;
 };
