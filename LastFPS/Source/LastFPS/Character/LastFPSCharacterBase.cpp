@@ -36,6 +36,36 @@ float ALastFPSCharacterBase::GetMaxHealth() const
     return AttributeSet ? AttributeSet->GetMaxHealth() : 0.f;
 }
 
+FString ALastFPSCharacterBase::GetKillFeedDisplayName() const
+{
+    if (!CharacterNickname.IsEmpty())
+    {
+        return CharacterNickname;
+    }
+
+    if (const APlayerState* PS = GetPlayerState())
+    {
+        return PS->GetPlayerName();
+    }
+
+    return FString();
+}
+
+FString ALastFPSCharacterBase::GetKillFeedDisplayNameForPlayerState(const APlayerState* PS)
+{
+    if (!PS)
+    {
+        return FString();
+    }
+
+    if (const ALastFPSCharacterBase* Character = Cast<ALastFPSCharacterBase>(PS->GetPawn()))
+    {
+        return Character->GetKillFeedDisplayName();
+    }
+
+    return PS->GetPlayerName();
+}
+
 void ALastFPSCharacterBase::Multicast_PlayHitSound_Implementation()
 {
     if (HitSound)

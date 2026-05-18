@@ -33,6 +33,13 @@ public:
     UFUNCTION(BlueprintCallable, Category="LastFPS|Attributes")
     float GetMaxHealth() const;
 
+    /** 킬피드 등 UI 표시명. 비어 있으면 PlayerState 이름 사용 */
+    UFUNCTION(BlueprintPure, Category="LastFPS|Display")
+    FString GetKillFeedDisplayName() const;
+
+    /** Pawn 없을 때 PlayerState만으로 표시명 해석 */
+    static FString GetKillFeedDisplayNameForPlayerState(const APlayerState* PS);
+
     virtual bool GetIsADS() const { return false; }
 
     UFUNCTION(NetMulticast, Reliable)
@@ -68,6 +75,10 @@ protected:
     // AttributeSet은 PlayerState가 소유 — InitAbilitySystem에서 캐싱
     UPROPERTY()
     TObjectPtr<ULastFPSAttributeSet> AttributeSet;
+
+    /** BP/에디터에서 캐릭터별 닉네임 지정. 비어 있으면 GetPlayerName() */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Display")
+    FString CharacterNickname;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Sound")
     TObjectPtr<USoundBase> HitSound;
