@@ -1,18 +1,86 @@
 #include "UI/LastFPSHUDWidget.h"
+#include "UI/LastFPSHUDStyle.h"
 #include "AbilitySystemComponent.h"
+#include "Styling/SlateBrush.h"
+
+void FLastFPSSmoothedGaugeDisplay::Initialize(float Current, float InMax)
+{
+    Target          = Current;
+    Displayed       = Current;
+    Max             = FMath::Max(InMax, KINDA_SMALL_NUMBER);
+    bInterpActive   = false;
+}
+
+void FLastFPSSmoothedGaugeDisplay::SetTarget(float NewTarget)
+{
+    Target = NewTarget;
+    bInterpActive = !FMath::IsNearlyEqual(Displayed, Target, KINDA_SMALL_NUMBER);
+    if (!bInterpActive)
+    {
+        Displayed = Target;
+    }
+}
+
+bool FLastFPSSmoothedGaugeDisplay::Tick(float DeltaTime, float FillDuration)
+{
+    if (!bInterpActive)
+    {
+        return false;
+    }
+
+    const float FillSpeed = Max / FMath::Max(FillDuration, KINDA_SMALL_NUMBER);
+    const float Previous  = Displayed;
+
+    Displayed = FMath::FInterpConstantTo(Displayed, Target, DeltaTime, FillSpeed);
+
+    if (FMath::IsNearlyEqual(Displayed, Target, KINDA_SMALL_NUMBER))
+    {
+        Displayed     = Target;
+        bInterpActive = false;
+    }
+
+    return !FMath::IsNearlyEqual(Previous, Displayed, KINDA_SMALL_NUMBER) || !bInterpActive;
+}
+
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Game/LastFPSMatchGameState.h"
 #include "Game/LastFPSPlayerState.h"
+#include "GameFramework/PlayerState.h"
+#include "Character/LastFPSCharacterBase.h"
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
+#include "Components/HorizontalBox.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 
+ULastFPSHUDWidget::ULastFPSHUDWidget(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
+{
+    GaugeBackgroundColor     = LastFPSHUDStyle::GaugeBackground();
+    HealthFillColor          = LastFPSHUDStyle::HealthFill();
+    HealthLowFillColor       = LastFPSHUDStyle::HealthLowFill();
+    StaminaFillColor         = LastFPSHUDStyle::StaminaFill();
+    StaminaLowFillColor      = LastFPSHUDStyle::StaminaLowFill();
+    UltimateFillColor        = LastFPSHUDStyle::UltimateFill();
+    UltimateReadyFillColor   = LastFPSHUDStyle::UltimateReady();
+    HeatFillColor            = LastFPSHUDStyle::HeatFill();
+    HeatOverheatedFillColor  = LastFPSHUDStyle::HeatOverheated();
+    KillFeedKillerColor      = LastFPSHUDStyle::KillFeedKiller();
+    KillFeedVictimColor      = LastFPSHUDStyle::KillFeedVictim();
+    KillFeedSeparatorColor   = LastFPSHUDStyle::KillFeedSeparator();
+    KillFeedLocalPlayerColor = LastFPSHUDStyle::KillFeedLocalPlayer();
+}
+
 void ULastFPSHUDWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+
+    ApplyGaugeBarBackground(PB_Health);
+    ApplyGaugeBarBackground(PB_Stamina);
+    ApplyGaugeBarBackground(PB_Ultimate);
+    ApplyGaugeBarBackground(PB_Heat);
 
     if (HitMarkerImage)
         HitMarkerImage->SetVisibility(ESlateVisibility::Collapsed);
@@ -71,31 +139,93 @@ void ULastFPSHUDWidget::HandleKillFeed(const FString& KillerName, const FString&
     OnKillFeedEntry(KillerName, VictimName);
 }
 
+FString ULastFPSHUDWidget::GetLocalKillFeedDisplayName() const
+{
+    const APlayerController* PC = GetOwningPlayer();
+    if (!PC)
+    {
+        return FString();
+    }
+
+    if (const ALastFPSCharacterBase* Character = Cast<ALastFPSCharacterBase>(PC->GetPawn()))
+    {
+        return Character->GetKillFeedDisplayName();
+    }
+
+    if (const APlayerState* PS = PC->GetPlayerState<APlayerState>())
+    {
+        return PS->GetPlayerName();
+    }
+
+    return FString();
+}
+
+UTextBlock* ULastFPSHUDWidget::CreateKillFeedText(const FString& Text, const FLinearColor& Color)
+{
+    UTextBlock* TextBlock = NewObject<UTextBlock>(this);
+    if (!TextBlock)
+    {
+        return nullptr;
+    }
+
+    TextBlock->SetText(FText::FromString(Text));
+    TextBlock->SetColorAndOpacity(FSlateColor(Color));
+    TextBlock->SetShadowOffset(FVector2D(1.f, 1.f));
+    TextBlock->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.75f));
+    return TextBlock;
+}
+
 void ULastFPSHUDWidget::AddKillFeedLine(const FString& KillerName, const FString& VictimName)
 {
     if (!KillFeedContainer)
+    {
         return;
+    }
 
-    UTextBlock* Line = NewObject<UTextBlock>(this);
-    if (!Line)
+    const FString LocalName = GetLocalKillFeedDisplayName();
+    const bool bLocalIsKiller = !LocalName.IsEmpty()
+        && KillerName.Equals(LocalName, ESearchCase::IgnoreCase);
+    const bool bLocalIsVictim = !LocalName.IsEmpty()
+        && VictimName.Equals(LocalName, ESearchCase::IgnoreCase);
+
+    const FLinearColor KillerColor = bLocalIsKiller ? KillFeedLocalPlayerColor : KillFeedKillerColor;
+    const FLinearColor VictimColor = bLocalIsVictim ? KillFeedLocalPlayerColor : KillFeedVictimColor;
+
+    UHorizontalBox* Row = NewObject<UHorizontalBox>(this);
+    if (!Row)
+    {
         return;
+    }
 
-    Line->SetText(FText::FromString(FString::Printf(TEXT("%s  →  %s"), *KillerName, *VictimName)));
+    if (UTextBlock* KillerText = CreateKillFeedText(KillerName, KillerColor))
+    {
+        Row->AddChildToHorizontalBox(KillerText);
+    }
+
+    if (UTextBlock* SeparatorText = CreateKillFeedText(TEXT("  \u2192  "), KillFeedSeparatorColor))
+    {
+        Row->AddChildToHorizontalBox(SeparatorText);
+    }
+
+    if (UTextBlock* VictimText = CreateKillFeedText(VictimName, VictimColor))
+    {
+        Row->AddChildToHorizontalBox(VictimText);
+    }
 
     if (UVerticalBox* VBox = Cast<UVerticalBox>(KillFeedContainer))
     {
-        VBox->AddChildToVerticalBox(Line);
+        VBox->AddChildToVerticalBox(Row);
     }
     else
     {
-        KillFeedContainer->AddChild(Line);
+        KillFeedContainer->AddChild(Row);
     }
 
-    KillFeedLines.Add(Line);
+    KillFeedLines.Add(Row);
 
     while (KillFeedLines.Num() > MaxKillFeedEntries)
     {
-        if (UTextBlock* Oldest = KillFeedLines[0])
+        if (UWidget* Oldest = KillFeedLines[0])
         {
             Oldest->RemoveFromParent();
         }
@@ -106,6 +236,8 @@ void ULastFPSHUDWidget::AddKillFeedLine(const FString& KillerName, const FString
 void ULastFPSHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
     Super::NativeTick(MyGeometry, InDeltaTime);
+
+    TickSmoothedGauges(InDeltaTime);
 
     if (!MatchTimerText) return;
 
@@ -147,14 +279,13 @@ bool ULastFPSHUDWidget::InitializeHUD()
     ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetUltimateGaugeAttribute())
         .AddUObject(this, &ULastFPSHUDWidget::HandleUltimateGaugeChanged);
 
-    CachedMaxHealth        = AS->GetMaxHealth();
-    CachedMaxStamina       = AS->GetMaxStamina();
-    CachedMaxUltimateGauge = AS->GetMaxUltimateGauge();
+    HealthGauge.Initialize(AS->GetHealth(), AS->GetMaxHealth());
+    StaminaGauge.Initialize(AS->GetStamina(), AS->GetMaxStamina());
+    UltimateGauge.Initialize(AS->GetUltimateGauge(), AS->GetMaxUltimateGauge());
 
-    // 바인딩 직후 현재값으로 바 초기화
-    OnHealthChanged(AS->GetHealth(), CachedMaxHealth);
-    OnStaminaChanged(AS->GetStamina(), CachedMaxStamina);
-    OnUltimateGaugeChanged(AS->GetUltimateGauge(), CachedMaxUltimateGauge);
+    BroadcastHealthDisplay();
+    BroadcastStaminaDisplay();
+    BroadcastUltimateGaugeDisplay();
 
     // ── WeaponComponent 오버히트 / 크로스헤어 델리게이트 바인딩 ─────
     // Pawn도 아직 빙의 안 됐을 수 있으므로 실패해도 ASC 바인딩은 유지
@@ -163,7 +294,10 @@ bool ULastFPSHUDWidget::InitializeHUD()
         if (UWeaponComponent* Weapon = Hero->GetWeaponComponent())
         {
             Weapon->OnHeatChanged.AddDynamic(this, &ULastFPSHUDWidget::HandleHeatChanged);
-            OnHeatChanged(Weapon->GetCurrentHeat(), Weapon->GetMaxHeat(), Weapon->IsOverheated());
+            CachedMaxHeat         = Weapon->GetMaxHeat();
+            CachedHeatOverheated  = Weapon->IsOverheated();
+            HeatGauge.Initialize(Weapon->GetCurrentHeat(), CachedMaxHeat);
+            BroadcastHeatDisplay();
 
             Weapon->OnWeaponEquippedChanged.AddDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
             OnCrosshairVisibilityChanged(Weapon->HasWeapon());
@@ -175,22 +309,163 @@ bool ULastFPSHUDWidget::InitializeHUD()
 
 void ULastFPSHUDWidget::HandleHealthChanged(const FOnAttributeChangeData& Data)
 {
-    OnHealthChanged(Data.NewValue, CachedMaxHealth);
+    HealthGauge.SetTarget(Data.NewValue);
+    if (!HealthGauge.bInterpActive)
+    {
+        BroadcastHealthDisplay();
+    }
 }
 
 void ULastFPSHUDWidget::HandleStaminaChanged(const FOnAttributeChangeData& Data)
 {
-    OnStaminaChanged(Data.NewValue, CachedMaxStamina);
+    StaminaGauge.SetTarget(Data.NewValue);
+    if (!StaminaGauge.bInterpActive)
+    {
+        BroadcastStaminaDisplay();
+    }
 }
 
 void ULastFPSHUDWidget::HandleUltimateGaugeChanged(const FOnAttributeChangeData& Data)
 {
-    OnUltimateGaugeChanged(Data.NewValue, CachedMaxUltimateGauge);
+    UltimateGauge.SetTarget(Data.NewValue);
+    if (!UltimateGauge.bInterpActive)
+    {
+        BroadcastUltimateGaugeDisplay();
+    }
+}
+
+void ULastFPSHUDWidget::TickSmoothedGauges(float DeltaTime)
+{
+    if (HealthGauge.Tick(DeltaTime, GaugeFillDuration))
+    {
+        BroadcastHealthDisplay();
+    }
+
+    if (StaminaGauge.Tick(DeltaTime, GaugeFillDuration))
+    {
+        BroadcastStaminaDisplay();
+    }
+
+    if (UltimateGauge.Tick(DeltaTime, GaugeFillDuration))
+    {
+        BroadcastUltimateGaugeDisplay();
+    }
+
+    if (HeatGauge.Tick(DeltaTime, GaugeFillDuration))
+    {
+        BroadcastHeatDisplay();
+    }
+}
+
+bool ULastFPSHUDWidget::IsLowResource(float Current, float Max) const
+{
+    if (Max <= KINDA_SMALL_NUMBER)
+    {
+        return false;
+    }
+
+    return (Current / Max) < LowResourceThreshold;
+}
+
+FLinearColor ULastFPSHUDWidget::ResolveHealthFillColor() const
+{
+    return IsLowResource(HealthGauge.Displayed, HealthGauge.Max)
+        ? HealthLowFillColor
+        : HealthFillColor;
+}
+
+FLinearColor ULastFPSHUDWidget::ResolveStaminaFillColor() const
+{
+    return IsLowResource(StaminaGauge.Displayed, StaminaGauge.Max)
+        ? StaminaLowFillColor
+        : StaminaFillColor;
+}
+
+FLinearColor ULastFPSHUDWidget::ResolveUltimateFillColor() const
+{
+    if (UltimateGauge.Max > KINDA_SMALL_NUMBER
+        && UltimateGauge.Displayed >= UltimateGauge.Max - KINDA_SMALL_NUMBER)
+    {
+        return UltimateReadyFillColor;
+    }
+
+    return UltimateFillColor;
+}
+
+FLinearColor ULastFPSHUDWidget::ResolveHeatFillColor() const
+{
+    return CachedHeatOverheated ? HeatOverheatedFillColor : HeatFillColor;
+}
+
+void ULastFPSHUDWidget::ApplyGaugeBarBackground(UProgressBar* Bar) const
+{
+    if (!Bar)
+    {
+        return;
+    }
+
+    FProgressBarStyle Style = Bar->GetWidgetStyle();
+    Style.BackgroundImage.TintColor = FSlateColor(GaugeBackgroundColor);
+    Bar->SetWidgetStyle(Style);
+}
+
+void ULastFPSHUDWidget::ApplyGaugeBar(
+    UProgressBar* Bar,
+    float Current,
+    float Max,
+    const FLinearColor& FillColor) const
+{
+    if (!Bar)
+    {
+        return;
+    }
+
+    const float Percent = Max > KINDA_SMALL_NUMBER
+        ? FMath::Clamp(Current / Max, 0.f, 1.f)
+        : 0.f;
+
+    Bar->SetPercent(Percent);
+    Bar->SetFillColorAndOpacity(FillColor);
+}
+
+void ULastFPSHUDWidget::BroadcastHealthDisplay()
+{
+    ApplyGaugeBar(PB_Health, HealthGauge.Displayed, HealthGauge.Max, ResolveHealthFillColor());
+    OnHealthChanged(HealthGauge.Displayed, HealthGauge.Max);
+}
+
+void ULastFPSHUDWidget::BroadcastStaminaDisplay()
+{
+    ApplyGaugeBar(PB_Stamina, StaminaGauge.Displayed, StaminaGauge.Max, ResolveStaminaFillColor());
+    OnStaminaChanged(StaminaGauge.Displayed, StaminaGauge.Max);
+}
+
+void ULastFPSHUDWidget::BroadcastUltimateGaugeDisplay()
+{
+    ApplyGaugeBar(PB_Ultimate, UltimateGauge.Displayed, UltimateGauge.Max, ResolveUltimateFillColor());
+    OnUltimateGaugeChanged(UltimateGauge.Displayed, UltimateGauge.Max);
+}
+
+void ULastFPSHUDWidget::BroadcastHeatDisplay()
+{
+    ApplyGaugeBar(PB_Heat, HeatGauge.Displayed, CachedMaxHeat, ResolveHeatFillColor());
+    OnHeatChanged(HeatGauge.Displayed, CachedMaxHeat, CachedHeatOverheated);
 }
 
 void ULastFPSHUDWidget::HandleHeatChanged(float Current, float Max, bool bIsOverheated)
 {
-    OnHeatChanged(Current, Max, bIsOverheated);
+    const bool bOverheatedChanged = (bIsOverheated != CachedHeatOverheated);
+
+    CachedMaxHeat        = Max;
+    CachedHeatOverheated = bIsOverheated;
+    HeatGauge.Max        = FMath::Max(Max, KINDA_SMALL_NUMBER);
+    HeatGauge.SetTarget(Current);
+
+    if (!HeatGauge.bInterpActive || bOverheatedChanged)
+    {
+        // 오버히트 색상은 즉시 반영, heat fill만 보간
+        BroadcastHeatDisplay();
+    }
 }
 
 void ULastFPSHUDWidget::HandleWeaponEquippedChanged(bool bEquipped)
