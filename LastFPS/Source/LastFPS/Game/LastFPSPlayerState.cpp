@@ -8,7 +8,7 @@
 ALastFPSPlayerState::ALastFPSPlayerState()
 {
     // PlayerState 복제 갱신 빈도 — 기본값(1)보다 높여 GAS 응답성 확보
-    NetUpdateFrequency = 100.f;
+    SetNetUpdateFrequency(100.f);
 
     AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
     AbilitySystemComponent->SetIsReplicated(true);
@@ -16,6 +16,7 @@ ALastFPSPlayerState::ALastFPSPlayerState()
     AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 
     AttributeSet = CreateDefaultSubobject<ULastFPSAttributeSet>(TEXT("AttributeSet"));
+    AbilitySystemComponent->AddAttributeSetSubobject(AttributeSet.Get());
 }
 
 void ALastFPSPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

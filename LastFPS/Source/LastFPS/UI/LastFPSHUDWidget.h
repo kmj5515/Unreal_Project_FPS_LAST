@@ -12,6 +12,7 @@
 #include "LastFPSHUDWidget.generated.h"
 
 class UAbilitySystemComponent;
+class ULastFPSSkillCooldownSlotWidget;
 class UWeaponComponent;
 
 /** HUD Progress Bar 표시용 보간 (실제 gameplay 값과 분리) */
@@ -38,10 +39,19 @@ public:
 
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
-    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
     UFUNCTION(BlueprintCallable, Category="HUD|HitMarker")
     void ShowHitMarker();
+
+    /** WBP_HUD Hierarchy 이름과 동일 + Is Variable + Parent=LastFPSSkillCooldownSlotWidget */
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
+    TObjectPtr<ULastFPSSkillCooldownSlotWidget> WBP_SkillCooldownSlot_Q;
+
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
+    TObjectPtr<ULastFPSSkillCooldownSlotWidget> WBP_SkillCooldownSlot_E;
+
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
+    TObjectPtr<ULastFPSSkillCooldownSlotWidget> WBP_SkillCooldownSlot_F;
 
 protected:
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
@@ -68,11 +78,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="HUD|HitMarker", meta=(ClampMin="0.01", ClampMax="2.0"))
     float HitMarkerDisplayDuration = 0.15f;
 
-    /** WBP_HUD에서 동일 이름 TextBlock을 만들면 자동 바인딩되어 매치 남은 시간(MM:SS)이 표시됨 */
     UPROPERTY(BlueprintReadOnly, Category="HUD|Match", meta=(BindWidgetOptional))
     TObjectPtr<UTextBlock> MatchTimerText;
 
-    /** WBP_HUD에 Vertical Box 이름 KillFeedContainer — 없으면 BP 이벤트만 호출 */
     UPROPERTY(BlueprintReadOnly, Category="HUD|KillFeed", meta=(BindWidgetOptional))
     TObjectPtr<UPanelWidget> KillFeedContainer;
 
@@ -91,11 +99,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="HUD|KillFeed|Colors")
     FLinearColor KillFeedLocalPlayerColor;
 
-    /** 0→최대까지 채우거나 비우는 데 걸리는 시간(초). Health/Stamina/Ultimate/Heat 표시 공통 */
     UPROPERTY(EditDefaultsOnly, Category="HUD|Gauges", meta=(ClampMin="0.05", ClampMax="3.0"))
     float GaugeFillDuration = 0.4f;
 
-    /** WBP_HUD Progress Bar 이름과 일치 시 Percent·Fill Color 자동 적용 */
     UPROPERTY(BlueprintReadOnly, Category="HUD|Gauges", meta=(BindWidgetOptional))
     TObjectPtr<UProgressBar> PB_Health;
 
@@ -139,7 +145,6 @@ protected:
     FLinearColor HeatOverheatedFillColor;
 
 private:
-    // 성공 시 true 반환. PlayerState 미준비면 false → 타이머 재시도
     bool InitializeHUD();
 
     UFUNCTION()
@@ -148,6 +153,13 @@ private:
     void HandleHealthChanged(const FOnAttributeChangeData& Data);
     void HandleStaminaChanged(const FOnAttributeChangeData& Data);
     void HandleUltimateGaugeChanged(const FOnAttributeChangeData& Data);
+
+    bool TryInitSkillSlots();
+    void TickSkillSlots();
+    void HUDRefreshTick(float DeltaTime);
+    void HUDRefreshTickFromTimer();
+
+    void TryBindPawnComponents();
     void TickSmoothedGauges(float DeltaTime);
     void BroadcastHealthDisplay();
     void BroadcastStaminaDisplay();
@@ -173,6 +185,7 @@ private:
     void HandleWeaponEquippedChanged(bool bEquipped);
 
     FTimerHandle RetryTimerHandle;
+    FTimerHandle HUDRefreshTimerHandle;
     FTimerHandle HitMarkerTimerHandle;
 
     void HideHitMarker();
@@ -184,10 +197,15 @@ private:
     float CachedMaxHeat = 0.f;
     bool CachedHeatOverheated = false;
 
-    // 1초 단위로 1번만 BP에 통지하기 위한 캐시 (-1: 아직 미통지)
-    int32 CachedMatchTimeIntSec  = -1;
+    int32 CachedMatchTimeIntSec = -1;
 
     TWeakObjectPtr<class ALastFPSMatchGameState> BoundMatchGameState;
+    TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
+
+    bool bAttributeDelegatesBound = false;
+    bool bPawnComponentsBound = false;
+    bool bSkillSlotsInitialized = false;
+
     FDelegateHandle KillFeedHandle;
     TArray<TObjectPtr<UWidget>> KillFeedLines;
 };

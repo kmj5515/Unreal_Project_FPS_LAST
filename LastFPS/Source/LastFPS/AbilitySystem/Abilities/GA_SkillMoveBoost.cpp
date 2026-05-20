@@ -1,6 +1,7 @@
 #include "AbilitySystem/Abilities/GA_SkillMoveBoost.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/Effects/GE_MoveSpeedBuff.h"
+#include "AbilitySystem/Effects/GE_Skill1Cooldown.h"
 #include "NativeGameplayTags.h"
 
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Skill1, "Ability.Skill1")
@@ -11,6 +12,7 @@ UGA_SkillMoveBoost::UGA_SkillMoveBoost()
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 
     SpeedBoostEffect = ULastFPSGE_MoveSpeedBuff::StaticClass();
+    CooldownGameplayEffectClass = ULastFPSGE_Skill1Cooldown::StaticClass();
 
     AbilityTags.AddTag(TAG_Ability_Skill1);
 }

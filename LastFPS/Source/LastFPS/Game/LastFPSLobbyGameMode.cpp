@@ -1,5 +1,6 @@
 #include "Game/LastFPSLobbyGameMode.h"
 
+#include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSLobbyGameState.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
@@ -328,7 +329,15 @@ void ALastFPSLobbyGameMode::ExecuteMatchTravel()
         bTeamIntroInProgress = false;
         bLobbyMatchStartTriggered = true;
         SyncLobbyStateToGameState();
-        World->ServerTravel(MatchMapURL);
+
+        if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
+        {
+            GI->RequestTravelToMatch(MatchMapURL);
+        }
+        else
+        {
+            World->ServerTravel(MatchMapURL);
+        }
     }
     else
     {

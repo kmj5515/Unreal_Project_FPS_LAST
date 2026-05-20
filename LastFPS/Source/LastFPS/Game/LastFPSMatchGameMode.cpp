@@ -1,5 +1,7 @@
 #include "Game/LastFPSMatchGameMode.h"
 
+#include "Game/LastFPSGameInstance.h"
+
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Character/LastFPSCharacterBase.h"
 #include "Engine/World.h"
@@ -439,6 +441,14 @@ void ALastFPSMatchGameMode::TravelToLobby()
     if (UWorld* World = GetWorld())
     {
         DebugFlow(FString::Printf(TEXT("[Match] Returning to lobby: %s"), *LobbyMapURL), FColor::Green);
-        World->ServerTravel(LobbyMapURL);
+
+        if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
+        {
+            GI->RequestTravelToLobby(LobbyMapURL);
+        }
+        else
+        {
+            World->ServerTravel(LobbyMapURL);
+        }
     }
 }

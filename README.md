@@ -56,7 +56,7 @@ Time Takers의 빠른 템포와 스킬 기반 전투를 참고하여, 각 플레
 - **Health** — 최대 체력 / 현재 체력
 - **Damage** — 메타 어트리뷰트: GE가 여기에 가산한 뒤 `PostGameplayEffectExecute`에서 **Health**를 깎는 방식으로 소비됨
 - **Stamina** — 달리기·특수 이동 소모 자원
-- **UltimateGauge** — 궁극기 충전 (킬 2회로 F 사용 가능, 사용 후 0부터 재충전)
+- **UltimateGauge** — 궁극기 충전 (`UltimateKillsRequired = 1`, 킬 1회로 F 사용 가능, 사용 후 0부터 재충전)
 - **AttackDamage** — 기본 공격력 (무기 별 계수)
 - **Defense** — 피해 감소 수치
 - **MoveSpeed** — 기본 이동속도 배율
@@ -127,7 +127,7 @@ ALastFPSPlayerState
         │     ├── GA_Jump / GA_DoubleJump
         │     ├── GA_SkillMoveBoost (Q)  // 3초 이동속도 증가
         │     ├── GA_SkillHeal (E)       // 즉시 체력 회복
-        │     └── GA_Ultimate (F)        // 2킬 충전 후 사용, 8초간 킬 시 +100 HP
+        │     └── GA_Ultimate (F)        // 킬 1회 충전 후 사용, 8초간 킬 시 +100 HP
         ├── GameplayEffects
         │     ├── ULastFPSGE_DamageInstant  // 네이티브 즉시 피해 (Damage 메타 +Additive, 기본 15)
         │     ├── (선택) BP 피해 GE — GA_BasicShoot `DamageEffectClass`로 지정, **Damage** 메타에 Additive 양수 권장
@@ -158,6 +158,14 @@ ALastFPSPlayerState
 - 실제 사망 포즈/레이어 전환은 AnimBP에서 `bIsDead`를 사용해 처리한다.
 
 ### 네트워크 구조
+
+```
+Dedicated Server
+  ├── ALastFPSMatchGameMode     // 규칙·리스폰·매치 종료 (서버 전용)
+  ├── ALastFPSMatchGameState    // 타이머·킬피드 Multicast·매치 종료 (복제)
+  ├── ALastFPSPlayerState × N   // 개인 스탯, ASC 보유
+  └── ALastFPSCharacter × N     // 폰, 이동·애니 복제
+        └── ALastFPSPlayerController × N  // 입력, HUD
 ```
 
 ### 로비 캐릭터 선택 → 매치 스폰
@@ -168,18 +176,26 @@ ALastFPSPlayerState
   `PlayerState` 인덱스를 우선 사용하고, 필요 시 `GameInstance` 저장값으로 보정
 - `CharacterPawnClasses` 배열 인덱스(0-based)와 UI 버튼 인덱스가 동일해야 원하는 캐릭터가 스폰됨
 - 로비 전용 폰은 `ALastFPSLobbyGameMode::LobbyPawnClass`로 분리하여 전투 입력/사격을 차단
-Dedicated Server
-  ├── ALastFPSGameMode        // 규칙 관리 (서버 전용)
-  ├── ALastFPSGameState        // 매치 타이머·(필요 시) 개인/매치 상태 (모든 클라 복제)
-  ├── ALastFPSPlayerState × N  // 개인 스탯, ASC 보유
-  └── ALastFPSCharacter × N    // 폰, 이동·애니 복제
-        └── ALastFPSPlayerController × N  // 입력, HUD
-```
+
+### 킬피드 표시 이름 (`ALastFPSCharacterBase`)
+
+- 캐릭터 BP **`CharacterNickname`**(EditDefaultsOnly)이 있으면 킬피드·로컬 하이라이트에 닉네임 사용
+- 비어 있으면 `PlayerState::GetPlayerName()`(플랫폼 이름) 사용
+- `ALastFPSMatchGameState::Auth_BroadcastKillFeed` → `GetKillFeedDisplayNameForPlayerState`로 이름 해석 후 Multicast
+- **주의:** 닉네임 문자열이 플레이어 간에 겹치면 킬로그 구분·“내 킬” 파란색 하이라이트가 혼동될 수 있음 → 추후 PlayerState 고유 ID 비교 권장
+
+### HUD (`ULastFPSHUDWidget`)
+
+- **게이지 보간:** GAS 실값은 즉시 반영, Progress Bar 표시만 `GaugeFillDuration`(기본 0.4초)으로 `FInterpConstantTo` 보간
+- **게이지 색·Percent (C++ 자동):** WBP 위젯 이름 `PB_Health`, `PB_Stamina`, `PB_Ultimate`, `PB_Heat` — `BindWidgetOptional`로 Percent·Fill Color 적용 (`LastFPSHUDStyle.h` 기본색, 디테일 패널 `HUD|Gauges|Colors`에서 튜닝)
+- **킬피드 (C++ 자동):** `KillFeedContainer`에 킬러(금색)·구분자(회색)·피해자(빨강) 색 텍스트 행 추가. 로컬 플레이어 이름은 파란색 (`HUD|KillFeed|Colors`)
+- BP `OnHealthChanged` 등 이벤트는 **추가 연출용** — 동일 Progress Bar에 `SetPercent`/`SetFillColor`를 중복 연결하지 말 것
+- 모듈: Progress Bar 배경 스타일용 `SlateCore` (`LastFPS.Build.cs`)
 
 ### 캐릭터 클래스 계층
 ```
 ACharacter
-  └── ALastFPSCharacterBase      // GAS 인터페이스, AttributeSet
+  └── ALastFPSCharacterBase      // GAS, CharacterNickname, GetKillFeedDisplayName
         ├── ALastFPSHero         // 플레이어 캐릭터 (3인칭)
         │     └── (캐릭터별 파생 클래스)
         └── ALastFPSAICharacter  // (추후) AI 봇
@@ -234,23 +250,24 @@ ACharacter
 - [x] 프로토타입 스킬 2종 (C++ GA + C++ 기본 GE, BP에서 `DefaultAbilities`·수치 튜닝 가능)
   - [x] Q: `GA_SkillMoveBoost` — 3초 이속 증가 (`ULastFPSGE_MoveSpeedBuff`)
   - [x] E: `GA_SkillHeal` — 즉시 체력 회복 (`ULastFPSGE_HealInstant`)
-  - [x] F: `GA_Ultimate` — 2킬 충전(`UltimateGauge` 0~2), 사용 시 게이지 0, 8초간 킬 시 `GE_UltimateKillHeal` +100 HP
-- [x] `UltimateGauge` 충전 및 임계값 트리거 (킬 1회당 +1, 2 도달 시 F 사용 가능)
-- [ ] 쿨다운 UI 표시 (HUD)
+  - [x] F: `GA_Ultimate` — 킬 1회 충전(`UltimateGauge` 0~1), 사용 시 게이지 0, 8초간 킬 시 `GE_UltimateKillHeal` +100 HP
+- [x] `UltimateGauge` 충전 및 임계값 트리거 (`UltimateKillsRequired = 1`, 킬 1회당 +1)
+- [x] 쿨다운 UI 표시 (HUD) — `SkillSlot_Q/E/F` BindWidget
 - [ ] GameplayCue — 스킬 이펙트 / 사운드
 
 ### Phase 5 — UI & HUD (목표: ~2주)
-- [x] 체력바 / 스태미나바 / 궁극게이지 HUD — C++ 베이스(`ULastFPSHUDWidget`) + GAS 어트리뷰트 델리게이트 바인딩, Blueprint에서 Progress Bar 연결
-- [x] 오버히트 게이지 바 — `OnHeatChanged` RepNotify + 멀티캐스트 델리게이트, 오버히트 시 색상 분기
-- [ ] 스킬 슬롯 쿨다운 아이콘 (Q / E / F)
+- [x] 체력바 / 스태미나바 / 궁극게이지 HUD — `ULastFPSHUDWidget` + GAS 델리게이트, `PB_*` BindWidget 시 C++에서 Percent·색 자동 적용
+- [x] 게이지 표시 보간 — Health/Stamina/Ultimate/Heat 공통 `GaugeFillDuration`(기본 0.4s), gameplay 값은 즉시·UI만 tween
+- [x] 게이지 색 팔레트 — `LastFPSHUDStyle.h` + `HUD|Gauges|Colors` (저체력·궁극 만충 금색·오버히트 빨강 등)
+- [x] 오버히트 게이지 바 — `WeaponComponent::OnHeatChanged`, 오버히트 플래그는 즉시·fill만 보간
+- [x] 스킬 슬롯 쿨다운 — `ULastFPSSkillCooldownSlotWidget` + `GE_Skill1/2Cooldown`, F는 `UltimateGauge` 충전 표시
 - [x] 개인 점수판 — Tab 홀드 `ShowScoreboard` / `ULastFPSScoreboardWidget` (매치 중·종료 시)
-- [x] 킬피드 — `ALastFPSMatchGameState::Multicast_KillFeed` → `ULastFPSHUDWidget` (`KillFeedContainer` 또는 `OnKillFeedEntry` BP)
-- [ ] 미니맵 (참가자 위치 표시, 최대 3명)
+- [x] 킬피드 — `Multicast_KillFeed` + `CharacterNickname` 표시명, C++ 컬러 텍스트 행 (`KillFeedContainer`), `OnKillFeedEntry`는 추가 연출용
 - [x] 게임 종료 스코어보드 — `ALastFPSHUD`가 `ALastFPSMatchGameState::OnMatchEnded` 바인딩 후 자동 표시
 - [x] HUD 매치 타이머 — `ULastFPSHUDWidget::OnMatchTimeChanged(float)` BP 이벤트 (1초 단위 갱신)
 
 ### Phase 6 — 게임 흐름 & 연출 (목표: ~3주)
-- [x] 로비 / 매치 시작 흐름 (프로토타입) — `ALastFPSLobbyGameMode`에서 3명 입장 시 `ServerTravel(MatchMapURL)`로 게임 맵 이동, `ALastFPSMatchGameMode`로 인게임 흐름 분리
+- [x] 로비 / 매치 시작 흐름 (프로토타입) — `ALastFPSLobbyGameMode`에서 3명 입장 시 `ULastFPSGameInstance::RequestTravelToMatch` → `ServerTravel(MatchMapURL)` + 로딩 화면, `ALastFPSMatchGameMode`로 인게임 흐름 분리
 - [x] 로비 캐릭터 선택/확정 스폰 (프로토타입) — 로비 선택 인덱스 저장(`PlayerState` + `GameInstance`), 매치 첫 스폰 시 인덱스 기반 `CharacterPawnClasses` 적용
 - [x] 로비 전용 폰 분리 — 로비에서는 `LobbyPawnClass` 사용, 매치에서는 전투 Pawn 스폰
 - [x] 매치 인트로 동기화 — `ALastFPSMatchGameState::bDropIntroActive` 복제로 후속 접속 포함, 소유 클라이언트만 몽타주·셰이크·입력 잠금 (`ALastFPSHero::TickLocalMatchIntro`)
@@ -264,7 +281,7 @@ ACharacter
 - [x] **[MVP 결과 화면]** 게임 종료 후 결과 스코어보드 오버레이 (Victory 포즈/Level Sequence는 범위에서 제외)
   - [x] GameState 기반 종료(`bMatchEnded` RepNotify, `WinnerPlayerState`, `EndReason`) + MVP 선정(최다 킬, 동률 시 데스 적은 사람, 동률 시 무승부)
   - [x] 종료 시 모든 클라에 자동 스코어보드 표시 + Enhanced Input `ClearAllMappings()`로 입력 차단
-  - [x] `MatchResultDisplaySeconds`(기본 8초) 후 `ServerTravel(LobbyMapURL)`
+  - [x] `MatchResultDisplaySeconds`(기본 8초) 후 `RequestTravelToLobby` + 로딩 화면
 - [ ] 히트마커, 피격 방향 표시기
 - [ ] 발소리 / 총소리 3D 사운드
 - [ ] 포스트 프로세싱 (피격 화면 효과)
@@ -297,7 +314,7 @@ LastFPS/
 │   │   └── Components/         # WeaponComponent, etc.
 │   ├── Game/
 │   │   ├── LastFPSGameModeBase.h/.cpp
-│   │   ├── LastFPSGameInstance.h/.cpp  # 로비 캐릭터 선택 인덱스 저장/복원
+│   │   ├── LastFPSGameInstance.h/.cpp  # 캐릭터 선택 저장/복원 + 맵 전환 로딩 화면
 │   │   ├── LastFPSLobbyGameMode.h/.cpp   # 로비: 인원 대기, 시작 조건, 맵 이동
 │   │   ├── LastFPSLobbyGameState.h/.cpp  # 로비 상태 복제 (입장 인원·시작 트리거)
 │   │   ├── LastFPSMatchGameMode.h/.cpp   # 인게임: 매치 시작/종료/리스폰
@@ -305,8 +322,11 @@ LastFPS/
 │   │   └── LastFPSPlayerState.h/.cpp
 │   ├── Input/                  # InputConfig DataAsset, IMC
 │   ├── UI/
-│   │   ├── LastFPSHUD.h/.cpp          # HUD 기본 클래스 (히트마커 표시)
-│   │   └── LastFPSHUDWidget.h/.cpp    # UMG 위젯 C++ 베이스 (GAS 델리게이트 바인딩)
+│   │   ├── LastFPSHUD.h/.cpp          # HUD 기본 클래스 (히트마커·매치 종료)
+│   │   ├── LastFPSHUDWidget.h/.cpp    # UMG 베이스 (게이지 보간·색·킬피드)
+│   │   ├── LastFPSLoadingScreenWidget.h/.cpp  # 맵 전환 로딩 화면 베이스
+│   │   ├── LastFPSSkillCooldownSlotWidget.h/.cpp
+│   │   └── LastFPSHUDStyle.h          # HUD 기본 색 상수
 │   └── Weapons/
 │
 └── Content/
@@ -335,6 +355,31 @@ LastFPS/
 3. `Development Editor` | `Win64` 설정 후 빌드
 4. UE Editor에서 `LastFPS.uproject` 오픈
 
+> `LastFPS.Build.cs` 변경(예: `SlateCore` 추가) 후에는 **전체 리빌드**가 필요합니다. Live Coding만으로는 링크 오류가 남을 수 있습니다.
+
+### WBP_HUD 체크리스트
+| 위젯 이름 | 용도 |
+|-----------|------|
+| `PB_Health`, `PB_Stamina`, `PB_Ultimate`, `PB_Heat` | 게이지 (C++ 자동 Percent·색) |
+| `KillFeedContainer` | 킬피드 Vertical Box |
+| `MatchTimerText` | 매치 남은 시간 (선택) |
+| Hero BP `CharacterNickname` | 킬피드 표시명 (비우면 플랫폼 이름) |
+| `WBP_SkillCooldownSlot_Q` / `E` / `F` | `WBP_SkillCooldownSlot` ×3 (Parent: `LastFPSSkillCooldownSlotWidget`, Is Variable) |
+
+**스킬 슬롯:** `WBP_SkillCooldownSlot` (Parent `LastFPSSkillCooldownSlotWidget`) — `SkillIcon` Brush에 `MI_000` 등 지정, 스칼라 `CoolDownRemainingPercent`는 C++가 `Remaining/Duration`으로 갱신. `CooldownText`, `KeyLabel` 선택. Overlay 불필요.
+
+### WBP_Loading (맵 전환 로딩 화면)
+로비↔매치 `ServerTravel` 시 `ULastFPSGameInstance`가 전체 화면 로딩 UI를 표시합니다.
+
+| 항목 | 내용 |
+|------|------|
+| 위젯 | `Content/UI/WBP_Loading` — Parent Class: `LastFPSLoadingScreenWidget` |
+| 바인딩 이름 | `Text_Status`, `Text_MapName`, `PB_Loading` (모두 Optional) |
+| 클래스 할당 | **Project Settings → Maps & Modes → Game Instance** 에서 `LastFPSGameInstance` 선택 후 `Loading Screen Widget Class`에 `WBP_Loading` 지정 |
+| 동작 | 로비→매치: "매치로 이동 중..." → "맵 로딩 중..." → 최소 1초 표시 후 숨김. 매치→로비도 동일 패턴 |
+
+`PB_Loading`이 있으면 C++에서 막대가 왕복 애니메이션됩니다. `OnLoadingScreenUpdated` BP 이벤트로 추가 연출 가능합니다.
+
 ### 서버 실행 (로컬 테스트)
 ```bash
 # 서버
@@ -353,4 +398,4 @@ LastFPS.exe 127.0.0.1 -game -log
 
 ---
 
-*Last updated: 2026-05-11 — **MVP 결과 화면 closure:** Victory 포즈/Level Sequence는 범위에서 제외하고, 결과 스코어보드 오버레이(`WINNER: 이름` / `Reason: 사유` 헤더 + 개인 스탯 행) + 8초 후 자동 ServerTravel로 한 사이클 완결. 전 단계의 HUD 매치 타이머 / `OnMatchEnded` RepNotify / 입력 차단(`ClearAllMappings`) 흐름 위에 누적.*
+*Last updated: 2026-05-18 — HUD 게이지 보간·색 자동 적용(`PB_*`, `LastFPSHUDStyle`), 킬피드 닉네임(`CharacterNickname`)·컬러 텍스트, 궁극기 `UltimateKillsRequired = 1` 문서 정합.*

@@ -1,6 +1,9 @@
 #include "UI/LastFPSHUDWidget.h"
+#include "UI/LastFPSSkillCooldownSlotWidget.h"
 #include "UI/LastFPSHUDStyle.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Effects/GE_Skill1Cooldown.h"
+#include "AbilitySystem/Effects/GE_Skill2Cooldown.h"
 #include "Styling/SlateBrush.h"
 
 void FLastFPSSmoothedGaugeDisplay::Initialize(float Current, float InMax)
@@ -53,7 +56,12 @@ bool FLastFPSSmoothedGaugeDisplay::Tick(float DeltaTime, float FillDuration)
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
+#include "NativeGameplayTags.h"
 #include "TimerManager.h"
+
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Cooldown_Skill1, "Cooldown.Skill1");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Cooldown_Skill2, "Cooldown.Skill2");
 
 ULastFPSHUDWidget::ULastFPSHUDWidget(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
@@ -83,20 +91,37 @@ void ULastFPSHUDWidget::NativeConstruct()
     ApplyGaugeBarBackground(PB_Heat);
 
     if (HitMarkerImage)
-        HitMarkerImage->SetVisibility(ESlateVisibility::Collapsed);
-
-    if (!InitializeHUD())
     {
-        // 클라이언트에서 PlayerState 복제가 아직 안 된 경우 — 0.1초마다 재시도
-        GetWorld()->GetTimerManager().SetTimer(
-            RetryTimerHandle, this, &ULastFPSHUDWidget::RetryInitialize, 0.1f, true);
+        HitMarkerImage->SetVisibility(ESlateVisibility::Collapsed);
     }
 
     TryBindKillFeed();
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().SetTimer(
+            HUDRefreshTimerHandle,
+            this,
+            &ULastFPSHUDWidget::HUDRefreshTickFromTimer,
+            0.033f,
+            true);
+
+        if (!InitializeHUD())
+        {
+            World->GetTimerManager().SetTimer(
+                RetryTimerHandle, this, &ULastFPSHUDWidget::RetryInitialize, 0.1f, true);
+        }
+    }
 }
 
 void ULastFPSHUDWidget::NativeDestruct()
 {
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(HUDRefreshTimerHandle);
+        World->GetTimerManager().ClearTimer(RetryTimerHandle);
+    }
+
     if (ALastFPSMatchGameState* MGS = BoundMatchGameState.Get())
     {
         MGS->OnKillFeed.Remove(KillFeedHandle);
@@ -110,10 +135,10 @@ void ULastFPSHUDWidget::NativeDestruct()
 
 void ULastFPSHUDWidget::RetryInitialize()
 {
-    if (InitializeHUD())
+    if (InitializeHUD() && bSkillSlotsInitialized)
+    {
         GetWorld()->GetTimerManager().ClearTimer(RetryTimerHandle);
-
-    TryBindKillFeed();
+    }
 }
 
 void ULastFPSHUDWidget::TryBindKillFeed()
@@ -233,22 +258,51 @@ void ULastFPSHUDWidget::AddKillFeedLine(const FString& KillerName, const FString
     }
 }
 
-void ULastFPSHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+void ULastFPSHUDWidget::HUDRefreshTickFromTimer()
 {
-    Super::NativeTick(MyGeometry, InDeltaTime);
+    const UWorld* World = GetWorld();
+    const float DeltaTime = World ? World->GetDeltaSeconds() : 0.033f;
+    HUDRefreshTick(DeltaTime);
+}
 
-    TickSmoothedGauges(InDeltaTime);
+void ULastFPSHUDWidget::HUDRefreshTick(const float DeltaTime)
+{
+    TryBindPawnComponents();
 
-    if (!MatchTimerText) return;
+    if (!bSkillSlotsInitialized)
+    {
+        TryInitSkillSlots();
+    }
+
+    if (bSkillSlotsInitialized)
+    {
+        TickSkillSlots();
+    }
+
+    TickSmoothedGauges(DeltaTime);
+
+    if (!MatchTimerText)
+    {
+        return;
+    }
 
     UWorld* World = GetWorld();
-    if (!World) return;
+    if (!World)
+    {
+        return;
+    }
 
     const ALastFPSMatchGameState* MGS = World->GetGameState<ALastFPSMatchGameState>();
-    if (!MGS) return;
+    if (!MGS)
+    {
+        return;
+    }
 
     const int32 TotalSec = FMath::Max(0, FMath::CeilToInt(MGS->GetMatchTimeRemaining()));
-    if (TotalSec == CachedMatchTimeIntSec) return;
+    if (TotalSec == CachedMatchTimeIntSec)
+    {
+        return;
+    }
 
     CachedMatchTimeIntSec = TotalSec;
 
@@ -257,54 +311,135 @@ void ULastFPSHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTim
     MatchTimerText->SetText(FText::FromString(FString::Printf(TEXT("%02d:%02d"), Min, Sec)));
 }
 
+bool ULastFPSHUDWidget::TryInitSkillSlots()
+{
+    if (bSkillSlotsInitialized)
+    {
+        return true;
+    }
+
+    if (!WBP_SkillCooldownSlot_Q || !WBP_SkillCooldownSlot_E || !WBP_SkillCooldownSlot_F || !CachedASC.IsValid())
+    {
+        return false;
+    }
+
+    WBP_SkillCooldownSlot_Q->ConfigureCooldownSlot(
+        TAG_Cooldown_Skill1, ULastFPSGE_Skill1Cooldown::StaticClass());
+    WBP_SkillCooldownSlot_Q->SetKeyLabel(FText::FromString(TEXT("Q")));
+
+    WBP_SkillCooldownSlot_E->ConfigureCooldownSlot(
+        TAG_Cooldown_Skill2, ULastFPSGE_Skill2Cooldown::StaticClass());
+    WBP_SkillCooldownSlot_E->SetKeyLabel(FText::FromString(TEXT("E")));
+
+    WBP_SkillCooldownSlot_F->ConfigureUltimateSlot();
+    WBP_SkillCooldownSlot_F->SetKeyLabel(FText::FromString(TEXT("F")));
+
+    TickSkillSlots();
+    bSkillSlotsInitialized = true;
+    return true;
+}
+
+void ULastFPSHUDWidget::TickSkillSlots()
+{
+    if (!bSkillSlotsInitialized || !CachedASC.IsValid())
+    {
+        return;
+    }
+
+    UAbilitySystemComponent* ASC = CachedASC.Get();
+    const ULastFPSAttributeSet* AS = nullptr;
+    if (const APlayerController* PC = GetOwningPlayer())
+    {
+        if (const ALastFPSPlayerState* PS = PC->GetPlayerState<ALastFPSPlayerState>())
+        {
+            AS = PS->GetAttributeSet();
+        }
+    }
+
+    if (WBP_SkillCooldownSlot_Q) { WBP_SkillCooldownSlot_Q->UpdateFromASC(ASC); }
+    if (WBP_SkillCooldownSlot_E) { WBP_SkillCooldownSlot_E->UpdateFromASC(ASC); }
+    if (WBP_SkillCooldownSlot_F) { WBP_SkillCooldownSlot_F->UpdateFromASC(ASC, AS); }
+}
+
+void ULastFPSHUDWidget::TryBindPawnComponents()
+{
+    if (bPawnComponentsBound)
+    {
+        return;
+    }
+
+    APlayerController* PC = GetOwningPlayer();
+    if (!PC)
+    {
+        return;
+    }
+
+    ALastFPSHero* Hero = Cast<ALastFPSHero>(PC->GetPawn());
+    if (!Hero)
+    {
+        return;
+    }
+
+    UWeaponComponent* Weapon = Hero->GetWeaponComponent();
+    if (!Weapon)
+    {
+        return;
+    }
+
+    Weapon->OnHeatChanged.AddDynamic(this, &ULastFPSHUDWidget::HandleHeatChanged);
+    CachedMaxHeat        = Weapon->GetMaxHeat();
+    CachedHeatOverheated = Weapon->IsOverheated();
+    HeatGauge.Initialize(Weapon->GetCurrentHeat(), CachedMaxHeat);
+    BroadcastHeatDisplay();
+
+    Weapon->OnWeaponEquippedChanged.AddDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
+    OnCrosshairVisibilityChanged(Weapon->HasWeapon());
+
+    bPawnComponentsBound = true;
+}
+
 bool ULastFPSHUDWidget::InitializeHUD()
 {
     APlayerController* PC = GetOwningPlayer();
-    if (!PC) return false;
+    if (!PC || !PC->IsLocalController())
+    {
+        return false;
+    }
 
     ALastFPSPlayerState* PS = PC->GetPlayerState<ALastFPSPlayerState>();
-    if (!PS) return false;
+    if (!PS)
+    {
+        return false;
+    }
 
     UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent();
     const ULastFPSAttributeSet* AS = PS->GetAttributeSet();
-    if (!ASC || !AS) return false;
+    if (!ASC || !AS)
+    {
+        return false;
+    }
 
-    // ── GAS 어트리뷰트 델리게이트 바인딩 ────────────────────────
-    ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetHealthAttribute())
-        .AddUObject(this, &ULastFPSHUDWidget::HandleHealthChanged);
-
-    ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetStaminaAttribute())
-        .AddUObject(this, &ULastFPSHUDWidget::HandleStaminaChanged);
-
-    ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetUltimateGaugeAttribute())
-        .AddUObject(this, &ULastFPSHUDWidget::HandleUltimateGaugeChanged);
+    if (!bAttributeDelegatesBound)
+    {
+        ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetHealthAttribute())
+            .AddUObject(this, &ULastFPSHUDWidget::HandleHealthChanged);
+        ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetStaminaAttribute())
+            .AddUObject(this, &ULastFPSHUDWidget::HandleStaminaChanged);
+        ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetUltimateGaugeAttribute())
+            .AddUObject(this, &ULastFPSHUDWidget::HandleUltimateGaugeChanged);
+        bAttributeDelegatesBound = true;
+    }
 
     HealthGauge.Initialize(AS->GetHealth(), AS->GetMaxHealth());
     StaminaGauge.Initialize(AS->GetStamina(), AS->GetMaxStamina());
     UltimateGauge.Initialize(AS->GetUltimateGauge(), AS->GetMaxUltimateGauge());
-
     BroadcastHealthDisplay();
     BroadcastStaminaDisplay();
     BroadcastUltimateGaugeDisplay();
 
-    // ── WeaponComponent 오버히트 / 크로스헤어 델리게이트 바인딩 ─────
-    // Pawn도 아직 빙의 안 됐을 수 있으므로 실패해도 ASC 바인딩은 유지
-    if (ALastFPSHero* Hero = Cast<ALastFPSHero>(PC->GetPawn()))
-    {
-        if (UWeaponComponent* Weapon = Hero->GetWeaponComponent())
-        {
-            Weapon->OnHeatChanged.AddDynamic(this, &ULastFPSHUDWidget::HandleHeatChanged);
-            CachedMaxHeat         = Weapon->GetMaxHeat();
-            CachedHeatOverheated  = Weapon->IsOverheated();
-            HeatGauge.Initialize(Weapon->GetCurrentHeat(), CachedMaxHeat);
-            BroadcastHeatDisplay();
-
-            Weapon->OnWeaponEquippedChanged.AddDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
-            OnCrosshairVisibilityChanged(Weapon->HasWeapon());
-        }
-    }
-
-    return true;
+    CachedASC = ASC;
+    TryBindPawnComponents();
+    return TryInitSkillSlots();
 }
 
 void ULastFPSHUDWidget::HandleHealthChanged(const FOnAttributeChangeData& Data)
@@ -331,6 +466,19 @@ void ULastFPSHUDWidget::HandleUltimateGaugeChanged(const FOnAttributeChangeData&
     if (!UltimateGauge.bInterpActive)
     {
         BroadcastUltimateGaugeDisplay();
+    }
+
+    if (bSkillSlotsInitialized && WBP_SkillCooldownSlot_F && CachedASC.IsValid())
+    {
+        const ULastFPSAttributeSet* AS = nullptr;
+        if (const APlayerController* LocalPC = GetOwningPlayer())
+        {
+            if (const ALastFPSPlayerState* LocalPS = LocalPC->GetPlayerState<ALastFPSPlayerState>())
+            {
+                AS = LocalPS->GetAttributeSet();
+            }
+        }
+        WBP_SkillCooldownSlot_F->UpdateFromASC(CachedASC.Get(), AS);
     }
 }
 

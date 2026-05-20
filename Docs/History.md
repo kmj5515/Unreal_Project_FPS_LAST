@@ -14,6 +14,7 @@
 6. [무기 시스템](#6-무기-시스템)
 7. [GAS 네트워크 & Prediction](#7-gas-네트워크--prediction)
 8. [HUD 시스템](#8-hud-시스템)
+9. [킬피드 & 표시 이름](#9-킬피드--표시-이름)
 
 ---
 
@@ -221,7 +222,7 @@ Space 뗌
 |-----------|------|------|
 | Health / MaxHealth | 체력 | O |
 | Stamina / MaxStamina | 달리기·특수이동 자원 | O |
-| UltimateGauge / MaxUltimateGauge | 궁극기 게이지 | O |
+| UltimateGauge / MaxUltimateGauge | 궁극기 게이지 (`Max` = `UltimateKillsRequired`, 현재 **1**) | O |
 | AttackDamage | 기본 공격력 | O |
 | Defense | 피해 감소 | O |
 | MoveSpeed | 이동속도 배율 | O |
@@ -455,11 +456,9 @@ Owner/Avatar 분리 이유: GAS가 어빌리티 활성화 권한(Owner)과 물�
 
 ---
 
----
-
 ## 8. HUD 시스템
 
-**관련 파일:** `UI/LastFPSHUDWidget.h/.cpp`, `UI/LastFPSHUD.h/.cpp`
+**관련 파일:** `UI/LastFPSHUDWidget.h/.cpp`, `UI/LastFPSHUD.h/.cpp`, `UI/LastFPSHUDStyle.h`
 
 ### 구조
 
@@ -468,9 +467,13 @@ ALastFPSHUD (AHUD 서브클래스)
   └── BeginPlay() → CreateWidget<ULastFPSHUDWidget> → AddToViewport()
 
 ULastFPSHUDWidget (UUserWidget C++ 베이스)
-  ├── GAS 어트리뷰트 델리게이트 구독 (Health / Stamina / UltimateGauge)
-  ├── WeaponComponent::OnHeatChanged 구독
-  └── BlueprintImplementableEvent → WBP_HUD (Blueprint 자식)에서 Progress Bar 연결
+  ├── FLastFPSSmoothedGaugeDisplay ×4 (Health / Stamina / Ultimate / Heat)
+  ├── GAS 어트리뷰트 델리게이트 → Target 값 갱신, NativeTick에서 Display 보간
+  ├── BindWidgetOptional: PB_Health, PB_Stamina, PB_Ultimate, PB_Heat
+  │     └── Broadcast*Display() 시 Percent + Fill Color C++ 적용
+  ├── WeaponComponent::OnHeatChanged → Heat 게이지 Target
+  ├── KillFeedContainer → 동적 UHorizontalBox 행 (컬러 TextBlock)
+  └── BlueprintImplementableEvent (OnHealthChanged 등) — 추가 연출용, Percent 중복 금지
 ```
 
 ### 초기화 흐름 & 클라이언트 재시도
@@ -479,11 +482,12 @@ ULastFPSHUDWidget (UUserWidget C++ 베이스)
 
 ```
 NativeConstruct()
+  → ApplyGaugeBarBackground(PB_*)  // Slate ProgressBar 배경 틴트
   → InitializeHUD()
       ├── 성공 (PlayerState 준비됨)
       │     ├── ASC 어트리뷰트 델리게이트 바인딩 (Health, Stamina, UltGauge)
       │     ├── WeaponComponent::OnHeatChanged 바인딩
-      │     └── 현재값으로 바 초기화 호출
+      │     └── SmoothedGauge Initialize + Broadcast*Display()
       └── 실패 (PlayerState 미준비)
             → SetTimer(0.1s, RetryInitialize, 반복)
             → RetryInitialize() → InitializeHUD() 성공 시 타이머 해제
@@ -491,36 +495,102 @@ NativeConstruct()
 
 **서버는 즉시 성공, 클라이언트는 PlayerState 복제 완료 후 0.1~0.3초 내에 재시도 성공.**
 
+### 게이지 표시 보간 (UI tween)
+
+| 구분 | 동작 |
+|------|------|
+| **Gameplay 값** (GAS `UltimateGauge`, Health 등) | 서버에서 즉시 변경 → `CanActivateAbility` 등 판정에 사용 |
+| **표시 값** (`FLastFPSSmoothedGaugeDisplay::Displayed`) | `NativeTick`에서 `FInterpConstantTo`로 Target까지 이동 |
+| **속도** | `GaugeFillDuration`(기본 0.4s) — 0→Max 구간 기준 일정 속도 |
+
+오버히트: `bIsOverheated`는 **즉시** 반영(색 전환), `CurrentHeat` fill만 보간.
+
+### 게이지 색 (`LastFPSHUDStyle` / `HUD|Gauges|Colors`)
+
+| 게이지 | Fill (기본) | 조건 |
+|--------|-------------|------|
+| Health | `#3DDC84` | 25% 미만 → `#E74C3C` |
+| Stamina | `#5DADE2` | 25% 미만 → `#F39C12` |
+| Ultimate | `#BB86FC` | Displayed ≥ Max → `#FFD700` |
+| Heat | `#F39C12` | `bIsOverheated` → `#FF4444` |
+| 배경 | 어두운 회색 65% alpha | 공통 |
+
+`ApplyGaugeBar()` → `SetPercent` + `SetFillColorAndOpacity`. 배경은 `FProgressBarStyle::BackgroundImage.TintColor` (`SlateCore` 링크 필요).
+
 ### 오버히트 게이지 — RepNotify 구조
 
-`CurrentHeat`, `bIsOverheated` 를 단순 `Replicated` → `ReplicatedUsing=OnRep_HeatState`로 변경해 클라이언트에서도 값 도착 즉시 HUD에 알린다.
+`CurrentHeat`, `bIsOverheated` 를 `ReplicatedUsing=OnRep_HeatState`로 복제 후 `OnHeatChanged` 브로드캐스트.
 
 ```
 서버: AddHeat() / TickComponent()
   → CurrentHeat, bIsOverheated 변경
-  → OnHeatChanged.Broadcast() (서버 HUD 즉시 반영)
-  → 복제 전송
-
-클라이언트: 복제 수신
-  → OnRep_HeatState()
-  → OnHeatChanged.Broadcast() (클라 HUD 반영)
+  → OnHeatChanged.Broadcast()
+  → 복제 → OnRep_HeatState() → OnHeatChanged (클라)
 ```
 
-### Blueprint 연결 (WBP_HUD)
+### WBP_HUD 체크리스트
 
-| 이벤트 | 연결 대상 | 추가 로직 |
-|---|---|---|
-| `OnHealthChanged(Current, Max)` | `PB_Health.SetPercent(Current/Max)` | 없음 |
-| `OnStaminaChanged` | `PB_Stamina.SetPercent` | 없음 |
-| `OnUltimateGaugeChanged` | `PB_Ultimate.SetPercent` | 없음 |
-| `OnHeatChanged(Current, Max, bOverheated)` | `PB_Heat.SetPercent` | bOverheated로 Fill Color 분기 (주황↔빨강) |
+| 위젯 이름 | 필수 | 비고 |
+|-----------|------|------|
+| `PB_Health`, `PB_Stamina`, `PB_Ultimate`, `PB_Heat` | 권장 | 이름 일치 시 C++ 자동 바인딩 |
+| `KillFeedContainer` | 킬피드용 | Vertical Box |
+| `MatchTimerText` | 선택 | MM:SS |
+
+**BP 이벤트 그래프:** `OnHealthChanged` 등에서 **`SetPercent` / `SetFillColor` 하지 말 것** — C++과 충돌. 사운드·글로우만 연결.
 
 ### 에디터 설정
 
-- `BP_HUD` (Parent: `LastFPSHUD`) → `HUD Widget Class` = `WBP_HUD`
+- `BP_HUD` → `HUD Widget Class` = `WBP_HUD`
 - `BP_GameMode` → **HUD Class** = `BP_HUD`
-- `WBP_HUD` (Parent: `LastFPSHUDWidget`) → Progress Bar 4개 배치, 각 이벤트 구현
+- `WBP_HUD` Parent = `LastFPSHUDWidget`
+- `LastFPS.Build.cs`에 `SlateCore` 포함 — `Build.cs` 변경 후 **전체 리빌드** (Live Coding 패치 링크만으로 부족할 수 있음)
 
 ---
 
-*Last updated: 2026-05-11 — 발사 구조 Hitscan 전환(LocalFire+ServerFire), 투사체 VFX 전용 전환(30,000 cm/s·충돌 없음), DamageEffectClass GA_BasicShoot으로 이동, 캐릭터 회전 동기화 수정(bUseControllerRotationYaw 항시 활성화)*
+## 9. 킬피드 & 표시 이름
+
+**관련 파일:** `Game/LastFPSMatchGameState.cpp`, `Character/LastFPSCharacterBase.h/.cpp`, `UI/LastFPSHUDWidget.cpp`
+
+### 킬 발생 → HUD 표시
+
+```
+LastFPSAttributeSet::PostGameplayEffectExecute (Health → 0, 서버)
+  → AttackerPS->Auth_AddKill() / Auth_OnScoredKill()
+  → MatchGS->Auth_BroadcastKillFeed(KillerPS, VictimPS)
+      → Multicast_KillFeed(이름, 이름)
+          → OnKillFeed → ULastFPSHUDWidget::AddKillFeedLine()
+```
+
+### 표시 이름 해석
+
+`ALastFPSCharacterBase::GetKillFeedDisplayNameForPlayerState(PS)`:
+
+1. `PS->GetPawn()` → `CharacterNickname`이 비어 있지 않으면 **닉네임**
+2. 없으면 `PS->GetPlayerName()` (플랫폼 이름)
+
+Hero BP **Last FPS | Display → Character Nickname** 에 캐릭터별 이름 설정 (예: `Phoenix`).
+
+### 킬피드 UI (C++)
+
+`KillFeedContainer`에 행마다 `UHorizontalBox` + TextBlock 3개:
+
+| 요소 | 색 (`HUD|KillFeed|Colors`) |
+|------|---------------------------|
+| 킬러 | 금색 `#F1C40F` |
+| `→` | 회색 `#95A5A6` |
+| 피해자 | 빨강 `#E74C3C` |
+| 로컬 플레이어 이름 | 파랑 `#5DADE2` (킬러/피해자 해당 시) |
+
+로컬 이름 비교: `GetLocalKillFeedDisplayName()` ↔ 킬로그 문자열 (`Equals` IgnoreCase).  
+**닉네임이 다른 플레이어와 같으면** 하이라이트·구분이 틀릴 수 있음 → 추후 `PlayerState` UniqueId 비교 권장.
+
+`OnKillFeedEntry` BP 이벤트는 추가 연출용. C++이 이미 행을 만들었으면 텍스트 중복 생성 주의.
+
+### 궁극기 게이지 (참고)
+
+- `ALastFPSPlayerState::UltimateKillsRequired = 1` — 킬 1회 충전 후 F 사용
+- 사용 시 `UltimateGauge = 0`, `Auth_StartUltimateKillHealWindow(8s)` — 윈도우 내 킬 시 `GE_UltimateKillHeal` +100 HP
+
+---
+
+*Last updated: 2026-05-18 — HUD 게이지 보간·C++ 색 자동 적용(`PB_*`, `LastFPSHUDStyle`), 킬피드 닉네임·컬러 텍스트, 궁극기 1킬 충전 문서 정합, `SlateCore` 빌드 의존.*

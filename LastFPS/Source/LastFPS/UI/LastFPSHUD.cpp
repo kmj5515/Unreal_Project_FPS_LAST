@@ -7,17 +7,40 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogLastFPSHUD, Log, All);
+
 void ALastFPSHUD::BeginPlay()
 {
     Super::BeginPlay();
 
     APlayerController* PC = GetOwningPlayerController();
+    if (!PC || !PC->IsLocalController())
+    {
+        return;
+    }
 
     if (HUDWidgetClass)
     {
         HUDWidget = CreateWidget<ULastFPSHUDWidget>(PC, HUDWidgetClass);
         if (HUDWidget)
+        {
             HUDWidget->AddToViewport(0);
+            UE_LOG(
+                LogLastFPSHUD,
+                Log,
+                TEXT("HUD viewport added. Class=%s PC=%s Local=%d"),
+                *HUDWidgetClass->GetName(),
+                *PC->GetName(),
+                PC->IsLocalController() ? 1 : 0);
+        }
+        else
+        {
+            UE_LOG(LogLastFPSHUD, Error, TEXT("CreateWidget failed for %s"), *HUDWidgetClass->GetName());
+        }
+    }
+    else
+    {
+        UE_LOG(LogLastFPSHUD, Error, TEXT("HUDWidgetClass is null on %s"), *GetName());
     }
 
     if (ScoreboardWidgetClass)

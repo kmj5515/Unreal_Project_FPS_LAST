@@ -2,6 +2,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "AbilitySystem/Effects/GE_HealInstant.h"
+#include "AbilitySystem/Effects/GE_Skill2Cooldown.h"
 #include "NativeGameplayTags.h"
 
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Skill2, "Ability.Skill2")
@@ -12,6 +13,7 @@ UGA_SkillHeal::UGA_SkillHeal()
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 
     HealEffect = ULastFPSGE_HealInstant::StaticClass();
+    CooldownGameplayEffectClass = ULastFPSGE_Skill2Cooldown::StaticClass();
 
     AbilityTags.AddTag(TAG_Ability_Skill2);
 }
