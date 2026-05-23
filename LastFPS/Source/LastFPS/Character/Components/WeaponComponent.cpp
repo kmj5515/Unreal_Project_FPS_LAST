@@ -7,7 +7,7 @@
 
 UWeaponComponent::UWeaponComponent()
 {
-    SetIsReplicated(true);
+    SetIsReplicatedByDefault(true);
     PrimaryComponentTick.bCanEverTick = true;
 
     WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));

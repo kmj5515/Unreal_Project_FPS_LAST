@@ -22,6 +22,7 @@ public:
 
     ALastFPSPlayerState();
 
+    virtual void PostInitializeComponents() override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void CopyProperties(APlayerState* PlayerState) override;
     virtual void OverrideWith(APlayerState* PlayerState) override;
