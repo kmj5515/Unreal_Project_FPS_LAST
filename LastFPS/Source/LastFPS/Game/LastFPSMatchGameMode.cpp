@@ -76,7 +76,7 @@ AActor* ALastFPSMatchGameMode::ChoosePlayerStart_Implementation(AController* Pla
 
     while (MatchPlayerStartDeck.Num() > 0)
     {
-        const TWeakObjectPtr<APlayerStart> Back = MatchPlayerStartDeck.Pop(false);
+        const TWeakObjectPtr<APlayerStart> Back = MatchPlayerStartDeck.Pop(EAllowShrinking::No);
         if (APlayerStart* Chosen = Back.Get())
         {
             return Chosen;

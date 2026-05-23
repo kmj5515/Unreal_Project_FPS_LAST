@@ -14,7 +14,7 @@ public class LastFPS : ModuleRules
 		PublicDependencyModuleNames.AddRange(new string[] {
 			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
-			"UMG"
+			"UMG", "Json", "JsonUtilities", "AssetRegistry"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "NetCore", "SlateCore" });
