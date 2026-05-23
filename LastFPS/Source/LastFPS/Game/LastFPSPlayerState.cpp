@@ -11,12 +11,23 @@ ALastFPSPlayerState::ALastFPSPlayerState()
     SetNetUpdateFrequency(100.f);
 
     AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
-    AbilitySystemComponent->SetIsReplicated(true);
     // Mixed: GE는 소유 클라이언트에만, GameplayCue는 모든 클라이언트에 복제
     AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 
     AttributeSet = CreateDefaultSubobject<ULastFPSAttributeSet>(TEXT("AttributeSet"));
     AbilitySystemComponent->AddAttributeSetSubobject(AttributeSet.Get());
+}
+
+void ALastFPSPlayerState::PostInitializeComponents()
+{
+    Super::PostInitializeComponents();
+
+    // SetIsReplicatedByDefault는 protected라 외부 호출 불가.
+    // 컴포넌트 등록/초기화 이후인 이 시점에서 SetIsReplicated를 호출하면 ensure가 발동하지 않음.
+    if (AbilitySystemComponent)
+    {
+        AbilitySystemComponent->SetIsReplicated(true);
+    }
 }
 
 void ALastFPSPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
