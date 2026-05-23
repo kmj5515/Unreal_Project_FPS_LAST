@@ -1,13 +1,11 @@
 #include "Character/Components/WeaponComponent.h"
-#include "Weapons/LastFPSProjectile.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
-#include "Particles/ParticleSystemComponent.h"
 
 UWeaponComponent::UWeaponComponent()
 {
-    SetIsReplicated(true);
+    SetIsReplicatedByDefault(true);
     PrimaryComponentTick.bCanEverTick = true;
 
     WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));

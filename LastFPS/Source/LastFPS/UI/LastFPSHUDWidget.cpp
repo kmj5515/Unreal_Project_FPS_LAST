@@ -5,6 +5,7 @@
 #include "AbilitySystem/Effects/GE_Skill1Cooldown.h"
 #include "AbilitySystem/Effects/GE_Skill2Cooldown.h"
 #include "Styling/SlateBrush.h"
+#include "Utility/LastFPSTags.h"
 
 void FLastFPSSmoothedGaugeDisplay::Initialize(float Current, float InMax)
 {
@@ -59,9 +60,6 @@ bool FLastFPSSmoothedGaugeDisplay::Tick(float DeltaTime, float FillDuration)
 #include "GameFramework/PlayerController.h"
 #include "NativeGameplayTags.h"
 #include "TimerManager.h"
-
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Cooldown_Skill1, "Cooldown.Skill1");
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Cooldown_Skill2, "Cooldown.Skill2");
 
 ULastFPSHUDWidget::ULastFPSHUDWidget(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
@@ -324,11 +322,11 @@ bool ULastFPSHUDWidget::TryInitSkillSlots()
     }
 
     WBP_SkillCooldownSlot_Q->ConfigureCooldownSlot(
-        TAG_Cooldown_Skill1, ULastFPSGE_Skill1Cooldown::StaticClass());
+        FLastFPSTags::Get().Cooldown_Skill1, ULastFPSGE_Skill1Cooldown::StaticClass());
     WBP_SkillCooldownSlot_Q->SetKeyLabel(FText::FromString(TEXT("Q")));
 
     WBP_SkillCooldownSlot_E->ConfigureCooldownSlot(
-        TAG_Cooldown_Skill2, ULastFPSGE_Skill2Cooldown::StaticClass());
+        FLastFPSTags::Get().Cooldown_Skill2, ULastFPSGE_Skill2Cooldown::StaticClass());
     WBP_SkillCooldownSlot_E->SetKeyLabel(FText::FromString(TEXT("E")));
 
     WBP_SkillCooldownSlot_F->ConfigureUltimateSlot();
