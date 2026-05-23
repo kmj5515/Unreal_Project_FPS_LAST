@@ -6,7 +6,8 @@
 	"Modules": [
 		{
 			"Name": "LastFPS",
-			"Type": "Runtime"
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [
@@ -23,6 +24,10 @@
 		},
 		{
 			"Name": "MotionTrajectory",
+			"Enabled": true
+		},
+		{
+			"Name": "AnimationLocomotionLibrary",
 			"Enabled": true
 		}
 	]
