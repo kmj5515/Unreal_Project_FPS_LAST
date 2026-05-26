@@ -43,7 +43,7 @@ ULastFPSAttributeSet::ULastFPSAttributeSet()
     InitMaxUltimateGauge(static_cast<float>(ALastFPSPlayerState::UltimateKillsRequired));
     InitAttackDamage(10.f);
     InitDefense(0.f);
-    InitMoveSpeed(400.f);
+    InitMoveSpeed(500.f);
     InitDamage(0.f);
 }
 

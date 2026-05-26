@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Utility/LastFPSEnumTypes.h"
 #include "WeaponComponent.generated.h"
 
 class ALastFPSProjectile;
@@ -49,6 +50,13 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="Weapon")
     bool HasWeapon() const { return WeaponSkeletalMesh != nullptr; }
+
+    UFUNCTION(BlueprintCallable, Category="Weapon")
+    EMMWeaponType GetWeaponType() const { return HasWeapon() ? WeaponType : EMMWeaponType::Unarmed; }
+
+    // 무기 BP마다 Unarmed / Rifle / Pistol 지정 (Chooser Table 분기 입력)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
+    EMMWeaponType WeaponType = EMMWeaponType::Unarmed;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
     TObjectPtr<USkeletalMeshComponent> WeaponMesh;
