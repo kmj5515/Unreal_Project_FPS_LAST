@@ -75,8 +75,10 @@ private:
     void UpdateAirState();
     void UpdateStance();
     void UpdateCombatState();
-    void UpdateWeaponType();
     void UpdatePivot();
+
+    UFUNCTION()
+    void OnWeaponEquipped(bool bEquipped);
 
     UPROPERTY()
     TObjectPtr<ACharacter> OwnerCharacter;

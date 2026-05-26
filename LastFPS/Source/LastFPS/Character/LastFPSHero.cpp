@@ -173,7 +173,8 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 }
 void ALastFPSHero::HandleAbilityInput(const FInputActionValue& value, FGameplayTag InputID)
 {
-    if (value.Get<bool>())
+    bool IsPressed = value.Get<bool>();
+    if (IsPressed)
     {
         InputPressed(InputID);
 

@@ -6,6 +6,7 @@
 #include "WeaponComponent.generated.h"
 
 class ALastFPSProjectile;
+class AWeaponPickupActor;
 class USkeletalMesh;
 class UParticleSystem;
 class USoundBase;
@@ -30,6 +31,9 @@ public:
     void AddHeat();
     FTransform GetMuzzleTransform() const;
     void PlayFireEffects() const;
+
+    // 런타임 무기 장착 (서버에서 호출 → Multicast로 전체 적용)
+    void EquipWeapon(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer);
 
     UFUNCTION(BlueprintCallable, Category="Weapon|Overheat")
     float GetCurrentHeat() const { return CurrentHeat; }
@@ -83,9 +87,6 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="Weapon|Animation")
     TSubclassOf<UAnimInstance> WeaponAnimLayerClass;
 
-    void ApplyAnimLayer();
-    void RemoveAnimLayer();
-
     // ── 발사 이펙트 ───────────────────────────────────────────────
     UPROPERTY(EditDefaultsOnly, Category="Weapon|Effects")
     TObjectPtr<USoundBase> FireSound;
@@ -102,7 +103,17 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Overheat")
     float CooldownRate = 20.f;
+    
+    UFUNCTION(BlueprintCallable, Category="Weapon|Debug")
+    void TestEquipWeapon();
 
+    UFUNCTION(Server, Reliable)
+    void Server_TestEquipWeapon();
+
+    // 에디터에서 테스트할 픽업 BP 클래스 지정
+    UPROPERTY(EditDefaultsOnly, Category="Weapon|Debug")
+    TSubclassOf<AWeaponPickupActor> TestPickupClass;
+    
 protected:
     virtual void BeginPlay() override;
 
@@ -116,4 +127,9 @@ private:
 
     UFUNCTION()
     void OnRep_HeatState();
+
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_EquipWeapon(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer);
+
+    void ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer);
 };

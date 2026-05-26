@@ -1,4 +1,5 @@
 #include "Character/Components/WeaponComponent.h"
+#include "Weapons/WeaponPickupActor.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
@@ -31,28 +32,8 @@ void UWeaponComponent::BeginPlay()
             WeaponMesh->SetSkeletalMesh(WeaponSkeletalMesh);
 
         WeaponMesh->AttachToComponent(Owner->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, AttachSocketName);
-
-        ApplyAnimLayer();
         OnWeaponEquippedChanged.Broadcast(WeaponSkeletalMesh != nullptr);
     }
-}
-
-void UWeaponComponent::ApplyAnimLayer()
-{
-    if (!WeaponAnimLayerClass)
-        return;
-
-    if (ACharacter* Owner = Cast<ACharacter>(GetOwner()))
-        Owner->GetMesh()->LinkAnimClassLayers(WeaponAnimLayerClass);
-}
-
-void UWeaponComponent::RemoveAnimLayer()
-{
-    if (!WeaponAnimLayerClass)
-        return;
-
-    if (ACharacter* Owner = Cast<ACharacter>(GetOwner()))
-        Owner->GetMesh()->UnlinkAnimClassLayers(WeaponAnimLayerClass);
 }
 
 void UWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -119,4 +100,42 @@ FTransform UWeaponComponent::GetMuzzleTransform() const
         return WeaponMesh->GetSocketTransform(MuzzleSocketName);
 
     return GetOwner() ? GetOwner()->GetActorTransform() : FTransform::Identity;
+}
+
+void UWeaponComponent::TestEquipWeapon()
+{
+    Server_TestEquipWeapon();
+}
+
+void UWeaponComponent::Server_TestEquipWeapon_Implementation()
+{
+    if (!TestPickupClass) return;
+
+    ACharacter* Owner = Cast<ACharacter>(GetOwner());
+    if (!Owner) return;
+
+    GetWorld()->SpawnActor<AWeaponPickupActor>(TestPickupClass, Owner->GetActorLocation(), FRotator::ZeroRotator);
+}
+
+void UWeaponComponent::EquipWeapon(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer)
+{
+    if (!GetOwner()->HasAuthority()) return;
+    Multicast_EquipWeapon(NewMesh, NewType, NewAnimLayer);
+}
+
+void UWeaponComponent::Multicast_EquipWeapon_Implementation(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer)
+{
+    ApplyEquip(NewMesh, NewType, NewAnimLayer);
+}
+
+void UWeaponComponent::ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer)
+{
+    WeaponSkeletalMesh = NewMesh;
+    WeaponType = NewType;
+    WeaponAnimLayerClass = NewAnimLayer;
+
+    if (WeaponMesh)
+        WeaponMesh->SetSkeletalMesh(NewMesh);
+    
+    OnWeaponEquippedChanged.Broadcast(NewMesh != nullptr);
 }

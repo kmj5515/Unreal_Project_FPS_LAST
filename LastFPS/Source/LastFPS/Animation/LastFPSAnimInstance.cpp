@@ -14,6 +14,15 @@ void ULastFPSAnimInstance::NativeInitializeAnimation()
     if (OwnerCharacter)
     {
         MovementComponent = OwnerCharacter->GetCharacterMovement();
+
+        if (ALastFPSHero* Hero = Cast<ALastFPSHero>(OwnerCharacter))
+        {
+            if (UWeaponComponent* Weapon = Hero->GetWeaponComponent())
+            {
+                WeaponType = Weapon->GetWeaponType();
+                Weapon->OnWeaponEquippedChanged.AddDynamic(this, &ULastFPSAnimInstance::OnWeaponEquipped);
+            }
+        }
     }
 }
 
@@ -30,7 +39,6 @@ void ULastFPSAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     UpdateAirState();
     UpdateStance();
     UpdateCombatState();
-    UpdateWeaponType();
     UpdatePivot();
 }
 
@@ -112,7 +120,7 @@ void ULastFPSAnimInstance::UpdateCombatState()
     // }
 }
 
-void ULastFPSAnimInstance::UpdateWeaponType()
+void ULastFPSAnimInstance::OnWeaponEquipped(bool bEquipped)
 {
     if (ALastFPSHero* Hero = Cast<ALastFPSHero>(OwnerCharacter))
     {
