@@ -31,31 +31,25 @@ public:
     FORCEINLINE UWeaponComponent* GetWeaponComponent() const { return WeaponComponent; }
     virtual bool GetIsADS() const override { return bIsADS; }
 
+    // GAS 어빌리티에서 카메라 줌을 제어할 수 있도록 공개
+    void SetADS(bool bEnabled);
+
 protected:
     virtual void BeginPlay() override;
     virtual void GiveDefaultAbilities() override;
 
     void Move(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
-    void StartSprint();
-    void StopSprint();
-    void StartADS();
-    void StopADS();
-
-    void StartJump();
-    void StopJump();
-
-    void StartFire();
-    void StopFire();
-
-    void StartSkill1();
-    void StartSkill2();
-    void StartUltimate();
-
+    
+    // 네이티브 전용 입력 처리
     void StartScoreboard();
     void StopScoreboard();
-    void TryActivateAbilityByTag(const FGameplayTag& AbilityTag);
-    void CancelAbilityByTag(const FGameplayTag& AbilityTag);
+
+    // 공통 GAS 입력 처리
+    void TryActivateAbilityByTag(FGameplayTag AbilityTag);
+    void CancelAbilityByTag(FGameplayTag AbilityTag);
+    void InputPressed(FGameplayTag InputID);
+    void InputReleased(FGameplayTag InputID);
 
     void TickCameraInterp(float DeltaTime);
 
@@ -114,12 +108,7 @@ private:
     FVector TargetSocketOffset;
     float TargetFOV;
 
-    void TryBindNativeTriggered(UEnhancedInputComponent* EIC, const FGameplayTag& Tag,
-        void(ALastFPSHero::*Func)(const FInputActionValue&));
-    void TryBindNativeStartStop(UEnhancedInputComponent* EIC, const FGameplayTag& Tag,
-        void(ALastFPSHero::*StartFunc)(), void(ALastFPSHero::*StopFunc)());
-    void TryBindAbilityStart(UEnhancedInputComponent* EIC, const FGameplayTag& Tag,
-        void(ALastFPSHero::*Func)());
+    void HandleAbilityInput(const FInputActionValue& value, FGameplayTag InputID);
 
     void TickLocalMatchIntro();
 
