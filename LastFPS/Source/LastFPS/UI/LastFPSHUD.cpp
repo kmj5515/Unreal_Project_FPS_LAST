@@ -1,10 +1,12 @@
 #include "UI/LastFPSHUD.h"
 #include "UI/LastFPSHUDWidget.h"
 #include "UI/LastFPSScoreboardWidget.h"
+#include "UI/LastFPSUITags.h"
 #include "Game/LastFPSMatchGameState.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
+#include "PrimaryGameLayout.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSHUD, Log, All);
@@ -19,40 +21,7 @@ void ALastFPSHUD::BeginPlay()
         return;
     }
 
-    if (HUDWidgetClass)
-    {
-        HUDWidget = CreateWidget<ULastFPSHUDWidget>(PC, HUDWidgetClass);
-        if (HUDWidget)
-        {
-            HUDWidget->AddToViewport(0);
-            UE_LOG(
-                LogLastFPSHUD,
-                Log,
-                TEXT("HUD viewport added. Class=%s PC=%s Local=%d"),
-                *HUDWidgetClass->GetName(),
-                *PC->GetName(),
-                PC->IsLocalController() ? 1 : 0);
-        }
-        else
-        {
-            UE_LOG(LogLastFPSHUD, Error, TEXT("CreateWidget failed for %s"), *HUDWidgetClass->GetName());
-        }
-    }
-    else
-    {
-        UE_LOG(LogLastFPSHUD, Error, TEXT("HUDWidgetClass is null on %s"), *GetName());
-    }
-
-    if (ScoreboardWidgetClass)
-    {
-        ScoreboardWidget = CreateWidget<ULastFPSScoreboardWidget>(PC, ScoreboardWidgetClass);
-        if (ScoreboardWidget)
-        {
-            ScoreboardWidget->AddToViewport(1);
-            ScoreboardWidget->SetVisibility(ESlateVisibility::Collapsed);
-        }
-    }
-
+    TryPushWidgetsToUILayout();
     TryBindMatchGameState();
 }
 
@@ -61,6 +30,7 @@ void ALastFPSHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearTimer(BindRetryTimerHandle);
+        World->GetTimerManager().ClearTimer(UIPushRetryTimerHandle);
     }
 
     if (ALastFPSMatchGameState* MGS = BoundMatchGameState.Get())
@@ -73,6 +43,77 @@ void ALastFPSHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
     Super::EndPlay(EndPlayReason);
 }
 
+void ALastFPSHUD::TryPushWidgetsToUILayout()
+{
+    if (bWidgetsPushedToLayout)
+    {
+        return;
+    }
+
+    APlayerController* PC = GetOwningPlayerController();
+    if (!PC)
+    {
+        return;
+    }
+
+    UPrimaryGameLayout* RootLayout = UPrimaryGameLayout::GetPrimaryGameLayout(PC);
+    if (!RootLayout)
+    {
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().SetTimer(
+                UIPushRetryTimerHandle,
+                this,
+                &ALastFPSHUD::RetryPushWidgetsToUILayout,
+                0.1f,
+                true);
+        }
+        return;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(UIPushRetryTimerHandle);
+    }
+
+    if (HUDWidgetClass && !HUDWidget)
+    {
+        HUDWidget = RootLayout->PushWidgetToLayerStack<ULastFPSHUDWidget>(
+            LastFPSUITags::Layer_Game(),
+            HUDWidgetClass);
+        if (HUDWidget)
+        {
+            UE_LOG(
+                LogLastFPSHUD,
+                Log,
+                TEXT("HUD pushed to UI.Layer.Game. Class=%s"),
+                *HUDWidgetClass->GetName());
+        }
+        else
+        {
+            UE_LOG(LogLastFPSHUD, Error, TEXT("Failed to push HUD widget to layout"));
+        }
+    }
+
+    if (ScoreboardWidgetClass && !ScoreboardWidget)
+    {
+        ScoreboardWidget = RootLayout->PushWidgetToLayerStack<ULastFPSScoreboardWidget>(
+            LastFPSUITags::Layer_GameMenu(),
+            ScoreboardWidgetClass);
+        if (ScoreboardWidget)
+        {
+            ScoreboardWidget->SetVisibility(ESlateVisibility::Collapsed);
+        }
+    }
+
+    bWidgetsPushedToLayout = (HUDWidget != nullptr);
+}
+
+void ALastFPSHUD::RetryPushWidgetsToUILayout()
+{
+    TryPushWidgetsToUILayout();
+}
+
 void ALastFPSHUD::TryBindMatchGameState()
 {
     UWorld* World = GetWorld();
@@ -81,7 +122,6 @@ void ALastFPSHUD::TryBindMatchGameState()
     ALastFPSMatchGameState* MGS = World->GetGameState<ALastFPSMatchGameState>();
     if (!MGS)
     {
-        // 클라에서 GameState 복제가 아직 안 된 경우 — 0.1초마다 재시도
         World->GetTimerManager().SetTimer(
             BindRetryTimerHandle, this, &ALastFPSHUD::RetryBindMatchGameState, 0.1f, true);
         return;
@@ -90,7 +130,6 @@ void ALastFPSHUD::TryBindMatchGameState()
     BoundMatchGameState = MGS;
     MatchEndedHandle    = MGS->OnMatchEnded.AddUObject(this, &ALastFPSHUD::HandleMatchEnded);
 
-    // 늦게 바인딩되어 이미 매치 종료 상태면 즉시 1회 처리
     if (MGS->IsMatchEnded())
     {
         HandleMatchEnded();
@@ -118,8 +157,6 @@ void ALastFPSHUD::RetryBindMatchGameState()
 
 void ALastFPSHUD::HandleMatchEnded()
 {
-    // ClearAllMappings가 활성 IA의 Completed 콜백을 발동시켜 HideScoreboard가
-    // 호출되는 경로를 막기 위해, Show보다 먼저 가드를 켠다.
     bMatchEnded = true;
 
     ShowScoreboard();

@@ -508,15 +508,23 @@ void ULoadingScreenManager::ShowLoadingScreen()
 
 		LoadingScreenVisibilityChanged.Broadcast(/*bIsVisible=*/ true);
 
-		// Create the loading screen widget
+		// Create the loading screen widget (skip CreateWidget when class is unset — avoids blank-class errors)
 		TSubclassOf<UUserWidget> LoadingScreenWidgetClass = Settings->LoadingScreenWidget.TryLoadClass<UUserWidget>();
-		if (UUserWidget* UserWidget = UUserWidget::CreateWidgetInstance(*LocalGameInstance, LoadingScreenWidgetClass, NAME_None))
+		if (LoadingScreenWidgetClass)
 		{
-			LoadingScreenWidget = UserWidget->TakeWidget();
+			if (UUserWidget* UserWidget = UUserWidget::CreateWidgetInstance(*LocalGameInstance, LoadingScreenWidgetClass, NAME_None))
+			{
+				LoadingScreenWidget = UserWidget->TakeWidget();
+			}
+			else
+			{
+				UE_LOG(LogLoadingScreen, Error, TEXT("Failed to load the loading screen widget %s, falling back to placeholder."), *Settings->LoadingScreenWidget.ToString());
+				LoadingScreenWidget = SNew(SThrobber);
+			}
 		}
 		else
 		{
-			UE_LOG(LogLoadingScreen, Error, TEXT("Failed to load the loading screen widget %s, falling back to placeholder."), *Settings->LoadingScreenWidget.ToString());
+			UE_LOG(LogLoadingScreen, Log, TEXT("LoadingScreenWidget is not configured; using placeholder."));
 			LoadingScreenWidget = SNew(SThrobber);
 		}
 

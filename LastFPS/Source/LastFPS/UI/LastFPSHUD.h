@@ -36,6 +36,12 @@ private:
     UPROPERTY()
     TObjectPtr<ULastFPSScoreboardWidget> ScoreboardWidget;
 
+    /** PrimaryGameLayout 준비 후 HUD/스코어보드를 UI 레이어에 push */
+    void TryPushWidgetsToUILayout();
+
+    UFUNCTION()
+    void RetryPushWidgetsToUILayout();
+
     /** GameState 복제가 늦을 수 있어 BeginPlay에서 한 번 시도 후 실패 시 재시도 */
     void TryBindMatchGameState();
 
@@ -46,6 +52,8 @@ private:
     void HandleMatchEnded();
 
     FTimerHandle BindRetryTimerHandle;
+    FTimerHandle UIPushRetryTimerHandle;
+    bool bWidgetsPushedToLayout = false;
     TWeakObjectPtr<ALastFPSMatchGameState> BoundMatchGameState;
     FDelegateHandle MatchEndedHandle;
 

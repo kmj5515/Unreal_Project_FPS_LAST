@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
+#include "CommonActivatableWidget.h"
 #include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
 #include "LastFPSScoreboardWidget.generated.h"
@@ -9,7 +9,7 @@
 class ULastFPSScoreRowWidget;
 
 UCLASS()
-class LASTFPS_API ULastFPSScoreboardWidget : public UUserWidget
+class LASTFPS_API ULastFPSScoreboardWidget : public UCommonActivatableWidget
 {
     GENERATED_BODY()
 

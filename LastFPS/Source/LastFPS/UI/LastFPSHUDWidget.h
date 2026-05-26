@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
+#include "CommonActivatableWidget.h"
 #include "Components/Image.h"
 #include "Components/PanelWidget.h"
 #include "Components/ProgressBar.h"
@@ -30,7 +30,7 @@ struct FLastFPSSmoothedGaugeDisplay
 };
 
 UCLASS()
-class LASTFPS_API ULastFPSHUDWidget : public UUserWidget
+class LASTFPS_API ULastFPSHUDWidget : public UCommonActivatableWidget
 {
     GENERATED_BODY()
 

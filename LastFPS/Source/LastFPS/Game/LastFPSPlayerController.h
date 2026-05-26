@@ -1,13 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/PlayerController.h"
+#include "CommonPlayerController.h"
 #include "LastFPSPlayerController.generated.h"
 
 class APawn;
 
 UCLASS()
-class LASTFPS_API ALastFPSPlayerController : public APlayerController
+class LASTFPS_API ALastFPSPlayerController : public ACommonPlayerController
 {
     GENERATED_BODY()
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
+#include "CommonActivatableWidget.h"
 #include "LastFPSLobbyWidget.generated.h"
 
 class UButton;
@@ -9,7 +9,7 @@ class UTextBlock;
 class APawn;
 
 UCLASS()
-class LASTFPS_API ULastFPSLobbyWidget : public UUserWidget
+class LASTFPS_API ULastFPSLobbyWidget : public UCommonActivatableWidget
 {
     GENERATED_BODY()
 
