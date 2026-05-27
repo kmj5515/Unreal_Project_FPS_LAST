@@ -243,6 +243,8 @@ void UWeaponComponent::AttachWeaponToOwner(ALastFPSWeaponActor* WeaponActor)
         OwnerMesh,
         FAttachmentTransformRules::SnapToTargetNotIncludingScale,
         bSocketExists ? AttachSocketName : NAME_None);
+
+    WeaponActor->SetActorRelativeScale3D(FVector::OneVector);
 }
 
 void UWeaponComponent::ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass)

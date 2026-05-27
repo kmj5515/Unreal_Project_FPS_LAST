@@ -80,6 +80,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Camera|ADS")
     float ADSInterpSpeed = 18.f;
 
+    UPROPERTY(EditDefaultsOnly, Category="Camera|ADS")
+    float ADSWalkSpeed = 300.f;
+
     UPROPERTY(EditDefaultsOnly, Category="Camera")
     float CameraLagSpeed = 15.f;
 
@@ -103,6 +106,7 @@ protected:
 
 private:
     bool bIsADS = false;
+    float PreADSWalkSpeed = 0.f;
 
     float TargetArmLength;
     FVector TargetSocketOffset;

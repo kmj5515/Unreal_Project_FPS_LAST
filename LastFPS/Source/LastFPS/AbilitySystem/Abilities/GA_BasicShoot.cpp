@@ -104,7 +104,7 @@ void UGA_BasicShoot::Fire()
 
     AController* Controller = Character->GetController();
     if (!Controller)
-{
+    {
         return;
     }
 

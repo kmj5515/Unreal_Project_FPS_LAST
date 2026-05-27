@@ -288,6 +288,19 @@ void ALastFPSHero::SetADS(bool bEnabled)
         CameraBoom->bEnableCameraLag = !bIsADS;
         CameraBoom->CameraLagSpeed = bIsADS ? 60.f : CameraLagSpeed;
     }
+
+    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+    {
+        if (bIsADS)
+        {
+            PreADSWalkSpeed = Movement->MaxWalkSpeed;
+            Movement->MaxWalkSpeed = ADSWalkSpeed;
+        }
+        else
+        {
+            Movement->MaxWalkSpeed = PreADSWalkSpeed > 0.f ? PreADSWalkSpeed : 600.f;
+        }
+    }
 }
 
 void ALastFPSHero::StartScoreboard()
