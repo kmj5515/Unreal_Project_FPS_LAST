@@ -8,6 +8,8 @@
 #include "Editor.h"
 #include "FileHelpers.h"
 #include "Subsystems/AssetEditorSubsystem.h"
+#include "GameMapsSettings.h"
+#include "Engine/World.h"
 
 void UEUW_LevelRowWidget::SetMapInfo(const FEUW_MapAssetInfo& InInfo)
 {
@@ -42,6 +44,11 @@ void UEUW_LevelRowWidget::NativeConstruct()
     {
         OpenLevelButton->OnClicked.AddDynamic(this, &UEUW_LevelRowWidget::HandleOpenLevelClicked);
     }
+
+    if (SetAsStartLevelButton)
+    {
+        SetAsStartLevelButton->OnClicked.AddDynamic(this, &UEUW_LevelRowWidget::HandleSetAsStartLevelClicked);
+    }
 }
 
 void UEUW_LevelRowWidget::HandleFavoriteChanged(bool bIsChecked)
@@ -58,6 +65,33 @@ void UEUW_LevelRowWidget::HandleFavoriteChanged(bool bIsChecked)
     }
     
     UEUW_LevelHelper::SaveEditorSettings(Settings);
+}
+
+void UEUW_LevelRowWidget::HandleSetAsStartLevelClicked()
+{
+    if (MapInfo.PackagePath.IsEmpty())
+    {
+        return;
+    }
+
+    UGameMapsSettings* Settings = GetMutableDefault<UGameMapsSettings>();
+    if (!Settings)
+    {
+        return;
+    }
+
+    FProperty* Prop = FindFProperty<FProperty>(
+        UGameMapsSettings::StaticClass(),
+        GET_MEMBER_NAME_CHECKED(UGameMapsSettings, EditorStartupMap));
+
+    Settings->PreEditChange(Prop);
+    Settings->EditorStartupMap = FSoftObjectPath(MapInfo.PackagePath);
+    FPropertyChangedEvent ChangeEvent(Prop);
+    Settings->PostEditChangeProperty(ChangeEvent);
+
+    Settings->TryUpdateDefaultConfigFile();
+
+    UE_LOG(LogTemp, Log, TEXT("LastFPS: Editor Startup Map set to %s"), *MapInfo.PackagePath);
 }
 
 void UEUW_LevelRowWidget::HandleOpenLevelClicked()

@@ -1,15 +1,17 @@
 #include "AbilitySystem/Abilities/GA_Jump.h"
+#include "Utility/LastFPSTags.h"
 #include "GameFramework/Character.h"
-#include "NativeGameplayTags.h"
-
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Jump, "Ability.Jump")
 
 UGA_Jump::UGA_Jump()
 {
     InstancingPolicy   = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    AbilityTags.AddTag(TAG_Ability_Jump);
+    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
+    FGameplayTagContainer Tags;
+    Tags.AddTag(FPSTags.Ability_Jump);
+    Tags.AddTag(FPSTags.Input_Jump);
+    SetAssetTags(Tags);
 }
 
 bool UGA_Jump::CanActivateAbility(

@@ -10,12 +10,14 @@
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/GA_BasicShoot.h"
 #include "AbilitySystem/Abilities/GA_Ultimate.h"
 
 ALastFPSHero::ALastFPSHero()
@@ -53,6 +55,11 @@ ALastFPSHero::ALastFPSHero()
 
     JumpMaxCount = 2;
 
+    if (USkeletalMeshComponent* CharacterMesh = GetMesh())
+    {
+        CharacterMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+    }
+
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
 
     TargetArmLength    = DefaultArmLength;
@@ -63,12 +70,6 @@ ALastFPSHero::ALastFPSHero()
 void ALastFPSHero::GiveDefaultAbilities()
 {
     Super::GiveDefaultAbilities();
-
-    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-    if (!HasAuthority() || !ASC)
-        return;
-
-    ASC->GiveAbility(FGameplayAbilitySpec(UGA_Ultimate::StaticClass(), 1));
 }
 
 void ALastFPSHero::BeginPlay()
@@ -159,12 +160,17 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent);
     if (!EIC || !InputConfig) return;
 
-    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
+    const FLastFPSTags& FPSTags = FLastFPSTags::Get(); 
 
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_Move), ETriggerEvent::Triggered, this, &ALastFPSHero::Move);
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_Look), ETriggerEvent::Triggered, this, &ALastFPSHero::Look);
-
-    for (const FLastFPSInputAction& Action : InputConfig->NativeInputActions)
+    
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_ADS), ETriggerEvent::Started, this, &ALastFPSHero::SetADS, true);
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_ADS), ETriggerEvent::Completed, this, &ALastFPSHero::SetADS, false);
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_ADS), ETriggerEvent::Canceled, this, &ALastFPSHero::SetADS, false);
+    
+    // 어빌리티 전용 
+    for (const FLastFPSInputAction& Action : InputConfig->AbilityInputActions)
     {
         EIC->BindAction(Action.InputAction, ETriggerEvent::Triggered, this, &ALastFPSHero::HandleAbilityInput, Action.InputTag);
         EIC->BindAction(Action.InputAction, ETriggerEvent::Completed, this, &ALastFPSHero::HandleAbilityInput, Action.InputTag);
@@ -220,11 +226,34 @@ void ALastFPSHero::Look(const FInputActionValue& Value)
 void ALastFPSHero::TryActivateAbilityByTag(FGameplayTag AbilityTag)
 {
     UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-    if (!ASC) return;
+    if (!ASC)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("TryActivateAbilityByTag failed: ASC is null. Tag=%s"), *AbilityTag.ToString());
+        return;
+    }
 
+    UE_LOG(LogTemp, Warning, TEXT("TryActivateAbilityByTag: %s"), *AbilityTag.ToString());
+
+    for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+    {
+        if (!Spec.Ability)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("ASC AbilitySpec: null ability. Handle=%s"), *Spec.Handle.ToString());
+            continue;
+        }
+
+        const FGameplayTagContainer& AssetTags = Spec.Ability->GetAssetTags();
+
+        UE_LOG(LogTemp, Warning, TEXT("ASC AbilitySpec: %s | Tags=[%s] | Active=%s"),
+            *Spec.Ability->GetName(),
+            *AssetTags.ToStringSimple(),
+            Spec.IsActive() ? TEXT("true") : TEXT("false"));
+    }
+    
     FGameplayTagContainer AbilityTags;
     AbilityTags.AddTag(AbilityTag);
-    ASC->TryActivateAbilitiesByTag(AbilityTags);
+    const bool bActivated = ASC->TryActivateAbilitiesByTag(AbilityTags);
+    UE_LOG(LogTemp, Warning, TEXT("TryActivateAbilitiesByTag result: %s"), bActivated ? TEXT("true") : TEXT("false"));
 }
 
 void ALastFPSHero::CancelAbilityByTag(FGameplayTag AbilityTag)
@@ -253,6 +282,12 @@ void ALastFPSHero::SetADS(bool bEnabled)
     TargetArmLength    = bIsADS ? ADSArmLength : DefaultArmLength;
     TargetSocketOffset = bIsADS ? ADSSocketOffset : DefaultSocketOffset;
     TargetFOV          = bIsADS ? ADSFOV : DefaultFOV;
+
+    if (CameraBoom)
+    {
+        CameraBoom->bEnableCameraLag = !bIsADS;
+        CameraBoom->CameraLagSpeed = bIsADS ? 60.f : CameraLagSpeed;
+    }
 }
 
 void ALastFPSHero::StartScoreboard()

@@ -40,6 +40,7 @@ void ULastFPSAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     UpdateStance();
     UpdateCombatState();
     UpdatePivot();
+    UpdateHandIK();
 }
 
 void ULastFPSAnimInstance::UpdateLocomotionState()
@@ -109,6 +110,9 @@ void ULastFPSAnimInstance::UpdateCombatState()
         AimPitch = Delta.Pitch;
         AimYaw   = Delta.Yaw;
     }
+    
+    //UE_LOG(LogTemp, Log, TEXT("AimPitch: %f"), AimPitch);
+    //UE_LOG(LogTemp, Log, TEXT("AimYaw: %f"), AimYaw);
 
     // // 발사 중 여부
     // if (ALastFPSHero* Hero = Cast<ALastFPSHero>(Base))
@@ -146,4 +150,29 @@ void ULastFPSAnimInstance::UpdatePivot()
     const FVector VelDir = Velocity.GetSafeNormal2D();
     const FVector AccDir = Acc.GetSafeNormal2D();
     bIsPivoting = FVector::DotProduct(VelDir, AccDir) < PivotDotThreshold;
+}
+
+void ULastFPSAnimInstance::UpdateHandIK()
+{
+    LeftHandIKAlpha = 0.f;
+    LeftHandIKTransform = FTransform::Identity;
+
+    ALastFPSHero* Hero = Cast<ALastFPSHero>(OwnerCharacter);
+    if (!Hero || !Hero->GetMesh())
+    {
+        return;
+    }
+
+    UWeaponComponent* Weapon = Hero->GetWeaponComponent();
+    if (!Weapon || !Weapon->HasWeapon())
+    {
+        return;
+    }
+
+    FTransform IKTransform;
+    if (Weapon->GetLeftHandIKTransform(Hero->GetMesh(), RightHandBoneName, IKTransform))
+    {
+        LeftHandIKTransform = IKTransform;
+        LeftHandIKAlpha = 1.f;
+    }
 }

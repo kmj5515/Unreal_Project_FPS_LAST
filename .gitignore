@@ -81,3 +81,6 @@
 .bkit/
 .gemini/
 .idea/
+
+# Local Unreal SOLID harness notes
+Docs/UnrealSOLIDHarness/

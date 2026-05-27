@@ -47,7 +47,8 @@ public class EditorUtility : ModuleRules
 				"UnrealEd",
 				"UMGEditor",
 				"ToolMenus",
-				"DesktopPlatform"
+				"DesktopPlatform",
+				"EngineSettings"
 			}
 			);
 		

@@ -33,12 +33,18 @@ protected:
     UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
     TObjectPtr<class UButton> OpenLevelButton;
 
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidget, OptionalWidget = true))
+    TObjectPtr<class UButton> SetAsStartLevelButton;
+
 private:
     UFUNCTION()
     void HandleFavoriteChanged(bool bIsChecked);
 
     UFUNCTION()
     void HandleOpenLevelClicked();
+
+    UFUNCTION()
+    void HandleSetAsStartLevelClicked();
 
     FEUW_MapAssetInfo MapInfo;
 };

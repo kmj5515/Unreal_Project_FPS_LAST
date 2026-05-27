@@ -1,17 +1,19 @@
 #include "AbilitySystem/Abilities/GA_Ultimate.h"
+#include "Utility/LastFPSTags.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Game/LastFPSPlayerState.h"
-#include "NativeGameplayTags.h"
-
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Ultimate, "Ability.Ultimate");
 
 UGA_Ultimate::UGA_Ultimate()
 {
     InstancingPolicy   = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 
-    AbilityTags.AddTag(TAG_Ability_Ultimate);
+    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
+    FGameplayTagContainer Tags;
+    Tags.AddTag(FPSTags.Ability_Ultimate);
+    Tags.AddTag(FPSTags.Input_Ultimate);
+    SetAssetTags(Tags);
 }
 
 bool UGA_Ultimate::CanActivateAbility(

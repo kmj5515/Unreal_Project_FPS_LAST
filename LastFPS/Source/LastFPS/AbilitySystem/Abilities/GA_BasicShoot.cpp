@@ -1,22 +1,24 @@
 #include "AbilitySystem/Abilities/GA_BasicShoot.h"
+
 #include "Character/Components/WeaponComponent.h"
 #include "Character/LastFPSHero.h"
-#include "Character/LastFPSCharacterBase.h"
-#include "Weapons/LastFPSProjectile.h"
-#include "AbilitySystemInterface.h"
-#include "AbilitySystemComponent.h"
-#include "NativeGameplayTags.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Engine/World.h"
-#include "GameFramework/Pawn.h"
-
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Fire, "Ability.Fire")
+#include "GameFramework/Character.h"
+#include "GameFramework/Controller.h"
+#include "Utility/LastFPSTags.h"
 
 UGA_BasicShoot::UGA_BasicShoot()
 {
-    InstancingPolicy   = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+    InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    AbilityTags.AddTag(TAG_Ability_Fire);
+    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
+    FGameplayTagContainer Tags;
+    Tags.AddTag(FPSTags.Ability_Fire);
+    Tags.AddTag(FPSTags.Input_Fire);
+    SetAssetTags(Tags);
 }
 
 void UGA_BasicShoot::ActivateAbility(
@@ -30,14 +32,14 @@ void UGA_BasicShoot::ActivateAbility(
     const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
     if (!Hero || !Hero->IsAlive())
     {
-        UE_LOG(LogTemp, Warning, TEXT("GA_BasicShoot: 사망 상태에서 발사 시도됨"));
+        UE_LOG(LogTemp, Warning, TEXT("GA_BasicShoot: cannot fire while dead or missing hero"));
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
 
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
-        UE_LOG(LogTemp, Warning, TEXT("GA_BasicShoot: CommitAbility 실패 (쿨다운/비용)"));
+        UE_LOG(LogTemp, Warning, TEXT("GA_BasicShoot: CommitAbility failed"));
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
@@ -46,7 +48,7 @@ void UGA_BasicShoot::ActivateAbility(
     UWeaponComponent* Weapon = CachedWeapon.Get();
     if (!Weapon || !Weapon->CanFire())
     {
-        UE_LOG(LogTemp, Warning, TEXT("GA_BasicShoot: 무기 없음 또는 오버히트 상태"));
+        UE_LOG(LogTemp, Warning, TEXT("GA_BasicShoot: missing weapon or cannot fire"));
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
@@ -59,8 +61,10 @@ void UGA_BasicShoot::ActivateAbility(
         {
             World->GetTimerManager().SetTimer(
                 FireTimerHandle,
-                this, &UGA_BasicShoot::Fire,
-                Weapon->FireRate, true);
+                this,
+                &UGA_BasicShoot::Fire,
+                Weapon->FireRate,
+                true);
         }
     }
     else
@@ -71,7 +75,10 @@ void UGA_BasicShoot::ActivateAbility(
 
 void UGA_BasicShoot::Fire()
 {
-    if (!GetWorld()) return;
+    if (!GetWorld())
+    {
+        return;
+    }
 
     const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
     if (!Hero || !Hero->IsAlive())
@@ -88,97 +95,62 @@ void UGA_BasicShoot::Fire()
     }
 
     ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
-    if (!Character) return;
+    if (!Character || !Character->IsLocallyControlled())
+    {
+        return;
+    }
 
-    // 로컬 클라이언트: 사운드 + 머즐플래시 즉시 재생 (레이턴시 없는 클라이언트 예측)
-    if (Character->IsLocallyControlled())
-        LocalFire(Weapon);
+    LocalFire(Weapon);
 
-    // 서버: LineTrace 히트 판정 + 데미지 GE 적용 + VFX 투사체 스폰
-    if (Character->HasAuthority())
-        ServerFire(Character, Weapon);
+    AController* Controller = Character->GetController();
+    if (!Controller)
+{
+        return;
+    }
 
-    Weapon->AddHeat();
+    FVector CameraLocation;
+    FRotator AimRotation;
+    Controller->GetPlayerViewPoint(CameraLocation, AimRotation);
+
+    Weapon->FireFromClientAim(
+        Weapon->GetMuzzleTransform().GetLocation(),
+        CameraLocation,
+        AimRotation.Vector(),
+        DamageEffectClass,
+        bDrawDebugShot,
+        DebugShotDuration);
 
     if (!Weapon->CanFire())
+    {
         EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
+    }
 }
 
 void UGA_BasicShoot::LocalFire(UWeaponComponent* Weapon)
 {
-    Weapon->PlayFireEffects();
-}
-
-void UGA_BasicShoot::ServerFire(ACharacter* Character, UWeaponComponent* Weapon)
-{
-    UWorld* World = GetWorld();
-    if (!World) return;
-
-    AController* Controller = Character->GetController();
-    if (!Controller) return;
-
-    FVector  CameraLocation;
-    FRotator AimRotation;
-    Controller->GetPlayerViewPoint(CameraLocation, AimRotation);
-
-    const FVector MuzzleLocation = Weapon->GetMuzzleTransform().GetLocation();
-    const FVector TraceEnd       = CameraLocation + AimRotation.Vector() * 10000.f;
-
-    FHitResult HitResult;
-    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WeaponTrace), false, Character);
-    QueryParams.AddIgnoredActor(Character);
-
-    // ECC_Visibility만으로는 캐릭터 캡슐을 인식 못할 수 있으므로
-    // WorldStatic/Dynamic + Pawn 오브젝트 타입을 모두 포함해 트레이스
-    FCollisionObjectQueryParams ObjectParams;
-    ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
-    ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
-    ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
-    ObjectParams.AddObjectTypesToQuery(ECC_PhysicsBody);
-
-    const bool bHit = World->LineTraceSingleByObjectType(
-        HitResult, CameraLocation, TraceEnd, ObjectParams, QueryParams);
-
-    // VFX 전용 투사체 스폰 (서버 스폰 → bReplicates로 모든 클라이언트에 복제됨)
-    if (Weapon->ProjectileClass)
+    if (Weapon)
     {
-        const FVector  AimTarget          = bHit ? HitResult.ImpactPoint : TraceEnd;
-        const FRotator ProjectileRotation = (AimTarget - MuzzleLocation).Rotation();
-
-        FActorSpawnParameters SpawnParams;
-        SpawnParams.Instigator = Character;
-        SpawnParams.Owner      = Character;
-        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-        World->SpawnActor<ALastFPSProjectile>(
-            Weapon->ProjectileClass, MuzzleLocation, ProjectileRotation, SpawnParams);
+        Weapon->PlayFireEffects();
     }
 
-    if (ALastFPSHero* Hero = Cast<ALastFPSHero>(Character))
-        Hero->Multicast_PlayWeaponFireEffects();
-
-    if (!bHit || !HitResult.GetActor() || !DamageEffectClass) return;
-
-    IAbilitySystemInterface* SourceASI = Cast<IAbilitySystemInterface>(Character);
-    IAbilitySystemInterface* TargetASI = Cast<IAbilitySystemInterface>(HitResult.GetActor());
-    if (!SourceASI || !TargetASI) return;
-
-    UAbilitySystemComponent* SourceASC = SourceASI->GetAbilitySystemComponent();
-    UAbilitySystemComponent* TargetASC = TargetASI->GetAbilitySystemComponent();
-    if (!SourceASC || !TargetASC) return;
-
-    FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
-    Context.AddSourceObject(Character);
-    if (APawn* Pawn = Cast<APawn>(Character))
-        Context.AddInstigator(Pawn, Character);
-
-    FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.f, Context);
-    if (Spec.IsValid())
+    ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+    if (!Hero || !Hero->GetMesh())
     {
-        TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+        return;
+    }
 
-        if (ALastFPSCharacterBase* ShooterChar = Cast<ALastFPSCharacterBase>(Character))
-            ShooterChar->Client_NotifyHitMarker();
+    UAnimMontage* FireMontage = Hero->GetIsADS() ? ADSFireMontage : HipFireMontage;
+    if (!FireMontage)
+    {
+        FireMontage = HipFireMontage;
+    }
+
+    if (FireMontage)
+    {
+        if (UAnimInstance* AnimInstance = Hero->GetMesh()->GetAnimInstance())
+        {
+            AnimInstance->Montage_Play(FireMontage);
+        }
     }
 }
 
@@ -190,7 +162,9 @@ void UGA_BasicShoot::EndAbility(
     bool bWasCancelled)
 {
     if (GetWorld())
+    {
         GetWorld()->GetTimerManager().ClearTimer(FireTimerHandle);
+    }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
@@ -198,6 +172,9 @@ void UGA_BasicShoot::EndAbility(
 UWeaponComponent* UGA_BasicShoot::GetWeaponComponent() const
 {
     if (ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo()))
+    {
         return Hero->GetWeaponComponent();
+    }
+
     return nullptr;
 }

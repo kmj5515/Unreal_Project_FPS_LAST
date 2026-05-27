@@ -7,6 +7,7 @@
 class UWeaponComponent;
 class ACharacter;
 class UGameplayEffect;
+class UAnimMontage;
 
 UCLASS()
 class LASTFPS_API UGA_BasicShoot : public UGameplayAbility
@@ -35,6 +36,18 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Shoot")
     TSubclassOf<UGameplayEffect> DamageEffectClass;
 
+    UPROPERTY(EditDefaultsOnly, Category="Shoot|Debug")
+    bool bDrawDebugShot = true;
+
+    UPROPERTY(EditDefaultsOnly, Category="Shoot|Debug", meta=(EditCondition="bDrawDebugShot", ClampMin="0.0"))
+    float DebugShotDuration = 2.f;
+
+    UPROPERTY(EditDefaultsOnly, Category="Shoot|Animation")
+    TObjectPtr<UAnimMontage> HipFireMontage;
+
+    UPROPERTY(EditDefaultsOnly, Category="Shoot|Animation")
+    TObjectPtr<UAnimMontage> ADSFireMontage;
+
 private:
     void Fire();
 
@@ -42,8 +55,6 @@ private:
     void LocalFire(UWeaponComponent* Weapon);
 
     // 서버 전용: LineTrace 히트 판정 + 데미지 GE 적용 + VFX 투사체 스폰
-    void ServerFire(ACharacter* Character, UWeaponComponent* Weapon);
-
     UWeaponComponent* GetWeaponComponent() const;
 
     FTimerHandle FireTimerHandle;

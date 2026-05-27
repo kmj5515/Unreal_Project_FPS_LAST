@@ -1,16 +1,18 @@
 #include "AbilitySystem/Abilities/GA_Sprint.h"
+#include "Utility/LastFPSTags.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
-#include "NativeGameplayTags.h"
-
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_Ability_Sprint, "Ability.Sprint")
 
 UGA_Sprint::UGA_Sprint()
 {
     InstancingPolicy   = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    AbilityTags.AddTag(TAG_Ability_Sprint);
+    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
+    FGameplayTagContainer Tags;
+    Tags.AddTag(FPSTags.Ability_Sprint);
+    Tags.AddTag(FPSTags.Input_Sprint);
+    SetAssetTags(Tags);
 }
 
 void UGA_Sprint::ActivateAbility(

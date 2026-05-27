@@ -70,12 +70,26 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
     bool bIsDead = false;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Debug")
+    bool bDebugAimValues = false;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|IK")
+    FTransform LeftHandIKTransform = FTransform::Identity;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|IK")
+    float LeftHandIKAlpha = 0.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|IK")
+    FName RightHandBoneName = TEXT("hand_r");
+
 private:
     void UpdateLocomotionState();
     void UpdateAirState();
     void UpdateStance();
     void UpdateCombatState();
     void UpdatePivot();
+    void UpdateHandIK();
+    void DebugAimValues() const;
 
     UFUNCTION()
     void OnWeaponEquipped(bool bEquipped);

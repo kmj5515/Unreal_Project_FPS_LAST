@@ -6,8 +6,11 @@
 #include "WeaponComponent.generated.h"
 
 class ALastFPSProjectile;
+class ALastFPSWeaponActor;
 class AWeaponPickupActor;
+class UGameplayEffect;
 class USkeletalMesh;
+class USkeletalMeshComponent;
 class UParticleSystem;
 class USoundBase;
 
@@ -31,9 +34,13 @@ public:
     void AddHeat();
     FTransform GetMuzzleTransform() const;
     void PlayFireEffects() const;
+    void FireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
+
+    UFUNCTION(BlueprintCallable, Category="Weapon|IK")
+    bool GetLeftHandIKTransform(USkeletalMeshComponent* CharacterMesh, FName RelativeToBoneName, FTransform& OutTransform) const;
 
     // 런타임 무기 장착 (서버에서 호출 → Multicast로 전체 적용)
-    void EquipWeapon(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer);
+    void EquipWeapon(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass = nullptr);
 
     UFUNCTION(BlueprintCallable, Category="Weapon|Overheat")
     float GetCurrentHeat() const { return CurrentHeat; }
@@ -53,30 +60,33 @@ public:
     FOnWeaponEquippedChanged OnWeaponEquippedChanged;
 
     UFUNCTION(BlueprintCallable, Category="Weapon")
-    bool HasWeapon() const { return WeaponSkeletalMesh != nullptr; }
+    bool HasWeapon() const { return CurrentWeapon != nullptr; }
 
     UFUNCTION(BlueprintCallable, Category="Weapon")
     EMMWeaponType GetWeaponType() const { return HasWeapon() ? WeaponType : EMMWeaponType::Unarmed; }
 
     // 무기 BP마다 Unarmed / Rifle / Pistol 지정 (Chooser Table 분기 입력)
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, ReplicatedUsing=OnRep_WeaponType, Category="Weapon")
     EMMWeaponType WeaponType = EMMWeaponType::Unarmed;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
-    TObjectPtr<USkeletalMeshComponent> WeaponMesh;
 
     // ── 에디터 설정 ──────────────────────────────────────────────
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
     TObjectPtr<USkeletalMesh> WeaponSkeletalMesh;
 
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
+    TSubclassOf<ALastFPSWeaponActor> WeaponActorClass;
+
+    UPROPERTY(EditDefaultsOnly, Category="Weapon")
     TSubclassOf<ALastFPSProjectile> ProjectileClass;
 
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
-    FName MuzzleSocketName = TEXT("MuzzleFlash");
+    FName MuzzleSocketName = TEXT("Projectile_Start");
 
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
     FName AttachSocketName = TEXT("WeaponSocket");
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|IK")
+    FName LeftHandIKSocketName = TEXT("LeftHandIK");
 
     // 최소 연사 간격 (초)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
@@ -84,7 +94,7 @@ public:
 
     // ── 애니메이션 레이어 ──────────────────────────────────────────
     // 에디터에서 무기별 Layer ABP 클래스 할당 (ABP_Rifle_Layers 등)
-    UPROPERTY(EditDefaultsOnly, Category="Weapon|Animation")
+    UPROPERTY(EditDefaultsOnly, Replicated, Category="Weapon|Animation")
     TSubclassOf<UAnimInstance> WeaponAnimLayerClass;
 
     // ── 발사 이펙트 ───────────────────────────────────────────────
@@ -110,6 +120,9 @@ public:
     UFUNCTION(Server, Reliable)
     void Server_TestEquipWeapon();
 
+    UFUNCTION(Server, Reliable)
+    void Server_FireFromClientAim(FVector_NetQuantize ClientMuzzleLocation, FVector_NetQuantize ClientCameraLocation, FVector_NetQuantizeNormal ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
+
     // 에디터에서 테스트할 픽업 BP 클래스 지정
     UPROPERTY(EditDefaultsOnly, Category="Weapon|Debug")
     TSubclassOf<AWeaponPickupActor> TestPickupClass;
@@ -118,6 +131,9 @@ protected:
     virtual void BeginPlay() override;
 
 private:
+    UPROPERTY(ReplicatedUsing=OnRep_CurrentWeapon)
+    TObjectPtr<ALastFPSWeaponActor> CurrentWeapon;
+
     // ReplicatedUsing: 클라이언트에서 값이 복제될 때 OnRep_HeatState 호출
     UPROPERTY(ReplicatedUsing=OnRep_HeatState, BlueprintReadOnly, Category="Weapon", meta=(AllowPrivateAccess="true"))
     float CurrentHeat = 0.f;
@@ -128,8 +144,17 @@ private:
     UFUNCTION()
     void OnRep_HeatState();
 
-    UFUNCTION(NetMulticast, Reliable)
-    void Multicast_EquipWeapon(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer);
+    UFUNCTION()
+    void OnRep_CurrentWeapon();
 
-    void ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer);
+    UFUNCTION()
+    void OnRep_WeaponType();
+
+    void ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass);
+
+    void AttachWeaponToOwner(ALastFPSWeaponActor* WeaponActor);
+    ALastFPSWeaponActor* SpawnWeaponActor(USkeletalMesh* NewMesh, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass);
+    void DestroyCurrentWeapon();
+    void HandleFireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
+    bool ValidateClientMuzzleLocation(const FVector& ClientMuzzleLocation) const;
 };

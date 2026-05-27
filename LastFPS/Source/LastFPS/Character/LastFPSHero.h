@@ -69,16 +69,16 @@ protected:
     float DefaultFOV = 90.f;
 
     UPROPERTY(EditDefaultsOnly, Category="Camera|ADS")
-    float ADSArmLength = 120.f;
+    float ADSArmLength = 90.f;
 
     UPROPERTY(EditDefaultsOnly, Category="Camera|ADS")
-    FVector ADSSocketOffset = FVector(0.f, 55.f, 25.f);
+    FVector ADSSocketOffset = FVector(0.f, 25.f, 35.f);
 
     UPROPERTY(EditDefaultsOnly, Category="Camera|ADS")
-    float ADSFOV = 75.f;
+    float ADSFOV = 65.f;
 
     UPROPERTY(EditDefaultsOnly, Category="Camera|ADS")
-    float ADSInterpSpeed = 10.f;
+    float ADSInterpSpeed = 18.f;
 
     UPROPERTY(EditDefaultsOnly, Category="Camera")
     float CameraLagSpeed = 15.f;

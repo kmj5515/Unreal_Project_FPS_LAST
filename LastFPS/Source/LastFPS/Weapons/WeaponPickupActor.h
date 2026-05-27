@@ -8,6 +8,7 @@
 class USphereComponent;
 class USkeletalMeshComponent;
 class UAnimInstance;
+class ALastFPSWeaponActor;
 
 UCLASS()
 class LASTFPS_API AWeaponPickupActor : public AActor
@@ -18,6 +19,7 @@ public:
     AWeaponPickupActor();
 
 protected:
+    virtual void OnConstruction(const FTransform& Transform) override;
     virtual void BeginPlay() override;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Pickup")
@@ -37,6 +39,9 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
     TSubclassOf<UAnimInstance> WeaponAnimLayerClass;
 
+    UPROPERTY(EditDefaultsOnly, Category="Weapon")
+    TSubclassOf<ALastFPSWeaponActor> WeaponActorClass;
+
 protected:
 
     // 픽업 가능 반경 (cm)
@@ -48,4 +53,6 @@ private:
     void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
                         UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
                         bool bFromSweep, const FHitResult& SweepResult);
+
+    void TryEquipToActor(AActor* OtherActor);
 };
