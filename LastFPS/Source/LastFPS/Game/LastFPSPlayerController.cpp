@@ -1,5 +1,6 @@
 #include "Game/LastFPSPlayerController.h"
 
+#include "UI/LastFPSCharacterSelectWidget.h"
 #include "UI/LastFPSHUDWidget.h"
 #include "UI/LastFPSMainMenuWidget.h"
 #include "UI/LastFPSNoticeWidget.h"
@@ -53,6 +54,11 @@ void ALastFPSPlayerController::BeginPlay()
         TryPushMainMenuToUILayout();
     }
 
+    if (bPushCharacterSelectOnBeginPlay)
+    {
+        TryPushCharacterSelectToUILayout();
+    }
+
     if (bPushHUDOnBeginPlay)
     {
         TryPushHUDToUILayout();
@@ -67,6 +73,7 @@ void ALastFPSPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
     {
         World->GetTimerManager().ClearTimer(HUDPushRetryTimerHandle);
         World->GetTimerManager().ClearTimer(MainMenuPushRetryTimerHandle);
+        World->GetTimerManager().ClearTimer(CharacterSelectPushRetryTimerHandle);
     }
 
     Super::EndPlay(EndPlayReason);
@@ -106,9 +113,6 @@ void ALastFPSPlayerController::TryPushHUDToUILayout()
     if (HUDWidget)
     {
         bHUDWidgetPushed = true;
-        UE_LOG(LogLastFPSPlayerController, Log,
-            TEXT("HUD pushed to UI.Layer.Game. Class=%s"),
-            *HUDWidgetClass->GetName());
     }
     else
     {
@@ -155,9 +159,6 @@ void ALastFPSPlayerController::TryPushMainMenuToUILayout()
     if (MainMenuWidget)
     {
         bMainMenuWidgetPushed = true;
-        UE_LOG(LogLastFPSPlayerController, Log,
-            TEXT("Main menu pushed to UI.Layer.Menu. Class=%s"),
-            *MainMenuWidgetClass->GetName());
     }
     else
     {
@@ -168,6 +169,52 @@ void ALastFPSPlayerController::TryPushMainMenuToUILayout()
 void ALastFPSPlayerController::RetryPushMainMenuToUILayout()
 {
     TryPushMainMenuToUILayout();
+}
+
+void ALastFPSPlayerController::TryPushCharacterSelectToUILayout()
+{
+    if (bCharacterSelectWidgetPushed || !CharacterSelectWidgetClass)
+    {
+        return;
+    }
+
+    UPrimaryGameLayout* RootLayout = UPrimaryGameLayout::GetPrimaryGameLayout(this);
+    if (!RootLayout)
+    {
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().SetTimer(
+                CharacterSelectPushRetryTimerHandle,
+                this,
+                &ALastFPSPlayerController::RetryPushCharacterSelectToUILayout,
+                0.1f,
+                true);
+        }
+        return;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(CharacterSelectPushRetryTimerHandle);
+    }
+
+    CharacterSelectWidget = RootLayout->PushWidgetToLayerStack<ULastFPSCharacterSelectWidget>(
+        LastFPSUITags::Layer_Menu(),
+        CharacterSelectWidgetClass);
+
+    if (CharacterSelectWidget)
+    {
+        bCharacterSelectWidgetPushed = true;
+    }
+    else
+    {
+        UE_LOG(LogLastFPSPlayerController, Error, TEXT("Failed to push CharacterSelect widget to layout"));
+    }
+}
+
+void ALastFPSPlayerController::RetryPushCharacterSelectToUILayout()
+{
+    TryPushCharacterSelectToUILayout();
 }
 
 void ALastFPSPlayerController::ShowConfirm(

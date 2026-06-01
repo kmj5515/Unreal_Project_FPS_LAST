@@ -6,6 +6,7 @@
 #include "LastFPSPlayerController.generated.h"
 
 class APawn;
+class ULastFPSCharacterSelectWidget;
 class ULastFPSHUDWidget;
 class ULastFPSMainMenuWidget;
 class ULastFPSNoticeWidget;
@@ -60,6 +61,9 @@ protected:
     TSubclassOf<ULastFPSMainMenuWidget> MainMenuWidgetClass;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
+    TSubclassOf<ULastFPSCharacterSelectWidget> CharacterSelectWidgetClass;
+
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
     TSubclassOf<ULastFPSConfirmWidget> ConfirmWidgetClass;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
@@ -73,14 +77,22 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
     bool bPushMainMenuOnBeginPlay = false;
 
+    /** 캐릭터 선택 UI */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
+    bool bPushCharacterSelectOnBeginPlay = false;
+
     void TryPushHUDToUILayout();
     void TryPushMainMenuToUILayout();
+    void TryPushCharacterSelectToUILayout();
 
     UFUNCTION()
     void RetryPushHUDToUILayout();
 
     UFUNCTION()
     void RetryPushMainMenuToUILayout();
+
+    UFUNCTION()
+    void RetryPushCharacterSelectToUILayout();
 
     template<typename TWidget>
     TWidget* PushWidgetToModalLayer(TSubclassOf<TWidget> WidgetClass);
@@ -100,6 +112,9 @@ protected:
     UPROPERTY()
     TObjectPtr<ULastFPSMainMenuWidget> MainMenuWidget;
 
+    UPROPERTY()
+    TObjectPtr<ULastFPSCharacterSelectWidget> CharacterSelectWidget;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
     TArray<TSubclassOf<APawn>> SelectableCharacterClasses;
 
@@ -108,6 +123,8 @@ protected:
 
     FTimerHandle HUDPushRetryTimerHandle;
     FTimerHandle MainMenuPushRetryTimerHandle;
+    FTimerHandle CharacterSelectPushRetryTimerHandle;
     bool bHUDWidgetPushed = false;
     bool bMainMenuWidgetPushed = false;
+    bool bCharacterSelectWidgetPushed = false;
 };
