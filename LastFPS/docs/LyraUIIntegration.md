@@ -5,7 +5,7 @@
 - **플러그인**: `CommonUI`, `CommonGame`, `CommonUser`, `AsyncMixin`, `CommonLoadingScreen`, `ModularGameplayActors`
 - **C++**: `ULastFPSUIManagerSubsystem`, `ULastFPSUIPolicy`, `ULastFPSPrimaryGameLayout`
 - **레이어 태그**: `UI.Layer.Game` / `GameMenu` / `Menu` / `Modal`
-- **HUD**: `WBP_HUD` → `UI.Layer.Game`, 스코어보드 → `UI.Layer.GameMenu`
+- **HUD**: `WBP_HUD` → `UI.Layer.Game` (`ALastFPSPlayerController`에서 Push)
 - **PlayerController**: `ACommonPlayerController` 상속 (CommonLocalPlayer 이벤트)
 - **LocalPlayer**: `UCommonLocalPlayer` (`DefaultEngine.ini`)
 
@@ -19,8 +19,7 @@
 
 | 위젯 | 새 Parent Class |
 |------|-----------------|
-| `WBP_HUD` | `LastFPSHUDWidget` (이제 `UCommonActivatableWidget` 기반) |
-| `WBP_Scoreboard` | `LastFPSScoreboardWidget` |
+| `WBP_HUD` | `LastFPSHUDWidget` (`UCommonActivatableWidget` — `ALastFPSPlayerController`가 Push) |
 | 일시정지/메뉴 (신규) | `CommonActivatableWidget` |
 
 에디터에서 Parent Class가 자동 갱신되지 않으면 WBP를 열고 Parent를 수동으로 바꿉니다.

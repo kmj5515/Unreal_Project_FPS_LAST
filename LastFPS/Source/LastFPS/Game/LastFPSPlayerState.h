@@ -81,7 +81,7 @@ protected:
     UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Stats")
     float StatHealingGiven = 0.f;
 
-    UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Lobby")
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Character")
     int32 SelectedCharacterIndex = 0;
 
 private:

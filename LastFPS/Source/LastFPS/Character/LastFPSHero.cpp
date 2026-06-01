@@ -1,8 +1,6 @@
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Input/LastFPSInputConfig.h"
-#include "UI/LastFPSHUD.h"
-#include "Game/LastFPSMatchGameState.h"
 #include "Utility/LastFPSTags.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -90,61 +88,7 @@ void ALastFPSHero::BeginPlay()
 void ALastFPSHero::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
-    TickLocalMatchIntro();
     TickCameraInterp(DeltaTime);
-}
-
-void ALastFPSHero::TickLocalMatchIntro()
-{
-    if (!IsLocallyControlled()) return;
-
-    UWorld* World = GetWorld();
-    if (!World) return;
-
-    ALastFPSMatchGameState* MatchGS = World->GetGameState<ALastFPSMatchGameState>();
-    if (!MatchGS)
-    {
-        if (bLocalMatchIntroInputDisabled)
-        {
-            if (APlayerController* PC = Cast<APlayerController>(GetController())) EnableInput(PC);
-            bLocalMatchIntroInputDisabled = false;
-        }
-        bLocalMatchIntroFxStarted = false;
-        return;
-    }
-
-    const bool bIntro = MatchGS->IsDropIntroActive();
-
-    if (bIntro && !bLocalMatchIntroFxStarted)
-    {
-        bLocalMatchIntroFxStarted = true;
-        if (MatchIntroMontage && GetMesh())
-        {
-            if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance()) AnimInst->Montage_Play(MatchIntroMontage);
-        }
-
-        if (MatchIntroCameraShake)
-        {
-            if (APlayerController* PC = Cast<APlayerController>(GetController()))
-            {
-                if (APlayerCameraManager* PCM = PC->PlayerCameraManager) PCM->StartCameraShake(MatchIntroCameraShake, MatchIntroCameraShakeScale);
-            }
-        }
-
-        if (APlayerController* PC = Cast<APlayerController>(GetController()))
-        {
-            DisableInput(PC);
-            bLocalMatchIntroInputDisabled = true;
-        }
-    }
-
-    if (!bIntro && bLocalMatchIntroInputDisabled)
-    {
-        if (APlayerController* PC = Cast<APlayerController>(GetController())) EnableInput(PC);
-        bLocalMatchIntroInputDisabled = false;
-    }
-
-    if (!bIntro) bLocalMatchIntroFxStarted = false;
 }
 
 void ALastFPSHero::TickCameraInterp(float DeltaTime)
@@ -179,25 +123,14 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 }
 void ALastFPSHero::HandleAbilityInput(const FInputActionValue& value, FGameplayTag InputID)
 {
-    bool IsPressed = value.Get<bool>();
+    const bool IsPressed = value.Get<bool>();
     if (IsPressed)
     {
         InputPressed(InputID);
-
-        // 네이티브 전용 로직 (GAS로 이전 가능하다면 나중에 제거 가능)
-        if (InputID == FLastFPSTags::Get().Input_Scoreboard)
-        {
-            StartScoreboard();
-        }
     }
     else
     {
         InputReleased(InputID);
-
-        if (InputID == FLastFPSTags::Get().Input_Scoreboard)
-        {
-            StopScoreboard();
-        }
     }
 }
 
@@ -301,18 +234,6 @@ void ALastFPSHero::SetADS(bool bEnabled)
             Movement->MaxWalkSpeed = PreADSWalkSpeed > 0.f ? PreADSWalkSpeed : 600.f;
         }
     }
-}
-
-void ALastFPSHero::StartScoreboard()
-{
-    APlayerController* PC = Cast<APlayerController>(GetController());
-    if (PC) if (ALastFPSHUD* HUD = Cast<ALastFPSHUD>(PC->GetHUD())) HUD->ShowScoreboard();
-}
-
-void ALastFPSHero::StopScoreboard()
-{
-    APlayerController* PC = Cast<APlayerController>(GetController());
-    if (PC) if (ALastFPSHUD* HUD = Cast<ALastFPSHUD>(PC->GetHUD())) HUD->HideScoreboard();
 }
 
 void ALastFPSHero::Multicast_PlayWeaponFireEffects_Implementation()

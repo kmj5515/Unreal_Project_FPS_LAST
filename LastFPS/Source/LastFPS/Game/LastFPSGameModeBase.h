@@ -21,7 +21,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="LastFPS|Players")
     int32 GetTotalConnectedPlayers() const;
 
-    // 캐릭터 선택 인덱스별 Pawn 클래스 목록 (로비/매치 GM에서 동일 순서로 세팅)
+    // 캐릭터 선택 인덱스별 Pawn 클래스 목록
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
     TArray<TSubclassOf<APawn>> CharacterPawnClasses;
 

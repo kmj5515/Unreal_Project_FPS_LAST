@@ -47,15 +47,11 @@ bool FLastFPSSmoothedGaugeDisplay::Tick(float DeltaTime, float FillDuration)
 }
 
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
-#include "Game/LastFPSMatchGameState.h"
 #include "Game/LastFPSPlayerState.h"
 #include "GameFramework/PlayerState.h"
 #include "Character/LastFPSCharacterBase.h"
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
-#include "Components/HorizontalBox.h"
-#include "Components/VerticalBox.h"
-#include "Components/VerticalBoxSlot.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "NativeGameplayTags.h"
@@ -73,10 +69,6 @@ ULastFPSHUDWidget::ULastFPSHUDWidget(const FObjectInitializer& ObjectInitializer
     UltimateReadyFillColor   = LastFPSHUDStyle::UltimateReady();
     HeatFillColor            = LastFPSHUDStyle::HeatFill();
     HeatOverheatedFillColor  = LastFPSHUDStyle::HeatOverheated();
-    KillFeedKillerColor      = LastFPSHUDStyle::KillFeedKiller();
-    KillFeedVictimColor      = LastFPSHUDStyle::KillFeedVictim();
-    KillFeedSeparatorColor   = LastFPSHUDStyle::KillFeedSeparator();
-    KillFeedLocalPlayerColor = LastFPSHUDStyle::KillFeedLocalPlayer();
 }
 
 void ULastFPSHUDWidget::NativeConstruct()
@@ -92,8 +84,6 @@ void ULastFPSHUDWidget::NativeConstruct()
     {
         HitMarkerImage->SetVisibility(ESlateVisibility::Collapsed);
     }
-
-    TryBindKillFeed();
 
     if (UWorld* World = GetWorld())
     {
@@ -120,14 +110,6 @@ void ULastFPSHUDWidget::NativeDestruct()
         World->GetTimerManager().ClearTimer(RetryTimerHandle);
     }
 
-    if (ALastFPSMatchGameState* MGS = BoundMatchGameState.Get())
-    {
-        MGS->OnKillFeed.Remove(KillFeedHandle);
-    }
-    BoundMatchGameState.Reset();
-    KillFeedHandle.Reset();
-    KillFeedLines.Empty();
-
     Super::NativeDestruct();
 }
 
@@ -136,123 +118,6 @@ void ULastFPSHUDWidget::RetryInitialize()
     if (InitializeHUD() && bSkillSlotsInitialized)
     {
         GetWorld()->GetTimerManager().ClearTimer(RetryTimerHandle);
-    }
-}
-
-void ULastFPSHUDWidget::TryBindKillFeed()
-{
-    if (BoundMatchGameState.IsValid())
-        return;
-
-    UWorld* World = GetWorld();
-    if (!World)
-        return;
-
-    ALastFPSMatchGameState* MGS = World->GetGameState<ALastFPSMatchGameState>();
-    if (!MGS)
-        return;
-
-    BoundMatchGameState = MGS;
-    KillFeedHandle      = MGS->OnKillFeed.AddUObject(this, &ULastFPSHUDWidget::HandleKillFeed);
-}
-
-void ULastFPSHUDWidget::HandleKillFeed(const FString& KillerName, const FString& VictimName)
-{
-    AddKillFeedLine(KillerName, VictimName);
-    OnKillFeedEntry(KillerName, VictimName);
-}
-
-FString ULastFPSHUDWidget::GetLocalKillFeedDisplayName() const
-{
-    const APlayerController* PC = GetOwningPlayer();
-    if (!PC)
-    {
-        return FString();
-    }
-
-    if (const ALastFPSCharacterBase* Character = Cast<ALastFPSCharacterBase>(PC->GetPawn()))
-    {
-        return Character->GetKillFeedDisplayName();
-    }
-
-    if (const APlayerState* PS = PC->GetPlayerState<APlayerState>())
-    {
-        return PS->GetPlayerName();
-    }
-
-    return FString();
-}
-
-UTextBlock* ULastFPSHUDWidget::CreateKillFeedText(const FString& Text, const FLinearColor& Color)
-{
-    UTextBlock* TextBlock = NewObject<UTextBlock>(this);
-    if (!TextBlock)
-    {
-        return nullptr;
-    }
-
-    TextBlock->SetText(FText::FromString(Text));
-    TextBlock->SetColorAndOpacity(FSlateColor(Color));
-    TextBlock->SetShadowOffset(FVector2D(1.f, 1.f));
-    TextBlock->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.75f));
-    return TextBlock;
-}
-
-void ULastFPSHUDWidget::AddKillFeedLine(const FString& KillerName, const FString& VictimName)
-{
-    if (!KillFeedContainer)
-    {
-        return;
-    }
-
-    const FString LocalName = GetLocalKillFeedDisplayName();
-    const bool bLocalIsKiller = !LocalName.IsEmpty()
-        && KillerName.Equals(LocalName, ESearchCase::IgnoreCase);
-    const bool bLocalIsVictim = !LocalName.IsEmpty()
-        && VictimName.Equals(LocalName, ESearchCase::IgnoreCase);
-
-    const FLinearColor KillerColor = bLocalIsKiller ? KillFeedLocalPlayerColor : KillFeedKillerColor;
-    const FLinearColor VictimColor = bLocalIsVictim ? KillFeedLocalPlayerColor : KillFeedVictimColor;
-
-    UHorizontalBox* Row = NewObject<UHorizontalBox>(this);
-    if (!Row)
-    {
-        return;
-    }
-
-    if (UTextBlock* KillerText = CreateKillFeedText(KillerName, KillerColor))
-    {
-        Row->AddChildToHorizontalBox(KillerText);
-    }
-
-    if (UTextBlock* SeparatorText = CreateKillFeedText(TEXT("  \u2192  "), KillFeedSeparatorColor))
-    {
-        Row->AddChildToHorizontalBox(SeparatorText);
-    }
-
-    if (UTextBlock* VictimText = CreateKillFeedText(VictimName, VictimColor))
-    {
-        Row->AddChildToHorizontalBox(VictimText);
-    }
-
-    if (UVerticalBox* VBox = Cast<UVerticalBox>(KillFeedContainer))
-    {
-        VBox->AddChildToVerticalBox(Row);
-    }
-    else
-    {
-        KillFeedContainer->AddChild(Row);
-    }
-
-    KillFeedLines.Add(Row);
-
-    while (KillFeedLines.Num() > MaxKillFeedEntries)
-    {
-        if (UWidget* Oldest = KillFeedLines[0])
-        {
-            Oldest->RemoveFromParent();
-        }
-        KillFeedLines.RemoveAt(0);
     }
 }
 
@@ -267,10 +132,8 @@ void ULastFPSHUDWidget::HUDRefreshTick(const float DeltaTime)
 {
     TryBindPawnComponents();
 
-    if (!bSkillSlotsInitialized)
-    {
-        TryInitSkillSlots();
-    }
+    UWorld* World = GetWorld();
+    if (!World) return;
 
     if (bSkillSlotsInitialized)
     {
@@ -278,35 +141,6 @@ void ULastFPSHUDWidget::HUDRefreshTick(const float DeltaTime)
     }
 
     TickSmoothedGauges(DeltaTime);
-
-    if (!MatchTimerText)
-    {
-        return;
-    }
-
-    UWorld* World = GetWorld();
-    if (!World)
-    {
-        return;
-    }
-
-    const ALastFPSMatchGameState* MGS = World->GetGameState<ALastFPSMatchGameState>();
-    if (!MGS)
-    {
-        return;
-    }
-
-    const int32 TotalSec = FMath::Max(0, FMath::CeilToInt(MGS->GetMatchTimeRemaining()));
-    if (TotalSec == CachedMatchTimeIntSec)
-    {
-        return;
-    }
-
-    CachedMatchTimeIntSec = TotalSec;
-
-    const int32 Min = TotalSec / 60;
-    const int32 Sec = TotalSec % 60;
-    MatchTimerText->SetText(FText::FromString(FString::Printf(TEXT("%02d:%02d"), Min, Sec)));
 }
 
 bool ULastFPSHUDWidget::TryInitSkillSlots()

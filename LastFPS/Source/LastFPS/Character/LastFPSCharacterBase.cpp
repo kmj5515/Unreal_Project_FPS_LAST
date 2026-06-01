@@ -6,7 +6,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
-#include "UI/LastFPSHUD.h"
+#include "Game/LastFPSPlayerController.h"
 
 ALastFPSCharacterBase::ALastFPSCharacterBase()
 {
@@ -76,8 +76,10 @@ void ALastFPSCharacterBase::Client_NotifyHitMarker_Implementation()
 {
     APlayerController* PC = GetController<APlayerController>();
     if (!PC) return;
-    if (ALastFPSHUD* FPSHUD = Cast<ALastFPSHUD>(PC->GetHUD()))
-        FPSHUD->ShowHitMarker();
+    if (ALastFPSPlayerController* LastPC = Cast<ALastFPSPlayerController>(PC))
+    {
+        LastPC->ShowHitMarker();
+    }
 }
 
 void ALastFPSCharacterBase::RecordAttacker(APlayerState* Attacker)

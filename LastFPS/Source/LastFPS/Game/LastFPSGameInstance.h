@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
+#include "Utility/LastFPSTravelTypes.h"
 #include "LastFPSGameInstance.generated.h"
 
 UCLASS(Config=Game)
@@ -19,15 +20,59 @@ public:
     void SaveSelectedCharacterIndex(const FString& PlayerKey, int32 SelectedIndex);
     bool TryGetSelectedCharacterIndex(const FString& PlayerKey, int32& OutSelectedIndex) const;
 
-    /** 로비 → 매치 ServerTravel. 로딩 화면은 CommonLoadingScreen이 자동 처리. */
     UFUNCTION(BlueprintCallable, Category="LastFPS|Travel")
-    void RequestTravelToMatch(const FString& MatchMapURL);
+    void RequestTravelToDestination(ELastFPSTravelDestination Destination);
 
-    /** 매치 → 로비 ServerTravel. */
     UFUNCTION(BlueprintCallable, Category="LastFPS|Travel")
-    void RequestTravelToLobby(const FString& LobbyMapURL);
+    void RequestTravelToMainMenu();
+
+    UFUNCTION(BlueprintCallable, Category="LastFPS|Travel")
+    void RequestTravelToCharacterSelect();
+
+    UFUNCTION(BlueprintCallable, Category="LastFPS|Travel")
+    void RequestTravelToHub();
+
+    UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
+    bool ResolveMapURL(ELastFPSTravelDestination Destination, FString& OutMapURL) const;
+
+    UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
+    ELastFPSTravelDestination GetPendingTravelDestination() const { return PendingTravelDestination; }
+
+    UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
+    FText GetPendingTravelStatusText() const { return PendingTravelStatusText; }
+
+    UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
+    FText GetPendingTravelMapNameText() const { return PendingTravelMapNameText; }
+
+    UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
+    static FText GetDefaultStatusTextForDestination(ELastFPSTravelDestination Destination);
+
+    UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
+    static FText GetDefaultMapNameTextForDestination(ELastFPSTravelDestination Destination);
+
+protected:
+    void ExecuteServerTravel(const FString& MapURL, ELastFPSTravelDestination DestinationForUI);
+    void SetPendingTravelPresentation(ELastFPSTravelDestination Destination, const FText& StatusText, const FText& MapNameText);
+    void ClearPendingTravelPresentation();
+
+    void HandlePostLoadMap(UWorld* LoadedWorld);
+
+    UPROPERTY(Config, EditAnywhere, Category="LastFPS|Travel")
+    FString MainMenuMap = TEXT("/Game/Maps/Test/MainMenuMap");
+
+    UPROPERTY(Config, EditAnywhere, Category="LastFPS|Travel")
+    FString CharacterSelectMap = TEXT("/Game/Maps/Test/CharacterSelectMap");
+
+    UPROPERTY(Config, EditAnywhere, Category="LastFPS|Travel")
+    FString HubMap = TEXT("/Game/Maps/Test/HubMap");
 
 private:
     UPROPERTY()
     TMap<FString, int32> SelectedCharacterIndexByPlayerKey;
+
+    ELastFPSTravelDestination PendingTravelDestination = ELastFPSTravelDestination::MainMenu;
+    FText PendingTravelStatusText;
+    FText PendingTravelMapNameText;
+
+    FDelegateHandle PostLoadMapDelegateHandle;
 };

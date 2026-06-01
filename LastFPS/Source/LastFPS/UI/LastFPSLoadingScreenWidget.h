@@ -23,7 +23,10 @@ public:
     void OnLoadingScreenUpdated(const FText& StatusText, const FText& MapNameText);
 
 protected:
+    virtual void NativeConstruct() override;
     virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+
+    void RefreshFromGameInstance();
 
     /** WBP_Loading에서 동일 이름으로 만들면 자동 바인딩 */
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
