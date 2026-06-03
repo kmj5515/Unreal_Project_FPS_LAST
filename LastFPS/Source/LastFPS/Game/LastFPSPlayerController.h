@@ -2,11 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "CommonPlayerController.h"
+#include "Hub/ILastFPSInteractable.h"
 #include "UI/LastFPSConfirmWidget.h"
 #include "LastFPSPlayerController.generated.h"
 
 class APawn;
 class ULastFPSCharacterSelectWidget;
+class ULastFPSLobbyWidget;
 class ULastFPSHUDWidget;
 class ULastFPSMainMenuWidget;
 class ULastFPSNoticeWidget;
@@ -22,6 +24,12 @@ public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    virtual void SetupInputComponent() override;
+
+    /** NPC 범위 진입 시 호출 */
+    void SetNearestInteractable(AActor* Interactable);
+    /** NPC 범위 이탈 시 호출 */
+    void ClearNearestInteractable(AActor* Interactable);
 
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
     void ShowHitMarker();
@@ -64,6 +72,9 @@ protected:
     TSubclassOf<ULastFPSCharacterSelectWidget> CharacterSelectWidgetClass;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
+    TSubclassOf<ULastFPSLobbyWidget> HubWidgetClass;
+
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
     TSubclassOf<ULastFPSConfirmWidget> ConfirmWidgetClass;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
@@ -81,9 +92,14 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
     bool bPushCharacterSelectOnBeginPlay = false;
 
+    /** Hub UI */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
+    bool bPushHubOnBeginPlay = false;
+
     void TryPushHUDToUILayout();
     void TryPushMainMenuToUILayout();
     void TryPushCharacterSelectToUILayout();
+    void TryPushHubToUILayout();
 
     UFUNCTION()
     void RetryPushHUDToUILayout();
@@ -93,6 +109,9 @@ protected:
 
     UFUNCTION()
     void RetryPushCharacterSelectToUILayout();
+
+    UFUNCTION()
+    void RetryPushHubToUILayout();
 
     template<typename TWidget>
     TWidget* PushWidgetToModalLayer(TSubclassOf<TWidget> WidgetClass);
@@ -115,6 +134,9 @@ protected:
     UPROPERTY()
     TObjectPtr<ULastFPSCharacterSelectWidget> CharacterSelectWidget;
 
+    UPROPERTY()
+    TObjectPtr<ULastFPSLobbyWidget> HubWidget;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
     TArray<TSubclassOf<APawn>> SelectableCharacterClasses;
 
@@ -124,7 +146,15 @@ protected:
     FTimerHandle HUDPushRetryTimerHandle;
     FTimerHandle MainMenuPushRetryTimerHandle;
     FTimerHandle CharacterSelectPushRetryTimerHandle;
+    FTimerHandle HubPushRetryTimerHandle;
     bool bHUDWidgetPushed = false;
     bool bMainMenuWidgetPushed = false;
     bool bCharacterSelectWidgetPushed = false;
+    bool bHubWidgetPushed = false;
+
+    // ── 상호작용 ──────────────────────────────────────────────────
+    void TryInteract();
+
+    /** 현재 범위 안에 있는 인터랙터블 (NPC 등) */
+    TWeakObjectPtr<AActor> NearestInteractableActor;
 };

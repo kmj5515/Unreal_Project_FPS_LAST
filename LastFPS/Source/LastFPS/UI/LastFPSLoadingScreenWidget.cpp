@@ -26,6 +26,21 @@ void ULastFPSLoadingScreenWidget::NativeConstruct()
 {
     Super::NativeConstruct();
     RefreshFromGameInstance();
+
+    if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
+    {
+        TravelPresentationChangedHandle = GI->OnTravelPresentationChanged.AddUObject(
+            this, &ULastFPSLoadingScreenWidget::HandleTravelPresentationChanged);
+    }
+}
+
+void ULastFPSLoadingScreenWidget::NativeDestruct()
+{
+    if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
+    {
+        GI->OnTravelPresentationChanged.Remove(TravelPresentationChangedHandle);
+    }
+    Super::NativeDestruct();
 }
 
 void ULastFPSLoadingScreenWidget::RefreshFromGameInstance()
@@ -48,11 +63,16 @@ void ULastFPSLoadingScreenWidget::RefreshFromGameInstance()
     }
 }
 
+void ULastFPSLoadingScreenWidget::HandleTravelPresentationChanged(const FText& StatusText, const FText& MapNameText)
+{
+    SetStatusText(StatusText);
+    SetMapNameText(MapNameText);
+    OnLoadingScreenUpdated(StatusText, MapNameText);
+}
+
 void ULastFPSLoadingScreenWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
     Super::NativeTick(MyGeometry, InDeltaTime);
-
-    RefreshFromGameInstance();
 
     if (!PB_Loading || IndeterminateCycleSeconds <= KINDA_SMALL_NUMBER)
     {

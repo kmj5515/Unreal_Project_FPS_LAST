@@ -1,6 +1,8 @@
 #include "Game/LastFPSPlayerController.h"
 
 #include "UI/LastFPSCharacterSelectWidget.h"
+#include "Hub/ILastFPSInteractable.h"
+#include "UI/LastFPSLobbyWidget.h"
 #include "UI/LastFPSHUDWidget.h"
 #include "UI/LastFPSMainMenuWidget.h"
 #include "UI/LastFPSNoticeWidget.h"
@@ -9,6 +11,7 @@
 #include "Engine/World.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerState.h"
+#include "InputCoreTypes.h"
 #include "Net/UnrealNetwork.h"
 #include "PrimaryGameLayout.h"
 #include "TimerManager.h"
@@ -59,6 +62,11 @@ void ALastFPSPlayerController::BeginPlay()
         TryPushCharacterSelectToUILayout();
     }
 
+    if (bPushHubOnBeginPlay)
+    {
+        TryPushHubToUILayout();
+    }
+
     if (bPushHUDOnBeginPlay)
     {
         TryPushHUDToUILayout();
@@ -74,6 +82,7 @@ void ALastFPSPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
         World->GetTimerManager().ClearTimer(HUDPushRetryTimerHandle);
         World->GetTimerManager().ClearTimer(MainMenuPushRetryTimerHandle);
         World->GetTimerManager().ClearTimer(CharacterSelectPushRetryTimerHandle);
+        World->GetTimerManager().ClearTimer(HubPushRetryTimerHandle);
     }
 
     Super::EndPlay(EndPlayReason);
@@ -215,6 +224,90 @@ void ALastFPSPlayerController::TryPushCharacterSelectToUILayout()
 void ALastFPSPlayerController::RetryPushCharacterSelectToUILayout()
 {
     TryPushCharacterSelectToUILayout();
+}
+
+void ALastFPSPlayerController::TryPushHubToUILayout()
+{
+    if (bHubWidgetPushed || !HubWidgetClass)
+    {
+        return;
+    }
+
+    UPrimaryGameLayout* RootLayout = UPrimaryGameLayout::GetPrimaryGameLayout(this);
+    if (!RootLayout)
+    {
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().SetTimer(
+                HubPushRetryTimerHandle,
+                this,
+                &ALastFPSPlayerController::RetryPushHubToUILayout,
+                0.1f,
+                true);
+        }
+        return;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(HubPushRetryTimerHandle);
+    }
+
+    HubWidget = RootLayout->PushWidgetToLayerStack<ULastFPSLobbyWidget>(
+        LastFPSUITags::Layer_Game(),
+        HubWidgetClass);
+
+    if (HubWidget)
+    {
+        bHubWidgetPushed = true;
+    }
+    else
+    {
+        UE_LOG(LogLastFPSPlayerController, Error, TEXT("Failed to push Hub widget to layout"));
+    }
+}
+
+void ALastFPSPlayerController::RetryPushHubToUILayout()
+{
+    TryPushHubToUILayout();
+}
+
+// ── 상호작용 ─────────────────────────────────────────────────────
+
+void ALastFPSPlayerController::SetupInputComponent()
+{
+    Super::SetupInputComponent();
+    if (InputComponent)
+    {
+        InputComponent->BindKey(EKeys::F, IE_Pressed, this, &ALastFPSPlayerController::TryInteract);
+    }
+}
+
+void ALastFPSPlayerController::SetNearestInteractable(AActor* Interactable)
+{
+    NearestInteractableActor = Interactable;
+}
+
+void ALastFPSPlayerController::ClearNearestInteractable(AActor* Interactable)
+{
+    if (NearestInteractableActor.Get() == Interactable)
+    {
+        NearestInteractableActor.Reset();
+    }
+}
+
+void ALastFPSPlayerController::TryInteract()
+{
+    AActor* Actor = NearestInteractableActor.Get();
+    if (!Actor)
+    {
+        return;
+    }
+
+    if (Actor->Implements<ULastFPSInteractable>())
+    {
+        ILastFPSInteractable::Execute_Interact(Actor, this);
+    }
 }
 
 void ALastFPSPlayerController::ShowConfirm(

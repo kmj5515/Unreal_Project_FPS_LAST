@@ -24,6 +24,7 @@ public:
 
 protected:
     virtual void NativeConstruct() override;
+    virtual void NativeDestruct() override;
     virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
     void RefreshFromGameInstance();
@@ -43,5 +44,8 @@ protected:
     float IndeterminateCycleSeconds = 1.5f;
 
 private:
+    void HandleTravelPresentationChanged(const FText& StatusText, const FText& MapNameText);
+
+    FDelegateHandle TravelPresentationChangedHandle;
     float IndeterminatePhase = 0.0f;
 };

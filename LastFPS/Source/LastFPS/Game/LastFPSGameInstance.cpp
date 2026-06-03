@@ -234,12 +234,14 @@ void ULastFPSGameInstance::SetPendingTravelPresentation(
 	PendingTravelDestination = Destination;
 	PendingTravelStatusText = StatusText;
 	PendingTravelMapNameText = MapNameText;
+	OnTravelPresentationChanged.Broadcast(PendingTravelStatusText, PendingTravelMapNameText);
 }
 
 void ULastFPSGameInstance::ClearPendingTravelPresentation()
 {
 	PendingTravelStatusText = FText::GetEmpty();
 	PendingTravelMapNameText = FText::GetEmpty();
+	OnTravelPresentationChanged.Broadcast(PendingTravelStatusText, PendingTravelMapNameText);
 }
 
 void ULastFPSGameInstance::HandlePostLoadMap(UWorld* LoadedWorld)

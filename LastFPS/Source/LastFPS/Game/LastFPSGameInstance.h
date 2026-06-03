@@ -5,6 +5,10 @@
 #include "Utility/LastFPSTravelTypes.h"
 #include "LastFPSGameInstance.generated.h"
 
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnLastFPSTravelPresentationChanged,
+	const FText& /*StatusText*/,
+	const FText& /*MapNameText*/);
+
 UCLASS(Config=Game)
 class LASTFPS_API ULastFPSGameInstance : public UGameInstance
 {
@@ -49,6 +53,8 @@ public:
 
     UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
     static FText GetDefaultMapNameTextForDestination(ELastFPSTravelDestination Destination);
+
+    FOnLastFPSTravelPresentationChanged OnTravelPresentationChanged;
 
 protected:
     void ExecuteServerTravel(const FString& MapURL, ELastFPSTravelDestination DestinationForUI);
