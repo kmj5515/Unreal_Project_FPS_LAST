@@ -3,7 +3,7 @@
 #include "UI/LastFPSActivatableWidget.h"
 #include "LastFPSLobbyWidget.generated.h"
 
-class UButton;
+class ULastFPSButtonBase;
 class UTextBlock;
 
 /**
@@ -24,24 +24,24 @@ protected:
 
 	// ── 주요 액션 ─────────────────────────────────────────────────
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_StartMatch;
+	TObjectPtr<ULastFPSButtonBase> Button_StartMatch;
 
 	// ── 퀵 메뉴 ──────────────────────────────────────────────────
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Inventory;
+	TObjectPtr<ULastFPSButtonBase> Button_Inventory;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Missions;
+	TObjectPtr<ULastFPSButtonBase> Button_Missions;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Shop;
+	TObjectPtr<ULastFPSButtonBase> Button_Shop;
 
 	// ── 하단 ──────────────────────────────────────────────────────
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Settings;
+	TObjectPtr<ULastFPSButtonBase> Button_Settings;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_BackToMain;
+	TObjectPtr<ULastFPSButtonBase> Button_BackToMain;
 
 private:
 	UFUNCTION() void HandleStartMatchClicked();

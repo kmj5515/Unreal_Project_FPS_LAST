@@ -2,8 +2,8 @@
 
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
+#include "UI/LastFPSButtonBase.h"
 
-#include "Components/Button.h"
 #include "Kismet/KismetSystemLibrary.h"
 
 void ULastFPSMainMenuWidget::NativeConstruct()
@@ -12,15 +12,15 @@ void ULastFPSMainMenuWidget::NativeConstruct()
 
 	if (Button_Start)
 	{
-		Button_Start->OnClicked.AddDynamic(this, &ULastFPSMainMenuWidget::HandleStartClicked);
+		Button_Start->OnClicked().AddUObject(this, &ULastFPSMainMenuWidget::HandleStartClicked);
 	}
 	if (Button_Settings)
 	{
-		Button_Settings->OnClicked.AddDynamic(this, &ULastFPSMainMenuWidget::HandleSettingsClicked);
+		Button_Settings->OnClicked().AddUObject(this, &ULastFPSMainMenuWidget::HandleSettingsClicked);
 	}
 	if (Button_Quit)
 	{
-		Button_Quit->OnClicked.AddDynamic(this, &ULastFPSMainMenuWidget::HandleQuitClicked);
+		Button_Quit->OnClicked().AddUObject(this, &ULastFPSMainMenuWidget::HandleQuitClicked);
 	}
 }
 

@@ -3,7 +3,7 @@
 #include "UI/LastFPSActivatableWidget.h"
 #include "LastFPSCharacterSelectWidget.generated.h"
 
-class UButton;
+class ULastFPSButtonBase;
 class UTextBlock;
 class ULastFPSCharacterCardWidget;
 
@@ -16,16 +16,16 @@ protected:
 	virtual void NativeConstruct() override;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Confirm;
+	TObjectPtr<ULastFPSButtonBase> Button_Confirm;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Back;
+	TObjectPtr<ULastFPSButtonBase> Button_Back;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Prev;
+	TObjectPtr<ULastFPSButtonBase> Button_Prev;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Next;
+	TObjectPtr<ULastFPSButtonBase> Button_Next;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<ULastFPSCharacterCardWidget> Card_0;

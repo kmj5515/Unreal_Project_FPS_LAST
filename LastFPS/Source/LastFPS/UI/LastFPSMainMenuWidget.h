@@ -3,7 +3,7 @@
 #include "UI/LastFPSActivatableWidget.h"
 #include "LastFPSMainMenuWidget.generated.h"
 
-class UButton;
+class ULastFPSButtonBase;
 
 UCLASS()
 class LASTFPS_API ULastFPSMainMenuWidget : public ULastFPSActivatableWidget
@@ -14,13 +14,13 @@ protected:
 	virtual void NativeConstruct() override;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Start;
+	TObjectPtr<ULastFPSButtonBase> Button_Start;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Settings;
+	TObjectPtr<ULastFPSButtonBase> Button_Settings;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Quit;
+	TObjectPtr<ULastFPSButtonBase> Button_Quit;
 
 	UFUNCTION()
 	void HandleStartClicked();

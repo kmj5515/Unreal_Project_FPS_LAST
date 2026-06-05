@@ -3,7 +3,7 @@
 #include "UI/LastFPSModalDialogBase.h"
 #include "LastFPSConfirmWidget.generated.h"
 
-class UButton;
+class ULastFPSButtonBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLastFPSConfirmResult, bool, bConfirmed);
 
@@ -24,10 +24,10 @@ protected:
 	virtual bool NativeOnHandleBackAction() override;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Confirm;
+	TObjectPtr<ULastFPSButtonBase> Button_Confirm;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Cancel;
+	TObjectPtr<ULastFPSButtonBase> Button_Cancel;
 
 	UFUNCTION()
 	void HandleConfirmClicked();

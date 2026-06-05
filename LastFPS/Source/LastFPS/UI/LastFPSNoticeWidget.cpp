@@ -1,6 +1,6 @@
 #include "UI/LastFPSNoticeWidget.h"
 
-#include "Components/Button.h"
+#include "UI/LastFPSButtonBase.h"
 
 void ULastFPSNoticeWidget::NativeConstruct()
 {
@@ -8,7 +8,7 @@ void ULastFPSNoticeWidget::NativeConstruct()
 
 	if (Button_Ok)
 	{
-		Button_Ok->OnClicked.AddDynamic(this, &ULastFPSNoticeWidget::HandleOkClicked);
+		Button_Ok->OnClicked().AddUObject(this, &ULastFPSNoticeWidget::HandleOkClicked);
 	}
 }
 

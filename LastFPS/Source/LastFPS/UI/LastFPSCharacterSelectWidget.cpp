@@ -1,10 +1,10 @@
 #include "UI/LastFPSCharacterSelectWidget.h"
 
 #include "UI/LastFPSCharacterCardWidget.h"
+#include "UI/LastFPSButtonBase.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
 
-#include "Components/Button.h"
 #include "Components/TextBlock.h"
 
 void ULastFPSCharacterSelectWidget::NativeConstruct()
@@ -13,19 +13,19 @@ void ULastFPSCharacterSelectWidget::NativeConstruct()
 
 	if (Button_Confirm)
 	{
-		Button_Confirm->OnClicked.AddDynamic(this, &ULastFPSCharacterSelectWidget::HandleConfirmClicked);
+		Button_Confirm->OnClicked().AddUObject(this, &ULastFPSCharacterSelectWidget::HandleConfirmClicked);
 	}
 	if (Button_Back)
 	{
-		Button_Back->OnClicked.AddDynamic(this, &ULastFPSCharacterSelectWidget::HandleBackClicked);
+		Button_Back->OnClicked().AddUObject(this, &ULastFPSCharacterSelectWidget::HandleBackClicked);
 	}
 	if (Button_Prev)
 	{
-		Button_Prev->OnClicked.AddDynamic(this, &ULastFPSCharacterSelectWidget::HandlePrevClicked);
+		Button_Prev->OnClicked().AddUObject(this, &ULastFPSCharacterSelectWidget::HandlePrevClicked);
 	}
 	if (Button_Next)
 	{
-		Button_Next->OnClicked.AddDynamic(this, &ULastFPSCharacterSelectWidget::HandleNextClicked);
+		Button_Next->OnClicked().AddUObject(this, &ULastFPSCharacterSelectWidget::HandleNextClicked);
 	}
 
 	if (ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>())

@@ -1,8 +1,13 @@
 # 아웃게임 개발 체크리스트
 
-> 마지막 업데이트: 2026-06-03  
+> 마지막 업데이트: 2026-06-05  
 > 기준 브랜치: `kmj-dev-roll`  
-> 전체 완성도: **약 20%** (Phase 1 완료, Phase 3-1 Hub 기반 구조 완료)
+> 전체 완성도: **약 22%** (Phase 1 완료, Phase 3-1 Hub 기반 구조 + NPC 에디터 작업 완료)
+
+> **최근 변경 (06-04)**
+> - `BP_NPC_Quartermaster`, `WBP_NPCMarker` 에디터 작업 완료 → Phase 3-1 NPC 상호작용 실제 배치 가능
+> - 고아 BP 정리: `BP_CharacterSelect_PlayerController`, `BP_MainMenu_LastFPS_PlayerController` 삭제 (`1c522b5`)
+> - `WBP_Scoreboard` / `WBP_ScoreRow` 존재 확인 — C++ 백킹(`ULastFPSScoreboardWidget`) 미구현 BP 전용
 
 ---
 
@@ -42,11 +47,14 @@
   - `LastFPSActivatableWidget` — `NativeOnHandleBackAction` 오버라이드
   - ESC / 뒤로가기 자동 처리
 
-- [ ] **공통 버튼 (`UCommonButtonBase`) 교체** ⚠️
-  - `LastFPSMainMenuWidget.h` — `UButton` x3
-  - `LastFPSCharacterSelectWidget.h` — `UButton` x4
-  - `LastFPSConfirmWidget.h` — `UButton` x2
-  - > 교체 전까지 키보드/패드 포커스 내비게이션 미동작
+- [x] **공통 버튼 (`UCommonButtonBase`) 교체 — C++ 완료** 🔨
+  - [x] `ULastFPSButtonBase : UCommonButtonBase` 신설 (`UI/LastFPSButtonBase.h`)
+  - [x] 5개 위젯 BindWidget 타입 `UButton` → `ULastFPSButtonBase` 전환
+    - `MainMenu`(3), `CharacterSelect`(4), `Lobby`(6), `Confirm`(2), `Notice`(1)
+  - [x] 바인딩 방식 `OnClicked.AddDynamic` → `OnClicked().AddUObject` 전환, 빌드 검증 완료
+  - [ ] **에디터 작업 남음** ⚠️ — 각 WBP의 `Button` 위젯을 `ULastFPSButtonBase` 기반 위젯으로 교체해야 실제 연결됨
+    - `BindWidgetOptional`이라 크래시는 없으나, 교체 전까지 해당 버튼 null → 클릭 무동작
+    - 권장: `WBP_LastFPSButton`(ULastFPSButtonBase 상속) 1개 제작 후 5개 WBP에서 버튼 교체
 
 - [x] **공통 팝업 베이스 (Confirm / Notice)**
   - `LastFPSModalDialogBase` → `LastFPSConfirmWidget`, `LastFPSNoticeWidget`
@@ -123,7 +131,8 @@
   - `ALastFPSNPCBase` — `USphereComponent` 범위 감지, `UWidgetComponent` 3D 마커
   - `ULastFPSNPCMarkerWidget` — 이름 / 역할 텍스트, `[F] 대화` 힌트 토글
   - `PlayerController` — `SetNearestInteractable` / `ClearNearestInteractable` / `TryInteract` (F키)
-  - **에디터 작업**: `WBP_NPCMarker` 생성 → `BP_NPC` 생성 → 메시 / `DisplayName` / `NPCRole` / 위젯 클래스 할당 → HubMap 배치
+  - [x] **에디터 작업 완료**: `WBP_NPCMarker` + `BP_NPC_Quartermaster` 생성 완료
+  - > 추가 NPC(역할별) 배치 시 `BP_NPC_Quartermaster` 복제 후 메시/`DisplayName`/`NPCRole` 변경
 
 - [ ] **NPC 대화 UI** ⬜
   - 대화 텍스트 / 선택지
@@ -148,8 +157,10 @@
 
 ## Phase 4 — 피니시
 
-- [ ] **매치 결과 화면** ⬜
-  - `PlayerState` 통계 이미 수집 중 (킬/뎃/어시스트/힐/딜) — UI만 작성하면 됨
+- [ ] **매치 결과 화면** 🔨
+  - `PlayerState` 통계 이미 수집 중 (킬/뎃/어시스트/힐/딜)
+  - `WBP_Scoreboard` / `WBP_ScoreRow` 에디터에 존재하나 C++ 백킹 없음 → `ULastFPSScoreboardWidget` + `ULastFPSScoreRowWidget` 신설 필요
+  - PlayerState 배열 바인딩 + `UListView` row 위젯 연동
 
 - [ ] **상점 (유료 / 무료)** ⬜
 - [ ] **시즌 패스** ⬜
@@ -161,9 +172,8 @@
 
 ### 즉시 처리
 
-- [ ] **`UCommonButtonBase` 교체** | 난이도: 하
-  - 대상: `LastFPSMainMenuWidget`, `LastFPSCharacterSelectWidget`, `LastFPSConfirmWidget`
-  - `UButton` → `UCommonButtonBase`, `OnClicked` → `OnButtonClicked`
+- [x] **`UCommonButtonBase` 교체 — C++ 완료** | 남은 작업: 에디터 WBP 버튼 교체
+  - `ULastFPSButtonBase` 신설, 5개 위젯 전환 완료 (Phase 1-1 참고)
 
 - [ ] **`ULastFPSCharacterDefinition` DataAsset 신설** | 난이도: 중
   - 통합 대상: `CharacterNames[]` (위젯), `SelectableCharacterClasses[]` (PC), `CharacterPawnClasses[]` (GameMode)
@@ -192,13 +202,13 @@
 
 ```
 [지금 당장]
-  UCommonButtonBase 교체 (하, 2~3일)
-  WBP_NPCMarker + BP_NPC 에디터 작업 (하, 1~2일)
+  UCommonButtonBase 교체 (하, 2~3일)  ← 모든 위젯 입력 라우팅의 선결 과제
+  NPC 대화 UI + DataTable (중, 3~5일)  ← NPC 에디터 작업 완료로 즉시 착수 가능
   설정 화면 (중, 5~7일)
 
 [다음 주]
-  NPC 대화 UI + DataTable (중, 3~5일)
   퀘스트 데이터 구조 + 목록 UI (중, 3~5일)
+  매치 결과 화면 — Scoreboard C++ 신설 (중, 2~3일, 통계 데이터 준비됨)
 
 [인게임 팀 작업 완료 후]
   CharacterDefinition DataAsset 신설

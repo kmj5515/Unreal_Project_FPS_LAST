@@ -3,7 +3,7 @@
 #include "UI/LastFPSModalDialogBase.h"
 #include "LastFPSNoticeWidget.generated.h"
 
-class UButton;
+class ULastFPSButtonBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLastFPSNoticeClosed);
 
@@ -24,7 +24,7 @@ protected:
 	virtual bool NativeOnHandleBackAction() override;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UButton> Button_Ok;
+	TObjectPtr<ULastFPSButtonBase> Button_Ok;
 
 	UFUNCTION()
 	void HandleOkClicked();

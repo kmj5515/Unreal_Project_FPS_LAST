@@ -2,8 +2,8 @@
 
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
+#include "UI/LastFPSButtonBase.h"
 
-#include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "GameFramework/PlayerState.h"
 
@@ -19,12 +19,12 @@ void ULastFPSLobbyWidget::NativeConstruct()
 		}
 	}
 
-	if (Button_StartMatch)  Button_StartMatch->OnClicked.AddDynamic(this, &ULastFPSLobbyWidget::HandleStartMatchClicked);
-	if (Button_Inventory)   Button_Inventory->OnClicked.AddDynamic(this, &ULastFPSLobbyWidget::HandleInventoryClicked);
-	if (Button_Missions)    Button_Missions->OnClicked.AddDynamic(this, &ULastFPSLobbyWidget::HandleMissionsClicked);
-	if (Button_Shop)        Button_Shop->OnClicked.AddDynamic(this, &ULastFPSLobbyWidget::HandleShopClicked);
-	if (Button_Settings)    Button_Settings->OnClicked.AddDynamic(this, &ULastFPSLobbyWidget::HandleSettingsClicked);
-	if (Button_BackToMain)  Button_BackToMain->OnClicked.AddDynamic(this, &ULastFPSLobbyWidget::HandleBackToMainClicked);
+	if (Button_StartMatch)  Button_StartMatch->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleStartMatchClicked);
+	if (Button_Inventory)   Button_Inventory->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleInventoryClicked);
+	if (Button_Missions)    Button_Missions->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleMissionsClicked);
+	if (Button_Shop)        Button_Shop->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleShopClicked);
+	if (Button_Settings)    Button_Settings->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleSettingsClicked);
+	if (Button_BackToMain)  Button_BackToMain->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleBackToMainClicked);
 }
 
 void ULastFPSLobbyWidget::HandleStartMatchClicked()  { ShowWIPNotice(NSLOCTEXT("LastFPS", "Lobby_StartMatch", "매칭")); }

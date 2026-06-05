@@ -1,6 +1,6 @@
 #include "UI/LastFPSConfirmWidget.h"
 
-#include "Components/Button.h"
+#include "UI/LastFPSButtonBase.h"
 
 void ULastFPSConfirmWidget::NativeConstruct()
 {
@@ -8,11 +8,11 @@ void ULastFPSConfirmWidget::NativeConstruct()
 
 	if (Button_Confirm)
 	{
-		Button_Confirm->OnClicked.AddDynamic(this, &ULastFPSConfirmWidget::HandleConfirmClicked);
+		Button_Confirm->OnClicked().AddUObject(this, &ULastFPSConfirmWidget::HandleConfirmClicked);
 	}
 	if (Button_Cancel)
 	{
-		Button_Cancel->OnClicked.AddDynamic(this, &ULastFPSConfirmWidget::HandleCancelClicked);
+		Button_Cancel->OnClicked().AddUObject(this, &ULastFPSConfirmWidget::HandleCancelClicked);
 	}
 }
 
