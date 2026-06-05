@@ -99,7 +99,7 @@ void ULastFPSAnimInstance::UpdateCombatState()
     }
 
     bIsDead = !Base->IsAlive();
-    CombatState = Base->GetIsADS() ? EMMCombatState::ADS : EMMCombatState::Hip;
+    AimMode = Base->GetIsADS() ? EMMAimMode::ADS : EMMAimMode::Hip;
 
     // Aim Pitch / Yaw: 컨트롤러 회전과 캐릭터 회전의 차이를 -180~180으로 정규화
     if (AController* Controller = OwnerCharacter->GetController())
@@ -114,14 +114,17 @@ void ULastFPSAnimInstance::UpdateCombatState()
     //UE_LOG(LogTemp, Log, TEXT("AimPitch: %f"), AimPitch);
     //UE_LOG(LogTemp, Log, TEXT("AimYaw: %f"), AimYaw);
 
-    // // 발사 중 여부
-    // if (ALastFPSHero* Hero = Cast<ALastFPSHero>(Base))
-    // {
-    //     if (UWeaponComponent* Weapon = Hero->GetWeaponComponent())
-    //     {
-    //         bIsFiring = Weapon->IsFiring();
-    //     }
-    // }
+    // 발사 중 여부
+    if (ALastFPSHero* Hero = Cast<ALastFPSHero>(Base))
+    {
+        CombatState = Hero->GetCombatState();
+        bIsFiring = CombatState == EMMCombatState::Attacking;
+    }
+    else
+    {
+        CombatState = EMMCombatState::Idle;
+        bIsFiring = false;
+    }
 }
 
 void ULastFPSAnimInstance::OnWeaponEquipped(bool bEquipped)
@@ -170,7 +173,15 @@ void ULastFPSAnimInstance::UpdateHandIK()
     }
 
     FTransform IKTransform;
-    if (Weapon->GetLeftHandIKTransform(Hero->GetMesh(), RightHandBoneName, IKTransform))
+    const bool bUseReloadTarget = bUseReloadLeftHandIKTarget
+        && CombatState == EMMCombatState::Reloading
+        && !Weapon->ReloadLeftHandIKTargetName.IsNone();
+
+    const bool bHasIKTransform = bUseReloadTarget
+        ? Weapon->GetLeftHandIKTransformForTarget(Weapon->ReloadLeftHandIKTargetName, Hero->GetMesh(), RightHandBoneName, IKTransform)
+        : Weapon->GetLeftHandIKTransform(Hero->GetMesh(), RightHandBoneName, IKTransform);
+
+    if (bHasIKTransform)
     {
         LeftHandIKTransform = IKTransform;
         LeftHandIKAlpha = 1.f;

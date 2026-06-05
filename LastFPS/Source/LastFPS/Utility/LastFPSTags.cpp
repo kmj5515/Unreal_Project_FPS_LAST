@@ -23,6 +23,7 @@ void FLastFPSTags::InitializeNativeTags()
     Tags.AddTag(Tags.Input_ADS,         "InputTag.ADS",         "ADS input");
     Tags.AddTag(Tags.Input_Jump,        "InputTag.Jump",        "Jump input");
     Tags.AddTag(Tags.Input_Fire,        "InputTag.Fire",        "Fire input");
+    Tags.AddTag(Tags.Input_Reload,      "InputTag.Reload",      "Reload input");
     Tags.AddTag(Tags.Input_Scoreboard,  "InputTag.Scoreboard",  "Scoreboard input");
     Tags.AddTag(Tags.Input_Skill1,      "InputTag.Skill1",      "Skill 1 input");
     Tags.AddTag(Tags.Input_Skill2,      "InputTag.Skill2",      "Skill 2 input");
@@ -32,6 +33,7 @@ void FLastFPSTags::InitializeNativeTags()
     Tags.AddTag(Tags.Ability_Sprint,   "Ability.Sprint",   "Sprint ability");
     Tags.AddTag(Tags.Ability_Jump,     "Ability.Jump",     "Jump ability");
     Tags.AddTag(Tags.Ability_Fire,     "Ability.Fire",     "Fire ability");
+    Tags.AddTag(Tags.Ability_Reload,   "Ability.Reload",   "Reload ability");
     Tags.AddTag(Tags.Ability_Skill1,   "Ability.Skill1",   "Skill 1 ability");
     Tags.AddTag(Tags.Ability_Skill2,   "Ability.Skill2",   "Skill 2 ability");
     Tags.AddTag(Tags.Ability_Ultimate, "Ability.Ultimate", "Ultimate ability");

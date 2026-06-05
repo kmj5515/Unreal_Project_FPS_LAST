@@ -48,8 +48,12 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Shoot|Animation")
     TObjectPtr<UAnimMontage> ADSFireMontage;
 
+    UPROPERTY(EditDefaultsOnly, Category="Shoot|State", meta=(ClampMin="0.0"))
+    float MinAttackStateDuration = 0.12f;
+
 private:
     void Fire();
+    void FinishAbility();
 
     // 로컬 클라이언트: 사운드 + 머즐플래시 즉시 재생 (클라이언트 예측)
     void LocalFire(UWeaponComponent* Weapon);
@@ -58,5 +62,6 @@ private:
     UWeaponComponent* GetWeaponComponent() const;
 
     FTimerHandle FireTimerHandle;
+    FTimerHandle FinishAbilityTimerHandle;
     TWeakObjectPtr<UWeaponComponent> CachedWeapon;
 };

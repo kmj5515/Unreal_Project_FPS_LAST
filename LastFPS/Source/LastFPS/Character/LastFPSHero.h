@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Character/LastFPSCharacterBase.h"
+#include "Utility/LastFPSEnumTypes.h"
 #include "LastFPSHero.generated.h"
 
 class USpringArmComponent;
@@ -21,6 +22,8 @@ class LASTFPS_API ALastFPSHero : public ALastFPSCharacterBase
 public:
     ALastFPSHero();
 
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
     UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayWeaponFireEffects();
 
@@ -30,9 +33,11 @@ public:
     FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
     FORCEINLINE UWeaponComponent* GetWeaponComponent() const { return WeaponComponent; }
     virtual bool GetIsADS() const override { return bIsADS; }
+    FORCEINLINE EMMCombatState GetCombatState() const { return CombatState; }
 
     // GAS 어빌리티에서 카메라 줌을 제어할 수 있도록 공개
     void SetADS(bool bEnabled);
+    void SetCombatState(EMMCombatState NewState);
 
 protected:
     virtual void BeginPlay() override;
@@ -108,11 +113,18 @@ private:
     bool bIsADS = false;
     float PreADSWalkSpeed = 0.f;
 
+    UPROPERTY(ReplicatedUsing=OnRep_CombatState, BlueprintReadOnly, Category="Combat", meta=(AllowPrivateAccess="true"))
+    EMMCombatState CombatState = EMMCombatState::Idle;
+
     float TargetArmLength;
     FVector TargetSocketOffset;
     float TargetFOV;
 
+    UFUNCTION()
+    void OnRep_CombatState();
+
     void HandleAbilityInput(const FInputActionValue& value, FGameplayTag InputID);
+    bool ShouldCancelAbilityOnRelease(FGameplayTag InputID) const;
 
     void TickLocalMatchIntro();
 

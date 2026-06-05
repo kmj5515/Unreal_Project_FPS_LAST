@@ -19,6 +19,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/Abilities/GA_BasicShoot.h"
 #include "AbilitySystem/Abilities/GA_Ultimate.h"
+#include "Net/UnrealNetwork.h"
 
 ALastFPSHero::ALastFPSHero()
 {
@@ -65,6 +66,12 @@ ALastFPSHero::ALastFPSHero()
     TargetArmLength    = DefaultArmLength;
     TargetSocketOffset = DefaultSocketOffset;
     TargetFOV          = DefaultFOV;
+}
+
+void ALastFPSHero::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(ALastFPSHero, CombatState);
 }
 
 void ALastFPSHero::GiveDefaultAbilities()
@@ -177,6 +184,7 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
         EIC->BindAction(Action.InputAction, ETriggerEvent::Canceled, this, &ALastFPSHero::HandleAbilityInput, Action.InputTag);
     }
 }
+
 void ALastFPSHero::HandleAbilityInput(const FInputActionValue& value, FGameplayTag InputID)
 {
     bool IsPressed = value.Get<bool>();
@@ -192,7 +200,10 @@ void ALastFPSHero::HandleAbilityInput(const FInputActionValue& value, FGameplayT
     }
     else
     {
-        InputReleased(InputID);
+        if (!ShouldCancelAbilityOnRelease(InputID))
+        {
+            InputReleased(InputID);
+        }
 
         if (InputID == FLastFPSTags::Get().Input_Scoreboard)
         {
@@ -301,6 +312,25 @@ void ALastFPSHero::SetADS(bool bEnabled)
             Movement->MaxWalkSpeed = PreADSWalkSpeed > 0.f ? PreADSWalkSpeed : 600.f;
         }
     }
+}
+
+bool ALastFPSHero::ShouldCancelAbilityOnRelease(FGameplayTag InputID) const
+{
+    return InputConfig && InputConfig->ReleaseCancelInputTags.HasTagExact(InputID);
+}
+
+void ALastFPSHero::SetCombatState(EMMCombatState NewState)
+{
+    if (CombatState == NewState)
+    {
+        return;
+    }
+
+    CombatState = NewState;
+}
+
+void ALastFPSHero::OnRep_CombatState()
+{
 }
 
 void ALastFPSHero::StartScoreboard()

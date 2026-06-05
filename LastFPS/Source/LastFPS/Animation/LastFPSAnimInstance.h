@@ -51,11 +51,14 @@ protected:
 
     // ── Combat ──────────────────────────────────────────────────
     UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
-    EMMCombatState CombatState = EMMCombatState::Hip;
+    EMMAimMode AimMode = EMMAimMode::Hip;
 
     UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
     EMMWeaponType WeaponType = EMMWeaponType::Unarmed;
-
+    
+    UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
+    EMMCombatState CombatState = EMMCombatState::Idle;
+    
     // Aim Offset 용 (-90 ~ 90)
     UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
     float AimPitch = 0.f;
@@ -81,6 +84,9 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|IK")
     FName RightHandBoneName = TEXT("hand_r");
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|IK")
+    bool bUseReloadLeftHandIKTarget = true;
 
 private:
     void UpdateLocomotionState();

@@ -17,6 +17,7 @@ struct FLastFPSInputAction
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Meta=(Categories="InputTag"))
     FGameplayTag InputTag;
+
 };
 
 // DataAsset으로 만들어서 BP에서 InputAction ↔ GameplayTag 매핑을 에디터에서 편집
@@ -36,4 +37,7 @@ public:
     // GAS 어빌리티를 트리거하는 액션 (Q / E / F / 사격 / 점프)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Meta=(TitleProperty="InputAction"))
     TArray<FLastFPSInputAction> AbilityInputActions;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Meta=(Categories="InputTag"))
+    FGameplayTagContainer ReleaseCancelInputTags;
 };

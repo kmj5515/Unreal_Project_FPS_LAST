@@ -168,13 +168,18 @@ void UWeaponComponent::Server_FireFromClientAim_Implementation(FVector_NetQuanti
 
 bool UWeaponComponent::GetLeftHandIKTransform(USkeletalMeshComponent* CharacterMesh, FName RelativeToBoneName, FTransform& OutTransform) const
 {
+    return GetLeftHandIKTransformForTarget(LeftHandIKSocketName, CharacterMesh, RelativeToBoneName, OutTransform);
+}
+
+bool UWeaponComponent::GetLeftHandIKTransformForTarget(FName TargetName, USkeletalMeshComponent* CharacterMesh, FName RelativeToBoneName, FTransform& OutTransform) const
+{
     if (!CurrentWeapon)
     {
         OutTransform = FTransform::Identity;
         return false;
     }
 
-    return CurrentWeapon->GetSocketTransformInBoneSpace(LeftHandIKSocketName, CharacterMesh, RelativeToBoneName, OutTransform);
+    return CurrentWeapon->GetSocketTransformInBoneSpace(TargetName, CharacterMesh, RelativeToBoneName, OutTransform);
 }
 
 void UWeaponComponent::TestEquipWeapon()

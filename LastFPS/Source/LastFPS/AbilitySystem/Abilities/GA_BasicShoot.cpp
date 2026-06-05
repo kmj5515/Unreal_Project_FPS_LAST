@@ -29,10 +29,16 @@ void UGA_BasicShoot::ActivateAbility(
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+    ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
     if (!Hero || !Hero->IsAlive())
     {
         UE_LOG(LogTemp, Warning, TEXT("GA_BasicShoot: cannot fire while dead or missing hero"));
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return;
+    }
+
+    if (Hero->GetCombatState() != EMMCombatState::Idle)
+    {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
@@ -53,6 +59,7 @@ void UGA_BasicShoot::ActivateAbility(
         return;
     }
 
+    Hero->SetCombatState(EMMCombatState::Attacking);
     Fire();
 
     if (bIsAutoFire)
@@ -69,7 +76,19 @@ void UGA_BasicShoot::ActivateAbility(
     }
     else
     {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().SetTimer(
+                FinishAbilityTimerHandle,
+                this,
+                &UGA_BasicShoot::FinishAbility,
+                MinAttackStateDuration,
+                false);
+        }
+        else
+        {
+            EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        }
     }
 }
 
@@ -154,6 +173,11 @@ void UGA_BasicShoot::LocalFire(UWeaponComponent* Weapon)
     }
 }
 
+void UGA_BasicShoot::FinishAbility()
+{
+    EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
+}
+
 void UGA_BasicShoot::EndAbility(
     const FGameplayAbilitySpecHandle Handle,
     const FGameplayAbilityActorInfo* ActorInfo,
@@ -164,6 +188,15 @@ void UGA_BasicShoot::EndAbility(
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().ClearTimer(FireTimerHandle);
+        GetWorld()->GetTimerManager().ClearTimer(FinishAbilityTimerHandle);
+    }
+
+    if (ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo()))
+    {
+        if (Hero->GetCombatState() == EMMCombatState::Attacking)
+        {
+            Hero->SetCombatState(EMMCombatState::Idle);
+        }
     }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

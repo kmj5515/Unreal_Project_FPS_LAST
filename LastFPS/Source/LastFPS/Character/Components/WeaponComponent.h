@@ -30,14 +30,17 @@ public:
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+    FTransform GetMuzzleTransform() const;
     bool CanFire() const;
     void AddHeat();
-    FTransform GetMuzzleTransform() const;
     void PlayFireEffects() const;
     void FireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
 
     UFUNCTION(BlueprintCallable, Category="Weapon|IK")
     bool GetLeftHandIKTransform(USkeletalMeshComponent* CharacterMesh, FName RelativeToBoneName, FTransform& OutTransform) const;
+
+    UFUNCTION(BlueprintCallable, Category="Weapon|IK")
+    bool GetLeftHandIKTransformForTarget(FName TargetName, USkeletalMeshComponent* CharacterMesh, FName RelativeToBoneName, FTransform& OutTransform) const;
 
     // 런타임 무기 장착 (서버에서 호출 → Multicast로 전체 적용)
     void EquipWeapon(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass = nullptr);
@@ -87,6 +90,9 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|IK")
     FName LeftHandIKSocketName = TEXT("LeftHandIK");
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|IK")
+    FName ReloadLeftHandIKTargetName = TEXT("Clip_Bone");
 
     // 최소 연사 간격 (초)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")

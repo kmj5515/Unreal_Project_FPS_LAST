@@ -20,11 +20,21 @@ enum class EMMStance : uint8
 };
 
 UENUM(BlueprintType)
-enum class EMMCombatState : uint8
+enum class EMMAimMode : uint8
 {
     Hip UMETA(DisplayName = "Hip"),
     ADS UMETA(DisplayName = "ADS"),
 };
+
+UENUM(BlueprintType)
+enum class EMMCombatState : uint8
+{
+    Idle    UMETA(DisplayName = "Idle"),
+    Attacking   UMETA(DisplayName = "Attacking"),
+    Reloading   UMETA(DisplayName = "Reloading"),
+    
+};
+
 
 UENUM(BlueprintType)
 enum class EMMAirState : uint8

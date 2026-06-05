@@ -30,6 +30,7 @@ public:
     FGameplayTag Input_ADS;
     FGameplayTag Input_Jump;
     FGameplayTag Input_Fire;
+    FGameplayTag Input_Reload;
     FGameplayTag Input_Scoreboard;
     FGameplayTag Input_Skill1;
     FGameplayTag Input_Skill2;
@@ -39,6 +40,7 @@ public:
     FGameplayTag Ability_Sprint;
     FGameplayTag Ability_Jump;
     FGameplayTag Ability_Fire;
+    FGameplayTag Ability_Reload;
     FGameplayTag Ability_Skill1;
     FGameplayTag Ability_Skill2;
     FGameplayTag Ability_Ultimate;
