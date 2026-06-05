@@ -2,8 +2,15 @@
 
 > 마지막 업데이트: 2026-06-05  
 > 기준 브랜치: `kmj-dev-roll`  
-> 전체 완성도: **약 22%** (Phase 1 완료, Phase 3-1 Hub 기반 구조 + NPC 에디터 작업 완료)
+> 전체 완성도: **약 24%** (Phase 1 완료 — 공통 버튼 전환 마무리, Phase 3-1 Hub 기반 + NPC 에디터 완료)
 
+> **설계 방침** — The First Descendant 참고 PvE 루터슈터지만 **"매치" 개념 없음**: 매치 결과/스코어보드, 로비 출격(StartMatch) **미사용**
+
+> **최근 변경 (06-05)**
+> - **공통 버튼 CommonUI 전환 완료** — `ULastFPSButtonBase` 신설, 5개 위젯 + WBP 5종 전부 교체
+> - **로비 출격 버튼 `Button_StartMatch` 제거** (매치 개념 부재), 매치 결과/매칭 UI 설계 제외 처리
+> - **`WBP_Lobby` 연결** — `BP_PC_Hub`에 `HubWidgetClass` 할당 → HubMap 진입 시 `Layer_Game`에 자동 푸시
+>
 > **최근 변경 (06-04)**
 > - `BP_NPC_Quartermaster`, `WBP_NPCMarker` 에디터 작업 완료 → Phase 3-1 NPC 상호작용 실제 배치 가능
 > - 고아 BP 정리: `BP_CharacterSelect_PlayerController`, `BP_MainMenu_LastFPS_PlayerController` 삭제 (`1c522b5`)
@@ -47,14 +54,15 @@
   - `LastFPSActivatableWidget` — `NativeOnHandleBackAction` 오버라이드
   - ESC / 뒤로가기 자동 처리
 
-- [x] **공통 버튼 (`UCommonButtonBase`) 교체 — C++ 완료** 🔨
-  - [x] `ULastFPSButtonBase : UCommonButtonBase` 신설 (`UI/LastFPSButtonBase.h`)
+- [x] **공통 버튼 (`UCommonButtonBase`) 교체 — 완료** ✅
+  - [x] `ULastFPSButtonBase : UCommonButtonBase` 신설 (`UI/LastFPSButtonBase.h/.cpp`)
+    - `TextBlock`(BindWidgetOptional) + `ButtonText`(EditAnywhere) → `NativePreConstruct`에서 라벨 자동 반영
+    - `SetButtonText()` 런타임 변경 지원
   - [x] 5개 위젯 BindWidget 타입 `UButton` → `ULastFPSButtonBase` 전환
-    - `MainMenu`(3), `CharacterSelect`(4), `Lobby`(6), `Confirm`(2), `Notice`(1)
+    - `MainMenu`(3), `CharacterSelect`(4), `Lobby`(5), `Confirm`(2), `Notice`(1)
   - [x] 바인딩 방식 `OnClicked.AddDynamic` → `OnClicked().AddUObject` 전환, 빌드 검증 완료
-  - [ ] **에디터 작업 남음** ⚠️ — 각 WBP의 `Button` 위젯을 `ULastFPSButtonBase` 기반 위젯으로 교체해야 실제 연결됨
-    - `BindWidgetOptional`이라 크래시는 없으나, 교체 전까지 해당 버튼 null → 클릭 무동작
-    - 권장: `WBP_LastFPSButton`(ULastFPSButtonBase 상속) 1개 제작 후 5개 WBP에서 버튼 교체
+  - [x] `WBP_LastFPSButton` 신설 + WBP 5종 버튼 전부 교체 (`MainMenu`/`CharacterSelect`/`Confirm`/`Notice`/`Lobby`)
+  - > PIE 실물 클릭/포커스 내비게이션 검증 권장
 
 - [x] **공통 팝업 베이스 (Confirm / Notice)**
   - `LastFPSModalDialogBase` → `LastFPSConfirmWidget`, `LastFPSNoticeWidget`
@@ -79,11 +87,11 @@
   - > 인게임 캐릭터 구현 완료 후 진행
 
 - [x] **로비 화면** (`LastFPSLobbyWidget`) — Game Layer
-  - `TB_PlayerName`, `Button_StartMatch`, `Button_Inventory`, `Button_Missions`
-  - `Button_Shop`, `Button_Settings`, `Button_BackToMain`
+  - `TB_PlayerName`, `Button_Inventory`, `Button_Missions`, `Button_Shop`, `Button_Settings`, `Button_BackToMain`
+  - > **출격(`Button_StartMatch`) 제거됨** — 매치 개념 없음. 미션 진입은 별도 경로(허브 NPC/미션보드)
   - 미구현 버튼 클릭 시 "준비 중" 공지 표시
-  - `PlayerController.bPushHubOnBeginPlay = true` → HubMap 진입 시 자동 표시
-  - **에디터 작업**: `WBP_Lobby` 생성 → `BP_PC_Hub`에 `HubWidgetClass` 할당
+  - `PlayerController.bPushHubOnBeginPlay = true` → HubMap 진입 시 `Layer_Game`에 자동 푸시 (`LastFPSPlayerController.cpp:256`)
+  - [x] **에디터 작업 완료**: `WBP_Lobby` 5버튼 구성 + `BP_PC_Hub`에 `HubWidgetClass` 할당
 
 - [ ] **설정 화면** ⬜
   - 그래픽 / 사운드 / 입력 3탭
@@ -144,10 +152,12 @@
 - [ ] **퀘스트 목록 UI** ⬜ — 진행중 / 완료 탭
 - [ ] **HUD 퀘스트 트래커** ⬜ — 현재 목표 1~3개
 
-### 3-3. 파티 / 매칭
+### 3-3. 파티 / 매칭 — ❌ 보류 (매치 개념 부재)
 
-- [ ] **파티 UI** ⬜ — 파티원 슬롯 (최대 4인)
-- [ ] **매칭 UI** ⬜ — `IOnlineSession` 연동 설계 선행 필요
+> "매치" 개념 자체가 없음 → 매칭 UI 제외. 4인 협동 파티/세션 연동 존속 여부 미확정.
+
+- [~] ~~**파티 UI** — 파티원 슬롯 (최대 4인)~~ → 존속 여부 재검토 필요
+- [x] ~~**매칭 UI** — `IOnlineSession` 연동~~ → **제외**
 
 ### 3-4. 제작
 
@@ -157,10 +167,9 @@
 
 ## Phase 4 — 피니시
 
-- [ ] **매치 결과 화면** 🔨
-  - `PlayerState` 통계 이미 수집 중 (킬/뎃/어시스트/힐/딜)
-  - `WBP_Scoreboard` / `WBP_ScoreRow` 에디터에 존재하나 C++ 백킹 없음 → `ULastFPSScoreboardWidget` + `ULastFPSScoreRowWidget` 신설 필요
-  - PlayerState 배열 바인딩 + `UListView` row 위젯 연동
+- [x] ~~**매치 결과 화면 / 스코어보드**~~ → ❌ **설계 제외 (매치 개념 부재)**
+  - 매치(MVP·통계 결과) 화면 안 만듦. `WBP_Scoreboard` / `WBP_ScoreRow`는 사용 안 함 → 정리 대상
+  - `PlayerState` 통계 필드(킬/뎃/어시스트/힐/딜)는 다른 용도(계승자 성장 등)로 재활용 검토 가능
 
 - [ ] **상점 (유료 / 무료)** ⬜
 - [ ] **시즌 패스** ⬜
@@ -172,8 +181,8 @@
 
 ### 즉시 처리
 
-- [x] **`UCommonButtonBase` 교체 — C++ 완료** | 남은 작업: 에디터 WBP 버튼 교체
-  - `ULastFPSButtonBase` 신설, 5개 위젯 전환 완료 (Phase 1-1 참고)
+- [x] **`UCommonButtonBase` 교체 — 완료** ✅
+  - `ULastFPSButtonBase` 신설 + 5개 위젯 전환 + WBP 5종 전부 교체 (Phase 1-1 참고)
 
 - [ ] **`ULastFPSCharacterDefinition` DataAsset 신설** | 난이도: 중
   - 통합 대상: `CharacterNames[]` (위젯), `SelectableCharacterClasses[]` (PC), `CharacterPawnClasses[]` (GameMode)
@@ -202,13 +211,12 @@
 
 ```
 [지금 당장]
-  UCommonButtonBase 교체 (하, 2~3일)  ← 모든 위젯 입력 라우팅의 선결 과제
   NPC 대화 UI + DataTable (중, 3~5일)  ← NPC 에디터 작업 완료로 즉시 착수 가능
   설정 화면 (중, 5~7일)
 
 [다음 주]
   퀘스트 데이터 구조 + 목록 UI (중, 3~5일)
-  매치 결과 화면 — Scoreboard C++ 신설 (중, 2~3일, 통계 데이터 준비됨)
+  인벤토리 UI 프로토타입 (중, 고정 슬롯 그리드)
 
 [인게임 팀 작업 완료 후]
   CharacterDefinition DataAsset 신설

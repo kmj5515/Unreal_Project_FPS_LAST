@@ -22,10 +22,6 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_PlayerName;
 
-	// ── 주요 액션 ─────────────────────────────────────────────────
-	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<ULastFPSButtonBase> Button_StartMatch;
-
 	// ── 퀵 메뉴 ──────────────────────────────────────────────────
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<ULastFPSButtonBase> Button_Inventory;
@@ -44,7 +40,6 @@ protected:
 	TObjectPtr<ULastFPSButtonBase> Button_BackToMain;
 
 private:
-	UFUNCTION() void HandleStartMatchClicked();
 	UFUNCTION() void HandleInventoryClicked();
 	UFUNCTION() void HandleMissionsClicked();
 	UFUNCTION() void HandleShopClicked();

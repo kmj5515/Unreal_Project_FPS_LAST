@@ -19,7 +19,6 @@ void ULastFPSLobbyWidget::NativeConstruct()
 		}
 	}
 
-	if (Button_StartMatch)  Button_StartMatch->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleStartMatchClicked);
 	if (Button_Inventory)   Button_Inventory->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleInventoryClicked);
 	if (Button_Missions)    Button_Missions->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleMissionsClicked);
 	if (Button_Shop)        Button_Shop->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleShopClicked);
@@ -27,7 +26,6 @@ void ULastFPSLobbyWidget::NativeConstruct()
 	if (Button_BackToMain)  Button_BackToMain->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleBackToMainClicked);
 }
 
-void ULastFPSLobbyWidget::HandleStartMatchClicked()  { ShowWIPNotice(NSLOCTEXT("LastFPS", "Lobby_StartMatch", "매칭")); }
 void ULastFPSLobbyWidget::HandleInventoryClicked()   { ShowWIPNotice(NSLOCTEXT("LastFPS", "Lobby_Inventory", "인벤토리")); }
 void ULastFPSLobbyWidget::HandleMissionsClicked()    { ShowWIPNotice(NSLOCTEXT("LastFPS", "Lobby_Missions", "임무")); }
 void ULastFPSLobbyWidget::HandleShopClicked()        { ShowWIPNotice(NSLOCTEXT("LastFPS", "Lobby_Shop", "상점")); }
