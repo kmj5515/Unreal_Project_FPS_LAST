@@ -10,7 +10,7 @@ class UImage;
 /**
  * NPC 머리 위 3D 플로팅 마커 (WidgetComponent에 할당)
  * - 이름 / 역할 항상 표시
- * - 플레이어가 범위 안에 들어오면 "[F] 대화" 힌트 표시
+ * - 플레이어가 범위 안에 들어오면 "[G] 대화" 힌트 표시
  */
 UCLASS()
 class LASTFPS_API ULastFPSNPCMarkerWidget : public UUserWidget
@@ -37,7 +37,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_NPCRole;
 
-	/** "[F] 대화" 힌트 루트 — Visibility로 전체 토글 */
+	/** "[G] 대화" 힌트 루트 — Visibility로 전체 토글 */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UWidget> InteractionHint;
 

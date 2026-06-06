@@ -3,6 +3,7 @@
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
 #include "UI/LastFPSButtonBase.h"
+#include "UI/LastFPSUITags.h"
 
 #include "Components/TextBlock.h"
 #include "GameFramework/PlayerState.h"
@@ -26,10 +27,10 @@ void ULastFPSLobbyWidget::NativeConstruct()
 	if (Button_BackToMain)  Button_BackToMain->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleBackToMainClicked);
 }
 
-void ULastFPSLobbyWidget::HandleInventoryClicked()   { ShowWIPNotice(NSLOCTEXT("LastFPS", "Lobby_Inventory", "인벤토리")); }
-void ULastFPSLobbyWidget::HandleMissionsClicked()    { ShowWIPNotice(NSLOCTEXT("LastFPS", "Lobby_Missions", "임무")); }
-void ULastFPSLobbyWidget::HandleShopClicked()        { ShowWIPNotice(NSLOCTEXT("LastFPS", "Lobby_Shop", "상점")); }
-void ULastFPSLobbyWidget::HandleSettingsClicked()    { ShowWIPNotice(NSLOCTEXT("LastFPS", "Lobby_Settings", "설정")); }
+void ULastFPSLobbyWidget::HandleInventoryClicked()   { OpenScreenOrNotice(LastFPSUITags::Screen_Inventory(), NSLOCTEXT("LastFPS", "Lobby_Inventory", "인벤토리")); }
+void ULastFPSLobbyWidget::HandleMissionsClicked()    { OpenScreenOrNotice(LastFPSUITags::Screen_Mission(),   NSLOCTEXT("LastFPS", "Lobby_Missions", "임무")); }
+void ULastFPSLobbyWidget::HandleShopClicked()        { OpenScreenOrNotice(LastFPSUITags::Screen_Shop(),      NSLOCTEXT("LastFPS", "Lobby_Shop", "상점")); }
+void ULastFPSLobbyWidget::HandleSettingsClicked()    { OpenScreenOrNotice(LastFPSUITags::Screen_Settings(),  NSLOCTEXT("LastFPS", "Lobby_Settings", "설정")); }
 
 void ULastFPSLobbyWidget::HandleBackToMainClicked()
 {
@@ -39,12 +40,22 @@ void ULastFPSLobbyWidget::HandleBackToMainClicked()
 	}
 }
 
-void ULastFPSLobbyWidget::ShowWIPNotice(const FText& FeatureName)
+void ULastFPSLobbyWidget::OpenScreenOrNotice(const FGameplayTag& ScreenTag, const FText& FeatureName)
 {
-	if (ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>())
+	ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>();
+	if (!PC)
 	{
-		PC->ShowNotice(
-			FeatureName,
-			FText::Format(NSLOCTEXT("LastFPS", "Lobby_WIP", "{0} 기능은 준비 중입니다."), FeatureName));
+		return;
 	}
+
+	// 레지스트리에 등록돼 있으면 그 화면을 연다.
+	if (PC->OpenScreen(ScreenTag))
+	{
+		return;
+	}
+
+	// 아직 없으면 "준비 중" 공지로 폴백.
+	PC->ShowNotice(
+		FeatureName,
+		FText::Format(NSLOCTEXT("LastFPS", "Lobby_WIP", "{0} 기능은 준비 중입니다."), FeatureName));
 }

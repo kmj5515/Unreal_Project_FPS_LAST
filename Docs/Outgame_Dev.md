@@ -13,7 +13,7 @@
 >
 > **최근 변경 (06-04)**
 > - `BP_NPC_Quartermaster`, `WBP_NPCMarker` 에디터 작업 완료 → Phase 3-1 NPC 상호작용 실제 배치 가능
-> - 고아 BP 정리: `BP_CharacterSelect_PlayerController`, `BP_MainMenu_LastFPS_PlayerController` 삭제 (`1c522b5`)
+> - ~~고아 BP 정리: `BP_CharacterSelect_PlayerController`, `BP_MainMenu_LastFPS_PlayerController` 삭제 (`1c522b5`)~~ **[06-06 정정] 실제로는 삭제 안 됨 — 둘 다 존재하며 각 GameMode가 실사용 중. 현황은 `Outgame_Refactor_Roadmap.md` 0-2 참고**
 > - `WBP_Scoreboard` / `WBP_ScoreRow` 존재 확인 — C++ 백킹(`ULastFPSScoreboardWidget`) 미구현 BP 전용
 
 ---
@@ -33,11 +33,13 @@
 
 > 작업 전 확인 필요
 
-- [ ] **`BP_PC_Hub` WASD 이동 불가** ⚠️
-  - 원인: `WBP_Lobby`(LobbyWidget)가 활성화될 때 CommonUI가 입력 모드를 `ECommonInputMode::Menu`로 강제 전환
-  - 로그: `LogUIActionRouter: InputMode → ECommonInputMode::Menu`
-  - 해결 방향: `ULastFPSLobbyWidget::GetDesiredInputConfig()` 오버라이드 → `ECommonInputMode::Game` 반환
-  - > 의도적으로 롤백됨 — 추후 적용 여부 결정 필요
+- [x] **`BP_PC_Hub` WASD 이동 불가** — 해결 (원안 방식: 로비 메뉴 = 온디맨드)
+  - 원인: `WBP_Lobby`가 허브 진입 시 **Game 레이어에 상시 push**되어 있었고, 메뉴 성격 위젯이라 CommonUI가 입력 모드를 `Menu`로 잡아 WASD가 막힘.
+  - 해결: 자동 push 제거. `bEnableHubMenu`(구 `bPushHubOnBeginPlay`, CoreRedirect로 값 보존) 켜진 컨트롤러에서 **ESC로 토글**.
+    - 열기: 허브는 Game 모드 → ESC가 PC에 도달 → `OpenHubMenu()`가 로비를 **Menu 레이어**에 push.
+    - 닫기: 로비는 Menu 모드 → ESC가 CommonUI Back으로 소비 → `bIsBackHandler`가 pop. (PC까지 안 와서 재오픈 충돌 없음)
+  - `GetDesiredInputConfig()` 오버라이드는 **불필요** — 메뉴를 띄울 때만 Menu 모드가 되는 게 정상 동작이므로 시스템 기본 흐름을 그대로 사용.
+  - ⚠️ PIE에서 ESC는 세션을 멈추므로, 토글 테스트는 Standalone 또는 PIE의 ESC 키 설정 해제 후 확인.
 
 ---
 

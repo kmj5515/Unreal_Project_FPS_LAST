@@ -1,6 +1,7 @@
 #pragma once
 
 #include "UI/LastFPSActivatableWidget.h"
+#include "GameplayTagContainer.h"
 #include "LastFPSLobbyWidget.generated.h"
 
 class ULastFPSButtonBase;
@@ -46,5 +47,6 @@ private:
 	UFUNCTION() void HandleSettingsClicked();
 	UFUNCTION() void HandleBackToMainClicked();
 
-	void ShowWIPNotice(const FText& FeatureName);
+	/** 화면을 연다. 레지스트리에 없으면 "준비 중" 공지로 폴백. */
+	void OpenScreenOrNotice(const FGameplayTag& ScreenTag, const FText& FeatureName);
 };

@@ -28,8 +28,7 @@ void ULastFPSMainMenuWidget::HandleStartClicked()
 {
 	if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
 	{
-		// [임시] 캐릭터 선택 미구현 — Hub 직행
-		GI->RequestTravelToHub();
+		GI->RequestTravelToCharacterSelect();
 	}
 }
 

@@ -1,15 +1,15 @@
 #include "Game/LastFPSPlayerController.h"
 
-#include "UI/LastFPSCharacterSelectWidget.h"
 #include "Hub/ILastFPSInteractable.h"
-#include "UI/LastFPSLobbyWidget.h"
 #include "UI/LastFPSHUDWidget.h"
-#include "UI/LastFPSMainMenuWidget.h"
 #include "UI/LastFPSNoticeWidget.h"
+#include "UI/LastFPSUIManagerSubsystem.h"
 #include "UI/LastFPSUITags.h"
 
+#include "CommonActivatableWidget.h"
 #include "Engine/World.h"
 #include "Game/LastFPSGameInstance.h"
+#include "Game/LastFPSGameModeBase.h"
 #include "Game/LastFPSPlayerState.h"
 #include "InputCoreTypes.h"
 #include "Net/UnrealNetwork.h"
@@ -52,25 +52,13 @@ void ALastFPSPlayerController::BeginPlay()
         return;
     }
 
-    if (bPushMainMenuOnBeginPlay)
-    {
-        TryPushMainMenuToUILayout();
-    }
-
-    if (bPushCharacterSelectOnBeginPlay)
-    {
-        TryPushCharacterSelectToUILayout();
-    }
-
-    if (bPushHubOnBeginPlay)
-    {
-        TryPushHubToUILayout();
-    }
-
     if (bPushHUDOnBeginPlay)
     {
         TryPushHUDToUILayout();
     }
+
+    CacheUIConfigFromGameMode();
+    OpenInitialScreen();
 
     OnSelectedCharacterIndexChanged(SelectedCharacterIndex);
 }
@@ -79,14 +67,74 @@ void ALastFPSPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     if (UWorld* World = GetWorld())
     {
+        World->GetTimerManager().ClearTimer(InitialScreenRetryTimerHandle);
         World->GetTimerManager().ClearTimer(HUDPushRetryTimerHandle);
-        World->GetTimerManager().ClearTimer(MainMenuPushRetryTimerHandle);
-        World->GetTimerManager().ClearTimer(CharacterSelectPushRetryTimerHandle);
-        World->GetTimerManager().ClearTimer(HubPushRetryTimerHandle);
     }
 
     Super::EndPlay(EndPlayReason);
 }
+
+// ── UI 진입점 (Subsystem에 위임) ─────────────────────────────────────
+
+UCommonActivatableWidget* ALastFPSPlayerController::OpenScreen(FGameplayTag ScreenTag)
+{
+    if (ULastFPSUIManagerSubsystem* UI = ULastFPSUIManagerSubsystem::Get(this))
+    {
+        return UI->OpenScreen(ScreenTag, this);
+    }
+    return nullptr;
+}
+
+void ALastFPSPlayerController::CloseScreen(FGameplayTag ScreenTag)
+{
+    if (ULastFPSUIManagerSubsystem* UI = ULastFPSUIManagerSubsystem::Get(this))
+    {
+        UI->CloseScreen(ScreenTag);
+    }
+}
+
+void ALastFPSPlayerController::CacheUIConfigFromGameMode()
+{
+    // "어떤 화면을 띄울지"는 맵 규칙이라 GameMode가 소유 → 여기서 읽어와 캐시.
+    // (네트워크 클라이언트는 GetAuthGameMode가 null → 태그 비어 동작 안 함. standalone/호스트 OK.
+    //  완전 네트워크 대응은 GameState 복제로 추후. TODO)
+    if (const UWorld* World = GetWorld())
+    {
+        if (const ALastFPSGameModeBase* GM = World->GetAuthGameMode<ALastFPSGameModeBase>())
+        {
+            InitialScreenTag = GM->GetInitialScreenTag();
+            EscMenuScreenTag = GM->GetEscMenuScreenTag();
+        }
+    }
+}
+
+void ALastFPSPlayerController::OpenInitialScreen()
+{
+    if (!InitialScreenTag.IsValid())
+    {
+        return;
+    }
+
+    // PrimaryGameLayout이 준비돼야 push 가능 → 준비될 때까지 재시도.
+    if (UPrimaryGameLayout::GetPrimaryGameLayout(this))
+    {
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().ClearTimer(InitialScreenRetryTimerHandle);
+        }
+        OpenScreen(InitialScreenTag);
+        return;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().SetTimer(
+            InitialScreenRetryTimerHandle, this,
+            &ALastFPSPlayerController::OpenInitialScreen, 0.1f, true);
+    }
+}
+
+// ── HUD (인게임 팀 영역 — 휴면) ─────────────────────────────────────
 
 void ALastFPSPlayerController::TryPushHUDToUILayout()
 {
@@ -102,10 +150,8 @@ void ALastFPSPlayerController::TryPushHUDToUILayout()
         {
             World->GetTimerManager().SetTimer(
                 HUDPushRetryTimerHandle,
-                this,
-                &ALastFPSPlayerController::RetryPushHUDToUILayout,
-                0.1f,
-                true);
+                FTimerDelegate::CreateWeakLambda(this, [this]() { TryPushHUDToUILayout(); }),
+                0.1f, true);
         }
         return;
     }
@@ -116,170 +162,31 @@ void ALastFPSPlayerController::TryPushHUDToUILayout()
     }
 
     HUDWidget = RootLayout->PushWidgetToLayerStack<ULastFPSHUDWidget>(
-        LastFPSUITags::Layer_Game(),
-        HUDWidgetClass);
-
-    if (HUDWidget)
-    {
-        bHUDWidgetPushed = true;
-    }
-    else
-    {
-        UE_LOG(LogLastFPSPlayerController, Error, TEXT("Failed to push HUD widget to layout"));
-    }
+        LastFPSUITags::Layer_Game(), HUDWidgetClass);
+    bHUDWidgetPushed = (HUDWidget != nullptr);
 }
 
-void ALastFPSPlayerController::RetryPushHUDToUILayout()
-{
-    TryPushHUDToUILayout();
-}
-
-void ALastFPSPlayerController::TryPushMainMenuToUILayout()
-{
-    if (bMainMenuWidgetPushed || !MainMenuWidgetClass)
-    {
-        return;
-    }
-
-    UPrimaryGameLayout* RootLayout = UPrimaryGameLayout::GetPrimaryGameLayout(this);
-    if (!RootLayout)
-    {
-        if (UWorld* World = GetWorld())
-        {
-            World->GetTimerManager().SetTimer(
-                MainMenuPushRetryTimerHandle,
-                this,
-                &ALastFPSPlayerController::RetryPushMainMenuToUILayout,
-                0.1f,
-                true);
-        }
-        return;
-    }
-
-    if (UWorld* World = GetWorld())
-    {
-        World->GetTimerManager().ClearTimer(MainMenuPushRetryTimerHandle);
-    }
-
-    MainMenuWidget = RootLayout->PushWidgetToLayerStack<ULastFPSMainMenuWidget>(
-        LastFPSUITags::Layer_Menu(),
-        MainMenuWidgetClass);
-
-    if (MainMenuWidget)
-    {
-        bMainMenuWidgetPushed = true;
-    }
-    else
-    {
-        UE_LOG(LogLastFPSPlayerController, Error, TEXT("Failed to push main menu widget to layout"));
-    }
-}
-
-void ALastFPSPlayerController::RetryPushMainMenuToUILayout()
-{
-    TryPushMainMenuToUILayout();
-}
-
-void ALastFPSPlayerController::TryPushCharacterSelectToUILayout()
-{
-    if (bCharacterSelectWidgetPushed || !CharacterSelectWidgetClass)
-    {
-        return;
-    }
-
-    UPrimaryGameLayout* RootLayout = UPrimaryGameLayout::GetPrimaryGameLayout(this);
-    if (!RootLayout)
-    {
-        if (UWorld* World = GetWorld())
-        {
-            World->GetTimerManager().SetTimer(
-                CharacterSelectPushRetryTimerHandle,
-                this,
-                &ALastFPSPlayerController::RetryPushCharacterSelectToUILayout,
-                0.1f,
-                true);
-        }
-        return;
-    }
-
-    if (UWorld* World = GetWorld())
-    {
-        World->GetTimerManager().ClearTimer(CharacterSelectPushRetryTimerHandle);
-    }
-
-    CharacterSelectWidget = RootLayout->PushWidgetToLayerStack<ULastFPSCharacterSelectWidget>(
-        LastFPSUITags::Layer_Menu(),
-        CharacterSelectWidgetClass);
-
-    if (CharacterSelectWidget)
-    {
-        bCharacterSelectWidgetPushed = true;
-    }
-    else
-    {
-        UE_LOG(LogLastFPSPlayerController, Error, TEXT("Failed to push CharacterSelect widget to layout"));
-    }
-}
-
-void ALastFPSPlayerController::RetryPushCharacterSelectToUILayout()
-{
-    TryPushCharacterSelectToUILayout();
-}
-
-void ALastFPSPlayerController::TryPushHubToUILayout()
-{
-    if (bHubWidgetPushed || !HubWidgetClass)
-    {
-        return;
-    }
-
-    UPrimaryGameLayout* RootLayout = UPrimaryGameLayout::GetPrimaryGameLayout(this);
-    if (!RootLayout)
-    {
-        if (UWorld* World = GetWorld())
-        {
-            World->GetTimerManager().SetTimer(
-                HubPushRetryTimerHandle,
-                this,
-                &ALastFPSPlayerController::RetryPushHubToUILayout,
-                0.1f,
-                true);
-        }
-        return;
-    }
-
-    if (UWorld* World = GetWorld())
-    {
-        World->GetTimerManager().ClearTimer(HubPushRetryTimerHandle);
-    }
-
-    HubWidget = RootLayout->PushWidgetToLayerStack<ULastFPSLobbyWidget>(
-        LastFPSUITags::Layer_Game(),
-        HubWidgetClass);
-
-    if (HubWidget)
-    {
-        bHubWidgetPushed = true;
-    }
-    else
-    {
-        UE_LOG(LogLastFPSPlayerController, Error, TEXT("Failed to push Hub widget to layout"));
-    }
-}
-
-void ALastFPSPlayerController::RetryPushHubToUILayout()
-{
-    TryPushHubToUILayout();
-}
-
-// ── 상호작용 ─────────────────────────────────────────────────────
+// ── 입력 · 상호작용 ──────────────────────────────────────────────────
 
 void ALastFPSPlayerController::SetupInputComponent()
 {
     Super::SetupInputComponent();
     if (InputComponent)
     {
-        InputComponent->BindKey(EKeys::F, IE_Pressed, this, &ALastFPSPlayerController::TryInteract);
+        // 상호작용은 G — F는 캐릭터 Enhanced Input의 궁극기(IA_Ultimate)와 충돌하므로.
+        InputComponent->BindKey(EKeys::G, IE_Pressed, this, &ALastFPSPlayerController::TryInteract);
+
+        // ESC → 설정된 메뉴 화면 열기. 열려 있을 땐 Menu 입력모드라 PC까지 안 오고
+        // CommonUI Back이 받아 닫으므로 같은 키로 토글이 성립한다.
+        InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ALastFPSPlayerController::HandleEscMenu);
+    }
+}
+
+void ALastFPSPlayerController::HandleEscMenu()
+{
+    if (EscMenuScreenTag.IsValid())
+    {
+        OpenScreen(EscMenuScreenTag);
     }
 }
 
@@ -309,6 +216,8 @@ void ALastFPSPlayerController::TryInteract()
         ILastFPSInteractable::Execute_Interact(Actor, this);
     }
 }
+
+// ── 모달 · 공지 ──────────────────────────────────────────────────────
 
 void ALastFPSPlayerController::ShowConfirm(
     const FText& Title,
@@ -340,6 +249,8 @@ void ALastFPSPlayerController::ShowHitMarker()
         HUDWidget->ShowHitMarker();
     }
 }
+
+// ── 캐릭터 선택 ──────────────────────────────────────────────────────
 
 int32 ALastFPSPlayerController::ClampSelectedCharacterIndex(const int32 NewIndex) const
 {

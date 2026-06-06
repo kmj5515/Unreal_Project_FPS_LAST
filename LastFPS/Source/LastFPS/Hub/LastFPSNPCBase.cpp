@@ -64,14 +64,24 @@ FText ALastFPSNPCBase::GetInteractionLabel_Implementation() const
 
 void ALastFPSNPCBase::OnInteract_Implementation(APlayerController* InstigatorPC)
 {
-	if (ALastFPSPlayerController* PC = Cast<ALastFPSPlayerController>(InstigatorPC))
+	ALastFPSPlayerController* PC = Cast<ALastFPSPlayerController>(InstigatorPC);
+	if (!PC)
 	{
-		PC->ShowNotice(
-			DisplayName,
-			FText::Format(
-				NSLOCTEXT("LastFPS", "NPC_DefaultDialog", "{0}(와)과 대화하려면 대화 시스템을 구현해주세요."),
-				DisplayName));
+		return;
 	}
+
+	// 화면이 지정 + 레지스트리에 등록돼 있으면 그 화면을 연다 (상점/임무 NPC 등).
+	if (ScreenToOpen.IsValid() && PC->OpenScreen(ScreenToOpen))
+	{
+		return;
+	}
+
+	// 미지정이거나 아직 미등록 화면 → 대화 공지로 폴백 (조용한 실패 방지).
+	PC->ShowNotice(
+		DisplayName,
+		FText::Format(
+			NSLOCTEXT("LastFPS", "NPC_DefaultDialog", "{0}(와)과 대화하려면 대화 시스템을 구현해주세요."),
+			DisplayName));
 }
 
 // ── 범위 감지 ────────────────────────────────────────────────────

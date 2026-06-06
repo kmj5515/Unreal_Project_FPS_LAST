@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "GameplayTagContainer.h"
 #include "Hub/ILastFPSInteractable.h"
 #include "LastFPSNPCBase.generated.h"
 
@@ -39,9 +40,13 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC")
 	FText NPCRole = NSLOCTEXT("LastFPS", "NPC_DefaultRole", "");
 
-	/** F키 힌트 텍스트. 기본값 "대화" */
+	/** G키 힌트 텍스트. 기본값 "대화" */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC")
 	FText InteractionLabel = NSLOCTEXT("LastFPS", "NPC_DefaultInteract", "대화");
+
+	/** F 상호작용 시 열 화면 태그. 비우면 기본 동작(대화 공지). NPC마다 드롭다운으로 지정. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC", meta=(Categories="UI.Screen"))
+	FGameplayTag ScreenToOpen;
 
 	/** 근접 감지 반경 (cm) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC", meta=(ClampMin="50"))
