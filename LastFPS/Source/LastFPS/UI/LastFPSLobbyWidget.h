@@ -1,74 +1,52 @@
 #pragma once
 
-#include "CoreMinimal.h"
-#include "CommonActivatableWidget.h"
+#include "UI/LastFPSActivatableWidget.h"
+#include "GameplayTagContainer.h"
 #include "LastFPSLobbyWidget.generated.h"
 
-class UButton;
+class ULastFPSButtonBase;
 class UTextBlock;
-class APawn;
 
+/**
+ * 아웃게임 로비 화면 — Menu Layer
+ * 버튼 뼈대만 구성. 기능은 각 서브 시스템 구현 후 연결.
+ */
 UCLASS()
-class LASTFPS_API ULastFPSLobbyWidget : public UCommonActivatableWidget
+class LASTFPS_API ULastFPSLobbyWidget : public ULastFPSActivatableWidget
 {
-    GENERATED_BODY()
-
-public:
-    virtual void NativeConstruct() override;
-    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
-
-    UFUNCTION(BlueprintCallable, Category="LastFPS|Lobby")
-    void SelectCharacterByIndex(int32 CharacterIndex);
-
-    UFUNCTION(BlueprintPure, Category="LastFPS|Lobby")
-    int32 GetSelectedCharacterIndex() const;
-
-    UFUNCTION(BlueprintPure, Category="LastFPS|Lobby")
-    TArray<TSubclassOf<APawn>> GetSelectableCharacterClasses() const;
-
-    UFUNCTION(BlueprintImplementableEvent, Category="LastFPS|Lobby")
-    void OnSelectedCharacterChanged(TSubclassOf<APawn> SelectedClass, int32 SelectedIndex);
+	GENERATED_BODY()
 
 protected:
-    // WBP_Lobby에서 아래 이름 그대로 만들면 자동 바인딩됨
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-    TObjectPtr<UButton> Button_Ready;
+	virtual void NativeConstruct() override;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-    TObjectPtr<UButton> Button_C1;
+	// ── 플레이어 정보 ─────────────────────────────────────────────
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> TB_PlayerName;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-    TObjectPtr<UButton> Button_C2;
+	// ── 퀵 메뉴 ──────────────────────────────────────────────────
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<ULastFPSButtonBase> Button_Inventory;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-    TObjectPtr<UButton> Button_C3;
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<ULastFPSButtonBase> Button_Missions;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-    TObjectPtr<UTextBlock> Text_Status;
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<ULastFPSButtonBase> Button_Shop;
 
-    UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-    TObjectPtr<UTextBlock> Text_TimeRemaining;
+	// ── 하단 ──────────────────────────────────────────────────────
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<ULastFPSButtonBase> Button_Settings;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<ULastFPSButtonBase> Button_BackToMain;
 
 private:
-    FString BuildPhaseText(bool bTravelTriggered, bool bTeamIntroInProgress, bool bCharacterSelectInProgress) const;
-    FString BuildLobbyStatusText(int32 CurrentPlayers, int32 NeededPlayers, bool bTravelTriggered, bool bTeamIntroInProgress, bool bCharacterSelectInProgress) const;
-    void UpdateRemainingTimeText(bool bCharacterSelectInProgress, int32 RemainingSeconds);
+	UFUNCTION() void HandleInventoryClicked();
+	UFUNCTION() void HandleMissionsClicked();
+	UFUNCTION() void HandleShopClicked();
+	UFUNCTION() void HandleSettingsClicked();
+	UFUNCTION() void HandleBackToMainClicked();
 
-    UFUNCTION()
-    void HandleReadyClicked();
-
-    UFUNCTION()
-    void HandleCharacter1Clicked();
-
-    UFUNCTION()
-    void HandleCharacter2Clicked();
-
-    UFUNCTION()
-    void HandleCharacter3Clicked();
-
-    void UpdateStatusText(const FString& InText);
-
-    bool bIsReady = false;
-    int32 CachedSelectedCharacterIndex = INDEX_NONE;
+	/** 화면을 연다. 레지스트리에 없으면 "준비 중" 공지로 폴백. */
+	void OpenScreenOrNotice(const FGameplayTag& ScreenTag, const FText& FeatureName);
 };
-

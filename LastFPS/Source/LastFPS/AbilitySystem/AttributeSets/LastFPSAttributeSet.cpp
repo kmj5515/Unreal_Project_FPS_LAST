@@ -5,7 +5,6 @@
 #include "Character/LastFPSCharacterBase.h"
 #include "Engine/World.h"
 #include "Game/LastFPSPlayerState.h"
-#include "Game/LastFPSMatchGameState.h"
 #include "GameFramework/Pawn.h"
 
 namespace
@@ -131,11 +130,6 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
     {
         AttackerPS->Auth_AddKill();
         AttackerPS->Auth_OnScoredKill(VictimPS);
-
-        if (ALastFPSMatchGameState* MatchGS = GetWorld()->GetGameState<ALastFPSMatchGameState>())
-        {
-            MatchGS->Auth_BroadcastKillFeed(AttackerPS, VictimPS);
-        }
     }
 
     if (!TargetChar)

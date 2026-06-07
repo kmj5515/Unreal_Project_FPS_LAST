@@ -46,10 +46,6 @@ protected:
     void Move(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
     
-    // 네이티브 전용 입력 처리
-    void StartScoreboard();
-    void StopScoreboard();
-
     // 공통 GAS 입력 처리
     void TryActivateAbilityByTag(FGameplayTag AbilityTag);
     void CancelAbilityByTag(FGameplayTag AbilityTag);
@@ -99,15 +95,6 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category="Input")
     TObjectPtr<ULastFPSInputConfig> InputConfig;
-
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|MatchIntro")
-    TObjectPtr<UAnimMontage> MatchIntroMontage;
-
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|MatchIntro")
-    TSubclassOf<UCameraShakeBase> MatchIntroCameraShake;
-
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|MatchIntro")
-    float MatchIntroCameraShakeScale = 1.f;
 
 private:
     bool bIsADS = false;

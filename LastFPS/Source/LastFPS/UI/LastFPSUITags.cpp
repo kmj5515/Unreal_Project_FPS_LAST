@@ -32,4 +32,28 @@ namespace LastFPSUITags
 		static const FGameplayTag Tag = RequestTag(TEXT("UI.Layer.Modal"));
 		return Tag;
 	}
+
+	FGameplayTag Screen_Inventory()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.Inventory"));
+		return Tag;
+	}
+
+	FGameplayTag Screen_Mission()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.Mission"));
+		return Tag;
+	}
+
+	FGameplayTag Screen_Shop()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.Shop"));
+		return Tag;
+	}
+
+	FGameplayTag Screen_Settings()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.Settings"));
+		return Tag;
+	}
 }
