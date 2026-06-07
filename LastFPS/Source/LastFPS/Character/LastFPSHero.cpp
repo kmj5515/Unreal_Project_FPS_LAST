@@ -271,18 +271,6 @@ void ALastFPSHero::OnRep_CombatState()
 {
 }
 
-void ALastFPSHero::StartScoreboard()
-{
-    APlayerController* PC = Cast<APlayerController>(GetController());
-    if (PC) if (ALastFPSHUD* HUD = Cast<ALastFPSHUD>(PC->GetHUD())) HUD->ShowScoreboard();
-}
-
-void ALastFPSHero::StopScoreboard()
-{
-    APlayerController* PC = Cast<APlayerController>(GetController());
-    if (PC) if (ALastFPSHUD* HUD = Cast<ALastFPSHUD>(PC->GetHUD())) HUD->HideScoreboard();
-}
-
 void ALastFPSHero::Multicast_PlayWeaponFireEffects_Implementation()
 {
     if (GetNetMode() == NM_DedicatedServer || IsLocallyControlled()) return;
