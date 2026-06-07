@@ -29,6 +29,7 @@ public:
     FGameplayTag Input_Sprint;
     FGameplayTag Input_ADS;
     FGameplayTag Input_Jump;
+    FGameplayTag Input_Dash;
     FGameplayTag Input_Fire;
     FGameplayTag Input_Reload;
     FGameplayTag Input_Scoreboard;
@@ -39,6 +40,7 @@ public:
     // 어빌리티
     FGameplayTag Ability_Sprint;
     FGameplayTag Ability_Jump;
+    FGameplayTag Ability_Dash;
     FGameplayTag Ability_Fire;
     FGameplayTag Ability_Reload;
     FGameplayTag Ability_Skill1;

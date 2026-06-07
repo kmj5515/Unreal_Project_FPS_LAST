@@ -32,6 +32,7 @@ enum class EMMCombatState : uint8
     Idle    UMETA(DisplayName = "Idle"),
     Attacking   UMETA(DisplayName = "Attacking"),
     Reloading   UMETA(DisplayName = "Reloading"),
+    Dashing     UMETA(DisplayName = "Dashing"),
     
 };
 

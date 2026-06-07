@@ -22,6 +22,7 @@ void FLastFPSTags::InitializeNativeTags()
     Tags.AddTag(Tags.Input_Sprint,      "InputTag.Sprint",      "Sprint input");
     Tags.AddTag(Tags.Input_ADS,         "InputTag.ADS",         "ADS input");
     Tags.AddTag(Tags.Input_Jump,        "InputTag.Jump",        "Jump input");
+    Tags.AddTag(Tags.Input_Dash,        "InputTag.Dash",        "Dash input");
     Tags.AddTag(Tags.Input_Fire,        "InputTag.Fire",        "Fire input");
     Tags.AddTag(Tags.Input_Reload,      "InputTag.Reload",      "Reload input");
     Tags.AddTag(Tags.Input_Scoreboard,  "InputTag.Scoreboard",  "Scoreboard input");
@@ -32,6 +33,7 @@ void FLastFPSTags::InitializeNativeTags()
     // 어빌리티
     Tags.AddTag(Tags.Ability_Sprint,   "Ability.Sprint",   "Sprint ability");
     Tags.AddTag(Tags.Ability_Jump,     "Ability.Jump",     "Jump ability");
+    Tags.AddTag(Tags.Ability_Dash,     "Ability.Dash",     "Dash ability");
     Tags.AddTag(Tags.Ability_Fire,     "Ability.Fire",     "Fire ability");
     Tags.AddTag(Tags.Ability_Reload,   "Ability.Reload",   "Reload ability");
     Tags.AddTag(Tags.Ability_Skill1,   "Ability.Skill1",   "Skill 1 ability");
