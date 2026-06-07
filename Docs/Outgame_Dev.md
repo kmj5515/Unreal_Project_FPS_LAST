@@ -72,7 +72,9 @@
   - 버튼 → `OpenScreenOrNotice` (등록 화면 열기, 미등록이면 "준비 중" 공지)
   - > 출격 버튼 제거됨 — 미션 진입은 NPC/미션보드 별도 경로
 
-- [ ] **설정 화면** ⬜ → `WBP_Settings`(`ContentScreenWidget` 상속) + `UI.Screen.Settings` (그래픽/사운드/입력, `GameUserSettings`)
+- [x] **설정 화면 라우팅** ✅ → `WBP_Settings`(`ContentScreenWidget` 상속) + `UI.Screen.Settings` 등록, 허브/메인메뉴 진입 작동 확인
+  - 허브 Settings 버튼 `OpenScreenOrNotice` / 메인메뉴 `HandleSettingsClicked` → `OpenScreen(Screen_Settings())` (미등록 시 공지 폴백)
+  - [ ] **설정 기능 구현** ⬜ — `GameUserSettings` 연동 (그래픽 품질/해상도, 사운드 볼륨, 입력 감도) + Apply/Revert
 
 ---
 
@@ -143,9 +145,14 @@
 ## 개발 순서 가이드
 
 ```
-[지금 당장 — 콘텐츠 양산 (시스템 완성됨, 화면만 찍으면 됨)]
-  WBP_Shop  + UI.Screen.Shop  등록  → Quartermaster(G) 검증   (중, 2~3일)
-  WBP_Settings + UI.Screen.Settings → 로비/메인메뉴 설정 버튼  (중, 5~7일)
+[완료]
+  ✅ WBP_Shop + UI.Screen.Shop 등록 → Quartermaster(G)/허브 Shop 버튼 작동 확인
+  ✅ WBP_Settings + UI.Screen.Settings 등록 → 허브/메인메뉴 설정 버튼 라우팅 작동 확인
+     (남음: GameUserSettings 실제 기능 — 그래픽/사운드/입력 연동)
+
+[지금 당장]
+  NPC 대화 UI + 대화 DataTable
+  퀘스트 데이터 구조 + 목록 UI
 
 [다음]
   NPC 대화 UI + DataTable

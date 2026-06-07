@@ -3,6 +3,7 @@
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
 #include "UI/LastFPSButtonBase.h"
+#include "UI/LastFPSUITags.h"
 
 #include "Kismet/KismetSystemLibrary.h"
 
@@ -36,9 +37,13 @@ void ULastFPSMainMenuWidget::HandleSettingsClicked()
 {
 	if (ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>())
 	{
-		PC->ShowNotice(
-			NSLOCTEXT("LastFPS", "SettingsNoticeTitle", "설정"),
-			NSLOCTEXT("LastFPS", "SettingsNoticeBody", "설정 화면은 준비 중입니다."));
+		// 등록 시 설정 화면 오픈, 미등록이면 OpenScreen이 nullptr 반환 → 준비 중 공지 폴백.
+		if (!PC->OpenScreen(LastFPSUITags::Screen_Settings()))
+		{
+			PC->ShowNotice(
+				NSLOCTEXT("LastFPS", "SettingsNoticeTitle", "설정"),
+				NSLOCTEXT("LastFPS", "SettingsNoticeBody", "설정 화면은 준비 중입니다."));
+		}
 	}
 }
 
