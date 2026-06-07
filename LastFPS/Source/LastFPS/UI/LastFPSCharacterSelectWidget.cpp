@@ -4,6 +4,7 @@
 #include "UI/LastFPSButtonBase.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
+#include "Game/LastFPSCharacterDefinition.h"
 
 #include "Components/TextBlock.h"
 
@@ -45,15 +46,16 @@ void ULastFPSCharacterSelectWidget::OnSelectionChanged_Implementation(int32 NewI
 		}
 	}
 
+	const ULastFPSCharacterDefinition* Def =
+		CharacterDefinitions.IsValidIndex(NewIndex) ? CharacterDefinitions[NewIndex] : nullptr;
+
 	if (TB_CharName)
 	{
-		TB_CharName->SetText(
-			CharacterNames.IsValidIndex(NewIndex) ? CharacterNames[NewIndex] : FText::GetEmpty());
+		TB_CharName->SetText(Def ? Def->DisplayName : FText::GetEmpty());
 	}
 	if (TB_CharRole)
 	{
-		TB_CharRole->SetText(
-			CharacterRoles.IsValidIndex(NewIndex) ? CharacterRoles[NewIndex] : FText::GetEmpty());
+		TB_CharRole->SetText(Def ? Def->Role : FText::GetEmpty());
 	}
 
 	if (Button_Prev)

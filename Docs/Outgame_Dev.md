@@ -8,7 +8,11 @@
 
 > **UI 시스템 문서** — 구조/사용법 → [`UI_System.md`](UI_System.md)
 
-> **최근 변경 (06-07) — NPC 대화 UI 완료** (인게임 작동 확인)
+> **최근 변경 (06-07) — 캐릭터 정의 DataAsset**: `ULastFPSCharacterDefinition`(UPrimaryDataAsset) 신설, 캐릭터 선택창의 이름/역할 위젯 직박 배열을 DataAsset 참조(`CharacterDefinitions[]`)로 교체. PawnClass 필드는 정의에 포함하되 스폰 경로엔 아직 미연결(인게임 팀 폰 준비 후).
+>
+> **이전 변경 (06-07) — 빌드 복구**: 삭제된 `ALastFPSHUD`를 참조하던 잔재 코드(`ALastFPSHero::StartScoreboard`/`StopScoreboard`) 제거 → 에디터 컴파일/실행 정상화. 스코어보드는 설계상 제외(매치 개념 부재)이며 호출부도 이미 주석 처리 상태였음.
+>
+> **이전 변경 (06-07) — NPC 대화 UI 완료** (인게임 작동 확인)
 > - 단방향 대화 시스템 — `FLastFPSDialogueData`(DataTable 행) + `ULastFPSDialogueWidget`(Modal) + `NPC.DialogueRow` + `PC.ShowDialogue`
 > - NPC `OnInteract` 폴백 3단: **화면(`ScreenToOpen`) → 대화행(`DialogueRow`) → 공지**
 > - 에디터: `WBP_Dialogue` + `DT_DialogueData` + PC `DialogueWidgetClass` 지정 + 테스트 NPC(`BP_NPC_A`/`BP_NPC_B`) 배치, G키 대화 작동 확인
@@ -52,12 +56,12 @@
 - [x] **메인메뉴** (`LastFPSMainMenuWidget`)
   - Start → **캐릭터 선택** (`RequestTravelToCharacterSelect`)
   - Quit → Confirm 팝업 → 종료
-  - [ ] Settings 버튼 → `UI.Screen.Settings` 연결 (화면 제작 후)
+  - [x] Settings 버튼 → `UI.Screen.Settings` 연결 ✅ (06-07) — 메인메뉴 진입 작동 확인
 
 - [ ] **캐릭터 선택창 고도화** 🔨
   - [x] `LastFPSCharacterSelectWidget` — 3카드 선택, Confirm/Back
   - [x] `LastFPSCharacterCardWidget` — `SetSelected(bool)`
-  - [ ] `CharacterNames`/`CharacterRoles` 위젯 직박 → DataAsset 연동 (인게임 팀 작업 후)
+  - [x] `CharacterNames`/`CharacterRoles` 위젯 직박 → **DataAsset 연동** ✅ (06-07) — `ULastFPSCharacterDefinition`(DataAsset) 신설, 위젯 `CharacterDefinitions[]`가 이름/역할 표시. 에디터 연동 완료(`DA_Char_0~2` 생성 + `WBP_CharacterSelect` 배열 지정). PawnClass는 인게임 팀 폰 준비 후
 
 - [x] **허브 메뉴** (`LastFPSLobbyWidget` = `WBP_Hub`) — **Menu 레이어 / 온디맨드**
   - `TB_PlayerName`, Inventory/Missions/Shop/Settings/BackToMain 버튼
@@ -75,7 +79,7 @@
 
 ### 2-1. 캐릭터(계승자) 관리
 > 인게임 팀 작업 완료 후 진행
-- [ ] **캐릭터 DataAsset 신설** ⬜ — `ULastFPSCharacterDefinition : UPrimaryDataAsset` (`DisplayName`/`NPCRole`/`PawnClass`/`Icon`/`Description`)
+- [x] **캐릭터 DataAsset 신설** ✅ (06-07) — `ULastFPSCharacterDefinition : UPrimaryDataAsset` (`DisplayName`/`Role`/`Icon`/`Description`/`PawnClass`). 현재 캐릭터 선택창 이름·역할 표시에 사용. PawnClass 스폰 연결은 인게임 팀 폰 준비 후
 - [ ] **계승자 관리 화면** ⬜ — 보유 목록 / 스탯 / 스킨 프리뷰
 - [ ] **아르케 조율 / 성장 시스템** ⬜
 
@@ -121,7 +125,7 @@
 
 ## Phase 4 — 피니시
 
-- [x] ~~**매치 결과 화면 / 스코어보드**~~ → ❌ 설계 제외. `WBP_Scoreboard`/`WBP_ScoreRow` 미사용(안 씀)
+- [x] ~~**매치 결과 화면 / 스코어보드**~~ → ❌ 설계 제외. `WBP_Scoreboard`/`WBP_ScoreRow` 미사용(안 씀). C++ `ALastFPSHUD` 클래스 및 관련 잔재 코드 제거 완료 (06-07)
 - [ ] **상점 (유료 / 무료)** ⬜
 - [ ] **시즌 패스** ⬜ / **도전과제 / 업적** ⬜
 
@@ -134,7 +138,7 @@
 
 ### 남음
 - [ ] **`SelectedCharacterIndex` 단일 소스화** | 난이도: 중 — `PlayerController`·`PlayerState` 양쪽 Replicated 중복. (인게임 팀 협의)
-- [ ] **`ULastFPSCharacterDefinition` DataAsset** | 난이도: 중 — `CharacterNames`(위젯)/`SelectableCharacterClasses`(PC)/`CharacterPawnClasses`(GM) 3중 중복 통합. (인게임 팀 작업 후)
+- [~] **`ULastFPSCharacterDefinition` DataAsset로 3중 중복 통합** | 난이도: 중 — DataAsset 신설 + **위젯 직박(`CharacterNames`/`CharacterRoles`) 제거 완료** ✅ (06-07). 남은 중복: `SelectableCharacterClasses`(PC)/`CharacterPawnClasses`(GM) → 폰 스폰이 PawnClass에 의존하므로 **인게임 팀 폰 준비 후** 통합.
   - ↳ 세트로 `PlayerController.SelectableCharacterClasses` 정리 (현재 **허브 폰도 이 목록[인덱스]로 스폰**됨)
 - [ ] **밸런스 수치 DataAsset화** | 난이도: 하 — `LastFPSPlayerState.h` constexpr
 - [ ] **맵 경로 `/Test/` 제거** | 난이도: 하 — `LastFPSGameInstance` 릴리즈 전
