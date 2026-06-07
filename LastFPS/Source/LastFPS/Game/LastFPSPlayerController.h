@@ -11,6 +11,7 @@ class APawn;
 class UCommonActivatableWidget;
 class ULastFPSHUDWidget;
 class ULastFPSNoticeWidget;
+class ULastFPSDialogueWidget;
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FLastFPSConfirmResultDelegate, bool, bConfirmed);
 
@@ -51,6 +52,10 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
     void ShowNotice(const FText& Title, const FText& Message);
+
+    /** 단방향 NPC 대화창 표시. Lines를 "다음"으로 한 줄씩 진행. */
+    UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
+    void ShowDialogue(const FText& Speaker, const TArray<FText>& Lines);
 
     // ── 상호작용 (NPC) ──────────────────────────────────────────────
 
@@ -95,6 +100,9 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
     TSubclassOf<ULastFPSNoticeWidget> NoticeWidgetClass;
+
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
+    TSubclassOf<ULastFPSDialogueWidget> DialogueWidgetClass;
 
     /** 인게임 HUD (인게임 팀 영역, 현재 휴면) */
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")

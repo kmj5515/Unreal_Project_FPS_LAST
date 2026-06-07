@@ -1,6 +1,7 @@
 #include "Hub/LastFPSNPCBase.h"
 
 #include "Game/LastFPSPlayerController.h"
+#include "Hub/LastFPSDialogueData.h"
 #include "UI/LastFPSNPCMarkerWidget.h"
 
 #include "Components/CapsuleComponent.h"
@@ -70,17 +71,29 @@ void ALastFPSNPCBase::OnInteract_Implementation(APlayerController* InstigatorPC)
 		return;
 	}
 
-	// 화면이 지정 + 레지스트리에 등록돼 있으면 그 화면을 연다 (상점/임무 NPC 등).
+	// 1) 화면이 지정 + 레지스트리에 등록돼 있으면 그 화면을 연다 (상점/임무 NPC 등).
 	if (ScreenToOpen.IsValid() && PC->OpenScreen(ScreenToOpen))
 	{
 		return;
 	}
 
-	// 미지정이거나 아직 미등록 화면 → 대화 공지로 폴백 (조용한 실패 방지).
+	// 2) 대화 행이 지정돼 있으면 단방향 대화창을 띄운다 (일반 NPC).
+	const FLastFPSDialogueData* Dialogue = DialogueRow.IsNull()
+		? nullptr
+		: DialogueRow.GetRow<FLastFPSDialogueData>(TEXT("NPC OnInteract"));
+	if (Dialogue)
+	{
+		// 행에 화자 이름이 없으면 NPC의 DisplayName을 사용.
+		const FText& Speaker = Dialogue->SpeakerName.IsEmpty() ? DisplayName : Dialogue->SpeakerName;
+		PC->ShowDialogue(Speaker, Dialogue->Lines);
+		return;
+	}
+
+	// 3) 화면·대화 모두 미지정 → 공지로 폴백 (조용한 실패 방지).
 	PC->ShowNotice(
 		DisplayName,
 		FText::Format(
-			NSLOCTEXT("LastFPS", "NPC_DefaultDialog", "{0}(와)과 대화하려면 대화 시스템을 구현해주세요."),
+			NSLOCTEXT("LastFPS", "NPC_DefaultDialog", "{0}(와)과 대화 내용이 아직 없습니다."),
 			DisplayName));
 }
 

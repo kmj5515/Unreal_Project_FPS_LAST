@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "GameplayTagContainer.h"
+#include "Engine/DataTable.h"
 #include "Hub/ILastFPSInteractable.h"
 #include "LastFPSNPCBase.generated.h"
 
@@ -15,7 +16,7 @@ class ULastFPSNPCMarkerWidget;
  * 허브 월드 NPC 베이스
  * - 머리 위 3D 마커 (UWidgetComponent)
  * - 근접 감지 구체 (USphereComponent)
- * - 플레이어가 F키를 누르면 Interact() 호출
+ * - 플레이어가 G키를 누르면 Interact() 호출
  * BP에서 상속해 메시 / 이름 / 역할 / 대화 내용 설정
  */
 UCLASS(Blueprintable)
@@ -44,9 +45,13 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC")
 	FText InteractionLabel = NSLOCTEXT("LastFPS", "NPC_DefaultInteract", "대화");
 
-	/** F 상호작용 시 열 화면 태그. 비우면 기본 동작(대화 공지). NPC마다 드롭다운으로 지정. */
+	/** G 상호작용 시 열 화면 태그. 지정 + 등록 시 그 화면을 연다(상점/임무 NPC). 비우면 대화로 폴백. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC", meta=(Categories="UI.Screen"))
 	FGameplayTag ScreenToOpen;
+
+	/** 대화 DataTable 행 (FLastFPSDialogueData). ScreenToOpen 미지정 시 이 대화를 표시. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC", meta=(RowType="/Script/LastFPS.LastFPSDialogueData"))
+	FDataTableRowHandle DialogueRow;
 
 	/** 근접 감지 반경 (cm) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC", meta=(ClampMin="50"))

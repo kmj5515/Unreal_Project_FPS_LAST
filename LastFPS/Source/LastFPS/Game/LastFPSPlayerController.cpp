@@ -3,6 +3,7 @@
 #include "Hub/ILastFPSInteractable.h"
 #include "UI/LastFPSHUDWidget.h"
 #include "UI/LastFPSNoticeWidget.h"
+#include "UI/LastFPSDialogueWidget.h"
 #include "UI/LastFPSUIManagerSubsystem.h"
 #include "UI/LastFPSUITags.h"
 
@@ -239,6 +240,14 @@ void ALastFPSPlayerController::ShowNotice(const FText& Title, const FText& Messa
     if (ULastFPSNoticeWidget* NoticeWidget = PushWidgetToModalLayer<ULastFPSNoticeWidget>(NoticeWidgetClass))
     {
         NoticeWidget->SetupNotice(Title, Message);
+    }
+}
+
+void ALastFPSPlayerController::ShowDialogue(const FText& Speaker, const TArray<FText>& Lines)
+{
+    if (ULastFPSDialogueWidget* DialogueWidget = PushWidgetToModalLayer<ULastFPSDialogueWidget>(DialogueWidgetClass))
+    {
+        DialogueWidget->SetupDialogue(Speaker, Lines);
     }
 }
 

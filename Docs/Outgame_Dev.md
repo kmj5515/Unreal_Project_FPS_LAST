@@ -2,13 +2,18 @@
 
 > 마지막 업데이트: 2026-06-07
 > 기준 브랜치: `kmj-dev-roll`
-> 전체 완성도: **약 30%** (Phase 1 기반 + UI 라우팅 시스템 + PC 통합 완료)
+> 전체 완성도: **약 35%** (Phase 1 기반 + UI 라우팅 + PC 통합 + NPC 대화 시스템 완료)
 
 > **설계 방침** — The First Descendant 참고 PvE 루터슈터지만 **"매치" 개념 없음**: 매치 결과/스코어보드, 로비 출격(StartMatch) **미사용**
 
 > **UI 시스템 문서** — 구조/사용법 → [`UI_System.md`](UI_System.md)
 
-> **최근 변경 (06-07) — UI 라우팅 시스템 + PC 통합** (커밋 `6a68d30`)
+> **최근 변경 (06-07) — NPC 대화 UI 완료** (인게임 작동 확인)
+> - 단방향 대화 시스템 — `FLastFPSDialogueData`(DataTable 행) + `ULastFPSDialogueWidget`(Modal) + `NPC.DialogueRow` + `PC.ShowDialogue`
+> - NPC `OnInteract` 폴백 3단: **화면(`ScreenToOpen`) → 대화행(`DialogueRow`) → 공지**
+> - 에디터: `WBP_Dialogue` + `DT_DialogueData` + PC `DialogueWidgetClass` 지정 + 테스트 NPC(`BP_NPC_A`/`BP_NPC_B`) 배치, G키 대화 작동 확인
+>
+> **이전 변경 (06-07) — UI 라우팅 시스템 + PC 통합** (커밋 `6a68d30`)
 > - **태그 기반 화면 라우팅 신설** — `ScreenRegistry`(DataAsset) + `UIManagerSubsystem.OpenScreen(Tag)`. 화면 추가 = "위젯 + 레지스트리 행 + 태그"(코드 0줄)
 > - **PlayerController 1개로 통합** — 화면별 push 메서드 전멸, 진입/ESC 화면을 GameMode가 결정. 맵별 PC 3종 → `BP_LastFPS_PlayerController` 1개
 > - **허브 메뉴 = 온디맨드** (ESC 토글), **ESC 닫기**는 `ActivatableWidget` 포커스+`NativeOnKeyDown`로 처리
@@ -36,22 +41,10 @@
 ### 1-1. UI 프레임워크
 
 - [x] **GameUIPolicy + Layer Stack**
-  - `LastFPSUIPolicy`, `LastFPSPrimaryGameLayout`, `LastFPSUIManagerSubsystem`
-  - 4계층 (Game / GameMenu / Menu / Modal) C++ 자동 생성
-
 - [x] **CommonActivatableWidget 베이스** — `LastFPSActivatableWidget`
-  - `NativeOnHandleBackAction` + **ESC 닫기 폴백**(활성화 시 포커스 확보 + `NativeOnKeyDown`)
-
 - [x] **태그 기반 화면 라우팅 시스템** ✅ (06-07) → 상세 `UI_System.md`
-  - `ScreenRegistry`(DataAsset) + `ScreenTypes` + `UISettings`(DeveloperSettings)
-  - `UIManagerSubsystem.OpenScreen / CloseScreen / IsScreenOpen`
-  - `ContentScreenWidget` 풀스크린 베이스, `UI.Screen.*` 태그
-  - PlayerController는 `OpenScreen(Tag)` 위임만 (얇은 리모컨)
-
 - [x] **공통 버튼** (`ULastFPSButtonBase : UCommonButtonBase`) — WBP 5종 전환 완료
-
 - [x] **공통 팝업 베이스 (Confirm / Notice)** — `LastFPSModalDialogBase` → Confirm/Notice
-
 - [x] **화면 전환 / 로딩 화면** — `LastFPSGameInstance` Travel System + `LoadingScreenWidget`(이벤트 드리븐)
 
 ### 1-2. 진입 플로우
@@ -106,7 +99,13 @@
   - [x] 에디터: `WBP_NPCMarker` + `BP_NPC_Quartermaster`(`ScreenToOpen=UI.Screen.Shop`)
   - > 추가 NPC: `BP_NPC_Quartermaster` 복제 후 메시/`DisplayName`/`NPCRole`/`ScreenToOpen` 변경
 
-- [ ] **NPC 대화 UI** ⬜ — 대화 텍스트/선택지, NPC별 대화 DataTable
+- [x] **NPC 대화 UI** ✅ (06-07) — 단방향 페이지 대화, 인게임 작동 확인
+  - `FLastFPSDialogueData : FTableRowBase` — `SpeakerName`(비우면 NPC `DisplayName`) + `Lines[]`(페이지). 단방향(분기/선택지 없음)
+  - `ULastFPSDialogueWidget : ULastFPSModalDialogBase` — Modal 레이어, `Button_Next` 페이지 진행 → 마지막에 닫기, ESC/Back은 전체 닫기
+  - `ALastFPSNPCBase.DialogueRow` + `OnInteract` 3단 폴백(**화면 → 대화행 → 공지**)
+  - `PlayerController.ShowDialogue(Speaker, Lines)` + `DialogueWidgetClass`
+  - 에디터: `WBP_Dialogue` + `DT_DialogueData` + 테스트 NPC `BP_NPC_A`/`BP_NPC_B`
+  - > 추가 대화: `DT_DialogueData`에 행 추가 후 NPC `DialogueRow`에 지정 (코드 0줄)
 
 ### 3-2. 미션 / 퀘스트
 - [ ] **퀘스트 데이터 구조** ⬜ — `FLastFPSQuestData : FTableRowBase`
@@ -149,14 +148,12 @@
   ✅ WBP_Shop + UI.Screen.Shop 등록 → Quartermaster(G)/허브 Shop 버튼 작동 확인
   ✅ WBP_Settings + UI.Screen.Settings 등록 → 허브/메인메뉴 설정 버튼 라우팅 작동 확인
      (남음: GameUserSettings 실제 기능 — 그래픽/사운드/입력 연동)
+  ✅ NPC 대화 UI — WBP_Dialogue + DT_DialogueData + 테스트 NPC, G키 대화 작동 확인
 
 [지금 당장]
-  NPC 대화 UI + 대화 DataTable
   퀘스트 데이터 구조 + 목록 UI
 
 [다음]
-  NPC 대화 UI + DataTable
-  퀘스트 데이터 구조 + 목록 UI
   인벤토리 UI 프로토타입 (고정 슬롯 그리드)
 
 [인게임 팀 작업 완료 후]
