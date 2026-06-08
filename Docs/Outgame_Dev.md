@@ -8,7 +8,9 @@
 
 > **UI 시스템 문서** — 구조/사용법 → [`UI_System.md`](UI_System.md)
 
-> **최근 변경 (06-07) — 캐릭터 정의 DataAsset**: `ULastFPSCharacterDefinition`(UPrimaryDataAsset) 신설, 캐릭터 선택창의 이름/역할 위젯 직박 배열을 DataAsset 참조(`CharacterDefinitions[]`)로 교체. PawnClass 필드는 정의에 포함하되 스폰 경로엔 아직 미연결(인게임 팀 폰 준비 후).
+> **최근 변경 (06-08) — 퀘스트 데이터 + 목록 UI (C++)**: `FLastFPSQuestData`(DataTable 행) + `ULastFPSQuestScreenWidget`(임무 화면, `QuestTable` 전수 나열) + `ULastFPSQuestEntryWidget`(행) 신설. 임무 화면=퀘스트 로그로 기존 `UI.Screen.Mission` 태그 재사용(C++ 라우팅/태그 추가 0). 에디터 자산(`DT_QuestData`/`WBP_QuestEntry`/`WBP_Missions`/레지스트리 행)만 만들면 허브 "임무" 버튼이 작동.
+>
+> **이전 변경 (06-07) — 캐릭터 정의 DataAsset**: `ULastFPSCharacterDefinition`(UPrimaryDataAsset) 신설, 캐릭터 선택창의 이름/역할 위젯 직박 배열을 DataAsset 참조(`CharacterDefinitions[]`)로 교체. PawnClass 필드는 정의에 포함하되 스폰 경로엔 아직 미연결(인게임 팀 폰 준비 후).
 >
 > **이전 변경 (06-07) — 빌드 복구**: 삭제된 `ALastFPSHUD`를 참조하던 잔재 코드(`ALastFPSHero::StartScoreboard`/`StopScoreboard`) 제거 → 에디터 컴파일/실행 정상화. 스코어보드는 설계상 제외(매치 개념 부재)이며 호출부도 이미 주석 처리 상태였음.
 >
@@ -112,8 +114,9 @@
   - > 추가 대화: `DT_DialogueData`에 행 추가 후 NPC `DialogueRow`에 지정 (코드 0줄)
 
 ### 3-2. 미션 / 퀘스트
-- [ ] **퀘스트 데이터 구조** ⬜ — `FLastFPSQuestData : FTableRowBase`
-- [ ] **퀘스트 목록 UI** ⬜ / **HUD 퀘스트 트래커** ⬜
+- [x] **퀘스트 데이터 구조** ✅ — `FLastFPSQuestData : FTableRowBase` (`Quest/LastFPSQuestData.h`). 필드: `Title`/`Type`(메인·서브)/`Status`(미시작·진행중·완료)/`Summary`/`Description`/`RewardText`/`Icon`. 진행 추적 서브시스템 없음 — 상태는 행에 직접 명시(프로토)
+- [x] **퀘스트 목록 UI** 🔨 — C++ 완료, 에디터 자산 대기. `ULastFPSQuestScreenWidget : ULastFPSContentScreenWidget`(`QuestTable` 전수 → `EntryWidgetClass` 생성 → `Box_QuestList`에 채움) + `ULastFPSQuestEntryWidget : UUserWidget`(`SetupQuest`/`OnQuestDisplayed`). **임무 화면 = 퀘스트 로그**로 기존 `UI.Screen.Mission` 태그 재사용(허브 "임무" 버튼이 이미 라우팅). > **설계 결정(06-08)**: 당장은 임무=퀘스트일지 **통합**. TFD처럼 출격용 미션 보드와 일지를 나누고 싶어지면, 위젯은 태그를 모르므로(레지스트리가 결정) → `Screen_Quests()` 태그 + 허브 "일지" 버튼 + 레지스트리 행만 추가하면 분리됨(C++ 위젯 수정 불필요). 에디터: `DT_QuestData` + `WBP_QuestEntry`(부모 `QuestEntryWidget`) + `WBP_Missions`(부모 `QuestScreenWidget`, `QuestTable`/`EntryWidgetClass` 지정) + 레지스트리 `UI.Screen.Mission → WBP_Missions` 행
+- [ ] **HUD 퀘스트 트래커** ⬜
 
 ### 3-3. 파티 / 매칭 — ❌ 보류 (매치 개념 부재)
 - [~] ~~파티 UI~~ → 존속 여부 재검토 / [x] ~~매칭 UI~~ → **제외**
@@ -155,7 +158,7 @@
   ✅ NPC 대화 UI — WBP_Dialogue + DT_DialogueData + 테스트 NPC, G키 대화 작동 확인
 
 [지금 당장]
-  퀘스트 데이터 구조 + 목록 UI
+  퀘스트 목록 UI — 에디터 자산 마무리 (DT_QuestData + WBP_QuestEntry + WBP_Missions + 레지스트리 행)
 
 [다음]
   인벤토리 UI 프로토타입 (고정 슬롯 그리드)
