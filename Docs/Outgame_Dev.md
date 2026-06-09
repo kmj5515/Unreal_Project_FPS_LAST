@@ -2,13 +2,13 @@
 
 > 마지막 업데이트: 2026-06-09
 > 기준 브랜치: `kmj-dev-roll`
-> 전체 완성도: **약 40%** (Phase 1 기반 + UI 라우팅 + PC 통합 + NPC 대화 + 퀘스트 목록 + 설정 기능 C++ 완료)
+> 전체 완성도: **약 45%** (Phase 1 완료 + 인벤토리 UI 에디터 완료)
 
 > **설계 방침** — The First Descendant 참고 PvE 루터슈터지만 **"매치" 개념 없음**: 매치 결과/스코어보드, 로비 출격(StartMatch) **미사용**
 
 > **UI 시스템 문서** — 구조/사용법 → [`UI_System.md`](UI_System.md)
 
-> **최근 변경 (06-09) — 인벤토리 UI 프로토타입 C++**: `FLastFPSItemData`(DataTable 행, ItemType/Rarity 열거형 포함) + `ULastFPSItemSlotWidget`(고정 슬롯 1칸, SetupSlot/SetEmpty + OnSlotDisplayed BP훅) + `ULastFPSInventoryWidget`(ULastFPSContentScreenWidget 상속, SlotCount=24 고정 슬롯 그리드, ItemTable → RebuildInventory). 아이콘 로드는 프로토 동기 LoadSynchronous(추후 AsyncLoad 교체). **에디터 작업**: `DT_ItemData` + `WBP_ItemSlot`(부모 `ItemSlotWidget`) + `WBP_Inventory`(부모 `InventoryWidget`, SlotCount/ItemTable/SlotWidgetClass 지정) + 레지스트리 `UI.Screen.Inventory → WBP_Inventory` 행.
+> **최근 변경 (06-09) — 인벤토리 UI 프로토타입 완료**: C++ + 에디터 자산 완료. `FLastFPSItemData` + `ULastFPSItemSlotWidget`(희귀도 색상 C++ 직접 처리, `RarityToColor()`, `Img_Background`/`Img_RarityBorder` 바인딩) + `ULastFPSInventoryWidget`(SlotCount=24 고정 슬롯 그리드). `DT_ItemData` + `WBP_ItemSlot` + `WBP_Inventory` + 레지스트리 `UI.Screen.Inventory` 행 완료 → 허브 "인벤토리" 버튼 작동.
 >
 > **이전 변경 (06-09) — 캐릭터 선택창 버그 수정 + 카드 데이터 표시**: Prev/Next 버튼 항상 비활성 버그 수정(`TotalCount`를 `SelectableCharacterClasses.Num()`→`CharacterDefinitions.Num()`으로). `SetupCard(BlueprintNativeEvent)` 추가로 카드마다 이름/역할 독립 표시. `TB_CharDesc` 바인딩 추가(선택 캐릭터 Description 표시).
 >
@@ -93,7 +93,7 @@
 
 ### 2-2. 장비 / 인벤토리
 - [x] **아이템 DataTable** ✅ (06-09) — `FLastFPSItemData : FTableRowBase` (`ItemName`/`Description`/`Icon`/`ItemType`/`Rarity`/`MaxStackSize`). `ELastFPSItemType`(무기·모듈·소모품·재료) + `ELastFPSItemRarity`(일반·희귀·영웅·전설)
-- [x] **인벤토리 UI** 🔨 (06-09) — C++ 완료. `ULastFPSItemSlotWidget`(SetupSlot/SetEmpty + OnSlotDisplayed BP훅) + `ULastFPSInventoryWidget`(SlotCount=24 고정 슬롯 그리드). **에디터 대기**: `DT_ItemData` + `WBP_ItemSlot` + `WBP_Inventory` + 레지스트리 행
+- [x] **인벤토리 UI** ✅ (06-09) — `ULastFPSItemSlotWidget`(희귀도 색상 C++ 처리, `Img_Background`/`Img_RarityBorder`/`Image_Icon`/`TB_ItemName`/`TB_Rarity`) + `ULastFPSInventoryWidget`(SlotCount=24 고정 슬롯 그리드) + 에디터(`DT_ItemData`/`WBP_ItemSlot`/`WBP_Inventory`/레지스트리 행) 완료
 - [ ] **모듈 시스템 UI** ⬜
 
 ---
@@ -165,10 +165,7 @@
   ✅ 설정 기능 C++ — ULastFPSGameUserSettings + ULastFPSSettingsWidget, WBP_Settings 에디터 완료
      (남음: BP OnAudioSettingsApplied → 사운드 클래스 연결 / OnSensitivityApplied → Input Modifier 연결)
   ✅ 캐릭터 선택창 마무리 — 카드 직접 클릭, Prev/Next 버그 수정, SetupCard, TB_CharDesc
-  ✅ 인벤토리 UI C++ — FLastFPSItemData + ULastFPSItemSlotWidget + ULastFPSInventoryWidget
-
-[지금 당장]
-  인벤토리 에디터 자산 — DT_ItemData + WBP_ItemSlot + WBP_Inventory + 레지스트리 행
+  ✅ 인벤토리 UI — FLastFPSItemData + ULastFPSItemSlotWidget + ULastFPSInventoryWidget + 에디터 자산 완료
 
 [다음]
   HUD 퀘스트 트래커 / 모듈 UI / 상점 UI

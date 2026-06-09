@@ -10,9 +10,12 @@ class UImage;
 
 /**
  * WBP_ItemSlot 의 Parent — 인벤토리 그리드 슬롯 1칸.
- * Designer: Image_Icon / TB_ItemName / TB_Rarity (모두 선택).
- * 희귀도 색상 등 스타일링은 OnSlotDisplayed(BP 이벤트)에서.
- * 비어있는 슬롯은 SetEmpty()로 처리(고정 슬롯 그리드 유지).
+ * Designer 바인딩:
+ *   Img_Background  — 빈 슬롯 배경 (아이템 있으면 Hidden)
+ *   Img_RarityBorder — 희귀도 테두리/배경 (아이템 없으면 Hidden)
+ *   Image_Icon      — 아이템 아이콘
+ *   TB_ItemName     — 아이템 이름
+ *   TB_Rarity       — 희귀도 텍스트
  */
 UCLASS()
 class LASTFPS_API ULastFPSItemSlotWidget : public UUserWidget
@@ -20,22 +23,20 @@ class LASTFPS_API ULastFPSItemSlotWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	/** 아이템 데이터로 슬롯 채우기 */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Inventory")
 	void SetupSlot(const FLastFPSItemData& InItem);
 
-	/** 빈 슬롯으로 초기화 */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Inventory")
 	void SetEmpty();
 
-protected:
-	/** 희귀도 색상·테두리 등 BP 측 스타일링 훅 */
-	UFUNCTION(BlueprintImplementableEvent, Category="LastFPS|Inventory")
-	void OnSlotDisplayed(ELastFPSItemType ItemType, ELastFPSItemRarity Rarity);
+	static FLinearColor RarityToColor(ELastFPSItemRarity Rarity);
 
-	/** 빈 슬롯 전환 시 BP 훅 */
-	UFUNCTION(BlueprintImplementableEvent, Category="LastFPS|Inventory")
-	void OnSlotCleared();
+protected:
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UImage> Img_Background;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UImage> Img_RarityBorder;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UImage> Image_Icon;
