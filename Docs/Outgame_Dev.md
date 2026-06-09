@@ -1,14 +1,16 @@
 # 아웃게임 개발 체크리스트
 
-> 마지막 업데이트: 2026-06-07
+> 마지막 업데이트: 2026-06-09
 > 기준 브랜치: `kmj-dev-roll`
-> 전체 완성도: **약 35%** (Phase 1 기반 + UI 라우팅 + PC 통합 + NPC 대화 시스템 완료)
+> 전체 완성도: **약 40%** (Phase 1 기반 + UI 라우팅 + PC 통합 + NPC 대화 + 퀘스트 목록 + 설정 기능 C++ 완료)
 
 > **설계 방침** — The First Descendant 참고 PvE 루터슈터지만 **"매치" 개념 없음**: 매치 결과/스코어보드, 로비 출격(StartMatch) **미사용**
 
 > **UI 시스템 문서** — 구조/사용법 → [`UI_System.md`](UI_System.md)
 
-> **최근 변경 (06-08) — 퀘스트 데이터 + 목록 UI (C++)**: `FLastFPSQuestData`(DataTable 행) + `ULastFPSQuestScreenWidget`(임무 화면, `QuestTable` 전수 나열) + `ULastFPSQuestEntryWidget`(행) 신설. 임무 화면=퀘스트 로그로 기존 `UI.Screen.Mission` 태그 재사용(C++ 라우팅/태그 추가 0). 에디터 자산(`DT_QuestData`/`WBP_QuestEntry`/`WBP_Missions`/레지스트리 행)만 만들면 허브 "임무" 버튼이 작동.
+> **최근 변경 (06-09) — 설정 기능 C++ 완료**: `ULastFPSGameUserSettings`(UGameUserSettings 상속, `MasterVolume`/`MusicVolume`/`SFXVolume`/`MouseSensitivity` Config 저장) + `ULastFPSSettingsWidget`(ULastFPSContentScreenWidget 상속) 신설. 그래픽 품질 4단계 버튼 + 볼륨 3 슬라이더 + 감도 슬라이더 + Apply/Revert. 오디오·감도 실제 적용은 `OnAudioSettingsApplied`/`OnSensitivityApplied` BlueprintImplementableEvent로 분리. `DefaultEngine.ini GameUserSettingsClassName` 등록 완료. **에디터 작업**: `WBP_Settings` 부모 클래스를 `LastFPSSettingsWidget`으로 변경 + 위젯 바인딩 추가.
+>
+> **이전 변경 (06-08) — 퀘스트 데이터 + 목록 UI (C++)**: `FLastFPSQuestData`(DataTable 행) + `ULastFPSQuestScreenWidget`(임무 화면, `QuestTable` 전수 나열) + `ULastFPSQuestEntryWidget`(행) 신설. 임무 화면=퀘스트 로그로 기존 `UI.Screen.Mission` 태그 재사용(C++ 라우팅/태그 추가 0). 에디터 자산(`DT_QuestData`/`WBP_QuestEntry`/`WBP_Missions`/레지스트리 행)만 만들면 허브 "임무" 버튼이 작동.
 >
 > **이전 변경 (06-07) — 캐릭터 정의 DataAsset**: `ULastFPSCharacterDefinition`(UPrimaryDataAsset) 신설, 캐릭터 선택창의 이름/역할 위젯 직박 배열을 DataAsset 참조(`CharacterDefinitions[]`)로 교체. PawnClass 필드는 정의에 포함하되 스폰 경로엔 아직 미연결(인게임 팀 폰 준비 후).
 >
@@ -73,7 +75,7 @@
 
 - [x] **설정 화면 라우팅** ✅ → `WBP_Settings`(`ContentScreenWidget` 상속) + `UI.Screen.Settings` 등록, 허브/메인메뉴 진입 작동 확인
   - 허브 Settings 버튼 `OpenScreenOrNotice` / 메인메뉴 `HandleSettingsClicked` → `OpenScreen(Screen_Settings())` (미등록 시 공지 폴백)
-  - [ ] **설정 기능 구현** ⬜ — `GameUserSettings` 연동 (그래픽 품질/해상도, 사운드 볼륨, 입력 감도) + Apply/Revert
+  - [x] **설정 기능 구현** ✅ (06-09) — `ULastFPSGameUserSettings`(Config 저장) + `ULastFPSSettingsWidget`(C++ 완료). **에디터**: `WBP_Settings` 부모→`LastFPSSettingsWidget`, 버튼/슬라이더 바인딩 추가. 오디오·감도 적용은 BP `OnAudioSettingsApplied`/`OnSensitivityApplied` 구현 필요.
 
 ---
 
@@ -154,18 +156,20 @@
 [완료]
   ✅ WBP_Shop + UI.Screen.Shop 등록 → Quartermaster(G)/허브 Shop 버튼 작동 확인
   ✅ WBP_Settings + UI.Screen.Settings 등록 → 허브/메인메뉴 설정 버튼 라우팅 작동 확인
-     (남음: GameUserSettings 실제 기능 — 그래픽/사운드/입력 연동)
   ✅ NPC 대화 UI — WBP_Dialogue + DT_DialogueData + 테스트 NPC, G키 대화 작동 확인
+  ✅ 퀘스트 목록 UI — DT_QuestData + WBP_QuestEntry + WBP_Missions + 레지스트리 행, 임무 화면 작동 확인
+  ✅ 설정 기능 C++ — ULastFPSGameUserSettings + ULastFPSSettingsWidget, WBP_Settings 에디터 완료
+     (남음: BP OnAudioSettingsApplied → 사운드 클래스 연결 / OnSensitivityApplied → Input Modifier 연결)
 
-[지금 당장]
-  퀘스트 목록 UI — 에디터 자산 마무리 (DT_QuestData + WBP_QuestEntry + WBP_Missions + 레지스트리 행)
+[지금 당장 — Phase 1 마무리]
+  캐릭터 선택창 카드 직접 클릭 선택 — LastFPSCharacterCardWidget에 클릭 이벤트 추가
 
 [다음]
   인벤토리 UI 프로토타입 (고정 슬롯 그리드)
 
 [인게임 팀 작업 완료 후]
-  CharacterDefinition DataAsset → 캐릭터 선택창 연동 → 계승자 관리 화면
-  SelectedCharacterIndex 단일화
+  CharacterDefinition DataAsset → PawnClass 스폰 연결 → 계승자 관리 화면
+  SelectedCharacterIndex 단일화 / SelectableCharacterClasses(PC) DataAsset으로 정리
 
 [마무리]
   모듈 UI / 상점 / 시즌패스 / 도전과제
