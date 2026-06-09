@@ -32,21 +32,21 @@ void ULastFPSInventoryWidget::RebuildInventory()
 	// SlotCount 개 슬롯 생성 — 앞에서부터 아이템으로 채우고 나머지는 빈 슬롯
 	for (int32 i = 0; i < SlotCount; ++i)
 	{
-		ULastFPSItemSlotWidget* Slot = CreateWidget<ULastFPSItemSlotWidget>(this, SlotWidgetClass);
-		if (!Slot)
+		ULastFPSItemSlotWidget* SlotWidget = CreateWidget<ULastFPSItemSlotWidget>(this, SlotWidgetClass);
+		if (!SlotWidget)
 		{
 			continue;
 		}
 
 		if (Rows.IsValidIndex(i) && Rows[i])
 		{
-			Slot->SetupSlot(*Rows[i]);
+			SlotWidget->SetupSlot(*Rows[i]);
 		}
 		else
 		{
-			Slot->SetEmpty();
+			SlotWidget->SetEmpty();
 		}
 
-		Box_Slots->AddChild(Slot);
+		Box_Slots->AddChild(SlotWidget);
 	}
 }
