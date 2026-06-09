@@ -29,6 +29,16 @@ void ULastFPSCharacterSelectWidget::NativeConstruct()
 		Button_Next->OnClicked().AddUObject(this, &ULastFPSCharacterSelectWidget::HandleNextClicked);
 	}
 
+	TObjectPtr<ULastFPSCharacterCardWidget> Cards[] = { Card_0, Card_1, Card_2 };
+	for (int32 i = 0; i < 3; ++i)
+	{
+		if (Cards[i])
+		{
+			Cards[i]->CardIndex = i;
+			Cards[i]->OnCardClicked.BindUObject(this, &ULastFPSCharacterSelectWidget::HandleCardClicked);
+		}
+	}
+
 	if (ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>())
 	{
 		OnSelectionChanged(PC->GetSelectedCharacterIndex(), PC->GetSelectableCharacterClasses().Num());
@@ -105,5 +115,17 @@ void ULastFPSCharacterSelectWidget::HandleNextClicked()
 	}
 
 	PC->SetSelectedCharacterIndex(PC->GetSelectedCharacterIndex() + 1);
+	OnSelectionChanged(PC->GetSelectedCharacterIndex(), PC->GetSelectableCharacterClasses().Num());
+}
+
+void ULastFPSCharacterSelectWidget::HandleCardClicked(int32 Index)
+{
+	ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>();
+	if (!PC)
+	{
+		return;
+	}
+
+	PC->SetSelectedCharacterIndex(Index);
 	OnSelectionChanged(PC->GetSelectedCharacterIndex(), PC->GetSelectableCharacterClasses().Num());
 }

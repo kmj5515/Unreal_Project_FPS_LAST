@@ -58,4 +58,6 @@ private:
 	UFUNCTION() void HandleBackClicked();
 	UFUNCTION() void HandlePrevClicked();
 	UFUNCTION() void HandleNextClicked();
+
+	void HandleCardClicked(int32 Index);
 };
