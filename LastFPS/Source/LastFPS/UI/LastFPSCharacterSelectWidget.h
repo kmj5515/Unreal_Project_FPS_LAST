@@ -43,6 +43,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_CharRole;
 
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> TB_CharDesc;
+
 	/** 카드별 캐릭터 정의(DataAsset) 목록 — 이름/역할은 여기서 읽는다.
 	 *  PlayerController의 SelectableCharacterClasses와 인덱스 순서를 맞춰 둘 것. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|CharacterSelect")

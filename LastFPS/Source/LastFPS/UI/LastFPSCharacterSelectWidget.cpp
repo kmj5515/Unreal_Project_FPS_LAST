@@ -36,12 +36,15 @@ void ULastFPSCharacterSelectWidget::NativeConstruct()
 		{
 			Cards[i]->CardIndex = i;
 			Cards[i]->OnCardClicked.BindUObject(this, &ULastFPSCharacterSelectWidget::HandleCardClicked);
+
+			const ULastFPSCharacterDefinition* Def = CharacterDefinitions.IsValidIndex(i) ? CharacterDefinitions[i] : nullptr;
+			Cards[i]->SetupCard(Def);
 		}
 	}
 
 	if (ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>())
 	{
-		OnSelectionChanged(PC->GetSelectedCharacterIndex(), PC->GetSelectableCharacterClasses().Num());
+		OnSelectionChanged(PC->GetSelectedCharacterIndex(), CharacterDefinitions.Num());
 	}
 }
 
@@ -66,6 +69,10 @@ void ULastFPSCharacterSelectWidget::OnSelectionChanged_Implementation(int32 NewI
 	if (TB_CharRole)
 	{
 		TB_CharRole->SetText(Def ? Def->Role : FText::GetEmpty());
+	}
+	if (TB_CharDesc)
+	{
+		TB_CharDesc->SetText(Def ? Def->Description : FText::GetEmpty());
 	}
 
 	if (Button_Prev)
@@ -103,7 +110,7 @@ void ULastFPSCharacterSelectWidget::HandlePrevClicked()
 	}
 
 	PC->SetSelectedCharacterIndex(PC->GetSelectedCharacterIndex() - 1);
-	OnSelectionChanged(PC->GetSelectedCharacterIndex(), PC->GetSelectableCharacterClasses().Num());
+	OnSelectionChanged(PC->GetSelectedCharacterIndex(), CharacterDefinitions.Num());
 }
 
 void ULastFPSCharacterSelectWidget::HandleNextClicked()
@@ -115,7 +122,7 @@ void ULastFPSCharacterSelectWidget::HandleNextClicked()
 	}
 
 	PC->SetSelectedCharacterIndex(PC->GetSelectedCharacterIndex() + 1);
-	OnSelectionChanged(PC->GetSelectedCharacterIndex(), PC->GetSelectableCharacterClasses().Num());
+	OnSelectionChanged(PC->GetSelectedCharacterIndex(), CharacterDefinitions.Num());
 }
 
 void ULastFPSCharacterSelectWidget::HandleCardClicked(int32 Index)
@@ -127,5 +134,5 @@ void ULastFPSCharacterSelectWidget::HandleCardClicked(int32 Index)
 	}
 
 	PC->SetSelectedCharacterIndex(Index);
-	OnSelectionChanged(PC->GetSelectedCharacterIndex(), PC->GetSelectableCharacterClasses().Num());
+	OnSelectionChanged(PC->GetSelectedCharacterIndex(), CharacterDefinitions.Num());
 }
