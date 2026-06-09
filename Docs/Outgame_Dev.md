@@ -8,7 +8,9 @@
 
 > **UI 시스템 문서** — 구조/사용법 → [`UI_System.md`](UI_System.md)
 
-> **최근 변경 (06-09) — 캐릭터 선택창 버그 수정 + 카드 데이터 표시**: Prev/Next 버튼 항상 비활성 버그 수정(`TotalCount`를 `SelectableCharacterClasses.Num()`→`CharacterDefinitions.Num()`으로). `SetupCard(BlueprintNativeEvent)` 추가로 카드마다 이름/역할 독립 표시. `TB_CharDesc` 바인딩 추가(선택 캐릭터 Description 표시).
+> **최근 변경 (06-09) — 인벤토리 UI 프로토타입 C++**: `FLastFPSItemData`(DataTable 행, ItemType/Rarity 열거형 포함) + `ULastFPSItemSlotWidget`(고정 슬롯 1칸, SetupSlot/SetEmpty + OnSlotDisplayed BP훅) + `ULastFPSInventoryWidget`(ULastFPSContentScreenWidget 상속, SlotCount=24 고정 슬롯 그리드, ItemTable → RebuildInventory). 아이콘 로드는 프로토 동기 LoadSynchronous(추후 AsyncLoad 교체). **에디터 작업**: `DT_ItemData` + `WBP_ItemSlot`(부모 `ItemSlotWidget`) + `WBP_Inventory`(부모 `InventoryWidget`, SlotCount/ItemTable/SlotWidgetClass 지정) + 레지스트리 `UI.Screen.Inventory → WBP_Inventory` 행.
+>
+> **이전 변경 (06-09) — 캐릭터 선택창 버그 수정 + 카드 데이터 표시**: Prev/Next 버튼 항상 비활성 버그 수정(`TotalCount`를 `SelectableCharacterClasses.Num()`→`CharacterDefinitions.Num()`으로). `SetupCard(BlueprintNativeEvent)` 추가로 카드마다 이름/역할 독립 표시. `TB_CharDesc` 바인딩 추가(선택 캐릭터 Description 표시).
 >
 > **이전 변경 (06-09) — 설정 기능 C++ 완료**: `ULastFPSGameUserSettings`(UGameUserSettings 상속, `MasterVolume`/`MusicVolume`/`SFXVolume`/`MouseSensitivity` Config 저장) + `ULastFPSSettingsWidget`(ULastFPSContentScreenWidget 상속) 신설. 그래픽 품질 4단계 버튼 + 볼륨 3 슬라이더 + 감도 슬라이더 + Apply/Revert. 오디오·감도 실제 적용은 `OnAudioSettingsApplied`/`OnSensitivityApplied` BlueprintImplementableEvent로 분리. `DefaultEngine.ini GameUserSettingsClassName` 등록 완료. **에디터 작업**: `WBP_Settings` 부모 클래스를 `LastFPSSettingsWidget`으로 변경 + 위젯 바인딩 추가.
 >
@@ -90,8 +92,8 @@
 - [ ] **아르케 조율 / 성장 시스템** ⬜
 
 ### 2-2. 장비 / 인벤토리
-- [ ] **아이템 DataTable** ⬜ — `FLastFPSItemData : FTableRowBase`
-- [ ] **인벤토리 UI** ⬜ — 고정 슬롯 그리드 프로토 → 추후 `UTileView` 가상화
+- [x] **아이템 DataTable** ✅ (06-09) — `FLastFPSItemData : FTableRowBase` (`ItemName`/`Description`/`Icon`/`ItemType`/`Rarity`/`MaxStackSize`). `ELastFPSItemType`(무기·모듈·소모품·재료) + `ELastFPSItemRarity`(일반·희귀·영웅·전설)
+- [x] **인벤토리 UI** 🔨 (06-09) — C++ 완료. `ULastFPSItemSlotWidget`(SetupSlot/SetEmpty + OnSlotDisplayed BP훅) + `ULastFPSInventoryWidget`(SlotCount=24 고정 슬롯 그리드). **에디터 대기**: `DT_ItemData` + `WBP_ItemSlot` + `WBP_Inventory` + 레지스트리 행
 - [ ] **모듈 시스템 UI** ⬜
 
 ---
@@ -162,12 +164,14 @@
   ✅ 퀘스트 목록 UI — DT_QuestData + WBP_QuestEntry + WBP_Missions + 레지스트리 행, 임무 화면 작동 확인
   ✅ 설정 기능 C++ — ULastFPSGameUserSettings + ULastFPSSettingsWidget, WBP_Settings 에디터 완료
      (남음: BP OnAudioSettingsApplied → 사운드 클래스 연결 / OnSensitivityApplied → Input Modifier 연결)
+  ✅ 캐릭터 선택창 마무리 — 카드 직접 클릭, Prev/Next 버그 수정, SetupCard, TB_CharDesc
+  ✅ 인벤토리 UI C++ — FLastFPSItemData + ULastFPSItemSlotWidget + ULastFPSInventoryWidget
 
-[지금 당장 — Phase 1 마무리]
-  캐릭터 선택창 카드 직접 클릭 선택 — LastFPSCharacterCardWidget에 클릭 이벤트 추가
+[지금 당장]
+  인벤토리 에디터 자산 — DT_ItemData + WBP_ItemSlot + WBP_Inventory + 레지스트리 행
 
 [다음]
-  인벤토리 UI 프로토타입 (고정 슬롯 그리드)
+  HUD 퀘스트 트래커 / 모듈 UI / 상점 UI
 
 [인게임 팀 작업 완료 후]
   CharacterDefinition DataAsset → PawnClass 스폰 연결 → 계승자 관리 화면
