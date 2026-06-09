@@ -8,7 +8,9 @@
 
 > **UI 시스템 문서** — 구조/사용법 → [`UI_System.md`](UI_System.md)
 
-> **최근 변경 (06-09) — 설정 기능 C++ 완료**: `ULastFPSGameUserSettings`(UGameUserSettings 상속, `MasterVolume`/`MusicVolume`/`SFXVolume`/`MouseSensitivity` Config 저장) + `ULastFPSSettingsWidget`(ULastFPSContentScreenWidget 상속) 신설. 그래픽 품질 4단계 버튼 + 볼륨 3 슬라이더 + 감도 슬라이더 + Apply/Revert. 오디오·감도 실제 적용은 `OnAudioSettingsApplied`/`OnSensitivityApplied` BlueprintImplementableEvent로 분리. `DefaultEngine.ini GameUserSettingsClassName` 등록 완료. **에디터 작업**: `WBP_Settings` 부모 클래스를 `LastFPSSettingsWidget`으로 변경 + 위젯 바인딩 추가.
+> **최근 변경 (06-09) — 캐릭터 선택창 버그 수정 + 카드 데이터 표시**: Prev/Next 버튼 항상 비활성 버그 수정(`TotalCount`를 `SelectableCharacterClasses.Num()`→`CharacterDefinitions.Num()`으로). `SetupCard(BlueprintNativeEvent)` 추가로 카드마다 이름/역할 독립 표시. `TB_CharDesc` 바인딩 추가(선택 캐릭터 Description 표시).
+>
+> **이전 변경 (06-09) — 설정 기능 C++ 완료**: `ULastFPSGameUserSettings`(UGameUserSettings 상속, `MasterVolume`/`MusicVolume`/`SFXVolume`/`MouseSensitivity` Config 저장) + `ULastFPSSettingsWidget`(ULastFPSContentScreenWidget 상속) 신설. 그래픽 품질 4단계 버튼 + 볼륨 3 슬라이더 + 감도 슬라이더 + Apply/Revert. 오디오·감도 실제 적용은 `OnAudioSettingsApplied`/`OnSensitivityApplied` BlueprintImplementableEvent로 분리. `DefaultEngine.ini GameUserSettingsClassName` 등록 완료. **에디터 작업**: `WBP_Settings` 부모 클래스를 `LastFPSSettingsWidget`으로 변경 + 위젯 바인딩 추가.
 >
 > **이전 변경 (06-08) — 퀘스트 데이터 + 목록 UI (C++)**: `FLastFPSQuestData`(DataTable 행) + `ULastFPSQuestScreenWidget`(임무 화면, `QuestTable` 전수 나열) + `ULastFPSQuestEntryWidget`(행) 신설. 임무 화면=퀘스트 로그로 기존 `UI.Screen.Mission` 태그 재사용(C++ 라우팅/태그 추가 0). 에디터 자산(`DT_QuestData`/`WBP_QuestEntry`/`WBP_Missions`/레지스트리 행)만 만들면 허브 "임무" 버튼이 작동.
 >
@@ -63,9 +65,9 @@
   - [x] Settings 버튼 → `UI.Screen.Settings` 연결 ✅ (06-07) — 메인메뉴 진입 작동 확인
 
 - [x] **캐릭터 선택창 고도화** ✅ (06-09)
-  - [x] `LastFPSCharacterSelectWidget` — 3카드 선택, Confirm/Back
-  - [x] `LastFPSCharacterCardWidget` — `SetSelected(bool)` + **카드 직접 클릭 선택** (`FOnCardClicked` 델리게이트 + `NativeOnMouseButtonDown`)
-  - [x] `CharacterNames`/`CharacterRoles` 위젯 직박 → **DataAsset 연동** ✅ (06-07) — `ULastFPSCharacterDefinition`(DataAsset) 신설. 에디터 연동 완료(`DA_Char_0~2` + `WBP_CharacterSelect` 배열 지정). PawnClass는 인게임 팀 폰 준비 후
+  - [x] `LastFPSCharacterSelectWidget` — 3카드 선택, Confirm/Back + `TB_CharName`/`TB_CharRole`/`TB_CharDesc` 선택 캐릭터 정보 표시
+  - [x] `LastFPSCharacterCardWidget` — `SetSelected(bool)` + **카드 직접 클릭** (`FOnCardClicked` + `NativeOnMouseButtonDown`) + `SetupCard`(카드별 이름/역할 독립 표시)
+  - [x] **DataAsset 연동** ✅ (06-07) — `ULastFPSCharacterDefinition`(DataAsset) 신설. 에디터 연동 완료(`DA_Char_0~2` + `WBP_CharacterSelect` 배열 지정). PawnClass는 인게임 팀 폰 준비 후
 
 - [x] **허브 메뉴** (`LastFPSLobbyWidget` = `WBP_Hub`) — **Menu 레이어 / 온디맨드**
   - `TB_PlayerName`, Inventory/Missions/Shop/Settings/BackToMain 버튼
