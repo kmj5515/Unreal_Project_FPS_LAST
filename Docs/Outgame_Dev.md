@@ -62,10 +62,10 @@
   - Quit → Confirm 팝업 → 종료
   - [x] Settings 버튼 → `UI.Screen.Settings` 연결 ✅ (06-07) — 메인메뉴 진입 작동 확인
 
-- [ ] **캐릭터 선택창 고도화** 🔨
+- [x] **캐릭터 선택창 고도화** ✅ (06-09)
   - [x] `LastFPSCharacterSelectWidget` — 3카드 선택, Confirm/Back
-  - [x] `LastFPSCharacterCardWidget` — `SetSelected(bool)`
-  - [x] `CharacterNames`/`CharacterRoles` 위젯 직박 → **DataAsset 연동** ✅ (06-07) — `ULastFPSCharacterDefinition`(DataAsset) 신설, 위젯 `CharacterDefinitions[]`가 이름/역할 표시. 에디터 연동 완료(`DA_Char_0~2` 생성 + `WBP_CharacterSelect` 배열 지정). PawnClass는 인게임 팀 폰 준비 후
+  - [x] `LastFPSCharacterCardWidget` — `SetSelected(bool)` + **카드 직접 클릭 선택** (`FOnCardClicked` 델리게이트 + `NativeOnMouseButtonDown`)
+  - [x] `CharacterNames`/`CharacterRoles` 위젯 직박 → **DataAsset 연동** ✅ (06-07) — `ULastFPSCharacterDefinition`(DataAsset) 신설. 에디터 연동 완료(`DA_Char_0~2` + `WBP_CharacterSelect` 배열 지정). PawnClass는 인게임 팀 폰 준비 후
 
 - [x] **허브 메뉴** (`LastFPSLobbyWidget` = `WBP_Hub`) — **Menu 레이어 / 온디맨드**
   - `TB_PlayerName`, Inventory/Missions/Shop/Settings/BackToMain 버튼
