@@ -12,6 +12,7 @@
 
 class UAbilitySystemComponent;
 class ULastFPSSkillCooldownSlotWidget;
+class ULastFPSQuestTrackerWidget;
 class UWeaponComponent;
 
 struct FLastFPSSmoothedGaugeDisplay
@@ -48,6 +49,9 @@ public:
 
     UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
     TObjectPtr<ULastFPSSkillCooldownSlotWidget> WBP_SkillCooldownSlot_F;
+
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Quest", meta=(BindWidgetOptional))
+    TObjectPtr<ULastFPSQuestTrackerWidget> WBP_QuestTracker;
 
 protected:
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
