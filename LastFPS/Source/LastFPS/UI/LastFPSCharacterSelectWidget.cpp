@@ -20,14 +20,6 @@ void ULastFPSCharacterSelectWidget::NativeConstruct()
 	{
 		Button_Back->OnClicked().AddUObject(this, &ULastFPSCharacterSelectWidget::HandleBackClicked);
 	}
-	if (Button_Prev)
-	{
-		Button_Prev->OnClicked().AddUObject(this, &ULastFPSCharacterSelectWidget::HandlePrevClicked);
-	}
-	if (Button_Next)
-	{
-		Button_Next->OnClicked().AddUObject(this, &ULastFPSCharacterSelectWidget::HandleNextClicked);
-	}
 
 	TObjectPtr<ULastFPSCharacterCardWidget> Cards[] = { Card_0, Card_1, Card_2 };
 	for (int32 i = 0; i < 3; ++i)
@@ -74,15 +66,6 @@ void ULastFPSCharacterSelectWidget::OnSelectionChanged_Implementation(int32 NewI
 	{
 		TB_CharDesc->SetText(Def ? Def->Description : FText::GetEmpty());
 	}
-
-	if (Button_Prev)
-	{
-		Button_Prev->SetIsEnabled(NewIndex > 0);
-	}
-	if (Button_Next)
-	{
-		Button_Next->SetIsEnabled(NewIndex < TotalCount - 1);
-	}
 }
 
 void ULastFPSCharacterSelectWidget::HandleConfirmClicked()
@@ -99,30 +82,6 @@ void ULastFPSCharacterSelectWidget::HandleBackClicked()
 	{
 		GI->RequestTravelToMainMenu();
 	}
-}
-
-void ULastFPSCharacterSelectWidget::HandlePrevClicked()
-{
-	ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>();
-	if (!PC)
-	{
-		return;
-	}
-
-	PC->SetSelectedCharacterIndex(PC->GetSelectedCharacterIndex() - 1);
-	OnSelectionChanged(PC->GetSelectedCharacterIndex(), CharacterDefinitions.Num());
-}
-
-void ULastFPSCharacterSelectWidget::HandleNextClicked()
-{
-	ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>();
-	if (!PC)
-	{
-		return;
-	}
-
-	PC->SetSelectedCharacterIndex(PC->GetSelectedCharacterIndex() + 1);
-	OnSelectionChanged(PC->GetSelectedCharacterIndex(), CharacterDefinitions.Num());
 }
 
 void ULastFPSCharacterSelectWidget::HandleCardClicked(int32 Index)

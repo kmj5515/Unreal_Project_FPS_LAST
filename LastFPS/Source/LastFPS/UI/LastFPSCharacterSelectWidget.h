@@ -23,12 +23,6 @@ protected:
 	TObjectPtr<ULastFPSButtonBase> Button_Back;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<ULastFPSButtonBase> Button_Prev;
-
-	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<ULastFPSButtonBase> Button_Next;
-
-	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<ULastFPSCharacterCardWidget> Card_0;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
@@ -59,8 +53,6 @@ protected:
 private:
 	UFUNCTION() void HandleConfirmClicked();
 	UFUNCTION() void HandleBackClicked();
-	UFUNCTION() void HandlePrevClicked();
-	UFUNCTION() void HandleNextClicked();
 
 	void HandleCardClicked(int32 Index);
 };
