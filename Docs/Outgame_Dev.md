@@ -124,7 +124,7 @@
 ### 3-2. 미션 / 퀘스트
 - [x] **퀘스트 데이터 구조** ✅ — `FLastFPSQuestData : FTableRowBase` (`Quest/LastFPSQuestData.h`). 필드: `Title`/`Type`(메인·서브)/`Status`(미시작·진행중·완료)/`Summary`/`Description`/`RewardText`/`Icon`. 진행 추적 서브시스템 없음 — 상태는 행에 직접 명시(프로토)
 - [x] **퀘스트 목록 UI** 🔨 — C++ 완료, 에디터 자산 대기. `ULastFPSQuestScreenWidget : ULastFPSContentScreenWidget`(`QuestTable` 전수 → `EntryWidgetClass` 생성 → `Box_QuestList`에 채움) + `ULastFPSQuestEntryWidget : UUserWidget`(`SetupQuest`/`OnQuestDisplayed`). **임무 화면 = 퀘스트 로그**로 기존 `UI.Screen.Mission` 태그 재사용(허브 "임무" 버튼이 이미 라우팅). > **설계 결정(06-08)**: 당장은 임무=퀘스트일지 **통합**. TFD처럼 출격용 미션 보드와 일지를 나누고 싶어지면, 위젯은 태그를 모르므로(레지스트리가 결정) → `Screen_Quests()` 태그 + 허브 "일지" 버튼 + 레지스트리 행만 추가하면 분리됨(C++ 위젯 수정 불필요). 에디터: `DT_QuestData` + `WBP_QuestEntry`(부모 `QuestEntryWidget`) + `WBP_Missions`(부모 `QuestScreenWidget`, `QuestTable`/`EntryWidgetClass` 지정) + 레지스트리 `UI.Screen.Mission → WBP_Missions` 행
-- [ ] **HUD 퀘스트 트래커** ⬜
+- [x] **HUD 퀘스트 트래커** 🔨 (06-10) — C++ 완료, 에디터 자산 진행중. `ULastFPSQuestTrackerWidget : UUserWidget` — `QuestTable`(`DT_QuestData`, 퀘스트 화면과 동일 테이블 재사용)에서 `Status == InProgress`인 행만 최대 `MaxTrackedQuests`개 골라 `EntryWidgetClass`(`WBP_QuestEntry` 재사용 가능)로 `Box_TrackerList`에 표시. `ULastFPSHUDWidget`에 `WBP_QuestTracker`(`BindWidgetOptional`) 바인딩 추가. 에디터: `WBP_QuestTracker`(부모 `QuestTrackerWidget`, `QuestTable`/`EntryWidgetClass` 지정) 생성 완료. **남음**: 위젯 계층(`Box_TrackerList`/`TB_Empty`) 구성 + `WBP_HUD`에 `WBP_QuestTracker` 이름으로 배치
 
 ### 3-3. 파티 / 매칭 — ❌ 보류 (매치 개념 부재)
 - [~] ~~파티 UI~~ → 존속 여부 재검토 / [x] ~~매칭 UI~~ → **제외**
@@ -170,9 +170,11 @@
   ✅ 인벤토리 UI — FLastFPSItemData + ULastFPSItemSlotWidget + ULastFPSInventoryWidget + 에디터 자산 완료
   ✅ 상점 UI 프로토타입 — FLastFPSShopItemData + ULastFPSShopEntryWidget + ULastFPSShopScreenWidget + 에디터 자산 완료
      (남음: 화폐/재고 시스템 — 구매는 현재 표시 전환만)
+  ✅ HUD 퀘스트 트래커 C++ — ULastFPSQuestTrackerWidget(QuestTable에서 진행중 퀘스트만 필터) + HUDWidget WBP_QuestTracker 바인딩
+     (남음: WBP_QuestTracker 에디터 자산 + WBP_HUD 배치)
 
 [다음]
-  HUD 퀘스트 트래커 / 모듈 UI
+  HUD 퀘스트 트래커 에디터 자산 / 모듈 UI
 
 [인게임 팀 작업 완료 후]
   CharacterDefinition DataAsset → PawnClass 스폰 연결 → 계승자 관리 화면
