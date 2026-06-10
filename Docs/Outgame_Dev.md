@@ -1,14 +1,16 @@
 # 아웃게임 개발 체크리스트
 
-> 마지막 업데이트: 2026-06-09
+> 마지막 업데이트: 2026-06-10
 > 기준 브랜치: `kmj-dev-roll`
-> 전체 완성도: **약 45%** (Phase 1 완료 + 인벤토리 UI 에디터 완료)
+> 전체 완성도: **약 50%** (Phase 1 완료 + 인벤토리/상점 UI 프로토타입 완료)
 
 > **설계 방침** — The First Descendant 참고 PvE 루터슈터지만 **"매치" 개념 없음**: 매치 결과/스코어보드, 로비 출격(StartMatch) **미사용**
 
 > **UI 시스템 문서** — 구조/사용법 → [`UI_System.md`](UI_System.md)
 
-> **최근 변경 (06-09) — 인벤토리 UI 프로토타입 완료**: C++ + 에디터 자산 완료. `FLastFPSItemData` + `ULastFPSItemSlotWidget`(희귀도 색상 C++ 직접 처리, `RarityToColor()`, `Img_Background`/`Img_RarityBorder` 바인딩) + `ULastFPSInventoryWidget`(SlotCount=24 고정 슬롯 그리드). `DT_ItemData` + `WBP_ItemSlot` + `WBP_Inventory` + 레지스트리 `UI.Screen.Inventory` 행 완료 → 허브 "인벤토리" 버튼 작동.
+> **최근 변경 (06-10) — 상점 UI 프로토타입 완료**: `FLastFPSShopItemData`(DataTable 행) + `ULastFPSShopEntryWidget`(목록 한 줄, 구매 버튼 클릭 시 "구매됨" 표시) + `ULastFPSShopScreenWidget`(테이블 전수 → 엔트리 목록 구성). `DT_ShopData` + `WBP_ShopEntry` + `WBP_Shop` 에디터 자산 완료. 화폐/재고 시스템은 아직 없어 구매는 표시 전환만 처리하는 프로토 단계.
+>
+> **이전 변경 (06-09) — 인벤토리 UI 프로토타입 완료**: C++ + 에디터 자산 완료. `FLastFPSItemData` + `ULastFPSItemSlotWidget`(희귀도 색상 C++ 직접 처리, `RarityToColor()`, `Img_Background`/`Img_RarityBorder` 바인딩) + `ULastFPSInventoryWidget`(SlotCount=24 고정 슬롯 그리드). `DT_ItemData` + `WBP_ItemSlot` + `WBP_Inventory` + 레지스트리 `UI.Screen.Inventory` 행 완료 → 허브 "인벤토리" 버튼 작동.
 >
 > **이전 변경 (06-09) — 캐릭터 선택창 버그 수정 + 카드 데이터 표시**: Prev/Next 버튼 항상 비활성 버그 수정(`TotalCount`를 `SelectableCharacterClasses.Num()`→`CharacterDefinitions.Num()`으로). `SetupCard(BlueprintNativeEvent)` 추가로 카드마다 이름/역할 독립 표시. `TB_CharDesc` 바인딩 추가(선택 캐릭터 Description 표시).
 >
@@ -135,7 +137,7 @@
 ## Phase 4 — 피니시
 
 - [x] ~~**매치 결과 화면 / 스코어보드**~~ → ❌ 설계 제외. `WBP_Scoreboard`/`WBP_ScoreRow` 미사용(안 씀). C++ `ALastFPSHUD` 클래스 및 관련 잔재 코드 제거 완료 (06-07)
-- [ ] **상점 (유료 / 무료)** ⬜
+- [x] **상점 UI** 🔨 (06-10) — `FLastFPSShopItemData` + `ULastFPSShopEntryWidget`(구매 버튼 → "구매됨" 표시) + `ULastFPSShopScreenWidget`(`DT_ShopData` 전수 나열) + 에디터(`DT_ShopData`/`WBP_ShopEntry`/`WBP_Shop`) 완료. 화폐/재고 시스템 미구현 — 구매는 표시 전환만
 - [ ] **시즌 패스** ⬜ / **도전과제 / 업적** ⬜
 
 ---
@@ -166,9 +168,11 @@
      (남음: BP OnAudioSettingsApplied → 사운드 클래스 연결 / OnSensitivityApplied → Input Modifier 연결)
   ✅ 캐릭터 선택창 마무리 — 카드 직접 클릭, Prev/Next 버그 수정, SetupCard, TB_CharDesc
   ✅ 인벤토리 UI — FLastFPSItemData + ULastFPSItemSlotWidget + ULastFPSInventoryWidget + 에디터 자산 완료
+  ✅ 상점 UI 프로토타입 — FLastFPSShopItemData + ULastFPSShopEntryWidget + ULastFPSShopScreenWidget + 에디터 자산 완료
+     (남음: 화폐/재고 시스템 — 구매는 현재 표시 전환만)
 
 [다음]
-  HUD 퀘스트 트래커 / 모듈 UI / 상점 UI
+  HUD 퀘스트 트래커 / 모듈 UI
 
 [인게임 팀 작업 완료 후]
   CharacterDefinition DataAsset → PawnClass 스폰 연결 → 계승자 관리 화면
