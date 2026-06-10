@@ -8,7 +8,9 @@
 
 > **UI 시스템 문서** — 구조/사용법 → [`UI_System.md`](UI_System.md)
 
-> **최근 변경 (06-10) — 상점 UI 프로토타입 완료**: `FLastFPSShopItemData`(DataTable 행) + `ULastFPSShopEntryWidget`(목록 한 줄, 구매 버튼 클릭 시 "구매됨" 표시) + `ULastFPSShopScreenWidget`(테이블 전수 → 엔트리 목록 구성). `DT_ShopData` + `WBP_ShopEntry` + `WBP_Shop` 에디터 자산 완료. 화폐/재고 시스템은 아직 없어 구매는 표시 전환만 처리하는 프로토 단계.
+> **최근 변경 (06-10) — 캐릭터 선택창 Prev/Next 버튼 제거**: 카드 직접 클릭(`OnCardClicked`)만으로 선택하도록 정리. `Button_Prev`/`Button_Next` 바인딩 + `HandlePrevClicked`/`HandleNextClicked` + `OnSelectionChanged`의 활성/비활성 토글 코드 제거. **에디터**: `WBP_CharacterSelect`에서 Prev/Next 버튼 제거 필요(C++은 `BindWidgetOptional`이라 안전).
+>
+> **이전 변경 (06-10) — 상점 UI 프로토타입 완료**: `FLastFPSShopItemData`(DataTable 행) + `ULastFPSShopEntryWidget`(목록 한 줄, 구매 버튼 클릭 시 "구매됨" 표시) + `ULastFPSShopScreenWidget`(테이블 전수 → 엔트리 목록 구성). `DT_ShopData` + `WBP_ShopEntry` + `WBP_Shop` 에디터 자산 완료. 화폐/재고 시스템은 아직 없어 구매는 표시 전환만 처리하는 프로토 단계.
 >
 > **이전 변경 (06-09) — 인벤토리 UI 프로토타입 완료**: C++ + 에디터 자산 완료. `FLastFPSItemData` + `ULastFPSItemSlotWidget`(희귀도 색상 C++ 직접 처리, `RarityToColor()`, `Img_Background`/`Img_RarityBorder` 바인딩) + `ULastFPSInventoryWidget`(SlotCount=24 고정 슬롯 그리드). `DT_ItemData` + `WBP_ItemSlot` + `WBP_Inventory` + 레지스트리 `UI.Screen.Inventory` 행 완료 → 허브 "인벤토리" 버튼 작동.
 >
@@ -68,9 +70,9 @@
   - Quit → Confirm 팝업 → 종료
   - [x] Settings 버튼 → `UI.Screen.Settings` 연결 ✅ (06-07) — 메인메뉴 진입 작동 확인
 
-- [x] **캐릭터 선택창 고도화** ✅ (06-09)
-  - [x] `LastFPSCharacterSelectWidget` — 3카드 선택, Confirm/Back + `TB_CharName`/`TB_CharRole`/`TB_CharDesc` 선택 캐릭터 정보 표시
-  - [x] `LastFPSCharacterCardWidget` — `SetSelected(bool)` + **카드 직접 클릭** (`FOnCardClicked` + `NativeOnMouseButtonDown`) + `SetupCard`(카드별 이름/역할 독립 표시)
+- [x] **캐릭터 선택창 고도화** ✅ (06-10)
+  - [x] `LastFPSCharacterSelectWidget` — 3카드 선택(Prev/Next 제거, 카드 클릭만), Confirm/Back + `TB_CharName`/`TB_CharRole`/`TB_CharDesc` 선택 캐릭터 정보 표시
+  - [x] `LastFPSCharacterCardWidget` — `SetSelected(bool)` + **카드 직접 클릭** (`FOnCardClicked` + `NativeOnMouseButtonDown`) + `SetupCard`(카드별 이름/역할 독립 표시). 선택 표시(`SetSelected`)는 WBP에서 구현 필요
   - [x] **DataAsset 연동** ✅ (06-07) — `ULastFPSCharacterDefinition`(DataAsset) 신설. 에디터 연동 완료(`DA_Char_0~2` + `WBP_CharacterSelect` 배열 지정). PawnClass는 인게임 팀 폰 준비 후
 
 - [x] **허브 메뉴** (`LastFPSLobbyWidget` = `WBP_Hub`) — **Menu 레이어 / 온디맨드**
@@ -148,9 +150,6 @@
 - [x] `UCommonButtonBase` 교체 / **RetryPushTimer 중복 통합** / **위젯 하드레퍼런스 제거**(레지스트리 소프트참조로) / **PC 1개 통합**
 
 ### 남음
-- [ ] **`SelectedCharacterIndex` 단일 소스화** | 난이도: 중 — `PlayerController`·`PlayerState` 양쪽 Replicated 중복. (인게임 팀 협의)
-- [~] **`ULastFPSCharacterDefinition` DataAsset로 3중 중복 통합** | 난이도: 중 — DataAsset 신설 + **위젯 직박(`CharacterNames`/`CharacterRoles`) 제거 완료** ✅ (06-07). 남은 중복: `SelectableCharacterClasses`(PC)/`CharacterPawnClasses`(GM) → 폰 스폰이 PawnClass에 의존하므로 **인게임 팀 폰 준비 후** 통합.
-  - ↳ 세트로 `PlayerController.SelectableCharacterClasses` 정리 (현재 **허브 폰도 이 목록[인덱스]로 스폰**됨)
 - [ ] **밸런스 수치 DataAsset화** | 난이도: 하 — `LastFPSPlayerState.h` constexpr
 - [ ] **맵 경로 `/Test/` 제거** | 난이도: 하 — `LastFPSGameInstance` 릴리즈 전
 
@@ -174,14 +173,19 @@
      (남음: WBP_QuestTracker 에디터 자산 + WBP_HUD 배치)
 
 [다음]
-  HUD 퀘스트 트래커 에디터 자산 / 모듈 UI
+  HUD 퀘스트 트래커 에디터 자산 (Box_TrackerList/TB_Empty 구성 + WBP_HUD 배치)
+  모듈 시스템 UI
 
 [인게임 팀 작업 완료 후]
-  CharacterDefinition DataAsset → PawnClass 스폰 연결 → 계승자 관리 화면
-  SelectedCharacterIndex 단일화 / SelectableCharacterClasses(PC) DataAsset으로 정리
+  CharacterDefinition DataAsset → PawnClass 스폰 연결 → 계승자 관리 화면 / 아르케 조율·성장 시스템
 
 [마무리]
-  모듈 UI / 상점 / 시즌패스 / 도전과제
+  상점 화폐/재고 시스템 — 구매 시 실제 차감/소지 처리 (현재는 표시 전환만)
+  제작 시스템 UI
+  파티 UI 존속 여부 재검토
+  시즌 패스 / 도전과제·업적
+  설정 — OnAudioSettingsApplied(사운드 클래스 연결) / OnSensitivityApplied(Input Modifier 연결) BP 구현
+  기술 부채 — 밸런스 수치 DataAsset화 / 맵 경로 `/Test/` 제거
 ```
 
 ---
