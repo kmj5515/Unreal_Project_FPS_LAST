@@ -1,10 +1,13 @@
 #include "UI/LastFPSLoadingScreenWidget.h"
 
 #include "Game/LastFPSGameInstance.h"
+#include "UI/LastFPSLoadingScreenSet.h"
 
+#include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Engine/GameInstance.h"
+#include "Engine/Texture2D.h"
 
 void ULastFPSLoadingScreenWidget::SetStatusText(const FText& InText)
 {
@@ -26,6 +29,7 @@ void ULastFPSLoadingScreenWidget::NativeConstruct()
 {
     Super::NativeConstruct();
     RefreshFromGameInstance();
+    ApplyRandomTip();
 
     if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
     {
@@ -61,6 +65,46 @@ void ULastFPSLoadingScreenWidget::RefreshFromGameInstance()
 
         OnLoadingScreenUpdated(Status, MapName);
     }
+}
+
+void ULastFPSLoadingScreenWidget::ApplyRandomTip()
+{
+    if (!LoadingSet)
+    {
+        return;
+    }
+
+    const FLastFPSLoadingTip* Entry = LoadingSet->PickRandomEntry();
+    if (!Entry)
+    {
+        return;
+    }
+
+    // 로딩 화면 위라 동기 로드의 히치는 사실상 보이지 않는다 — 선택된 1장만 즉시 올린다.
+    UTexture2D* Texture = Entry->Image.LoadSynchronous();
+
+    if (Img_Tip)
+    {
+        if (Texture)
+        {
+            Img_Tip->SetBrushFromTexture(Texture);
+            Img_Tip->SetVisibility(ESlateVisibility::HitTestInvisible);
+        }
+        else
+        {
+            Img_Tip->SetVisibility(ESlateVisibility::Collapsed);
+        }
+    }
+    if (Text_TipTitle)
+    {
+        Text_TipTitle->SetText(Entry->TipTitle);
+    }
+    if (Text_TipBody)
+    {
+        Text_TipBody->SetText(Entry->TipBody);
+    }
+
+    OnLoadingTipSelected(Texture, Entry->TipTitle, Entry->TipBody);
 }
 
 void ULastFPSLoadingScreenWidget::HandleTravelPresentationChanged(const FText& StatusText, const FText& MapNameText)
