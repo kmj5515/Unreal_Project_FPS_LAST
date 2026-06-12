@@ -9,6 +9,11 @@ FGameplayTag ULastFPSTagFunctionLibrary::GetTag_CooldownSkill1()
     return FLastFPSTags::Get().Cooldown_Skill1;
 }
 
+FGameplayTag ULastFPSTagFunctionLibrary::GetTag_CooldownSkillDash()
+{
+    return FLastFPSTags::Get().Cooldown_Skill_Dash;
+}
+
 FGameplayTag ULastFPSTagFunctionLibrary::GetTag_CooldownSkill2()
 {
     return FLastFPSTags::Get().Cooldown_Skill2;

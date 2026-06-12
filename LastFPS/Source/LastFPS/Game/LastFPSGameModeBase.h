@@ -6,6 +6,8 @@
 #include "LastFPSGameModeBase.generated.h"
 
 class ALastFPSPlayerState;
+class UAbilitySystemComponent;
+class ULastFPSCharacterDefinition;
 
 UCLASS()
 class LASTFPS_API ALastFPSGameModeBase : public AGameModeBase
@@ -25,6 +27,15 @@ public:
     // 캐릭터 선택 인덱스별 Pawn 클래스 목록
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
     TArray<TSubclassOf<APawn>> CharacterPawnClasses;
+
+    /** Preferred character source. Each definition owns pawn, stats, visuals, abilities, and optional AI profile. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
+    TArray<TObjectPtr<ULastFPSCharacterDefinition>> CharacterDefinitions;
+
+    const ULastFPSCharacterDefinition* GetCharacterDefinitionForIndex(int32 CharacterIndex) const;
+    bool ApplyCharacterDefinitionToAbilitySystem(
+        UAbilitySystemComponent* ASC,
+        const ULastFPSCharacterDefinition* CharacterDefinition) const;
 
     // ── 이 맵의 UI 진입 설정 (PlayerController가 읽어 OpenScreen) ──
     // "어떤 화면을 띄울지"는 맵마다 다른 규칙이므로 GameMode가 소유한다.

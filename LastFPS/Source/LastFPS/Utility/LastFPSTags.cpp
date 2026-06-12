@@ -10,6 +10,7 @@ void FLastFPSTags::InitializeNativeTags()
     Tags.AddTag(Tags.Character_State_Crouched, "Character.State.Crouched", "Character is crouching");
 
     // 쿨다운
+    Tags.AddTag(Tags.Cooldown_Skill_Dash, "Cooldown.Skill.Dash", "Dash cooldown");
     Tags.AddTag(Tags.Cooldown_Skill1, "Cooldown.Skill1", "Skill 1 cooldown");
     Tags.AddTag(Tags.Cooldown_Skill2, "Cooldown.Skill2", "Skill 2 cooldown");
 

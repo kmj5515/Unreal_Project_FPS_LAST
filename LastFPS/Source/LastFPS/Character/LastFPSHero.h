@@ -34,6 +34,7 @@ public:
     FORCEINLINE UWeaponComponent* GetWeaponComponent() const { return WeaponComponent; }
     virtual bool GetIsADS() const override { return bIsADS; }
     FORCEINLINE EMMCombatState GetCombatState() const { return CombatState; }
+    FORCEINLINE FVector2D GetCachedMoveInput() const { return CachedMoveInput; }
 
     // GAS 어빌리티에서 카메라 줌을 제어할 수 있도록 공개
     void SetADS(bool bEnabled);
@@ -44,6 +45,7 @@ protected:
     virtual void GiveDefaultAbilities() override;
 
     void Move(const FInputActionValue& Value);
+    void ClearMoveInput(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
     
     // 공통 GAS 입력 처리
@@ -99,6 +101,7 @@ protected:
 private:
     bool bIsADS = false;
     float PreADSWalkSpeed = 0.f;
+    FVector2D CachedMoveInput = FVector2D::ZeroVector;
 
     UPROPERTY(ReplicatedUsing=OnRep_CombatState, BlueprintReadOnly, Category="Combat", meta=(AllowPrivateAccess="true"))
     EMMCombatState CombatState = EMMCombatState::Idle;

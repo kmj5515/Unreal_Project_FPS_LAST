@@ -1,8 +1,13 @@
 #include "Character/LastFPSCharacterBase.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
+#include "Character/LastFPSAbilitySet.h"
+#include "Character/LastFPSCharacterVisualData.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Game/LastFPSCharacterDefinition.h"
 #include "Game/LastFPSPlayerState.h"
 #include "Components/CapsuleComponent.h"
+#include "Game/LastFPSGameModeBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
@@ -34,6 +39,64 @@ float ALastFPSCharacterBase::GetHealth() const
 float ALastFPSCharacterBase::GetMaxHealth() const
 {
     return AttributeSet ? AttributeSet->GetMaxHealth() : 0.f;
+}
+
+const ULastFPSCharacterDefinition* ALastFPSCharacterBase::GetCharacterDefinition() const
+{
+    return ResolveCharacterDefinition();
+}
+
+const ULastFPSCharacterDefinition* ALastFPSCharacterBase::ResolveCharacterDefinition() const
+{
+    if (CharacterDefinition)
+    {
+        return CharacterDefinition;
+    }
+
+    const ALastFPSPlayerState* PS = GetPlayerState<ALastFPSPlayerState>();
+    if (!PS)
+    {
+        return nullptr;
+    }
+
+    if (const UWorld* World = GetWorld())
+    {
+        if (const ALastFPSGameModeBase* GM = World->GetAuthGameMode<ALastFPSGameModeBase>())
+        {
+            return GM->GetCharacterDefinitionForIndex(PS->GetSelectedCharacterIndex());
+        }
+    }
+
+    if (const ALastFPSPlayerController* LastPC = Cast<ALastFPSPlayerController>(GetController()))
+    {
+        return LastPC->GetSelectedCharacterDefinition();
+    }
+
+    return nullptr;
+}
+
+void ALastFPSCharacterBase::ApplyCharacterVisuals(const ULastFPSCharacterDefinition* Definition)
+{
+    if (!Definition || !Definition->VisualData)
+    {
+        return;
+    }
+
+    USkeletalMeshComponent* MeshComp = GetMesh();
+    if (!MeshComp)
+    {
+        return;
+    }
+
+    if (Definition->VisualData->SkeletalMesh)
+    {
+        MeshComp->SetSkeletalMesh(Definition->VisualData->SkeletalMesh);
+    }
+
+    if (Definition->VisualData->AnimClass)
+    {
+        MeshComp->SetAnimInstanceClass(Definition->VisualData->AnimClass);
+    }
 }
 
 FString ALastFPSCharacterBase::GetKillFeedDisplayName() const
@@ -151,6 +214,8 @@ void ALastFPSCharacterBase::InitAbilitySystem()
 
     // AttributeSet 캐싱 — GetHealth() 등이 PlayerState 캐스팅 없이 접근 가능
     AttributeSet = PS->GetAttributeSet();
+    const ULastFPSCharacterDefinition* ResolvedDefinition = ResolveCharacterDefinition();
+    ApplyCharacterVisuals(ResolvedDefinition);
 
     if (!MoveSpeedDelegateHandle.IsValid())
     {
@@ -168,6 +233,11 @@ void ALastFPSCharacterBase::InitAbilitySystem()
 
     if (HasAuthority() && !PS->HasGrantedGASDefaults())
     {
+        if (ALastFPSGameModeBase* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALastFPSGameModeBase>() : nullptr)
+        {
+            GM->ApplyCharacterDefinitionToAbilitySystem(ASC, ResolvedDefinition);
+        }
+
         GiveDefaultAbilities();
         ApplyDefaultEffects();
         PS->MarkGASDefaultsGranted();
@@ -221,7 +291,14 @@ void ALastFPSCharacterBase::GiveDefaultAbilities()
     UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
     if (!HasAuthority() || !ASC) return;
 
-    for (const TSubclassOf<UGameplayAbility>& AbilityClass : DefaultAbilities)
+    const ULastFPSCharacterDefinition* ResolvedDefinition = ResolveCharacterDefinition();
+    const TArray<TSubclassOf<UGameplayAbility>>* AbilitiesToGrant = &DefaultAbilities;
+    if (ResolvedDefinition && ResolvedDefinition->AbilitySet)
+    {
+        AbilitiesToGrant = &ResolvedDefinition->AbilitySet->GrantedAbilities;
+    }
+
+    for (const TSubclassOf<UGameplayAbility>& AbilityClass : *AbilitiesToGrant)
     {
         if (AbilityClass)
             ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1));
@@ -236,7 +313,14 @@ void ALastFPSCharacterBase::ApplyDefaultEffects()
     FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
     Context.AddSourceObject(this);
 
-    for (const TSubclassOf<UGameplayEffect>& EffectClass : DefaultEffects)
+    const ULastFPSCharacterDefinition* ResolvedDefinition = ResolveCharacterDefinition();
+    const TArray<TSubclassOf<UGameplayEffect>>* EffectsToApply = &DefaultEffects;
+    if (ResolvedDefinition && ResolvedDefinition->AbilitySet)
+    {
+        EffectsToApply = &ResolvedDefinition->AbilitySet->StartupEffects;
+    }
+
+    for (const TSubclassOf<UGameplayEffect>& EffectClass : *EffectsToApply)
     {
         if (!EffectClass) continue;
         FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(EffectClass, 1.f, Context);

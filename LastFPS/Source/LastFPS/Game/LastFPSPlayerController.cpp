@@ -9,6 +9,7 @@
 
 #include "CommonActivatableWidget.h"
 #include "Engine/World.h"
+#include "Game/LastFPSCharacterDefinition.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSGameModeBase.h"
 #include "Game/LastFPSPlayerState.h"
@@ -263,7 +264,11 @@ void ALastFPSPlayerController::ShowHitMarker()
 
 int32 ALastFPSPlayerController::ClampSelectedCharacterIndex(const int32 NewIndex) const
 {
-    const int32 MaxIndex = SelectableCharacterClasses.Num() > 0 ? (SelectableCharacterClasses.Num() - 1) : NewIndex;
+    const int32 SelectableCount =
+        SelectableCharacterDefinitions.Num() > 0
+            ? SelectableCharacterDefinitions.Num()
+            : SelectableCharacterClasses.Num();
+    const int32 MaxIndex = SelectableCount > 0 ? (SelectableCount - 1) : NewIndex;
     return FMath::Clamp(NewIndex, 0, MaxIndex);
 }
 
@@ -291,12 +296,24 @@ void ALastFPSPlayerController::SetSelectedCharacterIndex(const int32 NewIndex)
 
 TSubclassOf<APawn> ALastFPSPlayerController::GetSelectedCharacterClass() const
 {
+    if (const ULastFPSCharacterDefinition* Definition = GetSelectedCharacterDefinition())
+    {
+        return Definition->PawnClass;
+    }
+
     if (!SelectableCharacterClasses.IsValidIndex(SelectedCharacterIndex))
     {
         return nullptr;
     }
 
     return SelectableCharacterClasses[SelectedCharacterIndex];
+}
+
+const ULastFPSCharacterDefinition* ALastFPSPlayerController::GetSelectedCharacterDefinition() const
+{
+    return SelectableCharacterDefinitions.IsValidIndex(SelectedCharacterIndex)
+        ? SelectableCharacterDefinitions[SelectedCharacterIndex]
+        : nullptr;
 }
 
 void ALastFPSPlayerController::ServerSetSelectedCharacterIndex_Implementation(const int32 NewIndex)

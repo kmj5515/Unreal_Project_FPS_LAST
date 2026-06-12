@@ -9,6 +9,7 @@
 
 class APawn;
 class UCommonActivatableWidget;
+class ULastFPSCharacterDefinition;
 class ULastFPSHUDWidget;
 class ULastFPSNoticeWidget;
 class ULastFPSDialogueWidget;
@@ -76,7 +77,12 @@ public:
     TSubclassOf<APawn> GetSelectedCharacterClass() const;
 
     UFUNCTION(BlueprintPure, Category="LastFPS|Character")
+    const ULastFPSCharacterDefinition* GetSelectedCharacterDefinition() const;
+
+    UFUNCTION(BlueprintPure, Category="LastFPS|Character")
     const TArray<TSubclassOf<APawn>>& GetSelectableCharacterClasses() const { return SelectableCharacterClasses; }
+
+    const TArray<TObjectPtr<ULastFPSCharacterDefinition>>& GetSelectableCharacterDefinitions() const { return SelectableCharacterDefinitions; }
 
     UFUNCTION(BlueprintImplementableEvent, Category="LastFPS|Character")
     void OnSelectedCharacterIndexChanged(int32 NewSelectedCharacterIndex);
@@ -145,6 +151,9 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
     TArray<TSubclassOf<APawn>> SelectableCharacterClasses;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
+    TArray<TObjectPtr<ULastFPSCharacterDefinition>> SelectableCharacterDefinitions;
 
     UPROPERTY(ReplicatedUsing=OnRep_SelectedCharacterIndex, BlueprintReadOnly, Category="LastFPS|Character")
     int32 SelectedCharacterIndex = 0;

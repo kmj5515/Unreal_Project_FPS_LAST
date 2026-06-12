@@ -17,6 +17,7 @@ public:
     FGameplayTag Character_State_Crouched;
 
     // 쿨다운
+    FGameplayTag Cooldown_Skill_Dash;
     FGameplayTag Cooldown_Skill1;
     FGameplayTag Cooldown_Skill2;
 

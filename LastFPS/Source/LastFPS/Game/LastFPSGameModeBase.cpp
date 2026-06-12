@@ -1,6 +1,8 @@
 #include "Game/LastFPSGameModeBase.h"
+#include "Character/LastFPSCharacterStatData.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
+#include "Game/LastFPSCharacterDefinition.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
 #include "Game/LastFPSPlayerState.h"
@@ -24,7 +26,7 @@ void ALastFPSGameModeBase::Logout(AController* Exiting)
 
 UClass* ALastFPSGameModeBase::GetDefaultPawnClassForController_Implementation(AController* InController)
 {
-    if (const ALastFPSPlayerState* LastPS = InController ? InController->GetPlayerState<ALastFPSPlayerState>() : nullptr)
+    if (ALastFPSPlayerState* LastPS = InController ? InController->GetPlayerState<ALastFPSPlayerState>() : nullptr)
     {
         int32 SelectedIndex = LastPS->GetSelectedCharacterIndex();
         if (ULastFPSGameInstance* LastGI = GetGameInstance<ULastFPSGameInstance>())
@@ -33,6 +35,16 @@ UClass* ALastFPSGameModeBase::GetDefaultPawnClassForController_Implementation(AC
             if (LastGI->TryGetSelectedCharacterIndex(LastPS->GetPlayerName(), RestoredIndex))
             {
                 SelectedIndex = RestoredIndex;
+            }
+        }
+
+        LastPS->Auth_SetSelectedCharacterIndex(SelectedIndex);
+
+        if (const ULastFPSCharacterDefinition* Definition = GetCharacterDefinitionForIndex(SelectedIndex))
+        {
+            if (Definition->PawnClass)
+            {
+                return Definition->PawnClass;
             }
         }
 
@@ -51,6 +63,28 @@ UClass* ALastFPSGameModeBase::GetDefaultPawnClassForController_Implementation(AC
     }
 
     return Super::GetDefaultPawnClassForController_Implementation(InController);
+}
+
+const ULastFPSCharacterDefinition* ALastFPSGameModeBase::GetCharacterDefinitionForIndex(const int32 CharacterIndex) const
+{
+    return CharacterDefinitions.IsValidIndex(CharacterIndex) ? CharacterDefinitions[CharacterIndex] : nullptr;
+}
+
+bool ALastFPSGameModeBase::ApplyCharacterDefinitionToAbilitySystem(
+    UAbilitySystemComponent* ASC,
+    const ULastFPSCharacterDefinition* CharacterDefinition) const
+{
+    if (!ASC || !CharacterDefinition)
+    {
+        return false;
+    }
+
+    if (CharacterDefinition->StatData && CharacterDefinition->StatData->ApplyToAbilitySystem(ASC))
+    {
+        return true;
+    }
+
+    return false;
 }
 
 int32 ALastFPSGameModeBase::GetTotalConnectedPlayers() const

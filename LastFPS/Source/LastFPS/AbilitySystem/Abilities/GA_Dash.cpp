@@ -4,6 +4,7 @@
 #include "Animation/AnimMontage.h"
 #include "Character/LastFPSHero.h"
 #include "Engine/World.h"
+#include "GameFramework/Controller.h"
 #include "Utility/LastFPSTags.h"
 
 UGA_Dash::UGA_Dash()
@@ -39,19 +40,28 @@ void UGA_Dash::ActivateAbility(
         return;
     }
 
+    ELastFPSDashDirection DashDirection = ELastFPSDashDirection::Forward;
+    const FVector DashVector = GetCardinalDashDirection(Hero, DashDirection);
+    const FDashMontageInfo& DashMontageInfo = GetDashMontageInfoForDirection(DashDirection);
+
     Hero->SetCombatState(EMMCombatState::Dashing);
+    if (!DashMontageInfo.bUseMontageRootMotion)
+    {
+        Hero->LaunchCharacter(DashVector * DashStrength, true, false);
+    }
 
     bool bWaitingForMontageEnd = false;
-    if (DashMontage && Hero->GetMesh())
+    UAnimMontage* SelectedDashMontage = DashMontageInfo.Montage.Get();
+    if (SelectedDashMontage && Hero->GetMesh())
     {
         if (UAnimInstance* AnimInstance = Hero->GetMesh()->GetAnimInstance())
         {
-            const float PlayedDuration = AnimInstance->Montage_Play(DashMontage, MontagePlayRate);
+            const float PlayedDuration = AnimInstance->Montage_Play(SelectedDashMontage, MontagePlayRate);
             if (PlayedDuration > 0.f)
             {
                 FOnMontageEnded EndDelegate;
                 EndDelegate.BindUObject(this, &UGA_Dash::OnDashMontageEnded);
-                AnimInstance->Montage_SetEndDelegate(EndDelegate, DashMontage);
+                AnimInstance->Montage_SetEndDelegate(EndDelegate, SelectedDashMontage);
                 bWaitingForMontageEnd = true;
             }
         }
@@ -82,12 +92,74 @@ void UGA_Dash::FinishDash()
 
 void UGA_Dash::OnDashMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
-    if (Montage != DashMontage)
+    if (!Montage)
     {
         return;
     }
 
     EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, bInterrupted);
+}
+
+FVector UGA_Dash::GetCardinalDashDirection(const ALastFPSHero* Hero, ELastFPSDashDirection& OutDashDirection) const
+{
+    OutDashDirection = ELastFPSDashDirection::Forward;
+
+    if (!Hero)
+    {
+        return FVector::ForwardVector;
+    }
+
+    const FRotator ControlRotation = Hero->GetController()
+        ? Hero->GetController()->GetControlRotation()
+        : Hero->GetActorRotation();
+    const FRotator YawRotation(0.f, ControlRotation.Yaw, 0.f);
+    const FVector Forward = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+    const FVector Right = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+    const FVector2D MoveInput = Hero->GetCachedMoveInput();
+    if (MoveInput.IsNearlyZero())
+    {
+        return Forward;
+    }
+
+    if (FMath::Abs(MoveInput.X) > FMath::Abs(MoveInput.Y))
+    {
+        OutDashDirection = MoveInput.X >= 0.f
+            ? ELastFPSDashDirection::Right
+            : ELastFPSDashDirection::Left;
+        return MoveInput.X >= 0.f ? Right : -Right;
+    }
+
+    OutDashDirection = MoveInput.Y >= 0.f
+        ? ELastFPSDashDirection::Forward
+        : ELastFPSDashDirection::Backward;
+    return MoveInput.Y >= 0.f ? Forward : -Forward;
+}
+
+const FDashMontageInfo& UGA_Dash::GetDashMontageInfoForDirection(ELastFPSDashDirection DashDirection) const
+{
+    const FDashMontageInfo* DirectionalMontageInfo = nullptr;
+    switch (DashDirection)
+    {
+    case ELastFPSDashDirection::Forward:
+        DirectionalMontageInfo = &DashForwardMontage;
+        break;
+    case ELastFPSDashDirection::Backward:
+        DirectionalMontageInfo = &DashBackwardMontage;
+        break;
+    case ELastFPSDashDirection::Left:
+        DirectionalMontageInfo = &DashLeftMontage;
+        break;
+    case ELastFPSDashDirection::Right:
+        DirectionalMontageInfo = &DashRightMontage;
+        break;
+    default:
+        break;
+    }
+    
+    return DirectionalMontageInfo && DirectionalMontageInfo->Montage.Get()
+        ? *DirectionalMontageInfo
+        : DefaultDashMontage;
 }
 
 void UGA_Dash::EndAbility(

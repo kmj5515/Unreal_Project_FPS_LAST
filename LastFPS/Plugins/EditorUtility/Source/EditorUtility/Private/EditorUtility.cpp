@@ -14,10 +14,12 @@
 #include "Styling/AppStyle.h"
 #include "Styling/SlateStyle.h"
 #include "Styling/SlateStyleRegistry.h"
+#include "../CharacterDatatAssetTool/SCharacterDataAssetTool.h"
 
 #define LOCTEXT_NAMESPACE "FEditorUtilityModule"
 
 const FName FEditorUtilityModule::LevelSelectionTabName("LevelSelectionTool");
+const FName FEditorUtilityModule::CharacterDataAssetTabName("CharacterDataAssetTool");
 
 void FEditorUtilityModule::StartupModule()
 {
@@ -64,11 +66,18 @@ void FEditorUtilityModule::RegisterTabSpawner()
 		.SetDisplayName(LOCTEXT("LevelSelectionTabTitle", "Level Selection Tool"))
 		.SetIcon(FSlateIcon(StyleSetInstance->GetStyleSetName(), "CatIcon"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
+
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(CharacterDataAssetTabName,
+		FOnSpawnTab::CreateRaw(this, &FEditorUtilityModule::OnSpawnCharacterDataAssetTab))
+		.SetDisplayName(LOCTEXT("CharacterDataAssetTabTitle", "Character Data Asset Tool"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.PrimaryDataAsset"))
+		.SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
 void FEditorUtilityModule::UnregisterTabSpawner()
 {
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(LevelSelectionTabName);
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(CharacterDataAssetTabName);
 }
 
 void FEditorUtilityModule::RegisterMenus()
@@ -96,6 +105,13 @@ void FEditorUtilityModule::FillLastFPSMenu(FMenuBuilder& MenuBuilder)
 			LOCTEXT("OpenLevelSelectionToolTooltip", "Opens the custom level selection tool."),
 			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.World"),
 			FUIAction(FExecuteAction::CreateRaw(this, &FEditorUtilityModule::OpenLevelSelectionTool))
+		);
+		
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("OpenCharacterDataAssetToolTitle", "캐릭터 데이터 에셋 생성 툴"),
+			LOCTEXT("OpenCharacterDataAssetTooltip", "Opens the custom character data asset make tool."),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.World"),
+			FUIAction(FExecuteAction::CreateRaw(this, &FEditorUtilityModule::OpenCharacterDataAssetTool))
 		);
 	}
 	MenuBuilder.EndSection();
@@ -128,6 +144,15 @@ TSharedRef<SDockTab> FEditorUtilityModule::OnSpawnLevelSelectionTab(const FSpawn
 	return NewTab;
 }
 
+TSharedRef<SDockTab> FEditorUtilityModule::OnSpawnCharacterDataAssetTab(const FSpawnTabArgs& Args)
+{
+	return SNew(SDockTab)
+		.TabRole(ETabRole::NomadTab)
+		[
+			SNew(SCharacterDataAssetTool)
+		];
+}
+
 void FEditorUtilityModule::OpenLevelSelectionTool()
 {
 	if (FGlobalTabmanager::Get()->HasTabSpawner(LevelSelectionTabName))
@@ -138,6 +163,19 @@ void FEditorUtilityModule::OpenLevelSelectionTool()
 	{
 		RegisterTabSpawner();
 		FGlobalTabmanager::Get()->TryInvokeTab(LevelSelectionTabName);
+	}
+}
+
+void FEditorUtilityModule::OpenCharacterDataAssetTool()
+{
+	if (FGlobalTabmanager::Get()->HasTabSpawner(CharacterDataAssetTabName))
+	{
+		FGlobalTabmanager::Get()->TryInvokeTab(CharacterDataAssetTabName);
+	}
+	else
+	{
+		RegisterTabSpawner();
+		FGlobalTabmanager::Get()->TryInvokeTab(CharacterDataAssetTabName);
 	}
 }
 

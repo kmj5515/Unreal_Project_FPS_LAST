@@ -9,6 +9,7 @@
 
 class UAbilitySystemComponent;
 class ULastFPSAttributeSet;
+class ULastFPSCharacterDefinition;
 class UGameplayEffect;
 class UGameplayAbility;
 class USoundBase;
@@ -42,6 +43,9 @@ public:
 
     virtual bool GetIsADS() const { return false; }
 
+    UFUNCTION(BlueprintPure, Category="LastFPS|Character")
+    const ULastFPSCharacterDefinition* GetCharacterDefinition() const;
+
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayHitSound();
 
@@ -71,6 +75,8 @@ protected:
     void OnHealthChanged(const FOnAttributeChangeData& Data);
     void UpdateAliveCollisionState(bool bAlive);
     void OnMoveSpeedChanged(const FOnAttributeChangeData& Data);
+    const ULastFPSCharacterDefinition* ResolveCharacterDefinition() const;
+    void ApplyCharacterVisuals(const ULastFPSCharacterDefinition* Definition);
 
     // AttributeSet은 PlayerState가 소유 — InitAbilitySystem에서 캐싱
     UPROPERTY()
@@ -79,6 +85,9 @@ protected:
     /** BP/에디터에서 캐릭터별 닉네임 지정. 비어 있으면 GetPlayerName() */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Display")
     FString CharacterNickname;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
+    TObjectPtr<ULastFPSCharacterDefinition> CharacterDefinition;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Sound")
     TObjectPtr<USoundBase> HitSound;

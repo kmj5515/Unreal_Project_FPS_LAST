@@ -17,7 +17,6 @@ public class EditorUtility : ModuleRules
 		
 		PrivateIncludePaths.AddRange(
 			new string[] {
-				// ... add other private include paths required here ...
 			}
 			);
 			
@@ -34,7 +33,8 @@ public class EditorUtility : ModuleRules
 				"AssetRegistry",
 				"Json",
 				"JsonUtilities",
-				"DeveloperSettings"
+				"DeveloperSettings",
+				"LastFPS"
 			}
 			);
 			
@@ -48,7 +48,10 @@ public class EditorUtility : ModuleRules
 				"UMGEditor",
 				"ToolMenus",
 				"DesktopPlatform",
-				"EngineSettings"
+				"EngineSettings",
+				"AssetTools",
+				"ContentBrowser",
+				"PropertyEditor"
 			}
 			);
 		

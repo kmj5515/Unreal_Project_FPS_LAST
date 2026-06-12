@@ -114,6 +114,8 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     const FLastFPSTags& FPSTags = FLastFPSTags::Get(); 
 
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_Move), ETriggerEvent::Triggered, this, &ALastFPSHero::Move);
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_Move), ETriggerEvent::Completed, this, &ALastFPSHero::ClearMoveInput);
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_Move), ETriggerEvent::Canceled, this, &ALastFPSHero::ClearMoveInput);
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_Look), ETriggerEvent::Triggered, this, &ALastFPSHero::Look);
     
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_ADS), ETriggerEvent::Started, this, &ALastFPSHero::SetADS, true);
@@ -142,17 +144,13 @@ void ALastFPSHero::HandleAbilityInput(const FInputActionValue& value, FGameplayT
         {
             InputReleased(InputID);
         }
-
-        // if (InputID == FLastFPSTags::Get().Input_Scoreboard)
-        // {
-        //     StopScoreboard();
-        // }
     }
 }
 
 void ALastFPSHero::Move(const FInputActionValue& Value)
 {
     const FVector2D MovementVector = Value.Get<FVector2D>();
+    CachedMoveInput = MovementVector;
     if (!Controller) return;
 
     const FRotator Rotation = Controller->GetControlRotation();
@@ -163,6 +161,11 @@ void ALastFPSHero::Move(const FInputActionValue& Value)
 
     AddMovementInput(ForwardDir, MovementVector.Y);
     AddMovementInput(RightDir,   MovementVector.X);
+}
+
+void ALastFPSHero::ClearMoveInput(const FInputActionValue& Value)
+{
+    CachedMoveInput = FVector2D::ZeroVector;
 }
 
 void ALastFPSHero::Look(const FInputActionValue& Value)

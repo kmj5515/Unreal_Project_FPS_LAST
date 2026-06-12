@@ -14,6 +14,10 @@ class LASTFPS_API ULastFPSTagFunctionLibrary : public UBlueprintFunctionLibrary
     GENERATED_BODY()
 
 public:
+    /** Dash 쿨다운 태그 반환 */
+    UFUNCTION(BlueprintPure, Category = "LastFPS|Tags")
+    static FGameplayTag GetTag_CooldownSkillDash();
+
     /** 스킬 1 쿨다운 태그 반환 */
     UFUNCTION(BlueprintPure, Category = "LastFPS|Tags")
     static FGameplayTag GetTag_CooldownSkill1();

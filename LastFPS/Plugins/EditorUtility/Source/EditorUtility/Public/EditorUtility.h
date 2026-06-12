@@ -18,8 +18,12 @@ private:
 
 	void FillLastFPSMenu(class FMenuBuilder& MenuBuilder);
 	TSharedRef<class SDockTab> OnSpawnLevelSelectionTab(const class FSpawnTabArgs& Args);
+	TSharedRef<class SDockTab> OnSpawnCharacterDataAssetTab(const class FSpawnTabArgs& Args);
 	void OpenLevelSelectionTool();
-
+	
+	void OpenCharacterDataAssetTool();
+	
 	static const FName LevelSelectionTabName;
+	static const FName CharacterDataAssetTabName;
 	TSharedPtr<class FSlateStyleSet> StyleSetInstance;
 };

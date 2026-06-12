@@ -9,13 +9,14 @@ public class LastFPS : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
 		// 모듈 루트를 include path에 추가 → "AbilitySystem/AttributeSets/Foo.h" 형태로 사용 가능
-		PrivateIncludePaths.Add(ModuleDirectory);
+		PublicIncludePaths.Add(ModuleDirectory);
 
 		PublicDependencyModuleNames.AddRange(new string[] {
 			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
 			"UMG", "Json", "JsonUtilities", "AssetRegistry", "DeveloperSettings",
-			"CommonUI", "CommonInput", "CommonGame", "ModularGameplayActors"
+			"CommonUI", "CommonInput", "CommonGame", "ModularGameplayActors",
+			"AIModule"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "NetCore", "SlateCore" });
