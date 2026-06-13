@@ -17,13 +17,20 @@ ALastFPSCharacterBase::ALastFPSCharacterBase()
 {
     PrimaryActorTick.bCanEverTick = false;
     bReplicates = true;
+
+    OwnedAbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("OwnedAbilitySystemComponent"));
+    OwnedAbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+
+    OwnedAttributeSet = CreateDefaultSubobject<ULastFPSAttributeSet>(TEXT("OwnedAttributeSet"));
+    OwnedAbilitySystemComponent->AddAttributeSetSubobject(OwnedAttributeSet.Get());
 }
 
 UAbilitySystemComponent* ALastFPSCharacterBase::GetAbilitySystemComponent() const
 {
     if (const ALastFPSPlayerState* PS = GetPlayerState<ALastFPSPlayerState>())
         return PS->GetAbilitySystemComponent();
-    return nullptr;
+
+    return OwnedAbilitySystemComponent;
 }
 
 bool ALastFPSCharacterBase::IsAlive() const
@@ -53,17 +60,14 @@ const ULastFPSCharacterDefinition* ALastFPSCharacterBase::ResolveCharacterDefini
         return CharacterDefinition;
     }
 
-    const ALastFPSPlayerState* PS = GetPlayerState<ALastFPSPlayerState>();
-    if (!PS)
+    if (const ALastFPSPlayerState* PS = GetPlayerState<ALastFPSPlayerState>())
     {
-        return nullptr;
-    }
-
-    if (const UWorld* World = GetWorld())
-    {
-        if (const ALastFPSGameModeBase* GM = World->GetAuthGameMode<ALastFPSGameModeBase>())
+        if (const UWorld* World = GetWorld())
         {
-            return GM->GetCharacterDefinitionForIndex(PS->GetSelectedCharacterIndex());
+            if (const ALastFPSGameModeBase* GM = World->GetAuthGameMode<ALastFPSGameModeBase>())
+            {
+                return GM->GetCharacterDefinitionForIndex(PS->GetSelectedCharacterIndex());
+            }
         }
     }
 
@@ -163,13 +167,31 @@ void ALastFPSCharacterBase::ClearRecentAttackers()
 void ALastFPSCharacterBase::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (const ULastFPSCharacterDefinition* Definition = ResolveCharacterDefinition())
+    {
+        if (Definition->CharacterType != ELastFPSCharacterType::Player)
+        {
+            InitAbilitySystem();
+        }
+    }
+}
+
+void ALastFPSCharacterBase::PostInitializeComponents()
+{
+    Super::PostInitializeComponents();
+
+    if (OwnedAbilitySystemComponent)
+    {
+        OwnedAbilitySystemComponent->SetIsReplicated(true);
+    }
 }
 
 void ALastFPSCharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     if (HealthDelegateHandle.IsValid())
     {
-        if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+        if (UAbilitySystemComponent* ASC = BoundAttributeASC.Get())
         {
             ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetHealthAttribute())
                 .Remove(HealthDelegateHandle);
@@ -179,13 +201,14 @@ void ALastFPSCharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
     if (MoveSpeedDelegateHandle.IsValid())
     {
-        if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+        if (UAbilitySystemComponent* ASC = BoundAttributeASC.Get())
         {
             ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetMoveSpeedAttribute())
                 .Remove(MoveSpeedDelegateHandle);
         }
         MoveSpeedDelegateHandle.Reset();
     }
+    BoundAttributeASC.Reset();
     Super::EndPlay(EndPlayReason);
 }
 
@@ -204,18 +227,41 @@ void ALastFPSCharacterBase::OnRep_PlayerState()
 void ALastFPSCharacterBase::InitAbilitySystem()
 {
     ALastFPSPlayerState* PS = GetPlayerState<ALastFPSPlayerState>();
-    if (!PS) return;
-
-    UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent();
+    UAbilitySystemComponent* ASC = PS ? PS->GetAbilitySystemComponent() : OwnedAbilitySystemComponent.Get();
     if (!ASC) return;
 
-    // PlayerState가 GAS Owner, Character가 Avatar
-    ASC->InitAbilityActorInfo(PS, this);
+    // Players use PlayerState as owner; non-player characters own their ASC.
+    AActor* AbilityOwner = PS ? static_cast<AActor*>(PS) : static_cast<AActor*>(this);
+    ASC->InitAbilityActorInfo(AbilityOwner, this);
 
-    // AttributeSet 캐싱 — GetHealth() 등이 PlayerState 캐스팅 없이 접근 가능
-    AttributeSet = PS->GetAttributeSet();
+    // Cache the active AttributeSet so attribute helpers work for both ownership modes.
+    AttributeSet = PS ? PS->GetAttributeSet() : OwnedAttributeSet.Get();
     const ULastFPSCharacterDefinition* ResolvedDefinition = ResolveCharacterDefinition();
     ApplyCharacterVisuals(ResolvedDefinition);
+
+    if (BoundAttributeASC.Get() != ASC)
+    {
+        if (UAbilitySystemComponent* PreviousASC = BoundAttributeASC.Get())
+        {
+            if (MoveSpeedDelegateHandle.IsValid())
+            {
+                PreviousASC->GetGameplayAttributeValueChangeDelegate(
+                    ULastFPSAttributeSet::GetMoveSpeedAttribute())
+                    .Remove(MoveSpeedDelegateHandle);
+                MoveSpeedDelegateHandle.Reset();
+            }
+
+            if (HealthDelegateHandle.IsValid())
+            {
+                PreviousASC->GetGameplayAttributeValueChangeDelegate(
+                    ULastFPSAttributeSet::GetHealthAttribute())
+                    .Remove(HealthDelegateHandle);
+                HealthDelegateHandle.Reset();
+            }
+        }
+
+        BoundAttributeASC = ASC;
+    }
 
     if (!MoveSpeedDelegateHandle.IsValid())
     {
@@ -231,7 +277,8 @@ void ALastFPSCharacterBase::InitAbilitySystem()
             .AddUObject(this, &ALastFPSCharacterBase::OnHealthChanged);
     }
 
-    if (HasAuthority() && !PS->HasGrantedGASDefaults())
+    const bool bDefaultsAlreadyGranted = PS ? PS->HasGrantedGASDefaults() : bOwnedGASDefaultsGranted;
+    if (HasAuthority() && !bDefaultsAlreadyGranted)
     {
         if (ALastFPSGameModeBase* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALastFPSGameModeBase>() : nullptr)
         {
@@ -240,7 +287,15 @@ void ALastFPSCharacterBase::InitAbilitySystem()
 
         GiveDefaultAbilities();
         ApplyDefaultEffects();
-        PS->MarkGASDefaultsGranted();
+
+        if (PS)
+        {
+            PS->MarkGASDefaultsGranted();
+        }
+        else
+        {
+            bOwnedGASDefaultsGranted = true;
+        }
     }
 
     if (AttributeSet && GetCharacterMovement())

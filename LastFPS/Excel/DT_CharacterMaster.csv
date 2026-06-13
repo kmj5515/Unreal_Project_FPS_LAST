@@ -1,4 +1,5 @@
 ﻿Name,CharacterId,CharacterType,DisplayName,Role,Description,Icon,PawnClass,TargetDefinition,DefinitionAssetName,bGenerateDefinition,StatData,VisualData,AbilitySet,AIProfile
-Viola,Viola,Player,비올라,,,,,,DA_Char_Viola,true,,,,
-Sniper,Sniper,Player,스나이퍼,,,,,,DA_Char_Sniper,true,,,,
-Engineer,Engineer,Player,엔지니어,,,,,,DA_Char_Engineer,true,,,,
+Viola,Viola,Player,비올라,,,,,,DA_Char_Viola,TRUE,,,,
+Sniper,Sniper,Player,스나이퍼,,,,,,DA_Char_Sniper,TRUE,,,,
+Engineer,Engineer,Player,엔지니어,,,,,,DA_Char_Engineer,TRUE,,,,
+Dummy,Dummy,Dummy,더미,Test Character,Dummy character for testing.,,,,DA_Char_Dummy,TRUE,,,,

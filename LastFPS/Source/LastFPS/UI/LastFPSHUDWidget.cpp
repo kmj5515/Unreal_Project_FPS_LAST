@@ -47,6 +47,8 @@ bool FLastFPSSmoothedGaugeDisplay::Tick(float DeltaTime, float FillDuration)
 }
 
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
+#include "Input/CommonUIInputTypes.h"
+#include "Input/UIActionBindingHandle.h"
 #include "Game/LastFPSPlayerState.h"
 #include "GameFramework/PlayerState.h"
 #include "Character/LastFPSCharacterBase.h"
@@ -111,6 +113,15 @@ void ULastFPSHUDWidget::NativeDestruct()
     }
 
     Super::NativeDestruct();
+}
+
+TOptional<FUIInputConfig> ULastFPSHUDWidget::GetDesiredInputConfig() const
+{
+    return FUIInputConfig(
+        ECommonInputMode::Game,
+        EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown,
+        EMouseLockMode::LockOnCapture,
+        true);
 }
 
 void ULastFPSHUDWidget::RetryInitialize()

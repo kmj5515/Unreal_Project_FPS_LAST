@@ -24,5 +24,11 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Character Data Asset Tool")
 	FString CharacterDefinitionOutputRoot = TEXT("/Game/Data/Characters");
 
+	UPROPERTY(Config, EditAnywhere, Category="Character Data Asset Tool")
+	FString CharacterStatOutputRoot = TEXT("/Game/Data/Characters");
+
+	UPROPERTY(Config, EditAnywhere, Category="Character Data Asset Tool")
+	FString CharacterAbilitySetOutputRoot = TEXT("/Game/Data/Characters");
+
 	static const UEUW_Settings* Get() { return GetDefault<UEUW_Settings>(); }
 };

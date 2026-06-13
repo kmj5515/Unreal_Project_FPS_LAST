@@ -68,6 +68,7 @@ protected:
     virtual void PossessedBy(AController* NewController) override;
     // 클라이언트: PlayerState 복제 완료 시 ASC 초기화
     virtual void OnRep_PlayerState() override;
+    virtual void PostInitializeComponents() override;
 
     void InitAbilitySystem();
     virtual void GiveDefaultAbilities();
@@ -78,9 +79,18 @@ protected:
     const ULastFPSCharacterDefinition* ResolveCharacterDefinition() const;
     void ApplyCharacterVisuals(const ULastFPSCharacterDefinition* Definition);
 
-    // AttributeSet은 PlayerState가 소유 — InitAbilitySystem에서 캐싱
+    // Character-owned GAS used when there is no PlayerState ASC.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="GAS")
+    TObjectPtr<UAbilitySystemComponent> OwnedAbilitySystemComponent;
+
+    UPROPERTY()
+    TObjectPtr<ULastFPSAttributeSet> OwnedAttributeSet;
+
     UPROPERTY()
     TObjectPtr<ULastFPSAttributeSet> AttributeSet;
+
+    bool bOwnedGASDefaultsGranted = false;
+    TWeakObjectPtr<UAbilitySystemComponent> BoundAttributeASC;
 
     /** BP/에디터에서 캐릭터별 닉네임 지정. 비어 있으면 GetPlayerName() */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Display")

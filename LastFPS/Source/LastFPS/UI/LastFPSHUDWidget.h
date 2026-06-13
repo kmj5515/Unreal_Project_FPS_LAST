@@ -37,6 +37,7 @@ public:
 
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
+    virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
 
     UFUNCTION(BlueprintCallable, Category="HUD|HitMarker")
     void ShowHitMarker();

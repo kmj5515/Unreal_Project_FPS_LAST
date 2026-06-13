@@ -86,44 +86,32 @@ void SCharacterDataAssetTool::Construct(const FArguments& InArgs)
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 8.f)
 			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("OutputRootLabel", "Output Root"))
+				DrawFolderPickerSection(
+					LOCTEXT("DefinitionOutputRootLabel", "Definition Output Root"),
+					&SCharacterDataAssetTool::DefinitionOutputRoot,
+					LOCTEXT("GenerateDefinitionButton", "Generate"),
+					&SCharacterDataAssetTool::GenerateCharacterDefinition)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 16.f)
 			[
-				SNew(SHorizontalBox)
-
-				+ SHorizontalBox::Slot()
-				.FillWidth(1.f)
-				[
-					SNew(SEditableTextBox)
-					.IsReadOnly(true)
-					.Text(this, &SCharacterDataAssetTool::GetOutputRootText)
-				]
-
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(8.f, 0.f, 0.f, 0.f)
-				[
-					SNew(SButton)
-					.Text(LOCTEXT("PickFolderButton", "Choose Folder"))
-					.OnClicked(this, &SCharacterDataAssetTool::OpenOutputRootPicker)
-				]
+				DrawFolderPickerSection(
+					LOCTEXT("StatOutputRootLabel", "Stat Output Root"),
+					&SCharacterDataAssetTool::StatOutputRoot,
+					LOCTEXT("GenerateStatButton", "Generate Stat"),
+					&SCharacterDataAssetTool::GenerateCharacterStat)
 			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.HAlign(HAlign_Right)
 			[
-				SNew(SButton)
-				.Text(LOCTEXT("GenerateButton", "Generate"))
-				.IsEnabled(this, &SCharacterDataAssetTool::CanGenerate)
-				.OnClicked(this, &SCharacterDataAssetTool::GenerateCharacterDefinition)
+				DrawFolderPickerSection(
+					LOCTEXT("AbilitySetOutputRootLabel", "AbilitySet Output Root"),
+					&SCharacterDataAssetTool::AbilitySetOutputRoot,
+					LOCTEXT("GenerateAbilityButton", "Generate AbilitySet"),
+					&SCharacterDataAssetTool::GenerateCharacterAbilitySet)
 			]
 		]
 	];
@@ -139,9 +127,15 @@ void SCharacterDataAssetTool::LoadSettings()
 	if (const UEUW_Settings* Settings = UEUW_Settings::Get())
 	{
 		MasterTableObjectPath = Settings->CharacterMasterTable.ToSoftObjectPath().ToString();
-		OutputRoot = Settings->CharacterDefinitionOutputRoot.IsEmpty()
-			? OutputRoot
-			: Settings->CharacterDefinitionOutputRoot;
+		DefinitionOutputRoot = Settings->CharacterDefinitionOutputRoot.IsEmpty()
+			                       ? DefinitionOutputRoot
+			                       : Settings->CharacterDefinitionOutputRoot;
+		StatOutputRoot = Settings->CharacterStatOutputRoot.IsEmpty()
+			                 ? StatOutputRoot
+			                 : Settings->CharacterStatOutputRoot;
+		AbilitySetOutputRoot = Settings->CharacterAbilitySetOutputRoot.IsEmpty()
+			                       ? AbilitySetOutputRoot
+			                       : Settings->CharacterAbilitySetOutputRoot;
 		MasterTable = Settings->CharacterMasterTable.LoadSynchronous();
 	}
 
@@ -156,7 +150,9 @@ void SCharacterDataAssetTool::SaveSettings() const
 	if (UEUW_Settings* Settings = GetMutableDefault<UEUW_Settings>())
 	{
 		Settings->CharacterMasterTable = TSoftObjectPtr<UDataTable>(FSoftObjectPath(MasterTableObjectPath));
-		Settings->CharacterDefinitionOutputRoot = OutputRoot;
+		Settings->CharacterDefinitionOutputRoot = DefinitionOutputRoot;
+		Settings->CharacterStatOutputRoot = StatOutputRoot;
+		Settings->CharacterAbilitySetOutputRoot = AbilitySetOutputRoot;
 		Settings->SaveConfig();
 	}
 }
@@ -221,15 +217,23 @@ TSharedRef<SWidget> SCharacterDataAssetTool::GenerateRowNameWidget(TSharedPtr<FN
 FText SCharacterDataAssetTool::GetSelectedRowNameText() const
 {
 	return SelectedRowName.IsValid()
-		? FText::FromName(*SelectedRowName)
-		: LOCTEXT("NoRowSelected", "Select a row");
+		       ? FText::FromName(*SelectedRowName)
+		       : LOCTEXT("NoRowSelected", "Select a row");
 }
 
-FReply SCharacterDataAssetTool::OpenOutputRootPicker()
+FReply SCharacterDataAssetTool::OpenFolderPicker(FString SCharacterDataAssetTool::*OutputRootMember)
 {
 	FPathPickerConfig PathPickerConfig;
-	PathPickerConfig.DefaultPath = OutputRoot;
-	PathPickerConfig.OnPathSelected = FOnPathSelected::CreateSP(this, &SCharacterDataAssetTool::HandleOutputRootSelected);
+	PathPickerConfig.DefaultPath = (this->*OutputRootMember);
+	PathPickerConfig.OnPathSelected = FOnPathSelected::CreateLambda(
+		[this, OutputRootMember](const FString& SelectedPath)
+		{
+			if (!SelectedPath.IsEmpty())
+			{
+				(this->*OutputRootMember) = SelectedPath;
+				SaveSettings();
+			}
+		});
 
 	FContentBrowserModule& ContentBrowserModule =
 		FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
@@ -272,15 +276,6 @@ FReply SCharacterDataAssetTool::OpenOutputRootPicker()
 	return FReply::Handled();
 }
 
-void SCharacterDataAssetTool::HandleOutputRootSelected(const FString& SelectedPath)
-{
-	if (!SelectedPath.IsEmpty())
-	{
-		OutputRoot = SelectedPath;
-		SaveSettings();
-	}
-}
-
 FReply SCharacterDataAssetTool::GenerateCharacterDefinition()
 {
 	UDataTable* Table = MasterTable.Get();
@@ -298,16 +293,17 @@ FReply SCharacterDataAssetTool::GenerateCharacterDefinition()
 	}
 
 	const FString CharacterIdString = Row->CharacterId.IsNone()
-		? SelectedRowName->ToString()
-		: Row->CharacterId.ToString();
+		                                  ? SelectedRowName->ToString()
+		                                  : Row->CharacterId.ToString();
+
 	const FString AssetName = Row->DefinitionAssetName.IsEmpty()
-		? FString::Printf(TEXT("DA_Char_%s"), *CharacterIdString)
-		: Row->DefinitionAssetName;
+		                          ? FString::Printf(TEXT("DA_Char_%s"), *CharacterIdString)
+		                          : Row->DefinitionAssetName;
 
 	ULastFPSCharacterDefinition* Definition = Row->TargetDefinition.LoadSynchronous();
 	if (!Definition)
 	{
-		const FString PackageName = OutputRoot / AssetName;
+		const FString PackageName = DefinitionOutputRoot / AssetName;
 		if (!FPackageName::IsValidLongPackageName(PackageName))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Invalid character definition package path: %s"), *PackageName);
@@ -347,14 +343,194 @@ FReply SCharacterDataAssetTool::GenerateCharacterDefinition()
 	return FReply::Handled();
 }
 
-FText SCharacterDataAssetTool::GetOutputRootText() const
-{
-	return FText::FromString(OutputRoot);
-}
-
 bool SCharacterDataAssetTool::CanGenerate() const
 {
-	return MasterTable.IsValid() && SelectedRowName.IsValid() && !OutputRoot.IsEmpty();
+	return MasterTable.IsValid() && SelectedRowName.IsValid();
+}
+
+TSharedRef<SWidget> SCharacterDataAssetTool::DrawFolderPickerSection(
+	const FText& LabelText,
+	FString SCharacterDataAssetTool::*OutputRootMember,
+	const FText& GenerateButtonText,
+	FReply (SCharacterDataAssetTool::*OnGenerateClicked)())
+{
+	return SNew(SVerticalBox)
+
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0.f, 0.f, 0.f, 8.f)
+		[
+			SNew(STextBlock)
+			.Text(LabelText)
+		]
+
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0.f, 0.f, 0.f, 16.f)
+		[
+			SNew(SHorizontalBox)
+
+			+ SHorizontalBox::Slot()
+			.FillWidth(1.f)
+			[
+				SNew(SEditableTextBox)
+				.IsReadOnly(true)
+				.Text_Lambda([this, OutputRootMember]()
+				{
+					return FText::FromString((this->*OutputRootMember));
+				})
+			]
+
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.Padding(8.f, 0.f, 0.f, 0.f)
+			[
+				SNew(SButton)
+				.Text(LOCTEXT("PickFolderButton", "Choose Folder"))
+				.OnClicked_Lambda([this, OutputRootMember]()
+				{
+					return OpenFolderPicker(OutputRootMember);
+				})
+			]
+
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.Padding(4.f, 0.f)
+			[
+				SNew(SButton)
+				.ContentPadding(FMargin(12.f, 4.f))
+				.Text(GenerateButtonText)
+				.IsEnabled_Lambda([this, OutputRootMember]()
+				{
+					return CanGenerate() && !(this->*OutputRootMember).IsEmpty();
+				})
+				.OnClicked(this, OnGenerateClicked)
+			]
+		];
+}
+
+FReply SCharacterDataAssetTool::GenerateCharacterStat()
+{
+	UDataTable* Table = MasterTable.Get();
+	if (!Table || !SelectedRowName.IsValid())
+	{
+		return FReply::Handled();
+	}
+
+	static const FString Context(TEXT("CharacterDataAssetTool"));
+	const FLastFPSCharacterMasterData* Row =
+		Table->FindRow<FLastFPSCharacterMasterData>(*SelectedRowName, Context, true);
+	if (!Row)
+	{
+		return FReply::Handled();
+	}
+
+	ULastFPSCharacterStatData* StatData = Row->StatData.LoadSynchronous();
+	if (!StatData)
+	{
+		const FString CharacterIdString = Row->CharacterId.IsNone()
+			                                  ? SelectedRowName->ToString()
+			                                  : Row->CharacterId.ToString();
+
+		const FString AssetName = FString::Printf(TEXT("DA_Char_%s_Stat"), *CharacterIdString);
+		const FString PackageName = StatOutputRoot / AssetName;
+
+		if (!FPackageName::IsValidLongPackageName(PackageName))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Invalid character definition package path: %s"),
+			       *PackageName);
+			return FReply::Handled();
+		}
+
+		if (UObject* ExistingAsset = StaticLoadObject(ULastFPSCharacterStatData::StaticClass(),
+		                                              nullptr, *(PackageName + TEXT(".") + AssetName)))
+		{
+			StatData = Cast<ULastFPSCharacterStatData>(ExistingAsset);
+		}
+		else
+		{
+			UPackage* Package = CreatePackage(*PackageName);
+			StatData = NewObject<ULastFPSCharacterStatData>(Package, ULastFPSCharacterStatData::StaticClass(),
+			                                                *AssetName, RF_Public | RF_Standalone | RF_Transactional);
+
+			FAssetRegistryModule::AssetCreated(StatData);
+		}
+	}
+
+	if (StatData)
+	{
+		StatData->MarkPackageDirty();
+
+		TArray<UObject*> ObjectsToSync;
+		ObjectsToSync.Add(StatData);
+		GEditor->SyncBrowserToObjects(ObjectsToSync);
+	}
+
+	return FReply::Handled();
+}
+
+FReply SCharacterDataAssetTool::GenerateCharacterAbilitySet()
+{
+	UDataTable* Table = MasterTable.Get();
+	if (!Table || !SelectedRowName.IsValid())
+	{
+		return FReply::Handled();
+	}
+
+	static const FString Context(TEXT("CharacterDataAssetTool"));
+	const FLastFPSCharacterMasterData* Row =
+		Table->FindRow<FLastFPSCharacterMasterData>(*SelectedRowName, Context, true);
+	if (!Row)
+	{
+		return FReply::Handled();
+	}
+
+	ULastFPSAbilitySet* AbilitySet = Row->AbilitySet.LoadSynchronous();
+	if (!AbilitySet)
+	{
+		const FString CharacterIdString = Row->CharacterId.IsNone()
+			                                  ? SelectedRowName->ToString()
+			                                  : Row->CharacterId.ToString();
+
+		const FString AssetName = FString::Printf(TEXT("DA_Char_%s_AbilitySet"), *CharacterIdString);
+		const FString PackageName = AbilitySetOutputRoot / AssetName;
+
+		if (!FPackageName::IsValidLongPackageName(PackageName))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Invalid character ability set package path: %s"), *PackageName);
+			return FReply::Handled();
+		}
+
+		if (UObject* ExistingAsset = StaticLoadObject(
+			ULastFPSAbilitySet::StaticClass(),
+			nullptr,
+			*(PackageName + TEXT(".") + AssetName)))
+		{
+			AbilitySet = Cast<ULastFPSAbilitySet>(ExistingAsset);
+		}
+		else
+		{
+			UPackage* Package = CreatePackage(*PackageName);
+			AbilitySet = NewObject<ULastFPSAbilitySet>(
+				Package,
+				ULastFPSAbilitySet::StaticClass(),
+				*AssetName,
+				RF_Public | RF_Standalone | RF_Transactional);
+
+			FAssetRegistryModule::AssetCreated(AbilitySet);
+		}
+	}
+
+	if (AbilitySet)
+	{
+		AbilitySet->MarkPackageDirty();
+
+		TArray<UObject*> ObjectsToSync;
+		ObjectsToSync.Add(AbilitySet);
+		GEditor->SyncBrowserToObjects(ObjectsToSync);
+	}
+
+	return FReply::Handled();
 }
 
 UObject* SCharacterDataAssetTool::LoadSoftObject(const FSoftObjectPath& Path) const
