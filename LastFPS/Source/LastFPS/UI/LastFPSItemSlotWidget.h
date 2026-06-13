@@ -23,8 +23,9 @@ class LASTFPS_API ULastFPSItemSlotWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	/** @param Count 보유 수량. 1 이하면 수량 텍스트(TB_Count) 숨김. */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Inventory")
-	void SetupSlot(const FLastFPSItemData& InItem);
+	void SetupSlot(const FLastFPSItemData& InItem, int32 Count = 1);
 
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Inventory")
 	void SetEmpty();
@@ -46,4 +47,8 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_Rarity;
+
+	/** 보유 수량 (예: "x3"). 1개면 숨김. */
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> TB_Count;
 };

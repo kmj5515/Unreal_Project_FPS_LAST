@@ -3,7 +3,7 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 
-void ULastFPSItemSlotWidget::SetupSlot(const FLastFPSItemData& InItem)
+void ULastFPSItemSlotWidget::SetupSlot(const FLastFPSItemData& InItem, int32 Count)
 {
 	// 배경 숨기고 희귀도 테두리 표시
 	if (Img_Background)
@@ -36,6 +36,19 @@ void ULastFPSItemSlotWidget::SetupSlot(const FLastFPSItemData& InItem)
 		TB_Rarity->SetText(UEnum::GetDisplayValueAsText(InItem.Rarity));
 		TB_Rarity->SetColorAndOpacity(FSlateColor(RarityToColor(InItem.Rarity)));
 	}
+
+	if (TB_Count)
+	{
+		if (Count > 1)
+		{
+			TB_Count->SetText(FText::Format(NSLOCTEXT("LastFPS", "Inventory_Count", "x{0}"), FText::AsNumber(Count)));
+			TB_Count->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+		else
+		{
+			TB_Count->SetVisibility(ESlateVisibility::Hidden);
+		}
+	}
 }
 
 void ULastFPSItemSlotWidget::SetEmpty()
@@ -59,6 +72,10 @@ void ULastFPSItemSlotWidget::SetEmpty()
 	if (TB_Rarity)
 	{
 		TB_Rarity->SetText(FText::GetEmpty());
+	}
+	if (TB_Count)
+	{
+		TB_Count->SetVisibility(ESlateVisibility::Hidden);
 	}
 }
 

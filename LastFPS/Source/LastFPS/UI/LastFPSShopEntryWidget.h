@@ -33,9 +33,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Shop")
 	void SetupShopItem(const FLastFPSShopItemData& InItem, FName InRowName);
 
-	/** 구매 완료 표시로 전환 — 버튼 비활성화 + 가격란을 "구매됨"으로 변경 */
+	/** 잔액으로 구매 가능한지에 따라 구매 버튼 활성/비활성 (무제한 재고 — 살 수 있으면 반복 구매) */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Shop")
-	void SetPurchased(bool bInPurchased);
+	void SetAffordable(bool bAffordable);
+
+	/** 이 항목의 가격 (상점 화면이 잔액 비교에 사용) */
+	int32 GetPrice() const { return Price; }
+
+	/** 구매 성공 시 호출 — 연출용(가격란 깜빡임 등). WBP에서 구현(선택). */
+	UFUNCTION(BlueprintImplementableEvent, Category="LastFPS|Shop")
+	void OnPurchaseSucceeded();
 
 	/** 부모(상점 화면)가 바인딩 — 구매 버튼 클릭 시 RowName과 함께 호출 */
 	FOnShopItemBuyClicked OnBuyClicked;

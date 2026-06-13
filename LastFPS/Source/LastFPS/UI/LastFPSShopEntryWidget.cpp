@@ -54,21 +54,17 @@ void ULastFPSShopEntryWidget::SetupShopItem(const FLastFPSShopItemData& InItem, 
 		TB_Rarity->SetColorAndOpacity(FSlateColor(ULastFPSItemSlotWidget::RarityToColor(InItem.Rarity)));
 	}
 
-	SetPurchased(false);
-}
-
-void ULastFPSShopEntryWidget::SetPurchased(bool bInPurchased)
-{
 	if (TB_Price)
 	{
-		TB_Price->SetText(bInPurchased
-			? NSLOCTEXT("LastFPS", "Shop_Purchased", "구매됨")
-			: FText::AsNumber(Price));
+		TB_Price->SetText(FText::AsNumber(Price));
 	}
+}
 
+void ULastFPSShopEntryWidget::SetAffordable(bool bAffordable)
+{
 	if (Button_Buy)
 	{
-		Button_Buy->SetIsEnabled(!bInPurchased);
+		Button_Buy->SetIsEnabled(bAffordable);
 	}
 }
 

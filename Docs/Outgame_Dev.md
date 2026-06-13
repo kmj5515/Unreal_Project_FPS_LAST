@@ -1,14 +1,16 @@
 # 아웃게임 개발 체크리스트
 
-> 마지막 업데이트: 2026-06-10
+> 마지막 업데이트: 2026-06-13
 > 기준 브랜치: `kmj-dev-roll`
-> 전체 완성도: **약 50%** (Phase 1 완료 + 인벤토리/상점 UI 프로토타입 완료)
+> 전체 완성도: **약 55%** (Phase 1 완료 + 인벤토리/상점 화폐·보유 시스템 연동)
 
 > **설계 방침** — The First Descendant 참고 PvE 루터슈터지만 **"매치" 개념 없음**: 매치 결과/스코어보드, 로비 출격(StartMatch) **미사용**
 
 > **UI 시스템 문서** — 구조/사용법 → [`UI_System.md`](UI_System.md)
 
-> **최근 변경 (06-10) — 캐릭터 선택창 Prev/Next 버튼 제거**: 카드 직접 클릭(`OnCardClicked`)만으로 선택하도록 정리. `Button_Prev`/`Button_Next` 바인딩 + `HandlePrevClicked`/`HandleNextClicked` + `OnSelectionChanged`의 활성/비활성 토글 코드 제거. **에디터**: `WBP_CharacterSelect`에서 Prev/Next 버튼 제거 필요(C++은 `BindWidgetOptional`이라 안전).
+> **최근 변경 (06-13) — 상점 화폐/재고 시스템 (실제 차감+소지)**: `ULastFPSEconomySubsystem`(GameInstanceSubsystem) 신설 — `Credits`(세션 잔액) + `OwnedItems`(DT_ItemData 행이름→수량). 맵 이동(메인/캐릭선택/허브)에도 유지, 앱 재시작 시 `StartingCredits`(기본 10000)/`StartingOwnedItems`로 초기화(SaveGame 영속화는 추후). 구매 = `TryPurchase(GrantItemRowId, Price)` → 잔액 충분하면 차감 + 아이템 지급, 부족하면 거부. **재고 무제한**(살 수 있으면 반복 구매). `FLastFPSShopItemData`에 `GrantItemRowId`(지급할 DT_ItemData 행) 필드 추가. 상점 화면: `TB_Credits` 잔액 표시 + 잔액 변동 시(`OnCreditsChanged`) 각 엔트리 구매버튼 활성/비활성. 엔트리: 영구 "구매됨" 토글 제거 → 가격 상시 표시 + `SetAffordable` + `OnPurchaseSucceeded`(BP 연출용). 인벤토리: 테이블 전수 표시 폐기 → `OwnedItems`만 표시, `OnInventoryChanged` 구독 자동 재구성, 슬롯 수량(`TB_Count`) 표시. **테스트 데이터**: 아이템 5종 + 상점 5종(서로 `GrantItemRowId` 매칭) 임포트 완료. **에디터 작업 남음(선택)**: ① `WBP_Shop`에 `TB_Credits` 텍스트 추가(잔액 표시) ② `WBP_ItemSlot`에 `TB_Count` 텍스트 추가(스택 수량) ③ 데모 시드 원하면 EconomySubsystem `StartingOwnedItems`/`StartingCredits`를 `DefaultGame.ini`에 지정.
+>
+> **이전 변경 (06-10) — 캐릭터 선택창 Prev/Next 버튼 제거**: 카드 직접 클릭(`OnCardClicked`)만으로 선택하도록 정리. `Button_Prev`/`Button_Next` 바인딩 + `HandlePrevClicked`/`HandleNextClicked` + `OnSelectionChanged`의 활성/비활성 토글 코드 제거. **에디터**: `WBP_CharacterSelect`에서 Prev/Next 버튼 제거 필요(C++은 `BindWidgetOptional`이라 안전).
 >
 > **이전 변경 (06-10) — 상점 UI 프로토타입 완료**: `FLastFPSShopItemData`(DataTable 행) + `ULastFPSShopEntryWidget`(목록 한 줄, 구매 버튼 클릭 시 "구매됨" 표시) + `ULastFPSShopScreenWidget`(테이블 전수 → 엔트리 목록 구성). `DT_ShopData` + `WBP_ShopEntry` + `WBP_Shop` 에디터 자산 완료. 화폐/재고 시스템은 아직 없어 구매는 표시 전환만 처리하는 프로토 단계.
 >
@@ -98,6 +100,7 @@
 ### 2-2. 장비 / 인벤토리
 - [x] **아이템 DataTable** ✅ (06-09) — `FLastFPSItemData : FTableRowBase` (`ItemName`/`Description`/`Icon`/`ItemType`/`Rarity`/`MaxStackSize`). `ELastFPSItemType`(무기·모듈·소모품·재료) + `ELastFPSItemRarity`(일반·희귀·영웅·전설)
 - [x] **인벤토리 UI** ✅ (06-09) — `ULastFPSItemSlotWidget`(희귀도 색상 C++ 처리, `Img_Background`/`Img_RarityBorder`/`Image_Icon`/`TB_ItemName`/`TB_Rarity`) + `ULastFPSInventoryWidget`(SlotCount=24 고정 슬롯 그리드) + 에디터(`DT_ItemData`/`WBP_ItemSlot`/`WBP_Inventory`/레지스트리 행) 완료
+  - [x] **보유 연동** ✅ (06-13) — 테이블 전수 표시 폐기 → `EconomySubsystem.OwnedItems`만 표시, `OnInventoryChanged` 구독 자동 재구성, 슬롯 수량(`TB_Count`, 선택 바인딩) 표시. 구매로 보유가 늘면 즉시 반영
 - [ ] **모듈 시스템 UI** ⬜
 
 ---
@@ -139,7 +142,8 @@
 ## Phase 4 — 피니시
 
 - [x] ~~**매치 결과 화면 / 스코어보드**~~ → ❌ 설계 제외. `WBP_Scoreboard`/`WBP_ScoreRow` 미사용(안 씀). C++ `ALastFPSHUD` 클래스 및 관련 잔재 코드 제거 완료 (06-07)
-- [x] **상점 UI** 🔨 (06-10) — `FLastFPSShopItemData` + `ULastFPSShopEntryWidget`(구매 버튼 → "구매됨" 표시) + `ULastFPSShopScreenWidget`(`DT_ShopData` 전수 나열) + 에디터(`DT_ShopData`/`WBP_ShopEntry`/`WBP_Shop`) 완료. 화폐/재고 시스템 미구현 — 구매는 표시 전환만
+- [x] **상점 UI** ✅ (06-13) — `FLastFPSShopItemData`(+`GrantItemRowId`) + `ULastFPSShopEntryWidget` + `ULastFPSShopScreenWidget`(`DT_ShopData` 전수 나열) + 에디터(`DT_ShopData`/`WBP_ShopEntry`/`WBP_Shop`) 완료
+  - [x] **화폐/재고 시스템** ✅ (06-13) — `ULastFPSEconomySubsystem`(GameInstanceSubsystem): `TryPurchase`로 잔액 차감 + `OwnedItems` 지급, 잔액 부족 시 거부, **재고 무제한**. `TB_Credits` 잔액 표시 + 잔액 변동 시 구매버튼 활성/비활성. **에디터 남음**: `DT_ShopData.GrantItemRowId` 채우기 / `WBP_Shop` `TB_Credits`(선택) / 데모 시드 `StartingCredits`·`StartingOwnedItems`(선택). > SaveGame 영속화(앱 재시작 유지)는 추후
 - [ ] **시즌 패스** ⬜ / **도전과제 / 업적** ⬜
 
 ---
@@ -167,8 +171,10 @@
      (남음: BP OnAudioSettingsApplied → 사운드 클래스 연결 / OnSensitivityApplied → Input Modifier 연결)
   ✅ 캐릭터 선택창 마무리 — 카드 직접 클릭, Prev/Next 버그 수정, SetupCard, TB_CharDesc
   ✅ 인벤토리 UI — FLastFPSItemData + ULastFPSItemSlotWidget + ULastFPSInventoryWidget + 에디터 자산 완료
-  ✅ 상점 UI 프로토타입 — FLastFPSShopItemData + ULastFPSShopEntryWidget + ULastFPSShopScreenWidget + 에디터 자산 완료
-     (남음: 화폐/재고 시스템 — 구매는 현재 표시 전환만)
+  ✅ 상점 UI — FLastFPSShopItemData + ULastFPSShopEntryWidget + ULastFPSShopScreenWidget + 에디터 자산 완료
+  ✅ 상점 화폐/재고 시스템 — ULastFPSEconomySubsystem(Credits/OwnedItems), TryPurchase 차감+지급, 인벤토리 보유 연동, 재고 무제한
+     (에디터 남음: DT_ShopData.GrantItemRowId 채우기 / WBP_Shop TB_Credits / WBP_ItemSlot TB_Count — 모두 선택)
+     (추후: SaveGame 영속화 — 앱 재시작에도 잔액/보유 유지)
   ✅ HUD 퀘스트 트래커 C++ — ULastFPSQuestTrackerWidget(QuestTable에서 진행중 퀘스트만 필터) + HUDWidget WBP_QuestTracker 바인딩
      (남음: WBP_QuestTracker 에디터 자산 + WBP_HUD 배치)
 
@@ -180,7 +186,7 @@
   CharacterDefinition DataAsset → PawnClass 스폰 연결 → 계승자 관리 화면 / 아르케 조율·성장 시스템
 
 [마무리]
-  상점 화폐/재고 시스템 — 구매 시 실제 차감/소지 처리 (현재는 표시 전환만)
+  상점 화폐/재고 — SaveGame 영속화 (앱 재시작에도 잔액/보유 유지)
   제작 시스템 UI
   파티 UI 존속 여부 재검토
   시즌 패스 / 도전과제·업적
@@ -213,3 +219,4 @@
 | 델리게이트 구독/해제 | `LastFPSLoadingScreenWidget.cpp` | `AddUObject` / `Remove(Handle)` |
 | GAS 속성 바인딩 | `LastFPSHUDWidget.cpp` | 이벤트 드리븐 |
 | NPC 상호작용 | `LastFPSNPCBase.cpp` `HandleBeginOverlap()` | `SetNearestInteractable` → **G키** → `Execute_Interact` |
+| 화폐/보유(경제) | `LastFPSEconomySubsystem` `TryPurchase()` | GameInstanceSubsystem(맵 이동 유지) + `OnCreditsChanged`/`OnInventoryChanged` 델리게이트로 상점·인벤토리 UI 갱신 |

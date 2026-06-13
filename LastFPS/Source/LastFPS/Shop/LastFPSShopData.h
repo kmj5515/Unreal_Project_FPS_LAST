@@ -36,4 +36,8 @@ struct LASTFPS_API FLastFPSShopItemData : public FTableRowBase
 	/** 가격 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Shop", meta=(ClampMin=0))
 	int32 Price = 0;
+
+	/** 구매 시 인벤토리에 지급할 아이템 — DT_ItemData 의 행 이름. 비우면 화폐만 차감. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Shop")
+	FName GrantItemRowId;
 };
