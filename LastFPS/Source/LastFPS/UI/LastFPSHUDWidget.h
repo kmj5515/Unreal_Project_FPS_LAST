@@ -13,6 +13,7 @@
 class UAbilitySystemComponent;
 class ULastFPSSkillCooldownSlotWidget;
 class ULastFPSQuestTrackerWidget;
+class UMaterialInstanceDynamic;
 class UWeaponComponent;
 
 struct FLastFPSSmoothedGaugeDisplay
@@ -73,8 +74,14 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="HUD|HitMarker", meta=(BindWidgetOptional))
     TObjectPtr<UImage> HitMarkerImage;
 
-    UPROPERTY(EditDefaultsOnly, Category="HUD|HitMarker", meta=(ClampMin="0.01", ClampMax="2.0"))
-    float HitMarkerDisplayDuration = 0.15f;
+    UPROPERTY(EditDefaultsOnly, Category="HUD|HitMarker|Material")
+    FName HitMarkerSpreadParameterName = TEXT("HitSpread");
+
+    UPROPERTY(EditDefaultsOnly, Category="HUD|HitMarker|Material", meta=(ClampMin="0.0"))
+    float HitMarkerMaxSpread = 5.f;
+
+    UPROPERTY(EditDefaultsOnly, Category="HUD|HitMarker|Material", meta=(ClampMin="0.01", ClampMax="1.0"))
+    float HitMarkerSpreadExpandDuration = 0.12f;
 
     UPROPERTY(BlueprintReadOnly, Category="HUD|Gauges", meta=(BindWidgetOptional))
     TObjectPtr<UProgressBar> PB_Health;
@@ -138,6 +145,9 @@ private:
 
     void TryBindPawnComponents();
     void TickSmoothedGauges(float DeltaTime);
+    void InitializeHitMarkerMaterial();
+    void TickHitMarkerSpread(float DeltaTime);
+    void SetHitMarkerSpread(float Spread);
     void BroadcastHealthDisplay();
     void BroadcastStaminaDisplay();
     void BroadcastUltimateGaugeDisplay();
@@ -158,9 +168,11 @@ private:
 
     FTimerHandle RetryTimerHandle;
     FTimerHandle HUDRefreshTimerHandle;
-    FTimerHandle HitMarkerTimerHandle;
-
     void HideHitMarker();
+
+    TWeakObjectPtr<UMaterialInstanceDynamic> HitMarkerMaterial;
+    float HitMarkerSpreadElapsed = 0.f;
+    bool bHitMarkerSpreadAnimating = false;
 
     FLastFPSSmoothedGaugeDisplay HealthGauge;
     FLastFPSSmoothedGaugeDisplay StaminaGauge;

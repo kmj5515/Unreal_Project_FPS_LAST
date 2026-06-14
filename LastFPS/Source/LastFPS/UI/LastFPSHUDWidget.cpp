@@ -56,6 +56,7 @@ bool FLastFPSSmoothedGaugeDisplay::Tick(float DeltaTime, float FillDuration)
 #include "Character/Components/WeaponComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "NativeGameplayTags.h"
 #include "TimerManager.h"
 
@@ -84,6 +85,8 @@ void ULastFPSHUDWidget::NativeConstruct()
 
     if (HitMarkerImage)
     {
+        InitializeHitMarkerMaterial();
+        SetHitMarkerSpread(0.f);
         HitMarkerImage->SetVisibility(ESlateVisibility::Collapsed);
     }
 
@@ -152,6 +155,7 @@ void ULastFPSHUDWidget::HUDRefreshTick(const float DeltaTime)
     }
 
     TickSmoothedGauges(DeltaTime);
+    TickHitMarkerSpread(DeltaTime);
 }
 
 bool ULastFPSHUDWidget::TryInitSkillSlots()
@@ -348,6 +352,48 @@ void ULastFPSHUDWidget::TickSmoothedGauges(float DeltaTime)
     }
 }
 
+void ULastFPSHUDWidget::InitializeHitMarkerMaterial()
+{
+    if (!HitMarkerImage || HitMarkerMaterial.IsValid())
+    {
+        return;
+    }
+
+    HitMarkerMaterial = HitMarkerImage->GetDynamicMaterial();
+}
+
+void ULastFPSHUDWidget::TickHitMarkerSpread(float DeltaTime)
+{
+    if (!bHitMarkerSpreadAnimating)
+    {
+        return;
+    }
+
+    HitMarkerSpreadElapsed += DeltaTime;
+
+    const float Alpha = FMath::Clamp(
+        HitMarkerSpreadElapsed / FMath::Max(HitMarkerSpreadExpandDuration, KINDA_SMALL_NUMBER),
+        0.f,
+        1.f);
+
+    SetHitMarkerSpread(FMath::Lerp(0.f, HitMarkerMaxSpread, Alpha));
+
+    if (Alpha >= 1.f)
+    {
+        HideHitMarker();
+    }
+}
+
+void ULastFPSHUDWidget::SetHitMarkerSpread(float Spread)
+{
+    InitializeHitMarkerMaterial();
+
+    if (UMaterialInstanceDynamic* Material = HitMarkerMaterial.Get())
+    {
+        Material->SetScalarParameterValue(HitMarkerSpreadParameterName, Spread);
+    }
+}
+
 bool ULastFPSHUDWidget::IsLowResource(float Current, float Max) const
 {
     if (Max <= KINDA_SMALL_NUMBER)
@@ -469,21 +515,19 @@ void ULastFPSHUDWidget::ShowHitMarker()
     if (!HitMarkerImage)
         return;
 
-    HitMarkerImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+    HitMarkerSpreadElapsed = 0.f;
+    bHitMarkerSpreadAnimating = true;
+    SetHitMarkerSpread(0.f);
 
-    if (UWorld* World = GetWorld())
-    {
-        World->GetTimerManager().ClearTimer(HitMarkerTimerHandle);
-        World->GetTimerManager().SetTimer(
-            HitMarkerTimerHandle,
-            FTimerDelegate::CreateUObject(this, &ULastFPSHUDWidget::HideHitMarker),
-            HitMarkerDisplayDuration,
-            false);
-    }
+    HitMarkerImage->SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 
 void ULastFPSHUDWidget::HideHitMarker()
 {
     if (HitMarkerImage)
         HitMarkerImage->SetVisibility(ESlateVisibility::Collapsed);
+
+    bHitMarkerSpreadAnimating = false;
+    HitMarkerSpreadElapsed = 0.f;
+    SetHitMarkerSpread(0.f);
 }
