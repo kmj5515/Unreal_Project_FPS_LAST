@@ -8,9 +8,9 @@
 
 > **UI 시스템 문서** — 구조/사용법 → [`UI_System.md`](UI_System.md)
 
-> **최근 변경 (06-13) — 상점 화폐/재고 시스템 (실제 차감+소지)**: `ULastFPSEconomySubsystem`(GameInstanceSubsystem) 신설 — `Credits`(세션 잔액) + `OwnedItems`(DT_ItemData 행이름→수량). 맵 이동(메인/캐릭선택/허브)에도 유지, 앱 재시작 시 `StartingCredits`(기본 10000)/`StartingOwnedItems`로 초기화(SaveGame 영속화는 추후). 구매 = `TryPurchase(GrantItemRowId, Price)` → 잔액 충분하면 차감 + 아이템 지급, 부족하면 거부. **재고 무제한**(살 수 있으면 반복 구매). `FLastFPSShopItemData`에 `GrantItemRowId`(지급할 DT_ItemData 행) 필드 추가. 상점 화면: `TB_Credits` 잔액 표시 + 잔액 변동 시(`OnCreditsChanged`) 각 엔트리 구매버튼 활성/비활성. 엔트리: 영구 "구매됨" 토글 제거 → 가격 상시 표시 + `SetAffordable` + `OnPurchaseSucceeded`(BP 연출용). 인벤토리: 테이블 전수 표시 폐기 → `OwnedItems`만 표시, `OnInventoryChanged` 구독 자동 재구성, 슬롯 수량(`TB_Count`) 표시. **테스트 데이터**: 아이템 5종 + 상점 5종(서로 `GrantItemRowId` 매칭) 임포트 완료. **에디터 작업 남음(선택)**: ① `WBP_Shop`에 `TB_Credits` 텍스트 추가(잔액 표시) ② `WBP_ItemSlot`에 `TB_Count` 텍스트 추가(스택 수량) ③ 데모 시드 원하면 EconomySubsystem `StartingOwnedItems`/`StartingCredits`를 `DefaultGame.ini`에 지정.
+> **최근 변경 (06-13) — 상점 화폐/재고 시스템 (실제 차감+소지)**: `ULastFPSEconomySubsystem`(GameInstanceSubsystem) 신설 — `Credits`(세션 잔액) + `OwnedItems`(DT_ItemData 행이름→수량). 맵 이동(메인/캐릭선택/허브)에도 유지, 앱 재시작 시 `StartingCredits`(기본 10000)/`StartingOwnedItems`로 초기화(SaveGame 영속화는 추후). 구매 = `TryPurchase(GrantItemRowId, Price)` → 잔액 충분하면 차감 + 아이템 지급, 부족하면 거부. **재고 무제한**(살 수 있으면 반복 구매). `FLastFPSShopItemData`에 `GrantItemRowId`(지급할 DT_ItemData 행) 필드 추가. 상점 화면: `TB_Credits` 잔액 표시 + 잔액 변동 시(`OnCreditsChanged`) 각 엔트리 구매버튼 활성/비활성. 엔트리: 영구 "구매됨" 토글 제거 → 가격 상시 표시 + `SetAffordable` + `OnPurchaseSucceeded`(BP 연출용). 인벤토리: 테이블 전수 표시 폐기 → `OwnedItems`만 표시, `OnInventoryChanged` 구독 자동 재구성, 슬롯 수량(`TB_Count`) 표시. **테스트 데이터**: 아이템 5종 + 상점 5종(서로 `GrantItemRowId` 매칭) 임포트 완료. **에디터 완료(06-14)**: `DT_ShopData.GrantItemRowId` 채우기 + `WBP_Shop` `TB_Credits` + `WBP_ItemSlot` `TB_Count` 모두 완료. (데모 시드 `StartingCredits`/`StartingOwnedItems` `DefaultGame.ini` 지정은 선택 사항으로 잔여)
 >
-> **이전 변경 (06-10) — 캐릭터 선택창 Prev/Next 버튼 제거**: 카드 직접 클릭(`OnCardClicked`)만으로 선택하도록 정리. `Button_Prev`/`Button_Next` 바인딩 + `HandlePrevClicked`/`HandleNextClicked` + `OnSelectionChanged`의 활성/비활성 토글 코드 제거. **에디터**: `WBP_CharacterSelect`에서 Prev/Next 버튼 제거 필요(C++은 `BindWidgetOptional`이라 안전).
+> **이전 변경 (06-10) — 캐릭터 선택창 Prev/Next 버튼 제거**: 카드 직접 클릭(`OnCardClicked`)만으로 선택하도록 정리. `Button_Prev`/`Button_Next` 바인딩 + `HandlePrevClicked`/`HandleNextClicked` + `OnSelectionChanged`의 활성/비활성 토글 코드 제거. **에디터 완료(06-14)**: `WBP_CharacterSelect`에서 Prev/Next 버튼 제거 완료.
 >
 > **이전 변경 (06-10) — 상점 UI 프로토타입 완료**: `FLastFPSShopItemData`(DataTable 행) + `ULastFPSShopEntryWidget`(목록 한 줄, 구매 버튼 클릭 시 "구매됨" 표시) + `ULastFPSShopScreenWidget`(테이블 전수 → 엔트리 목록 구성). `DT_ShopData` + `WBP_ShopEntry` + `WBP_Shop` 에디터 자산 완료. 화폐/재고 시스템은 아직 없어 구매는 표시 전환만 처리하는 프로토 단계.
 >
@@ -18,7 +18,7 @@
 >
 > **이전 변경 (06-09) — 캐릭터 선택창 버그 수정 + 카드 데이터 표시**: Prev/Next 버튼 항상 비활성 버그 수정(`TotalCount`를 `SelectableCharacterClasses.Num()`→`CharacterDefinitions.Num()`으로). `SetupCard(BlueprintNativeEvent)` 추가로 카드마다 이름/역할 독립 표시. `TB_CharDesc` 바인딩 추가(선택 캐릭터 Description 표시).
 >
-> **이전 변경 (06-09) — 설정 기능 C++ 완료**: `ULastFPSGameUserSettings`(UGameUserSettings 상속, `MasterVolume`/`MusicVolume`/`SFXVolume`/`MouseSensitivity` Config 저장) + `ULastFPSSettingsWidget`(ULastFPSContentScreenWidget 상속) 신설. 그래픽 품질 4단계 버튼 + 볼륨 3 슬라이더 + 감도 슬라이더 + Apply/Revert. 오디오·감도 실제 적용은 `OnAudioSettingsApplied`/`OnSensitivityApplied` BlueprintImplementableEvent로 분리. `DefaultEngine.ini GameUserSettingsClassName` 등록 완료. **에디터 작업**: `WBP_Settings` 부모 클래스를 `LastFPSSettingsWidget`으로 변경 + 위젯 바인딩 추가.
+> **이전 변경 (06-09) — 설정 기능 C++ 완료**: `ULastFPSGameUserSettings`(UGameUserSettings 상속, `MasterVolume`/`MusicVolume`/`SFXVolume`/`MouseSensitivity` Config 저장) + `ULastFPSSettingsWidget`(ULastFPSContentScreenWidget 상속) 신설. 그래픽 품질 4단계 버튼 + 볼륨 3 슬라이더 + 감도 슬라이더 + Apply/Revert. 오디오·감도 실제 적용은 `OnAudioSettingsApplied`/`OnSensitivityApplied` BlueprintImplementableEvent로 분리. `DefaultEngine.ini GameUserSettingsClassName` 등록 완료. **에디터 완료(06-14)**: `WBP_Settings` 부모 클래스를 `LastFPSSettingsWidget`으로 변경 + 버튼/슬라이더 바인딩 완료. (오디오·감도 실제 적용 BP `OnAudioSettingsApplied`/`OnSensitivityApplied`는 잔여)
 >
 > **이전 변경 (06-08) — 퀘스트 데이터 + 목록 UI (C++)**: `FLastFPSQuestData`(DataTable 행) + `ULastFPSQuestScreenWidget`(임무 화면, `QuestTable` 전수 나열) + `ULastFPSQuestEntryWidget`(행) 신설. 임무 화면=퀘스트 로그로 기존 `UI.Screen.Mission` 태그 재사용(C++ 라우팅/태그 추가 0). 에디터 자산(`DT_QuestData`/`WBP_QuestEntry`/`WBP_Missions`/레지스트리 행)만 만들면 허브 "임무" 버튼이 작동.
 >
@@ -85,7 +85,7 @@
 
 - [x] **설정 화면 라우팅** ✅ → `WBP_Settings`(`ContentScreenWidget` 상속) + `UI.Screen.Settings` 등록, 허브/메인메뉴 진입 작동 확인
   - 허브 Settings 버튼 `OpenScreenOrNotice` / 메인메뉴 `HandleSettingsClicked` → `OpenScreen(Screen_Settings())` (미등록 시 공지 폴백)
-  - [x] **설정 기능 구현** ✅ (06-09) — `ULastFPSGameUserSettings`(Config 저장) + `ULastFPSSettingsWidget`(C++ 완료). **에디터**: `WBP_Settings` 부모→`LastFPSSettingsWidget`, 버튼/슬라이더 바인딩 추가. 오디오·감도 적용은 BP `OnAudioSettingsApplied`/`OnSensitivityApplied` 구현 필요.
+  - [x] **설정 기능 구현** ✅ (06-09, 에디터 06-14) — `ULastFPSGameUserSettings`(Config 저장) + `ULastFPSSettingsWidget`(C++ 완료) + `WBP_Settings` 부모→`LastFPSSettingsWidget` + 버튼/슬라이더 바인딩 완료. 오디오·감도 실제 적용 BP `OnAudioSettingsApplied`/`OnSensitivityApplied`만 잔여(잔여 1건).
 
 ---
 
@@ -129,7 +129,7 @@
 ### 3-2. 미션 / 퀘스트
 - [x] **퀘스트 데이터 구조** ✅ — `FLastFPSQuestData : FTableRowBase` (`Quest/LastFPSQuestData.h`). 필드: `Title`/`Type`(메인·서브)/`Status`(미시작·진행중·완료)/`Summary`/`Description`/`RewardText`/`Icon`. 진행 추적 서브시스템 없음 — 상태는 행에 직접 명시(프로토)
 - [x] **퀘스트 목록 UI** 🔨 — C++ 완료, 에디터 자산 대기. `ULastFPSQuestScreenWidget : ULastFPSContentScreenWidget`(`QuestTable` 전수 → `EntryWidgetClass` 생성 → `Box_QuestList`에 채움) + `ULastFPSQuestEntryWidget : UUserWidget`(`SetupQuest`/`OnQuestDisplayed`). **임무 화면 = 퀘스트 로그**로 기존 `UI.Screen.Mission` 태그 재사용(허브 "임무" 버튼이 이미 라우팅). > **설계 결정(06-08)**: 당장은 임무=퀘스트일지 **통합**. TFD처럼 출격용 미션 보드와 일지를 나누고 싶어지면, 위젯은 태그를 모르므로(레지스트리가 결정) → `Screen_Quests()` 태그 + 허브 "일지" 버튼 + 레지스트리 행만 추가하면 분리됨(C++ 위젯 수정 불필요). 에디터: `DT_QuestData` + `WBP_QuestEntry`(부모 `QuestEntryWidget`) + `WBP_Missions`(부모 `QuestScreenWidget`, `QuestTable`/`EntryWidgetClass` 지정) + 레지스트리 `UI.Screen.Mission → WBP_Missions` 행
-- [x] **HUD 퀘스트 트래커** 🔨 (06-10) — C++ 완료, 에디터 자산 진행중. `ULastFPSQuestTrackerWidget : UUserWidget` — `QuestTable`(`DT_QuestData`, 퀘스트 화면과 동일 테이블 재사용)에서 `Status == InProgress`인 행만 최대 `MaxTrackedQuests`개 골라 `EntryWidgetClass`(`WBP_QuestEntry` 재사용 가능)로 `Box_TrackerList`에 표시. `ULastFPSHUDWidget`에 `WBP_QuestTracker`(`BindWidgetOptional`) 바인딩 추가. 에디터: `WBP_QuestTracker`(부모 `QuestTrackerWidget`, `QuestTable`/`EntryWidgetClass` 지정) 생성 완료. **남음**: 위젯 계층(`Box_TrackerList`/`TB_Empty`) 구성 + `WBP_HUD`에 `WBP_QuestTracker` 이름으로 배치
+- [x] **HUD 퀘스트 트래커** ✅ (06-10, 에디터 06-14) — C++ + 에디터 자산 완료. `ULastFPSQuestTrackerWidget : UUserWidget` — `QuestTable`(`DT_QuestData`, 퀘스트 화면과 동일 테이블 재사용)에서 `Status == InProgress`인 행만 최대 `MaxTrackedQuests`개 골라 `EntryWidgetClass`(`WBP_QuestEntry` 재사용 가능)로 `Box_TrackerList`에 표시. `ULastFPSHUDWidget`에 `WBP_QuestTracker`(`BindWidgetOptional`) 바인딩 추가. 에디터: `WBP_QuestTracker`(부모 `QuestTrackerWidget`, `QuestTable`/`EntryWidgetClass` 지정) 생성 완료. **에디터 완료(06-14)**: 위젯 계층(`Box_TrackerList`/`TB_Empty`) 구성 + `WBP_HUD`에 `WBP_QuestTracker` 이름으로 배치 완료
 
 ### 3-3. 파티 / 매칭 — ❌ 보류 (매치 개념 부재)
 - [~] ~~파티 UI~~ → 존속 여부 재검토 / [x] ~~매칭 UI~~ → **제외**
@@ -143,7 +143,7 @@
 
 - [x] ~~**매치 결과 화면 / 스코어보드**~~ → ❌ 설계 제외. `WBP_Scoreboard`/`WBP_ScoreRow` 미사용(안 씀). C++ `ALastFPSHUD` 클래스 및 관련 잔재 코드 제거 완료 (06-07)
 - [x] **상점 UI** ✅ (06-13) — `FLastFPSShopItemData`(+`GrantItemRowId`) + `ULastFPSShopEntryWidget` + `ULastFPSShopScreenWidget`(`DT_ShopData` 전수 나열) + 에디터(`DT_ShopData`/`WBP_ShopEntry`/`WBP_Shop`) 완료
-  - [x] **화폐/재고 시스템** ✅ (06-13) — `ULastFPSEconomySubsystem`(GameInstanceSubsystem): `TryPurchase`로 잔액 차감 + `OwnedItems` 지급, 잔액 부족 시 거부, **재고 무제한**. `TB_Credits` 잔액 표시 + 잔액 변동 시 구매버튼 활성/비활성. **에디터 남음**: `DT_ShopData.GrantItemRowId` 채우기 / `WBP_Shop` `TB_Credits`(선택) / 데모 시드 `StartingCredits`·`StartingOwnedItems`(선택). > SaveGame 영속화(앱 재시작 유지)는 추후
+  - [x] **화폐/재고 시스템** ✅ (06-13) — `ULastFPSEconomySubsystem`(GameInstanceSubsystem): `TryPurchase`로 잔액 차감 + `OwnedItems` 지급, 잔액 부족 시 거부, **재고 무제한**. `TB_Credits` 잔액 표시 + 잔액 변동 시 구매버튼 활성/비활성. **에디터 완료(06-14)**: `DT_ShopData.GrantItemRowId` / `WBP_Shop` `TB_Credits` / `WBP_ItemSlot` `TB_Count` 완료. (데모 시드 `StartingCredits`·`StartingOwnedItems`는 선택 잔여) > SaveGame 영속화(앱 재시작 유지)는 추후
 - [ ] **시즌 패스** ⬜ / **도전과제 / 업적** ⬜
 
 ---
@@ -173,13 +173,11 @@
   ✅ 인벤토리 UI — FLastFPSItemData + ULastFPSItemSlotWidget + ULastFPSInventoryWidget + 에디터 자산 완료
   ✅ 상점 UI — FLastFPSShopItemData + ULastFPSShopEntryWidget + ULastFPSShopScreenWidget + 에디터 자산 완료
   ✅ 상점 화폐/재고 시스템 — ULastFPSEconomySubsystem(Credits/OwnedItems), TryPurchase 차감+지급, 인벤토리 보유 연동, 재고 무제한
-     (에디터 남음: DT_ShopData.GrantItemRowId 채우기 / WBP_Shop TB_Credits / WBP_ItemSlot TB_Count — 모두 선택)
+     (에디터 완료 06-14: DT_ShopData.GrantItemRowId / WBP_Shop TB_Credits / WBP_ItemSlot TB_Count)
      (추후: SaveGame 영속화 — 앱 재시작에도 잔액/보유 유지)
-  ✅ HUD 퀘스트 트래커 C++ — ULastFPSQuestTrackerWidget(QuestTable에서 진행중 퀘스트만 필터) + HUDWidget WBP_QuestTracker 바인딩
-     (남음: WBP_QuestTracker 에디터 자산 + WBP_HUD 배치)
+  ✅ HUD 퀘스트 트래커 — ULastFPSQuestTrackerWidget(QuestTable에서 진행중 퀘스트만 필터) + HUDWidget 바인딩 + WBP_QuestTracker/WBP_HUD 에디터 자산 완료(06-14)
 
 [다음]
-  HUD 퀘스트 트래커 에디터 자산 (Box_TrackerList/TB_Empty 구성 + WBP_HUD 배치)
   모듈 시스템 UI
 
 [인게임 팀 작업 완료 후]
