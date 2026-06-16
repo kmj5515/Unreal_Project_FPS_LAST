@@ -44,7 +44,7 @@
 - [x] 아이템 DataTable (`FLastFPSItemData` — 타입/희귀도/스택)
 - [x] 인벤토리 UI (`ItemSlotWidget` + `InventoryWidget`, 24슬롯) — `EconomySubsystem.OwnedItems` 연동, `OnInventoryChanged` 자동 갱신
 - [x] **모듈 백엔드** (`FLastFPSModuleData` + `LoadoutSubsystem`) — 장착/캐파 검증/스탯 합/Infinite GE 적용 → `Module_System.md`. **남음: C++ 빌드 검증**
-- [ ] 🔨 **모듈 UI** ← *다음 작업* — 보유 목록 + 슬롯 + 스탯 미리보기(`ComputeBonus`), `TryEquip`/`Unequip`, `UI.Screen.Module` 라우팅
+- [x] 🔨 **모듈 UI** — C++ 완료(`ModuleScreenWidget` + `ModuleEntryWidget` + `ModuleSlotWidget`): 보유 목록 클릭→빈 슬롯 장착, 슬롯 클릭→해제, 캐파/보정 미리보기, `OnLoadoutChanged`/`OnInventoryChanged` 자동 갱신. **남음: WBP 3종 + `UI.Screen.Module` 레지스트리 행 + 허브/인벤토리 진입 버튼 + 빌드 검증**
 
 ---
 
