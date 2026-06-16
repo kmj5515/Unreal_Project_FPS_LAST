@@ -188,23 +188,23 @@ void ULastFPSModuleScreenWidget::RebuildSlots(ULastFPSLoadoutSubsystem* Loadout)
 
 	for (int32 i = 0; i < Loadout->GetSlotCount(); ++i)
 	{
-		ULastFPSModuleSlotWidget* Slot = CreateWidget<ULastFPSModuleSlotWidget>(this, SlotWidgetClass);
-		if (!Slot) { continue; }
+		ULastFPSModuleSlotWidget* SlotWidget = CreateWidget<ULastFPSModuleSlotWidget>(this, SlotWidgetClass);
+		if (!SlotWidget) { continue; }
 
 		const FName RowId = Loadout->GetEquippedModule(i);
 		const FLastFPSModuleData* Module = Loadout->FindModule(RowId);
 		const FLastFPSItemData* Item = FindItem(RowId);
 		if (Module && Item)
 		{
-			Slot->SetupEquipped(i, *Item, FormatStatMods(Module->StatMods));
+			SlotWidget->SetupEquipped(i, *Item, FormatStatMods(Module->StatMods));
 		}
 		else
 		{
-			Slot->SetEmpty(i);
+			SlotWidget->SetEmpty(i);
 		}
 
-		Slot->OnSlotClicked.BindUObject(this, &ULastFPSModuleScreenWidget::HandleSlotClicked);
-		Box_Slots->AddChild(Slot);
+		SlotWidget->OnSlotClicked.BindUObject(this, &ULastFPSModuleScreenWidget::HandleSlotClicked);
+		Box_Slots->AddChild(SlotWidget);
 	}
 }
 
@@ -229,8 +229,8 @@ void ULastFPSModuleScreenWidget::HandleEquipClicked(FName RowId)
 	ULastFPSLoadoutSubsystem* Loadout = GetLoadout();
 	if (!Loadout) { return; }
 
-	const int32 Slot = FindFirstEmptySlot(Loadout);
-	if (Slot == INDEX_NONE || !Loadout->TryEquip(Slot, RowId))
+	const int32 TargetSlot = FindFirstEmptySlot(Loadout);
+	if (TargetSlot == INDEX_NONE || !Loadout->TryEquip(TargetSlot, RowId))
 	{
 		OnEquipRejected();
 		return;
