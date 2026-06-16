@@ -41,15 +41,6 @@ public:
     FGameplayAttributeData MaxStamina;
     ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, MaxStamina)
 
-    // Ultimate Gauge
-    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_UltimateGauge, Category="Attributes|Vitals")
-    FGameplayAttributeData UltimateGauge;
-    ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, UltimateGauge)
-
-    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxUltimateGauge, Category="Attributes|Vitals")
-    FGameplayAttributeData MaxUltimateGauge;
-    ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, MaxUltimateGauge)
-
     // Combat
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_AttackDamage, Category="Attributes|Combat")
     FGameplayAttributeData AttackDamage;
@@ -73,8 +64,6 @@ protected:
     UFUNCTION() void OnRep_MaxHealth(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_Stamina(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_MaxStamina(const FGameplayAttributeData& Old);
-    UFUNCTION() void OnRep_UltimateGauge(const FGameplayAttributeData& Old);
-    UFUNCTION() void OnRep_MaxUltimateGauge(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_AttackDamage(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_Defense(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_MoveSpeed(const FGameplayAttributeData& Old);

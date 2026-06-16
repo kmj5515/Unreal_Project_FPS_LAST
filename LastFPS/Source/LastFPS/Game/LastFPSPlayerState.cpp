@@ -1,7 +1,6 @@
 #include "Game/LastFPSPlayerState.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
-#include "AbilitySystem/Effects/GE_UltimateKillHeal.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 
@@ -107,58 +106,4 @@ void ALastFPSPlayerState::Auth_SetSelectedCharacterIndex(int32 NewIndex)
         return;
 
     SelectedCharacterIndex = FMath::Max(0, NewIndex);
-}
-
-void ALastFPSPlayerState::Auth_OnScoredKill(ALastFPSPlayerState* VictimPS)
-{
-    if (!HasAuthority() || !VictimPS || VictimPS == this)
-        return;
-
-    Auth_AddUltimateKillCharge(1);
-    Auth_TryApplyUltimateKillHeal();
-}
-
-void ALastFPSPlayerState::Auth_StartUltimateKillHealWindow(float DurationSeconds)
-{
-    if (!HasAuthority() || DurationSeconds <= 0.f)
-        return;
-
-    const UWorld* World = GetWorld();
-    if (!World)
-        return;
-
-    UltimateKillHealWindowEndTime = World->GetTimeSeconds() + DurationSeconds;
-}
-
-void ALastFPSPlayerState::Auth_AddUltimateKillCharge(int32 Amount)
-{
-    if (!HasAuthority() || Amount <= 0 || !AttributeSet)
-        return;
-
-    const float Current = AttributeSet->GetUltimateGauge();
-    const float Max     = static_cast<float>(UltimateKillsRequired);
-    if (Current >= Max - KINDA_SMALL_NUMBER)
-        return;
-
-    AbilitySystemComponent->SetNumericAttributeBase(
-        ULastFPSAttributeSet::GetUltimateGaugeAttribute(),
-        FMath::Min(Current + static_cast<float>(Amount), Max));
-}
-
-void ALastFPSPlayerState::Auth_TryApplyUltimateKillHeal()
-{
-    if (!HasAuthority() || !AbilitySystemComponent || !AttributeSet)
-        return;
-
-    const UWorld* World = GetWorld();
-    if (!World || World->GetTimeSeconds() > UltimateKillHealWindowEndTime)
-        return;
-
-    FGameplayEffectContextHandle Context = AbilitySystemComponent->MakeEffectContext();
-    Context.AddSourceObject(this);
-
-    const FGameplayEffectSpecHandle Spec = AbilitySystemComponent->MakeOutgoingSpec(
-        ULastFPSGE_UltimateKillHeal::StaticClass(), 1.f, Context);
-    if (Spec.IsValid())
-        AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 }

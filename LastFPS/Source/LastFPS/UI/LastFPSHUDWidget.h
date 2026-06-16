@@ -63,9 +63,6 @@ protected:
     void OnStaminaChanged(float Current, float Max);
 
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
-    void OnUltimateGaugeChanged(float Current, float Max);
-
-    UFUNCTION(BlueprintImplementableEvent, Category="HUD")
     void OnHeatChanged(float Current, float Max, bool bIsOverheated);
 
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
@@ -88,9 +85,6 @@ protected:
 
     UPROPERTY(BlueprintReadOnly, Category="HUD|Gauges", meta=(BindWidgetOptional))
     TObjectPtr<UProgressBar> PB_Stamina;
-
-    UPROPERTY(BlueprintReadOnly, Category="HUD|Gauges", meta=(BindWidgetOptional))
-    TObjectPtr<UProgressBar> PB_Ultimate;
 
     UPROPERTY(BlueprintReadOnly, Category="HUD|Gauges", meta=(BindWidgetOptional))
     TObjectPtr<UProgressBar> PB_Heat;
@@ -117,12 +111,6 @@ protected:
     FLinearColor StaminaLowFillColor;
 
     UPROPERTY(EditDefaultsOnly, Category="HUD|Gauges|Colors")
-    FLinearColor UltimateFillColor;
-
-    UPROPERTY(EditDefaultsOnly, Category="HUD|Gauges|Colors")
-    FLinearColor UltimateReadyFillColor;
-
-    UPROPERTY(EditDefaultsOnly, Category="HUD|Gauges|Colors")
     FLinearColor HeatFillColor;
 
     UPROPERTY(EditDefaultsOnly, Category="HUD|Gauges|Colors")
@@ -136,7 +124,6 @@ private:
 
     void HandleHealthChanged(const FOnAttributeChangeData& Data);
     void HandleStaminaChanged(const FOnAttributeChangeData& Data);
-    void HandleUltimateGaugeChanged(const FOnAttributeChangeData& Data);
 
     bool TryInitSkillSlots();
     void TickSkillSlots();
@@ -150,13 +137,11 @@ private:
     void SetHitMarkerSpread(float Spread);
     void BroadcastHealthDisplay();
     void BroadcastStaminaDisplay();
-    void BroadcastUltimateGaugeDisplay();
     void BroadcastHeatDisplay();
     void ApplyGaugeBarBackground(UProgressBar* Bar) const;
     void ApplyGaugeBar(UProgressBar* Bar, float Current, float Max, const FLinearColor& FillColor) const;
     FLinearColor ResolveHealthFillColor() const;
     FLinearColor ResolveStaminaFillColor() const;
-    FLinearColor ResolveUltimateFillColor() const;
     FLinearColor ResolveHeatFillColor() const;
     bool IsLowResource(float Current, float Max) const;
 
@@ -176,7 +161,6 @@ private:
 
     FLastFPSSmoothedGaugeDisplay HealthGauge;
     FLastFPSSmoothedGaugeDisplay StaminaGauge;
-    FLastFPSSmoothedGaugeDisplay UltimateGauge;
     FLastFPSSmoothedGaugeDisplay HeatGauge;
     float CachedMaxHeat = 0.f;
     bool CachedHeatOverheated = false;

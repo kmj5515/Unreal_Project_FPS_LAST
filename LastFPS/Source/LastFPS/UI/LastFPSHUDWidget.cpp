@@ -4,6 +4,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/Effects/GE_Skill1Cooldown.h"
 #include "AbilitySystem/Effects/GE_Skill2Cooldown.h"
+#include "AbilitySystem/Effects/GE_UltimateCooldown.h"
 #include "Styling/SlateBrush.h"
 #include "Utility/LastFPSTags.h"
 
@@ -68,8 +69,6 @@ ULastFPSHUDWidget::ULastFPSHUDWidget(const FObjectInitializer& ObjectInitializer
     HealthLowFillColor       = LastFPSHUDStyle::HealthLowFill();
     StaminaFillColor         = LastFPSHUDStyle::StaminaFill();
     StaminaLowFillColor      = LastFPSHUDStyle::StaminaLowFill();
-    UltimateFillColor        = LastFPSHUDStyle::UltimateFill();
-    UltimateReadyFillColor   = LastFPSHUDStyle::UltimateReady();
     HeatFillColor            = LastFPSHUDStyle::HeatFill();
     HeatOverheatedFillColor  = LastFPSHUDStyle::HeatOverheated();
 }
@@ -80,7 +79,6 @@ void ULastFPSHUDWidget::NativeConstruct()
 
     ApplyGaugeBarBackground(PB_Health);
     ApplyGaugeBarBackground(PB_Stamina);
-    ApplyGaugeBarBackground(PB_Ultimate);
     ApplyGaugeBarBackground(PB_Heat);
 
     if (HitMarkerImage)
@@ -178,7 +176,8 @@ bool ULastFPSHUDWidget::TryInitSkillSlots()
         FLastFPSTags::Get().Cooldown_Skill2, ULastFPSGE_Skill2Cooldown::StaticClass());
     WBP_SkillCooldownSlot_E->SetKeyLabel(FText::FromString(TEXT("E")));
 
-    WBP_SkillCooldownSlot_F->ConfigureUltimateSlot();
+    WBP_SkillCooldownSlot_F->ConfigureCooldownSlot(
+        FLastFPSTags::Get().Cooldown_Ultimate, ULastFPSGE_UltimateCooldown::StaticClass());
     WBP_SkillCooldownSlot_F->SetKeyLabel(FText::FromString(TEXT("F")));
 
     TickSkillSlots();
@@ -272,17 +271,13 @@ bool ULastFPSHUDWidget::InitializeHUD()
             .AddUObject(this, &ULastFPSHUDWidget::HandleHealthChanged);
         ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetStaminaAttribute())
             .AddUObject(this, &ULastFPSHUDWidget::HandleStaminaChanged);
-        ASC->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetUltimateGaugeAttribute())
-            .AddUObject(this, &ULastFPSHUDWidget::HandleUltimateGaugeChanged);
         bAttributeDelegatesBound = true;
     }
 
     HealthGauge.Initialize(AS->GetHealth(), AS->GetMaxHealth());
     StaminaGauge.Initialize(AS->GetStamina(), AS->GetMaxStamina());
-    UltimateGauge.Initialize(AS->GetUltimateGauge(), AS->GetMaxUltimateGauge());
     BroadcastHealthDisplay();
     BroadcastStaminaDisplay();
-    BroadcastUltimateGaugeDisplay();
 
     CachedASC = ASC;
     TryBindPawnComponents();
@@ -307,28 +302,6 @@ void ULastFPSHUDWidget::HandleStaminaChanged(const FOnAttributeChangeData& Data)
     }
 }
 
-void ULastFPSHUDWidget::HandleUltimateGaugeChanged(const FOnAttributeChangeData& Data)
-{
-    UltimateGauge.SetTarget(Data.NewValue);
-    if (!UltimateGauge.bInterpActive)
-    {
-        BroadcastUltimateGaugeDisplay();
-    }
-
-    if (bSkillSlotsInitialized && WBP_SkillCooldownSlot_F && CachedASC.IsValid())
-    {
-        const ULastFPSAttributeSet* AS = nullptr;
-        if (const APlayerController* LocalPC = GetOwningPlayer())
-        {
-            if (const ALastFPSPlayerState* LocalPS = LocalPC->GetPlayerState<ALastFPSPlayerState>())
-            {
-                AS = LocalPS->GetAttributeSet();
-            }
-        }
-        WBP_SkillCooldownSlot_F->UpdateFromASC(CachedASC.Get(), AS);
-    }
-}
-
 void ULastFPSHUDWidget::TickSmoothedGauges(float DeltaTime)
 {
     if (HealthGauge.Tick(DeltaTime, GaugeFillDuration))
@@ -339,11 +312,6 @@ void ULastFPSHUDWidget::TickSmoothedGauges(float DeltaTime)
     if (StaminaGauge.Tick(DeltaTime, GaugeFillDuration))
     {
         BroadcastStaminaDisplay();
-    }
-
-    if (UltimateGauge.Tick(DeltaTime, GaugeFillDuration))
-    {
-        BroadcastUltimateGaugeDisplay();
     }
 
     if (HeatGauge.Tick(DeltaTime, GaugeFillDuration))
@@ -418,17 +386,6 @@ FLinearColor ULastFPSHUDWidget::ResolveStaminaFillColor() const
         : StaminaFillColor;
 }
 
-FLinearColor ULastFPSHUDWidget::ResolveUltimateFillColor() const
-{
-    if (UltimateGauge.Max > KINDA_SMALL_NUMBER
-        && UltimateGauge.Displayed >= UltimateGauge.Max - KINDA_SMALL_NUMBER)
-    {
-        return UltimateReadyFillColor;
-    }
-
-    return UltimateFillColor;
-}
-
 FLinearColor ULastFPSHUDWidget::ResolveHeatFillColor() const
 {
     return CachedHeatOverheated ? HeatOverheatedFillColor : HeatFillColor;
@@ -475,12 +432,6 @@ void ULastFPSHUDWidget::BroadcastStaminaDisplay()
 {
     ApplyGaugeBar(PB_Stamina, StaminaGauge.Displayed, StaminaGauge.Max, ResolveStaminaFillColor());
     OnStaminaChanged(StaminaGauge.Displayed, StaminaGauge.Max);
-}
-
-void ULastFPSHUDWidget::BroadcastUltimateGaugeDisplay()
-{
-    ApplyGaugeBar(PB_Ultimate, UltimateGauge.Displayed, UltimateGauge.Max, ResolveUltimateFillColor());
-    OnUltimateGaugeChanged(UltimateGauge.Displayed, UltimateGauge.Max);
 }
 
 void ULastFPSHUDWidget::BroadcastHeatDisplay()

@@ -25,12 +25,6 @@ public:
 	float MaxStamina = 100.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", meta=(ClampMin=0))
-	float UltimateGauge = 0.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", meta=(ClampMin=1))
-	float MaxUltimateGauge = 1.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", meta=(ClampMin=0))
 	float AttackDamage = 10.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", meta=(ClampMin=0))

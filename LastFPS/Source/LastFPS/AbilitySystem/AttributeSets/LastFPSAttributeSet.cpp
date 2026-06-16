@@ -38,8 +38,6 @@ ULastFPSAttributeSet::ULastFPSAttributeSet()
     InitMaxHealth(100.f);
     InitStamina(100.f);
     InitMaxStamina(100.f);
-    InitUltimateGauge(0.f);
-    InitMaxUltimateGauge(static_cast<float>(ALastFPSPlayerState::UltimateKillsRequired));
     InitAttackDamage(10.f);
     InitDefense(0.f);
     InitMoveSpeed(500.f);
@@ -54,8 +52,6 @@ void ULastFPSAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, MaxHealth,        COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, Stamina,          COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, MaxStamina,       COND_None, REPNOTIFY_Always);
-    DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, UltimateGauge,    COND_None, REPNOTIFY_Always);
-    DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, MaxUltimateGauge, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, AttackDamage,     COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, Defense,          COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, MoveSpeed,        COND_None, REPNOTIFY_Always);
@@ -69,8 +65,6 @@ void ULastFPSAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
         NewValue = FMath::Clamp(NewValue, 0.f, GetMaxHealth());
     else if (Attribute == GetStaminaAttribute())
         NewValue = FMath::Clamp(NewValue, 0.f, GetMaxStamina());
-    else if (Attribute == GetUltimateGaugeAttribute())
-        NewValue = FMath::Clamp(NewValue, 0.f, GetMaxUltimateGauge());
 }
 
 void ULastFPSAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
@@ -129,7 +123,6 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
     if (AttackerPS && AttackerPS != VictimPS)
     {
         AttackerPS->Auth_AddKill();
-        AttackerPS->Auth_OnScoredKill(VictimPS);
     }
 
     if (!TargetChar)
@@ -177,8 +170,6 @@ void ULastFPSAttributeSet::OnRep_Health(const FGameplayAttributeData& Old)      
 void ULastFPSAttributeSet::OnRep_MaxHealth(const FGameplayAttributeData& Old)        { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, MaxHealth, Old); }
 void ULastFPSAttributeSet::OnRep_Stamina(const FGameplayAttributeData& Old)          { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, Stamina, Old); }
 void ULastFPSAttributeSet::OnRep_MaxStamina(const FGameplayAttributeData& Old)       { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, MaxStamina, Old); }
-void ULastFPSAttributeSet::OnRep_UltimateGauge(const FGameplayAttributeData& Old)    { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, UltimateGauge, Old); }
-void ULastFPSAttributeSet::OnRep_MaxUltimateGauge(const FGameplayAttributeData& Old) { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, MaxUltimateGauge, Old); }
 void ULastFPSAttributeSet::OnRep_AttackDamage(const FGameplayAttributeData& Old)     { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, AttackDamage, Old); }
 void ULastFPSAttributeSet::OnRep_Defense(const FGameplayAttributeData& Old)          { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, Defense, Old); }
 void ULastFPSAttributeSet::OnRep_MoveSpeed(const FGameplayAttributeData& Old)        { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, MoveSpeed, Old); }

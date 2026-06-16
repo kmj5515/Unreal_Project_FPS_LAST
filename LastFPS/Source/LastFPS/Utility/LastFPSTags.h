@@ -20,6 +20,7 @@ public:
     FGameplayTag Cooldown_Skill_Dash;
     FGameplayTag Cooldown_Skill1;
     FGameplayTag Cooldown_Skill2;
+    FGameplayTag Cooldown_Ultimate;
 
     // UI
     FGameplayTag UI_HUD_Visible;

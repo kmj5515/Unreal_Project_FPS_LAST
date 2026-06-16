@@ -13,6 +13,7 @@ void FLastFPSTags::InitializeNativeTags()
     Tags.AddTag(Tags.Cooldown_Skill_Dash, "Cooldown.Skill.Dash", "Dash cooldown");
     Tags.AddTag(Tags.Cooldown_Skill1, "Cooldown.Skill1", "Skill 1 cooldown");
     Tags.AddTag(Tags.Cooldown_Skill2, "Cooldown.Skill2", "Skill 2 cooldown");
+    Tags.AddTag(Tags.Cooldown_Ultimate, "Cooldown.Ultimate", "Ultimate cooldown");
 
     // UI
     Tags.AddTag(Tags.UI_HUD_Visible, "UI.HUD.Visible", "HUD visibility status");

@@ -159,7 +159,7 @@
 - [x] `UCommonButtonBase` 교체 / **RetryPushTimer 중복 통합** / **위젯 하드레퍼런스 제거**(레지스트리 소프트참조로) / **PC 1개 통합**
 
 ### 남음
-- [ ] **밸런스 수치 DataAsset화** | 난이도: 하 — `LastFPSPlayerState.h` constexpr
+- [x] ~~**밸런스 수치 DataAsset화**~~ ❌ 제외 (06-16) — 대상이던 궁극기 상수가 **킬 기반 궁극기 폐기**로 불필요. ✅ **궁극기 쿨다운 전환 + 연쇄 정리 완료(06-16)**: 킬 게이지 충전·8초 킬힐(+100HP) 메커닉 전면 제거 → `UltimateGauge`/`MaxUltimateGauge` 어트리뷰트(복제/OnRep/클램프 포함)·`UltimateKill*` 상수·`Auth_OnScoredKill`/킬힐 메서드·`GE_UltimateKillHeal`·HUD 게이지(`PB_Ultimate`/스무딩/색)·슬롯 `UltimateCharge` 모드까지 삭제. F는 **다른 스킬과 동일한 쿨다운 슬롯**으로 전환(`GE_UltimateCooldown` 신설 기본 60초 + `Cooldown.Ultimate` 태그, `GA_Ultimate`가 `CommitAbility`로 적용). **남음: 궁극기 실제 효과는 TODO(기획 후 재구현)**
 - [ ] **맵 경로 `/Test/` 제거** | 난이도: 하 — `LastFPSGameInstance` 릴리즈 전
 
 ---
