@@ -8,6 +8,7 @@
 #include "Game/LastFPSPlayerState.h"
 #include "Components/CapsuleComponent.h"
 #include "Game/LastFPSGameModeBase.h"
+#include "Inventory/LastFPSLoadoutSubsystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
@@ -283,6 +284,15 @@ void ALastFPSCharacterBase::InitAbilitySystem()
         if (ALastFPSGameModeBase* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALastFPSGameModeBase>() : nullptr)
         {
             GM->ApplyCharacterDefinitionToAbilitySystem(ASC, ResolvedDefinition);
+        }
+
+        // 베이스 스탯 적용 직후, 장착 모듈 보정을 Infinite GE 로 얹는다 (서버 권위).
+        if (UGameInstance* GI = GetGameInstance())
+        {
+            if (ULastFPSLoadoutSubsystem* Loadout = GI->GetSubsystem<ULastFPSLoadoutSubsystem>())
+            {
+                Loadout->ApplyToAbilitySystem(ASC);
+            }
         }
 
         GiveDefaultAbilities();

@@ -1,14 +1,18 @@
 # 아웃게임 개발 체크리스트
 
-> 마지막 업데이트: 2026-06-13
+> 마지막 업데이트: 2026-06-16
 > 기준 브랜치: `kmj-dev-roll`
-> 전체 완성도: **약 55%** (Phase 1 완료 + 인벤토리/상점 화폐·보유 시스템 연동)
+> 전체 완성도: **약 65%** (제작 보류로 범위 축소 반영) — Phase 1 완료 + 인벤토리/상점 화폐·보유 + 모듈 장착 백엔드
+> 　└ 포폴 수직 슬라이스(모듈 UI + 로드아웃 화면 + SaveGame)만 따지면 **약 75%**. 전체 %가 낮아 보이는 건 계승자 관리·아르케 성장 등 인게임 대기/대형 메타가 분모에 남아서임
 
 > **설계 방침** — The First Descendant 참고 PvE 루터슈터지만 **"매치" 개념 없음**: 매치 결과/스코어보드, 로비 출격(StartMatch) **미사용**
 
 > **UI 시스템 문서** — 구조/사용법 → [`UI_System.md`](UI_System.md)
+> **모듈 시스템 문서** — 구조/API/세팅 → [`Module_System.md`](Module_System.md)
 
-> **최근 변경 (06-13) — 상점 화폐/재고 시스템 (실제 차감+소지)**: `ULastFPSEconomySubsystem`(GameInstanceSubsystem) 신설 — `Credits`(세션 잔액) + `OwnedItems`(DT_ItemData 행이름→수량). 맵 이동(메인/캐릭선택/허브)에도 유지, 앱 재시작 시 `StartingCredits`(기본 10000)/`StartingOwnedItems`로 초기화(SaveGame 영속화는 추후). 구매 = `TryPurchase(GrantItemRowId, Price)` → 잔액 충분하면 차감 + 아이템 지급, 부족하면 거부. **재고 무제한**(살 수 있으면 반복 구매). `FLastFPSShopItemData`에 `GrantItemRowId`(지급할 DT_ItemData 행) 필드 추가. 상점 화면: `TB_Credits` 잔액 표시 + 잔액 변동 시(`OnCreditsChanged`) 각 엔트리 구매버튼 활성/비활성. 엔트리: 영구 "구매됨" 토글 제거 → 가격 상시 표시 + `SetAffordable` + `OnPurchaseSucceeded`(BP 연출용). 인벤토리: 테이블 전수 표시 폐기 → `OwnedItems`만 표시, `OnInventoryChanged` 구독 자동 재구성, 슬롯 수량(`TB_Count`) 표시. **테스트 데이터**: 아이템 5종 + 상점 5종(서로 `GrantItemRowId` 매칭) 임포트 완료. **에디터 완료(06-14)**: `DT_ShopData.GrantItemRowId` 채우기 + `WBP_Shop` `TB_Credits` + `WBP_ItemSlot` `TB_Count` 모두 완료. (데모 시드 `StartingCredits`/`StartingOwnedItems` `DefaultGame.ini` 지정은 선택 사항으로 잔여)
+> **최근 변경 (06-16) — 모듈(장비) 장착 시스템 백엔드**: 인벤토리를 "보관함→빌드"로 바꾸는 루터슈터 정체성 기능. **C++ 백엔드 완료(UI·빌드검증 대기)**. `FLastFPSModuleData`(DT_ModuleData 행: `StatMods[]` + `CapacityCost`, **행 이름 = DT_ItemData 동일 행**으로 보유/아이콘 공유) + `ULastFPSLoadoutSubsystem`(GameInstanceSubsystem: 슬롯별 장착 상태 보관, `TryEquip`/`Unequip`/`CanEquip` 보유·캐파 검증, `ComputeBonus` 스탯 합, `ApplyToAbilitySystem` Infinite GE 적용). 적용 지점: `ALastFPSCharacterBase::InitAbilitySystem`에서 베이스 스탯(StatData) 적용 **직후** 서버 권위로 GE 가산 → MaxHealth/MaxStamina/AttackDamage/Defense/MoveSpeed (MoveSpeed는 기존 델리게이트로 MaxWalkSpeed까지 자동). 슬롯 4·캐파 10(`DefaultGame.ini` 조정). **더미 5종 임포트 완료**(`Excel/DT_ModuleData.json`: 치명타/체력/방어/신속/지구력, 합 캐파 14>10이라 장착 선택 강제). **남음: 장착 UI(보유 목록 + 슬롯 + `ComputeBonus` 스탯 미리보기, `UI.Screen.Module` 라우팅) / C++ 빌드 검증.** 상세 → [`Module_System.md`](Module_System.md)
+>
+> **이전 변경 (06-13) — 상점 화폐/재고 시스템 (실제 차감+소지)**: `ULastFPSEconomySubsystem`(GameInstanceSubsystem) 신설 — `Credits`(세션 잔액) + `OwnedItems`(DT_ItemData 행이름→수량). 맵 이동(메인/캐릭선택/허브)에도 유지, 앱 재시작 시 `StartingCredits`(기본 10000)/`StartingOwnedItems`로 초기화(SaveGame 영속화는 추후). 구매 = `TryPurchase(GrantItemRowId, Price)` → 잔액 충분하면 차감 + 아이템 지급, 부족하면 거부. **재고 무제한**(살 수 있으면 반복 구매). `FLastFPSShopItemData`에 `GrantItemRowId`(지급할 DT_ItemData 행) 필드 추가. 상점 화면: `TB_Credits` 잔액 표시 + 잔액 변동 시(`OnCreditsChanged`) 각 엔트리 구매버튼 활성/비활성. 엔트리: 영구 "구매됨" 토글 제거 → 가격 상시 표시 + `SetAffordable` + `OnPurchaseSucceeded`(BP 연출용). 인벤토리: 테이블 전수 표시 폐기 → `OwnedItems`만 표시, `OnInventoryChanged` 구독 자동 재구성, 슬롯 수량(`TB_Count`) 표시. **테스트 데이터**: 아이템 5종 + 상점 5종(서로 `GrantItemRowId` 매칭) 임포트 완료. **에디터 완료(06-14)**: `DT_ShopData.GrantItemRowId` 채우기 + `WBP_Shop` `TB_Credits` + `WBP_ItemSlot` `TB_Count` 모두 완료. (데모 시드 `StartingCredits`/`StartingOwnedItems` `DefaultGame.ini` 지정은 선택 사항으로 잔여)
 >
 > **이전 변경 (06-10) — 캐릭터 선택창 Prev/Next 버튼 제거**: 카드 직접 클릭(`OnCardClicked`)만으로 선택하도록 정리. `Button_Prev`/`Button_Next` 바인딩 + `HandlePrevClicked`/`HandleNextClicked` + `OnSelectionChanged`의 활성/비활성 토글 코드 제거. **에디터 완료(06-14)**: `WBP_CharacterSelect`에서 Prev/Next 버튼 제거 완료.
 >
@@ -101,7 +105,8 @@
 - [x] **아이템 DataTable** ✅ (06-09) — `FLastFPSItemData : FTableRowBase` (`ItemName`/`Description`/`Icon`/`ItemType`/`Rarity`/`MaxStackSize`). `ELastFPSItemType`(무기·모듈·소모품·재료) + `ELastFPSItemRarity`(일반·희귀·영웅·전설)
 - [x] **인벤토리 UI** ✅ (06-09) — `ULastFPSItemSlotWidget`(희귀도 색상 C++ 처리, `Img_Background`/`Img_RarityBorder`/`Image_Icon`/`TB_ItemName`/`TB_Rarity`) + `ULastFPSInventoryWidget`(SlotCount=24 고정 슬롯 그리드) + 에디터(`DT_ItemData`/`WBP_ItemSlot`/`WBP_Inventory`/레지스트리 행) 완료
   - [x] **보유 연동** ✅ (06-13) — 테이블 전수 표시 폐기 → `EconomySubsystem.OwnedItems`만 표시, `OnInventoryChanged` 구독 자동 재구성, 슬롯 수량(`TB_Count`, 선택 바인딩) 표시. 구매로 보유가 늘면 즉시 반영
-- [ ] **모듈 시스템 UI** ⬜
+- [x] **모듈 시스템 백엔드** ✅ (06-16) — `FLastFPSModuleData`(DT_ModuleData) + `ULastFPSLoadoutSubsystem`(슬롯별 장착 상태/캐파 검증/스탯 합/Infinite GE 적용). 스폰 시 `ALastFPSCharacterBase::InitAbilitySystem`에서 베이스 스탯 직후 서버 권위로 적용. 더미 5종 임포트(`Excel/DT_ModuleData.json`). 상세 → [`Module_System.md`](Module_System.md). **남음: C++ 빌드 검증**
+- [ ] **모듈 시스템 UI** 🔨 — 장착 화면(보유 모듈 목록 + 슬롯 + `ComputeBonus` 스탯 미리보기) + `TryEquip`/`Unequip` 연결 + `OnLoadoutChanged` 자동 갱신 + `UI.Screen.Module` 라우팅 등록. **백엔드 완료, UI만 남음**
 
 ---
 
@@ -134,8 +139,8 @@
 ### 3-3. 파티 / 매칭 — ❌ 보류 (매치 개념 부재)
 - [~] ~~파티 UI~~ → 존속 여부 재검토 / [x] ~~매칭 UI~~ → **제외**
 
-### 3-4. 제작
-- [ ] **제작 시스템 UI** ⬜
+### 3-4. 제작 — ⏸️ 보류 (06-16, 포폴 범위 밖)
+- [~] **제작 시스템 UI** ⏸️ 보류 — TFD 핵심 메타지만 비중 대비 무거워 수직 슬라이스(모듈/로드아웃/SaveGame) 완성 이후로 미룸
 
 ---
 
@@ -176,16 +181,18 @@
      (에디터 완료 06-14: DT_ShopData.GrantItemRowId / WBP_Shop TB_Credits / WBP_ItemSlot TB_Count)
      (추후: SaveGame 영속화 — 앱 재시작에도 잔액/보유 유지)
   ✅ HUD 퀘스트 트래커 — ULastFPSQuestTrackerWidget(QuestTable에서 진행중 퀘스트만 필터) + HUDWidget 바인딩 + WBP_QuestTracker/WBP_HUD 에디터 자산 완료(06-14)
+  ✅ 모듈 시스템 백엔드 (06-16) — FLastFPSModuleData(DT_ModuleData) + ULastFPSLoadoutSubsystem(장착/캐파검증/스탯합/Infinite GE), 스폰 시 적용, 더미 5종 임포트
+     (남음: 장착 UI / C++ 빌드 검증)
 
 [다음]
-  모듈 시스템 UI
+  모듈 시스템 UI — 보유 모듈 목록 + 슬롯 + ComputeBonus 스탯 미리보기, TryEquip/Unequip 연결, UI.Screen.Module 라우팅 등록
 
 [인게임 팀 작업 완료 후]
   CharacterDefinition DataAsset → PawnClass 스폰 연결 → 계승자 관리 화면 / 아르케 조율·성장 시스템
 
 [마무리]
   상점 화폐/재고 — SaveGame 영속화 (앱 재시작에도 잔액/보유 유지)
-  제작 시스템 UI
+  (보류) 제작 시스템 UI — 포폴 범위 밖, 수직 슬라이스 완성 이후
   파티 UI 존속 여부 재검토
   시즌 패스 / 도전과제·업적
   설정 — OnAudioSettingsApplied(사운드 클래스 연결) / OnSensitivityApplied(Input Modifier 연결) BP 구현
