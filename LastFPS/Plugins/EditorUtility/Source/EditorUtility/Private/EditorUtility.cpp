@@ -21,6 +21,12 @@
 const FName FEditorUtilityModule::LevelSelectionTabName("LevelSelectionTool");
 const FName FEditorUtilityModule::CharacterDataAssetTabName("CharacterDataAssetTool");
 
+FEditorUtilityModule::FOnExtendLastFPSMenu& FEditorUtilityModule::OnExtendLastFPSMenu()
+{
+	static FOnExtendLastFPSMenu Delegate;
+	return Delegate;
+}
+
 void FEditorUtilityModule::StartupModule()
 {
 	FCoreDelegates::OnPostEngineInit.AddRaw(this, &FEditorUtilityModule::RegisterTabSpawner);
@@ -115,6 +121,9 @@ void FEditorUtilityModule::FillLastFPSMenu(FMenuBuilder& MenuBuilder)
 		);
 	}
 	MenuBuilder.EndSection();
+
+	// Let other editor modules (e.g. WidgetTreeGen) append their own entries.
+	OnExtendLastFPSMenu().Broadcast(MenuBuilder);
 }
 
 TSharedRef<SDockTab> FEditorUtilityModule::OnSpawnLevelSelectionTab(const FSpawnTabArgs& Args)

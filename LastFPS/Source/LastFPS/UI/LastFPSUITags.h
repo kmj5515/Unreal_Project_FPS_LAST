@@ -15,4 +15,5 @@ namespace LastFPSUITags
 	LASTFPS_API FGameplayTag Screen_Mission();
 	LASTFPS_API FGameplayTag Screen_Shop();
 	LASTFPS_API FGameplayTag Screen_Settings();
+	LASTFPS_API FGameplayTag Screen_Module();
 }

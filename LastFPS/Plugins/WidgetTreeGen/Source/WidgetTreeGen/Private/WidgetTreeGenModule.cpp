@@ -1,0 +1,127 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
+#include "WidgetTreeGenModule.h"
+#include "WidgetTreeGenerator.h"
+#include "WidgetTreeGenRequest.h"
+
+#include "EditorUtility.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Styling/AppStyle.h"
+#include "Framework/Notifications/NotificationManager.h"
+#include "Widgets/Notifications/SNotificationList.h"
+#include "Widgets/SWindow.h"
+#include "Modules/ModuleManager.h"
+#include "PropertyEditorModule.h"
+#include "DetailsViewArgs.h"
+#include "IDetailsView.h"
+#include "UObject/StrongObjectPtr.h"
+#include "DesktopPlatformModule.h"
+#include "IDesktopPlatform.h"
+#include "Misc/Paths.h"
+
+#define LOCTEXT_NAMESPACE "FWidgetTreeGenModule"
+
+namespace
+{
+	void ShowResultNotification(const FWidgetTreeGenResult& Result)
+	{
+		FNotificationInfo Info(Result.bSuccess
+			? FText::Format(LOCTEXT("GenSuccess", "Generated: {0}"), FText::FromString(Result.AssetPath))
+			: FText::Format(LOCTEXT("GenFailed", "Generation failed: {0}"), FText::FromString(Result.ErrorMessage)));
+		Info.ExpireDuration = Result.bSuccess ? 4.0f : 8.0f;
+		FSlateNotificationManager::Get().AddNotification(Info);
+	}
+}
+
+void FWidgetTreeGenModule::StartupModule()
+{
+	// Append our entries to the EditorUtility plugin's "LastFPS" main-menu submenu.
+	FEditorUtilityModule::OnExtendLastFPSMenu().AddRaw(this, &FWidgetTreeGenModule::ExtendLastFPSMenu);
+}
+
+void FWidgetTreeGenModule::ShutdownModule()
+{
+	FEditorUtilityModule::OnExtendLastFPSMenu().RemoveAll(this);
+}
+
+void FWidgetTreeGenModule::ExtendLastFPSMenu(FMenuBuilder& MenuBuilder)
+{
+	MenuBuilder.BeginSection("WidgetTreeGen", LOCTEXT("WidgetTreeGenSection", "Widget Tree Gen"));
+	{
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("OpenGeneratorLabel", "위젯 트리 생성기"),
+			LOCTEXT("OpenGeneratorTooltip", "JSON으로 위젯 블루프린트를 생성하는 패널을 엽니다."),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.WidgetBlueprint"),
+			FUIAction(FExecuteAction::CreateRaw(this, &FWidgetTreeGenModule::OpenGeneratorWindow)));
+
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("GenerateFromFileLabel", "JSON 파일에서 생성..."),
+			LOCTEXT("GenerateFromFileTooltip", ".json 파일을 골라 즉시 위젯 블루프린트를 생성합니다."),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.WidgetBlueprint"),
+			FUIAction(FExecuteAction::CreateRaw(this, &FWidgetTreeGenModule::GenerateFromFileDialog)));
+	}
+	MenuBuilder.EndSection();
+}
+
+void FWidgetTreeGenModule::OpenGeneratorWindow()
+{
+	static TStrongObjectPtr<UWidgetTreeGenRequest> Request;
+	if (!Request.IsValid())
+	{
+		Request.Reset(NewObject<UWidgetTreeGenRequest>(GetTransientPackage(), NAME_None, RF_Transactional));
+	}
+
+	FPropertyEditorModule& PropertyModule =
+		FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
+
+	FDetailsViewArgs Args;
+	Args.bAllowSearch = false;
+	Args.NameAreaSettings = FDetailsViewArgs::HideNameArea;
+	TSharedRef<IDetailsView> DetailsView = PropertyModule.CreateDetailView(Args);
+	DetailsView->SetObject(Request.Get());
+
+	TSharedRef<SWindow> Window = SNew(SWindow)
+		.Title(LOCTEXT("GeneratorWindowTitle", "Widget Tree Generator"))
+		.ClientSize(FVector2D(560.f, 680.f))
+		.SupportsMaximize(false)
+		.SupportsMinimize(false)
+		[
+			DetailsView
+		];
+
+	FSlateApplication::Get().AddWindow(Window);
+}
+
+void FWidgetTreeGenModule::GenerateFromFileDialog()
+{
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (!DesktopPlatform)
+	{
+		return;
+	}
+
+	const void* ParentHandle = FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr);
+
+	TArray<FString> OutFiles;
+	const bool bPicked = DesktopPlatform->OpenFileDialog(
+		ParentHandle,
+		TEXT("Select a widget hierarchy JSON file"),
+		FPaths::ProjectDir(),
+		TEXT(""),
+		TEXT("JSON files (*.json)|*.json"),
+		EFileDialogFlags::None,
+		OutFiles);
+
+	if (!bPicked || OutFiles.Num() == 0)
+	{
+		return;
+	}
+
+	const FWidgetTreeGenResult Result = FWidgetTreeGenerator::GenerateFromJsonFile(OutFiles[0]);
+	ShowResultNotification(Result);
+}
+
+#undef LOCTEXT_NAMESPACE
+
+IMPLEMENT_MODULE(FWidgetTreeGenModule, WidgetTreeGen)

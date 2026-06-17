@@ -56,4 +56,10 @@ namespace LastFPSUITags
 		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.Settings"));
 		return Tag;
 	}
+
+	FGameplayTag Screen_Module()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.Module"));
+		return Tag;
+	}
 }

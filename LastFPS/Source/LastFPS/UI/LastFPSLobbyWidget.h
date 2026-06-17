@@ -33,6 +33,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<ULastFPSButtonBase> Button_Shop;
 
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<ULastFPSButtonBase> Button_Module;
+
 	// ── 하단 ──────────────────────────────────────────────────────
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<ULastFPSButtonBase> Button_Settings;
@@ -44,6 +47,7 @@ private:
 	UFUNCTION() void HandleInventoryClicked();
 	UFUNCTION() void HandleMissionsClicked();
 	UFUNCTION() void HandleShopClicked();
+	UFUNCTION() void HandleModuleClicked();
 	UFUNCTION() void HandleSettingsClicked();
 	UFUNCTION() void HandleBackToMainClicked();
 
