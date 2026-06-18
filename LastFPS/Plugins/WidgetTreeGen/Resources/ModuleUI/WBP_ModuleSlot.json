@@ -1,0 +1,37 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSModuleSlotWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_ModuleSlot",
+	"root": {
+		"type": "SizeBox",
+		"name": "Root_Size",
+		"children": [
+			{
+				"type": "Overlay",
+				"name": "Content",
+				"children": [
+					{
+						"type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C",
+						"name": "Button_Slot",
+						"halign": "Fill",
+						"valign": "Fill"
+					},
+					{ "type": "Image", "name": "Img_Empty", "halign": "Fill", "valign": "Fill" },
+					{ "type": "Image", "name": "Img_RarityBorder", "halign": "Fill", "valign": "Fill" },
+					{ "type": "Image", "name": "Image_Icon", "halign": "Fill", "valign": "Fill", "padding": 8 },
+					{
+						"type": "VerticalBox",
+						"name": "Labels",
+						"halign": "Fill",
+						"valign": "Bottom",
+						"padding": 4,
+						"children": [
+							{ "type": "TextBlock", "name": "TB_ModuleName", "text": "이름" },
+							{ "type": "TextBlock", "name": "TB_Stats", "text": "스탯" }
+						]
+					}
+				]
+			}
+		]
+	}
+}

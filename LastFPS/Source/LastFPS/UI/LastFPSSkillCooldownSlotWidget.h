@@ -13,8 +13,7 @@ class UTextBlock;
 UENUM(BlueprintType)
 enum class ELastFPSSkillSlotDisplayMode : uint8
 {
-    Cooldown,
-    UltimateCharge
+    Cooldown
 };
 
 /**
@@ -30,7 +29,6 @@ public:
     virtual void NativeConstruct() override;
 
     void ConfigureCooldownSlot(FGameplayTag InCooldownTag, TSubclassOf<UGameplayEffect> InCooldownEffectClass);
-    void ConfigureUltimateSlot();
     /** HUD에서 슬롯 표시 직전 1회 호출 — 머티리얼·Opacity·텍스트 기본 상태 */
     void InitializeSlotPresentation();
     void UpdateFromASC(const UAbilitySystemComponent* ASC, const class ULastFPSAttributeSet* AttributeSetOverride = nullptr);

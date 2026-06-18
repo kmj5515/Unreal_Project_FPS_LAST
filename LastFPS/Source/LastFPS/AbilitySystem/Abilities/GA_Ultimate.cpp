@@ -1,13 +1,14 @@
 #include "AbilitySystem/Abilities/GA_Ultimate.h"
 #include "Utility/LastFPSTags.h"
-#include "AbilitySystemComponent.h"
-#include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
-#include "Game/LastFPSPlayerState.h"
+#include "AbilitySystem/Effects/GE_UltimateCooldown.h"
 
 UGA_Ultimate::UGA_Ultimate()
 {
     InstancingPolicy   = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
+
+    // 다른 스킬(Q/E)과 동일하게 쿨다운 기반. CommitAbility 가 이 GE 를 적용한다.
+    CooldownGameplayEffectClass = ULastFPSGE_UltimateCooldown::StaticClass();
 
     const FLastFPSTags& FPSTags = FLastFPSTags::Get();
     FGameplayTagContainer Tags;
@@ -23,18 +24,9 @@ bool UGA_Ultimate::CanActivateAbility(
     const FGameplayTagContainer* TargetTags,
     FGameplayTagContainer* OptionalRelevantTags) const
 {
-    if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
-        return false;
-
-    const UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get();
-    if (!ASC)
-        return false;
-
-    const ULastFPSAttributeSet* AS = ASC->GetSet<ULastFPSAttributeSet>();
-    if (!AS)
-        return false;
-
-    return AS->GetUltimateGauge() >= static_cast<float>(ALastFPSPlayerState::UltimateKillsRequired) - KINDA_SMALL_NUMBER;
+    // TODO: 궁극기 쿨다운 기반 재설계. 킬 기반 게이지 게이트는 폐기됨 — 쿨다운(CooldownGameplayEffectClass)
+    //       외 추가 발동 조건이 필요해지면 여기서 처리. 현재는 기본 조건만.
+    return Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
 }
 
 void UGA_Ultimate::ActivateAbility(
@@ -45,23 +37,13 @@ void UGA_Ultimate::ActivateAbility(
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get();
-    if (!ASC)
+    // 다른 스킬(Q/E)과 동일하게 쿨다운/코스트를 커밋 (GE_UltimateCooldown 적용, 기본 60초).
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
 
-    ALastFPSPlayerState* PS = Cast<ALastFPSPlayerState>(ASC->GetOwnerActor());
-    if (!PS)
-    {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-        return;
-    }
-
-    ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetUltimateGaugeAttribute(), 0.f);
-
-    PS->Auth_StartUltimateKillHealWindow(ALastFPSPlayerState::UltimateKillHealWindowSeconds);
-
+    // TODO: 궁극기 효과 재구현(쿨다운 기반). 폐기된 메커닉 = 킬 게이지 충전 / 8초 킬힐(+100HP).
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }

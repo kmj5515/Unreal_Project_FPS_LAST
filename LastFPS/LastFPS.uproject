@@ -64,6 +64,10 @@
 		{
 			"Name": "CommonLoadingScreen",
 			"Enabled": true
+		},
+		{
+			"Name": "WidgetTreeGen",
+			"Enabled": true
 		}
 	]
 }

@@ -29,14 +29,6 @@ void ULastFPSSkillCooldownSlotWidget::ConfigureCooldownSlot(
     InitializeSlotPresentation();
 }
 
-void ULastFPSSkillCooldownSlotWidget::ConfigureUltimateSlot()
-{
-    DisplayMode = ELastFPSSkillSlotDisplayMode::UltimateCharge;
-    CooldownTag = FGameplayTag();
-    CooldownEffectClass = nullptr;
-    InitializeSlotPresentation();
-}
-
 void ULastFPSSkillCooldownSlotWidget::InitializeSlotPresentation()
 {
     SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -179,30 +171,11 @@ void ULastFPSSkillCooldownSlotWidget::ApplyVisual(
 
 void ULastFPSSkillCooldownSlotWidget::UpdateFromASC(
     const UAbilitySystemComponent* ASC,
-    const ULastFPSAttributeSet* AttributeSetOverride)
+    const ULastFPSAttributeSet* /*AttributeSetOverride*/)
 {
     if (!ASC)
     {
         ApplyVisual(true, 0.f, 0.f);
-        return;
-    }
-
-    if (DisplayMode == ELastFPSSkillSlotDisplayMode::UltimateCharge)
-    {
-        const ULastFPSAttributeSet* AS = AttributeSetOverride
-            ? AttributeSetOverride
-            : ASC->GetSet<ULastFPSAttributeSet>();
-        if (!AS)
-        {
-            ApplyVisual(true, 0.f, 0.f);
-            return;
-        }
-
-        const float Current = AS->GetUltimateGauge();
-        const float Max     = FMath::Max(AS->GetMaxUltimateGauge(), KINDA_SMALL_NUMBER);
-        const bool bReady   = Current >= Max - KINDA_SMALL_NUMBER;
-        const float Fraction = 1.f - FMath::Clamp(Current / Max, 0.f, 1.f);
-        ApplyVisual(bReady, Fraction, 0.f);
         return;
     }
 
