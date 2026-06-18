@@ -2,6 +2,8 @@
 
 #include "Character/Components/WeaponComponent.h"
 #include "Character/LastFPSHero.h"
+#include "Game/LastFPSPlayerController.h"
+#include "UI/LastFPSHUDWidget.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Engine/World.h"
@@ -156,6 +158,14 @@ void UGA_BasicShoot::LocalFire(UWeaponComponent* Weapon)
     if (!Hero || !Hero->GetMesh())
     {
         return;
+    }
+
+    if (ALastFPSPlayerController* PC = Cast<ALastFPSPlayerController>(Hero->GetController()))
+    {
+        if (ULastFPSHUDWidget* HUDWidget = PC->GetHUDWidget())
+        {
+            HUDWidget->AddCrosshairFireSpread();
+        }
     }
 
     UAnimMontage* FireMontage = Hero->GetIsADS() ? ADSFireMontage : HipFireMontage;

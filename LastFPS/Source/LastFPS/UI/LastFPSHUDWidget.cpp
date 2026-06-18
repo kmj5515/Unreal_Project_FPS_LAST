@@ -55,6 +55,7 @@ bool FLastFPSSmoothedGaugeDisplay::Tick(float DeltaTime, float FillDuration)
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Engine/World.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "NativeGameplayTags.h"
@@ -89,6 +90,9 @@ void ULastFPSHUDWidget::NativeConstruct()
         SetHitMarkerSpread(0.f);
         HitMarkerImage->SetVisibility(ESlateVisibility::Collapsed);
     }
+
+    InitializeCrosshairMaterial();
+    SetCrosshairSpread(CrosshairBaseSpread);
 
     if (UWorld* World = GetWorld())
     {
@@ -156,6 +160,7 @@ void ULastFPSHUDWidget::HUDRefreshTick(const float DeltaTime)
 
     TickSmoothedGauges(DeltaTime);
     TickHitMarkerSpread(DeltaTime);
+    TickCrosshairSpread(DeltaTime);
 }
 
 bool ULastFPSHUDWidget::TryInitSkillSlots()
@@ -392,6 +397,87 @@ void ULastFPSHUDWidget::SetHitMarkerSpread(float Spread)
     {
         Material->SetScalarParameterValue(HitMarkerSpreadParameterName, Spread);
     }
+}
+
+void ULastFPSHUDWidget::InitializeCrosshairMaterial()
+{
+    if (!CrosshairImage || CrosshairMaterial.IsValid())
+    {
+        return;
+    }
+
+    CrosshairMaterial = CrosshairImage->GetDynamicMaterial();
+}
+
+void ULastFPSHUDWidget::TickCrosshairSpread(float DeltaTime)
+{
+    ALastFPSHero* Hero = nullptr;
+    if (const APlayerController* PC = GetOwningPlayer())
+    {
+        Hero = Cast<ALastFPSHero>(PC->GetPawn());
+    }
+
+    float TargetSpread = CrosshairBaseSpread;
+
+    if (Hero)
+    {
+        const FVector Velocity = Hero->GetVelocity();
+        const float HorizontalSpeed = FVector(Velocity.X, Velocity.Y, 0.f).Size();
+        if (HorizontalSpeed > CrosshairMovementSpeedThreshold)
+        {
+            TargetSpread += CrosshairMoveSpread;
+        }
+
+        if (const UCharacterMovementComponent* Movement = Hero->GetCharacterMovement())
+        {
+            if (Movement->IsFalling())
+            {
+                TargetSpread += CrosshairJumpSpread;
+            }
+        }
+
+        if (Hero->GetIsADS())
+        {
+            TargetSpread *= CrosshairZoomSpreadMultiplier;
+        }
+    }
+
+    FireCrosshairSpread = FMath::FInterpTo(
+        FireCrosshairSpread,
+        0.f,
+        DeltaTime,
+        CrosshairFireRecoverSpeed);
+
+    TargetSpread += FireCrosshairSpread;
+
+    CurrentCrosshairSpread = FMath::FInterpTo(
+        CurrentCrosshairSpread,
+        TargetSpread,
+        DeltaTime,
+        CrosshairRecoverSpeed);
+
+    SetCrosshairSpread(CurrentCrosshairSpread);
+}
+
+void ULastFPSHUDWidget::SetCrosshairSpread(float Spread)
+{
+    InitializeCrosshairMaterial();
+
+    if (UMaterialInstanceDynamic* Material = CrosshairMaterial.Get())
+    {
+        Material->SetScalarParameterValue(CrosshairSpreadParameterName, Spread);
+    }
+
+    OnCrosshairSpreadChanged(Spread);
+}
+
+void ULastFPSHUDWidget::AddCrosshairFireSpread(float SpreadAmount)
+{
+    const float Amount = SpreadAmount >= 0.f ? SpreadAmount : CrosshairFireSpread;
+    FireCrosshairSpread = FMath::Clamp(
+        FireCrosshairSpread + Amount,
+        0.f,
+        CrosshairMaxFireSpread);
 }
 
 bool ULastFPSHUDWidget::IsLowResource(float Current, float Max) const

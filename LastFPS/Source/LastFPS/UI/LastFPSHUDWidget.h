@@ -43,6 +43,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="HUD|HitMarker")
     void ShowHitMarker();
 
+    UFUNCTION(BlueprintCallable, Category="HUD|Crosshair")
+    void AddCrosshairFireSpread(float SpreadAmount = -1.f);
+
     UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
     TObjectPtr<ULastFPSSkillCooldownSlotWidget> WBP_SkillCooldownSlot_Q;
 
@@ -71,8 +74,44 @@ protected:
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
     void OnCrosshairVisibilityChanged(bool bVisible);
 
+    UFUNCTION(BlueprintImplementableEvent, Category="HUD")
+    void OnCrosshairSpreadChanged(float Spread);
+
     UPROPERTY(BlueprintReadOnly, Category="HUD|HitMarker", meta=(BindWidgetOptional))
     TObjectPtr<UImage> HitMarkerImage;
+
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Crosshair", meta=(BindWidgetOptional))
+    TObjectPtr<UImage> CrosshairImage;
+
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Crosshair|Material")
+    FName CrosshairSpreadParameterName = TEXT("Spread");
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="-0.1"))
+    float CrosshairBaseSpread = 0.005f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
+    float CrosshairMoveSpread = 0.02f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
+    float CrosshairJumpSpread = 0.04f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
+    float CrosshairFireSpread = 0.025f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
+    float CrosshairMaxFireSpread = 0.08f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0", ClampMax="1.0"))
+    float CrosshairZoomSpreadMultiplier = 0.3f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
+    float CrosshairRecoverSpeed = 12.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
+    float CrosshairFireRecoverSpeed = 9.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
+    float CrosshairMovementSpeedThreshold = 10.f;
 
     UPROPERTY(EditDefaultsOnly, Category="HUD|HitMarker|Material")
     FName HitMarkerSpreadParameterName = TEXT("HitSpread");
@@ -148,6 +187,9 @@ private:
     void InitializeHitMarkerMaterial();
     void TickHitMarkerSpread(float DeltaTime);
     void SetHitMarkerSpread(float Spread);
+    void InitializeCrosshairMaterial();
+    void TickCrosshairSpread(float DeltaTime);
+    void SetCrosshairSpread(float Spread);
     void BroadcastHealthDisplay();
     void BroadcastStaminaDisplay();
     void BroadcastUltimateGaugeDisplay();
@@ -171,8 +213,11 @@ private:
     void HideHitMarker();
 
     TWeakObjectPtr<UMaterialInstanceDynamic> HitMarkerMaterial;
+    TWeakObjectPtr<UMaterialInstanceDynamic> CrosshairMaterial;
     float HitMarkerSpreadElapsed = 0.f;
     bool bHitMarkerSpreadAnimating = false;
+    float CurrentCrosshairSpread = 0.f;
+    float FireCrosshairSpread = 0.f;
 
     FLastFPSSmoothedGaugeDisplay HealthGauge;
     FLastFPSSmoothedGaugeDisplay StaminaGauge;
