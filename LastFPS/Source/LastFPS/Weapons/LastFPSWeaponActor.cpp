@@ -15,8 +15,19 @@ ALastFPSWeaponActor::ALastFPSWeaponActor()
     WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
     WeaponMesh->SetCollisionProfileName(TEXT("NoCollision"));
     WeaponMesh->SetGenerateOverlapEvents(false);
-    WeaponMesh->SetIsReplicated(true);
     RootComponent = WeaponMesh;
+}
+
+void ALastFPSWeaponActor::PostInitializeComponents()
+{
+    Super::PostInitializeComponents();
+
+    // 컴포넌트 초기화 이후에 호출해야 한다. 생성자에서 SetIsReplicated를 부르면
+    // "SetIsReplicatedByDefault is preferred during Component Construction" ensure가 발동한다.
+    if (WeaponMesh)
+    {
+        WeaponMesh->SetIsReplicated(true);
+    }
 }
 
 void ALastFPSWeaponActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

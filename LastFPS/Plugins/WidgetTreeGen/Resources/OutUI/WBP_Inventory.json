@@ -1,0 +1,20 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSInventoryWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_Inventory",
+	"overwrite": true,
+	"root": {
+		"type": "Border", "name": "Root_BG", "bgImage": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Character_Profile___Inventory/T_Inventory_Background.T_Inventory_Background", "padding": 28,
+		"children": [
+			{ "type": "VerticalBox", "name": "Root_VB", "children": [
+				{ "type": "HorizontalBox", "name": "TitleBar", "padding": [0, 0, 0, 14], "children": [
+					{ "type": "TextBlock", "name": "TB_Title", "text": "인벤토리", "fill": true, "valign": "Center", "fontSize": 32, "color": [0.96, 0.97, 1.0, 1.0] },
+					{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Close", "buttonText": "닫기", "valign": "Center" }
+				] },
+				{ "type": "ScrollBox", "name": "Scroll_Items", "fill": true, "halign": "Fill", "children": [
+					{ "type": "WrapBox", "name": "Box_Slots" }
+				] }
+			] }
+		]
+	}
+}

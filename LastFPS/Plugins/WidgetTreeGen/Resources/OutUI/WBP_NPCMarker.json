@@ -1,0 +1,16 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSNPCMarkerWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_NPCMarker",
+	"overwrite": true,
+	"root": {
+		"type": "VerticalBox", "name": "Root_VB", "halign": "Center",
+		"children": [
+			{ "type": "TextBlock", "name": "TB_NPCName", "text": "NPC 이름", "halign": "Center", "fontSize": 16, "color": [0.97, 0.98, 1.0, 1.0] },
+			{ "type": "TextBlock", "name": "TB_NPCRole", "text": "역할", "halign": "Center", "fontSize": 12, "color": [0.65, 0.68, 0.75, 1.0] },
+			{ "type": "Border", "name": "InteractionHint", "halign": "Center", "padding": [12, 5], "bgImage": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Menu/T_Small_Frame.T_Small_Frame", "children": [
+				{ "type": "TextBlock", "name": "TB_InteractionLabel", "text": "[E] 상호작용", "fontSize": 13, "color": [0.35, 0.65, 1.0, 1.0] }
+			] }
+		]
+	}
+}

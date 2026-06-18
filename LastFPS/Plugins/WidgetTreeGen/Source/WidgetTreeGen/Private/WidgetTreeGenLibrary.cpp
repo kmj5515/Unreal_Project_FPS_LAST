@@ -7,16 +7,18 @@ FWidgetTreeGenResult UWidgetTreeGenLibrary::GenerateFromJsonText(
 	const FString& JsonText,
 	TSubclassOf<UUserWidget> ParentClass,
 	const FString& SavePath,
-	const FString& AssetName)
+	const FString& AssetName,
+	bool bOverwriteExisting)
 {
-	return FWidgetTreeGenerator::GenerateFromJsonString(JsonText, ParentClass, SavePath, AssetName);
+	return FWidgetTreeGenerator::GenerateFromJsonString(JsonText, ParentClass, SavePath, AssetName, bOverwriteExisting);
 }
 
 FWidgetTreeGenResult UWidgetTreeGenLibrary::GenerateFromJsonFile(
 	const FString& JsonFilePath,
 	TSubclassOf<UUserWidget> ParentClass,
 	const FString& SavePath,
-	const FString& AssetName)
+	const FString& AssetName,
+	bool bOverwriteExisting)
 {
-	return FWidgetTreeGenerator::GenerateFromJsonFile(JsonFilePath, ParentClass, SavePath, AssetName);
+	return FWidgetTreeGenerator::GenerateFromJsonFile(JsonFilePath, ParentClass, SavePath, AssetName, bOverwriteExisting);
 }

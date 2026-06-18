@@ -1,0 +1,44 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSSettingsWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_Settings",
+	"overwrite": true,
+	"root": {
+		"type": "Border", "name": "Root_BG", "bgImage": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Options/T_Options_Main_Background.T_Options_Main_Background", "padding": 32,
+		"children": [
+			{ "type": "VerticalBox", "name": "Root_VB", "children": [
+				{ "type": "HorizontalBox", "name": "TitleBar", "padding": [0, 0, 0, 16], "children": [
+					{ "type": "TextBlock", "name": "TB_Title", "text": "설정", "fill": true, "valign": "Center", "fontSize": 32, "color": [0.96, 0.97, 1.0, 1.0] },
+					{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Close", "buttonText": "닫기", "valign": "Center" }
+				] },
+				{ "type": "HorizontalBox", "name": "QualityRow", "padding": [0, 6], "children": [
+					{ "type": "TextBlock", "name": "Label_Quality", "text": "그래픽 품질", "valign": "Center", "fontSize": 16, "color": [0.82, 0.85, 0.9, 1.0], "padding": [0, 0, 12, 0] },
+					{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_QualityLow", "buttonText": "최하", "padding": [2, 0] },
+					{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_QualityMedium", "buttonText": "중", "padding": [2, 0] },
+					{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_QualityHigh", "buttonText": "상", "padding": [2, 0] },
+					{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_QualityUltra", "buttonText": "최상", "padding": [2, 0] }
+				] },
+				{ "type": "HorizontalBox", "name": "MasterRow", "padding": [0, 6], "children": [
+					{ "type": "TextBlock", "name": "Label_Master", "text": "마스터 볼륨", "valign": "Center", "fontSize": 16, "color": [0.82, 0.85, 0.9, 1.0], "minWidth": 140 },
+					{ "type": "Slider", "name": "Slider_MasterVolume", "fill": true, "valign": "Center" }
+				] },
+				{ "type": "HorizontalBox", "name": "MusicRow", "padding": [0, 6], "children": [
+					{ "type": "TextBlock", "name": "Label_Music", "text": "음악 볼륨", "valign": "Center", "fontSize": 16, "color": [0.82, 0.85, 0.9, 1.0], "minWidth": 140 },
+					{ "type": "Slider", "name": "Slider_MusicVolume", "fill": true, "valign": "Center" }
+				] },
+				{ "type": "HorizontalBox", "name": "SFXRow", "padding": [0, 6], "children": [
+					{ "type": "TextBlock", "name": "Label_SFX", "text": "효과음 볼륨", "valign": "Center", "fontSize": 16, "color": [0.82, 0.85, 0.9, 1.0], "minWidth": 140 },
+					{ "type": "Slider", "name": "Slider_SFXVolume", "fill": true, "valign": "Center" }
+				] },
+				{ "type": "HorizontalBox", "name": "SensRow", "padding": [0, 6], "children": [
+					{ "type": "TextBlock", "name": "Label_Sens", "text": "마우스 감도", "valign": "Center", "fontSize": 16, "color": [0.82, 0.85, 0.9, 1.0], "minWidth": 140 },
+					{ "type": "Slider", "name": "Slider_Sensitivity", "fill": true, "valign": "Center" }
+				] },
+				{ "type": "HorizontalBox", "name": "ButtonRow", "halign": "Right", "padding": [0, 16], "children": [
+					{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Revert", "buttonText": "되돌리기", "padding": [4, 0] },
+					{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Apply", "buttonText": "적용", "padding": [4, 0] }
+				] }
+			] }
+		]
+	}
+}
