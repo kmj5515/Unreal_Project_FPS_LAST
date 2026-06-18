@@ -1,0 +1,18 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSCharacterCardWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_CharacterCard",
+	"overwrite": true,
+	"root": {
+		"type": "SizeBox", "name": "Root_Size", "width": 180, "height": 240,
+		"children": [
+			{ "type": "Border", "name": "Card_BG", "bgImage": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Choose_Character_Scene/Characters/T_Box.T_Box", "padding": 10, "children": [
+				{ "type": "VerticalBox", "name": "Info", "children": [
+					{ "type": "Image", "name": "Img_Avatar", "fill": true, "halign": "Center", "valign": "Fill", "image": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Choose_Character_Scene/Characters/T_Avatar_Frame.T_Avatar_Frame" },
+					{ "type": "TextBlock", "name": "TB_CardName", "text": "이름", "halign": "Center", "fontSize": 18, "color": [0.96, 0.97, 1.0, 1.0], "padding": [0, 6, 0, 0] },
+					{ "type": "TextBlock", "name": "TB_CardRole", "text": "역할", "halign": "Center", "fontSize": 13, "color": [0.6, 0.63, 0.7, 1.0] }
+				] }
+			] }
+		]
+	}
+}

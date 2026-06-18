@@ -1,0 +1,18 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSMainMenuWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_MainMenu",
+	"overwrite": true,
+	"root": {
+		"type": "Overlay", "name": "Root_BG",
+		"children": [
+			{ "type": "Image", "name": "BG_Fill", "halign": "Fill", "valign": "Fill", "image": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Create_Character_Scene/T_Background.T_Background" },
+			{ "type": "VerticalBox", "name": "Menu", "halign": "Center", "valign": "Center", "children": [
+				{ "type": "TextBlock", "name": "Label_Title", "text": "LAST FPS", "justify": "Center", "halign": "Center", "fontSize": 56, "color": [0.97, 0.98, 1.0, 1.0], "padding": [0, 0, 0, 40] },
+				{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Start",    "buttonText": "시작", "halign": "Center", "padding": [0, 6] },
+				{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Settings", "buttonText": "설정", "halign": "Center", "padding": [0, 6] },
+				{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Quit",     "buttonText": "종료", "halign": "Center", "padding": [0, 6] }
+			] }
+		]
+	}
+}

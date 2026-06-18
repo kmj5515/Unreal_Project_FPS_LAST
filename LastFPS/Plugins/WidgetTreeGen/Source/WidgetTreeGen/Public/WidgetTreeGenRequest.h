@@ -47,6 +47,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	FString AssetName;
 
+	/**
+	 * If the target asset already exists, regenerate it in place (rebuild only the widget tree;
+	 * keep its parent class, event graph and variables). If false, an existing asset is an error.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	bool bOverwriteExisting = false;
+
 	/** Result of the last Generate() call. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Result")
 	FWidgetTreeGenResult LastResult;

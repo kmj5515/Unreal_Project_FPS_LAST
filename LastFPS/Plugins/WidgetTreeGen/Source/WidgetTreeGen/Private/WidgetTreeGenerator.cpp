@@ -19,8 +19,18 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Components/OverlaySlot.h"
 #include "Components/TextBlock.h"
+#include "Components/SizeBox.h"
+#include "Components/Border.h"
+#include "Components/Image.h"
 #include "Components/SlateWrapperTypes.h"
+#include "Animation/WidgetAnimation.h"
+#include "Styling/SlateColor.h"
+#include "Fonts/SlateFontInfo.h"
 #include "Layout/Margin.h"
+#include "UObject/UnrealType.h"
+#include "UObject/TextProperty.h"
+#include "UObject/UObjectHash.h"
+#include "Engine/Texture2D.h"
 
 // Editor-only
 #include "WidgetBlueprint.h"
@@ -60,6 +70,20 @@ namespace
 
 		bool bHasFill = false;
 		float Fill = 1.f;
+
+		// --- Visual styling (all optional) ---
+		TOptional<float> Width, Height, MinWidth, MinHeight;   // USizeBox
+		TOptional<int32> FontSize;                             // UTextBlock
+		TOptional<FLinearColor> Color;                         // UTextBlock / UImage tint
+		TOptional<FLinearColor> BgColor;                       // UBorder background
+		TOptional<FVector2D> DesiredSize;                      // UImage
+		bool bHasAutoWrap = false;
+		bool bAutoWrap = false;                                // UTextBlock
+		FString Justify;                                       // UTextBlock (Left/Center/Right)
+		FString Image;                                         // UImage brush texture path
+		FString BgImage;                                       // UBorder background texture path
+		bool bHasButtonText = false;
+		FString ButtonText;                                    // any widget exposing an FText "ButtonText"
 
 		TArray<TSharedPtr<FWidgetGenNode>> Children;
 	};
@@ -132,6 +156,29 @@ namespace
 		Out.X = (*Arr)[0]->AsNumber();
 		Out.Y = (*Arr)[1]->AsNumber();
 		return true;
+	}
+
+	/** Color as [R,G,B] or [R,G,B,A], components 0..1. */
+	bool ParseColor(const TSharedPtr<FJsonValue>& Value, FLinearColor& Out)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (!Value.IsValid() || !Value->TryGetArray(Arr) || Arr->Num() < 3)
+		{
+			return false;
+		}
+		Out.R = (float)(*Arr)[0]->AsNumber();
+		Out.G = (float)(*Arr)[1]->AsNumber();
+		Out.B = (float)(*Arr)[2]->AsNumber();
+		Out.A = Arr->Num() >= 4 ? (float)(*Arr)[3]->AsNumber() : 1.f;
+		return true;
+	}
+
+	ETextJustify::Type ParseJustify(const FString& In, ETextJustify::Type Default)
+	{
+		if (In.Equals(TEXT("Left"),   ESearchCase::IgnoreCase)) return ETextJustify::Left;
+		if (In.Equals(TEXT("Center"), ESearchCase::IgnoreCase)) return ETextJustify::Center;
+		if (In.Equals(TEXT("Right"),  ESearchCase::IgnoreCase)) return ETextJustify::Right;
+		return Default;
 	}
 
 	bool ParsePadding(const TSharedPtr<FJsonValue>& Value, FMargin& Out)
@@ -226,6 +273,39 @@ namespace
 				Node->Fill = 1.f;
 			}
 		}
+
+		// --- Visual styling ---
+		{
+			double D = 0.0;
+			if (Obj->TryGetNumberField(TEXT("width"),     D)) { Node->Width = (float)D; }
+			if (Obj->TryGetNumberField(TEXT("height"),    D)) { Node->Height = (float)D; }
+			if (Obj->TryGetNumberField(TEXT("minWidth"),  D)) { Node->MinWidth = (float)D; }
+			if (Obj->TryGetNumberField(TEXT("minHeight"), D)) { Node->MinHeight = (float)D; }
+			if (Obj->TryGetNumberField(TEXT("fontSize"),  D)) { Node->FontSize = (int32)D; }
+		}
+		if (Obj->HasField(TEXT("color")))
+		{
+			FLinearColor C;
+			if (ParseColor(Obj->TryGetField(TEXT("color")), C)) { Node->Color = C; }
+		}
+		if (Obj->HasField(TEXT("bgColor")))
+		{
+			FLinearColor C;
+			if (ParseColor(Obj->TryGetField(TEXT("bgColor")), C)) { Node->BgColor = C; }
+		}
+		if (Obj->HasField(TEXT("desiredSize")))
+		{
+			FVector2D V;
+			if (ParseVector2D(Obj->TryGetField(TEXT("desiredSize")), V)) { Node->DesiredSize = V; }
+		}
+		{
+			bool bWrap = false;
+			if (Obj->TryGetBoolField(TEXT("autoWrap"), bWrap)) { Node->bHasAutoWrap = true; Node->bAutoWrap = bWrap; }
+		}
+		Obj->TryGetStringField(TEXT("justify"), Node->Justify);
+		Obj->TryGetStringField(TEXT("image"), Node->Image);
+		Obj->TryGetStringField(TEXT("bgImage"), Node->BgImage);
+		Node->bHasButtonText = Obj->TryGetStringField(TEXT("buttonText"), Node->ButtonText);
 
 		const TArray<TSharedPtr<FJsonValue>>* ChildArr = nullptr;
 		if (Obj->TryGetArrayField(TEXT("children"), ChildArr))
@@ -334,6 +414,63 @@ namespace
 		// Other slot types (Button content, Border, etc.) carry no positional data here.
 	}
 
+	/** Apply visual styling fields (size, color, font, background, button label) to a widget. */
+	void ApplyStyle(UWidget* Widget, const FWidgetGenNode& Node)
+	{
+		if (USizeBox* SizeBox = Cast<USizeBox>(Widget))
+		{
+			if (Node.Width.IsSet())     SizeBox->SetWidthOverride(*Node.Width);
+			if (Node.Height.IsSet())    SizeBox->SetHeightOverride(*Node.Height);
+			if (Node.MinWidth.IsSet())  SizeBox->SetMinDesiredWidth(*Node.MinWidth);
+			if (Node.MinHeight.IsSet()) SizeBox->SetMinDesiredHeight(*Node.MinHeight);
+		}
+		if (UTextBlock* TextBlock = Cast<UTextBlock>(Widget))
+		{
+			if (Node.FontSize.IsSet())
+			{
+				FSlateFontInfo FontInfo = TextBlock->GetFont();
+				FontInfo.Size = *Node.FontSize;
+				TextBlock->SetFont(FontInfo);
+			}
+			if (Node.Color.IsSet())    TextBlock->SetColorAndOpacity(FSlateColor(*Node.Color));
+			if (Node.bHasAutoWrap)     TextBlock->SetAutoWrapText(Node.bAutoWrap);
+			if (!Node.Justify.IsEmpty()) TextBlock->SetJustification(ParseJustify(Node.Justify, ETextJustify::Left));
+		}
+		if (UBorder* Border = Cast<UBorder>(Widget))
+		{
+			if (!Node.BgImage.IsEmpty())
+			{
+				if (UTexture2D* Tex = LoadObject<UTexture2D>(nullptr, *Node.BgImage))
+				{
+					Border->SetBrushFromTexture(Tex);
+				}
+			}
+			if (Node.BgColor.IsSet()) Border->SetBrushColor(*Node.BgColor);
+		}
+		if (UImage* Image = Cast<UImage>(Widget))
+		{
+			if (!Node.Image.IsEmpty())
+			{
+				if (UTexture2D* Tex = LoadObject<UTexture2D>(nullptr, *Node.Image))
+				{
+					Image->SetBrushFromTexture(Tex, /*bMatchSize=*/false);
+				}
+			}
+			if (Node.Color.IsSet())       Image->SetColorAndOpacity(*Node.Color);
+			if (Node.DesiredSize.IsSet()) Image->SetDesiredSizeOverride(*Node.DesiredSize);
+		}
+
+		// "buttonText" — set on any widget exposing an FText property named "ButtonText"
+		// (e.g. project common buttons). Done via reflection so the plugin needs no game dependency.
+		if (Node.bHasButtonText)
+		{
+			if (FTextProperty* TextProp = CastField<FTextProperty>(Widget->GetClass()->FindPropertyByName(TEXT("ButtonText"))))
+			{
+				TextProp->SetPropertyValue_InContainer(Widget, FText::FromString(Node.ButtonText));
+			}
+		}
+	}
+
 	/** Recursively construct widgets and wire them into the tree. */
 	UWidget* BuildWidget(UWidgetTree* Tree, const FWidgetGenNode& Node, TSet<FName>& UsedNames, FString& OutError)
 	{
@@ -363,6 +500,9 @@ namespace
 				TextBlock->SetText(FText::FromString(Node.Text));
 			}
 		}
+
+		// Visual styling (size, color, font, background, button label).
+		ApplyStyle(Widget, Node);
 
 		// Children.
 		if (Node.Children.Num() > 0)
@@ -437,7 +577,8 @@ FWidgetTreeGenResult FWidgetTreeGenerator::GenerateFromJsonString(
 	const FString& JsonString,
 	TSubclassOf<UUserWidget> ParentClassOverride,
 	const FString& SavePathOverride,
-	const FString& AssetNameOverride)
+	const FString& AssetNameOverride,
+	bool bOverwriteExisting)
 {
 	// --- Parse document ---
 	TSharedPtr<FJsonObject> RootObject;
@@ -489,6 +630,16 @@ FWidgetTreeGenResult FWidgetTreeGenerator::GenerateFromJsonString(
 	}
 	SavePath.RemoveFromEnd(TEXT("/"));
 
+	// "overwrite" can be enabled by the argument or the JSON field.
+	bool bOverwrite = bOverwriteExisting;
+	{
+		bool bJsonOverwrite = false;
+		if (RootObject->TryGetBoolField(TEXT("overwrite"), bJsonOverwrite))
+		{
+			bOverwrite = bOverwrite || bJsonOverwrite;
+		}
+	}
+
 	// --- Parse the widget node tree ---
 	const TSharedPtr<FJsonObject>* RootNodeObj = nullptr;
 	if (!RootObject->TryGetObjectField(TEXT("root"), RootNodeObj))
@@ -502,27 +653,59 @@ FWidgetTreeGenResult FWidgetTreeGenerator::GenerateFromJsonString(
 		return FWidgetTreeGenResult::MakeError(ParseError);
 	}
 
-	// --- Create the asset via the widget blueprint factory ---
-	UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>();
-	Factory->ParentClass = ParentClass;
+	// --- Get the target Widget Blueprint: reuse existing (overwrite) or create new ---
+	const FString ObjectPath = FString::Printf(TEXT("%s/%s"), *SavePath, *AssetName);
+	UWidgetBlueprint* WidgetBP = nullptr;
 
-	FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
-	UObject* NewAsset = AssetToolsModule.Get().CreateAsset(AssetName, SavePath, UWidgetBlueprint::StaticClass(), Factory);
-	UWidgetBlueprint* WidgetBP = Cast<UWidgetBlueprint>(NewAsset);
-	if (!WidgetBP || !WidgetBP->WidgetTree)
+	if (UEditorAssetLibrary::DoesAssetExist(ObjectPath))
 	{
-		return FWidgetTreeGenResult::MakeError(
-			FString::Printf(TEXT("Failed to create Widget Blueprint \"%s\" at \"%s\" (name may already be in use)."), *AssetName, *SavePath));
+		if (!bOverwrite)
+		{
+			return FWidgetTreeGenResult::MakeError(
+				FString::Printf(TEXT("Asset \"%s\" already exists. Set \"overwrite\":true (or the overwrite flag) to regenerate it."), *ObjectPath));
+		}
+
+		// Regenerate in place: keep the existing parent class, event graph and variables;
+		// only the widget tree (below) is rebuilt.
+		WidgetBP = Cast<UWidgetBlueprint>(UEditorAssetLibrary::LoadAsset(ObjectPath));
+		if (!WidgetBP || !WidgetBP->WidgetTree)
+		{
+			return FWidgetTreeGenResult::MakeError(
+				FString::Printf(TEXT("Asset \"%s\" exists but is not a Widget Blueprint; refusing to overwrite."), *ObjectPath));
+		}
+	}
+	else
+	{
+		UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>();
+		Factory->ParentClass = ParentClass;
+
+		FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
+		UObject* NewAsset = AssetToolsModule.Get().CreateAsset(AssetName, SavePath, UWidgetBlueprint::StaticClass(), Factory);
+		WidgetBP = Cast<UWidgetBlueprint>(NewAsset);
+		if (!WidgetBP || !WidgetBP->WidgetTree)
+		{
+			return FWidgetTreeGenResult::MakeError(
+				FString::Printf(TEXT("Failed to create Widget Blueprint \"%s\" at \"%s\"."), *AssetName, *SavePath));
+		}
 	}
 
 	UWidgetTree* Tree = WidgetBP->WidgetTree;
 
-	// The factory may have created a default root (e.g. CanvasPanel). Discard it so our
-	// tree fully owns the hierarchy and there are no name collisions.
-	if (UWidget* OldRoot = Tree->RootWidget)
+	// Discard every existing widget owned by this tree (factory default root, or — when
+	// overwriting — the previously generated widgets). We move ALL widgets parented to the
+	// tree out to the transient package, not just the root, so their names are freed and new
+	// widgets with the same names can't collide (which otherwise crashes with "Existing Object").
+	Tree->RootWidget = nullptr;
 	{
-		OldRoot->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional | REN_DoNotDirty);
-		Tree->RootWidget = nullptr;
+		TArray<UObject*> OldSubobjects;
+		GetObjectsWithOuter(Tree, OldSubobjects, /*bIncludeNestedObjects=*/false);
+		for (UObject* Obj : OldSubobjects)
+		{
+			if (UWidget* OldWidget = Cast<UWidget>(Obj))
+			{
+				OldWidget->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional | REN_DoNotDirty);
+			}
+		}
 	}
 
 	// --- Build the hierarchy ---
@@ -535,6 +718,26 @@ FWidgetTreeGenResult FWidgetTreeGenerator::GenerateFromJsonString(
 	}
 	Tree->RootWidget = BuiltRoot;
 
+	// The UMG compiler (WidgetBlueprintCompiler) requires EVERY source widget (and animation) to
+	// have an entry in WidgetVariableNameToGuidMap. The designer assigns these automatically;
+	// programmatic creation must do the same, or the compiler fires ensureAlways for each one.
+	// Use the exact same iterator the compiler uses (ForEachSourceWidget) so coverage matches.
+	WidgetBP->WidgetVariableNameToGuidMap.Reset();
+	WidgetBP->ForEachSourceWidget([WidgetBP](UWidget* InWidget)
+	{
+		if (InWidget)
+		{
+			WidgetBP->WidgetVariableNameToGuidMap.Add(InWidget->GetFName(), FGuid::NewGuid());
+		}
+	});
+	for (const TObjectPtr<UWidgetAnimation>& Anim : WidgetBP->Animations)
+	{
+		if (Anim)
+		{
+			WidgetBP->WidgetVariableNameToGuidMap.Add(Anim->GetFName(), FGuid::NewGuid());
+		}
+	}
+
 	// --- Compile & save ---
 	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBP);
 	FKismetEditorUtilities::CompileBlueprint(WidgetBP);
@@ -542,10 +745,9 @@ FWidgetTreeGenResult FWidgetTreeGenerator::GenerateFromJsonString(
 	if (WidgetBP->Status == BS_Error)
 	{
 		return FWidgetTreeGenResult::MakeError(
-			FString::Printf(TEXT("Widget Blueprint \"%s\" was created but failed to compile."), *AssetName));
+			FString::Printf(TEXT("Widget Blueprint \"%s\" failed to compile."), *AssetName));
 	}
 
-	const FString ObjectPath = FString::Printf(TEXT("%s/%s"), *SavePath, *AssetName);
 	if (!UEditorAssetLibrary::SaveLoadedAsset(WidgetBP, /*bOnlyIfIsDirty=*/false))
 	{
 		UE_LOG(LogWidgetTreeGen, Warning, TEXT("Generated \"%s\" but saving to disk failed."), *ObjectPath);
@@ -559,12 +761,13 @@ FWidgetTreeGenResult FWidgetTreeGenerator::GenerateFromJsonFile(
 	const FString& JsonFilePath,
 	TSubclassOf<UUserWidget> ParentClassOverride,
 	const FString& SavePathOverride,
-	const FString& AssetNameOverride)
+	const FString& AssetNameOverride,
+	bool bOverwriteExisting)
 {
 	FString JsonString;
 	if (!FFileHelper::LoadFileToString(JsonString, *JsonFilePath))
 	{
 		return FWidgetTreeGenResult::MakeError(FString::Printf(TEXT("Could not read JSON file: %s"), *JsonFilePath));
 	}
-	return GenerateFromJsonString(JsonString, ParentClassOverride, SavePathOverride, AssetNameOverride);
+	return GenerateFromJsonString(JsonString, ParentClassOverride, SavePathOverride, AssetNameOverride, bOverwriteExisting);
 }

@@ -1,0 +1,22 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSQuestEntryWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_QuestEntry",
+	"overwrite": true,
+	"root": {
+		"type": "SizeBox", "name": "Root_Size", "height": 84,
+		"children": [
+			{ "type": "Border", "name": "Root_BG", "bgImage": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Quests/Rewards/T_Reward_Item_Background.T_Reward_Item_Background", "padding": 8, "children": [
+				{ "type": "HorizontalBox", "name": "Row", "children": [
+					{ "type": "Image", "name": "Img_Icon", "valign": "Center", "padding": [0, 0, 10, 0], "desiredSize": [48, 48], "image": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Quests/Quest_Details/T_Checkmark_Icon.T_Checkmark_Icon" },
+					{ "type": "VerticalBox", "name": "Info", "fill": true, "halign": "Fill", "valign": "Center", "children": [
+						{ "type": "TextBlock", "name": "TB_Title", "text": "임무 제목", "fontSize": 18, "color": [0.95, 0.97, 1.0, 1.0] },
+						{ "type": "TextBlock", "name": "TB_Summary", "text": "임무 요약 설명입니다.", "fontSize": 12, "color": [0.62, 0.65, 0.72, 1.0], "autoWrap": true },
+						{ "type": "TextBlock", "name": "TB_Reward", "text": "보상: 100 G", "fontSize": 12, "color": [1.0, 0.84, 0.4, 1.0], "padding": [0, 2, 0, 0] }
+					] },
+					{ "type": "TextBlock", "name": "TB_Status", "text": "진행 중", "valign": "Center", "padding": [10, 0], "fontSize": 14, "color": [0.35, 0.65, 1.0, 1.0] }
+				] }
+			] }
+		]
+	}
+}

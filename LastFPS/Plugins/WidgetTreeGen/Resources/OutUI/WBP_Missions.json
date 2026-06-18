@@ -1,0 +1,25 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSQuestScreenWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_Missions",
+	"overwrite": true,
+	"root": {
+		"type": "Border", "name": "Root_BG", "bgImage": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Character_Profile___Inventory/T_Main_Background.T_Main_Background", "padding": 28,
+		"children": [
+			{ "type": "VerticalBox", "name": "Root_VB", "children": [
+				{ "type": "HorizontalBox", "name": "TitleBar", "padding": [0, 0, 0, 14], "children": [
+					{ "type": "TextBlock", "name": "TB_Title", "text": "임무", "fill": true, "valign": "Center", "fontSize": 34, "color": [0.96, 0.97, 1.0, 1.0] },
+					{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Close", "buttonText": "닫기", "valign": "Center" }
+				] },
+				{ "type": "Border", "name": "ListPanel", "fill": true, "halign": "Fill", "valign": "Fill", "bgImage": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Quests/Rewards/T_Rewards_Background.T_Rewards_Background", "padding": 12, "children": [
+					{ "type": "Overlay", "name": "Body", "children": [
+						{ "type": "ScrollBox", "name": "Scroll_Quests", "halign": "Fill", "valign": "Fill", "children": [
+							{ "type": "VerticalBox", "name": "Box_QuestList" }
+						] },
+						{ "type": "TextBlock", "name": "TB_Empty", "text": "진행 중인 임무가 없습니다", "halign": "Center", "valign": "Center", "fontSize": 16, "color": [0.6, 0.63, 0.7, 1.0] }
+					] }
+				] }
+			] }
+		]
+	}
+}
