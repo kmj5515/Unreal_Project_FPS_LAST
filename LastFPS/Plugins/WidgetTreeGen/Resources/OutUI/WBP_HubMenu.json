@@ -1,7 +1,7 @@
 {
 	"parentClass": "/Script/LastFPS.LastFPSLobbyWidget",
 	"savePath": "/Game/UI/OutUI",
-	"assetName": "WBP_Hub",
+	"assetName": "WBP_HubMenu",
 	"overwrite": true,
 	"root": {
 		"type": "Overlay", "name": "Root_BG",
