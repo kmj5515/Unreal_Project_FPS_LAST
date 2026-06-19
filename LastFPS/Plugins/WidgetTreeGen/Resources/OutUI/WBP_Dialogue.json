@@ -6,13 +6,18 @@
 	"root": {
 		"type": "SizeBox", "name": "Root_Size", "width": 760, "height": 200,
 		"children": [
-			{ "type": "Border", "name": "Root_BG", "bgImage": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Notification_Window/T_Notification_Window_Background.T_Notification_Window_Background", "padding": 20, "children": [
-				{ "type": "VerticalBox", "name": "Root_VB", "children": [
-					{ "type": "TextBlock", "name": "Text_Title", "text": "이름", "fontSize": 18, "color": [0.35, 0.65, 1.0, 1.0] },
-					{ "type": "TextBlock", "name": "Text_Body", "text": "대사 내용이 여기에 표시됩니다...", "fill": true, "fontSize": 16, "color": [0.85, 0.87, 0.92, 1.0], "autoWrap": true, "padding": [0, 8] },
-					{ "type": "HorizontalBox", "name": "NextRow", "halign": "Right", "children": [
-						{ "type": "TextBlock", "name": "Text_NextLabel", "text": "다음", "valign": "Center", "fontSize": 13, "color": [0.6, 0.63, 0.7, 1.0], "padding": [0, 0, 8, 0] },
-						{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Next", "buttonText": "▶" }
+			{ "type": "Border", "name": "Frame", "bgColor": [0.15, 0.78, 1.0, 0.7], "padding": 2, "children": [
+				{ "type": "Border", "name": "Root_BG", "bgColor": [0.04, 0.06, 0.09, 0.97], "padding": 20, "children": [
+					{ "type": "VerticalBox", "name": "Root_VB", "children": [
+						{ "type": "TextBlock", "name": "Text_Title", "text": "이름", "fontSize": 18, "color": [0.15, 0.78, 1.0, 1.0] },
+						{ "type": "SizeBox", "name": "TitleUnderline", "height": 1, "padding": [0, 4, 0, 8], "children": [
+							{ "type": "Border", "name": "TitleUnderlineFill", "halign": "Fill", "valign": "Fill", "bgColor": [0.15, 0.78, 1.0, 0.4] }
+						] },
+						{ "type": "TextBlock", "name": "Text_Body", "text": "대사 내용이 여기에 표시됩니다...", "fill": true, "fontSize": 16, "color": [0.85, 0.89, 0.95, 1.0], "autoWrap": true },
+						{ "type": "HorizontalBox", "name": "NextRow", "halign": "Right", "children": [
+							{ "type": "TextBlock", "name": "Text_NextLabel", "text": "다음", "valign": "Center", "fontSize": 13, "color": [0.55, 0.62, 0.72, 1.0], "padding": [0, 0, 8, 0] },
+							{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Next", "buttonText": "▶" }
+						] }
 					] }
 				] }
 			] }

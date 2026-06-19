@@ -6,9 +6,12 @@
 	"root": {
 		"type": "Overlay", "name": "Root_BG",
 		"children": [
-			{ "type": "Image", "name": "BG_Fill", "halign": "Fill", "valign": "Fill", "image": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Menu/T_Menu_Background.T_Menu_Background" },
+			{ "type": "Border", "name": "BG_Fill", "halign": "Fill", "valign": "Fill", "bgColor": [0.012, 0.022, 0.038, 1.0] },
 			{ "type": "VerticalBox", "name": "Menu", "halign": "Center", "valign": "Center", "children": [
-				{ "type": "TextBlock", "name": "TB_PlayerName", "text": "Player", "halign": "Center", "fontSize": 20, "color": [0.96, 0.97, 1.0, 1.0], "padding": [0, 0, 0, 16] },
+				{ "type": "TextBlock", "name": "TB_PlayerName", "text": "PLAYER", "halign": "Center", "fontSize": 22, "color": [0.15, 0.78, 1.0, 1.0] },
+				{ "type": "SizeBox", "name": "NameUnderline", "height": 2, "padding": [0, 6, 0, 18], "children": [
+					{ "type": "Border", "name": "NameUnderlineFill", "halign": "Fill", "valign": "Fill", "bgColor": [0.15, 0.78, 1.0, 0.6] }
+				] },
 				{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Inventory", "buttonText": "인벤토리", "halign": "Center", "padding": [0, 4] },
 				{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Missions", "buttonText": "임무", "halign": "Center", "padding": [0, 4] },
 				{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Shop", "buttonText": "상점", "halign": "Center", "padding": [0, 4] },

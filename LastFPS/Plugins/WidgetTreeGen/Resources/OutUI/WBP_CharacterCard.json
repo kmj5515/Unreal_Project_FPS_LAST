@@ -6,11 +6,13 @@
 	"root": {
 		"type": "SizeBox", "name": "Root_Size", "width": 180, "height": 240,
 		"children": [
-			{ "type": "Border", "name": "Card_BG", "bgImage": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Choose_Character_Scene/Characters/T_Box.T_Box", "padding": 10, "children": [
-				{ "type": "VerticalBox", "name": "Info", "children": [
-					{ "type": "Image", "name": "Img_Avatar", "fill": true, "halign": "Center", "valign": "Fill", "image": "/Game/Assets/SimpleAndCleanGUI/GRAPHICS__PNG_PSD_/PNG/Choose_Character_Scene/Characters/T_Avatar_Frame.T_Avatar_Frame" },
-					{ "type": "TextBlock", "name": "TB_CardName", "text": "이름", "halign": "Center", "fontSize": 18, "color": [0.96, 0.97, 1.0, 1.0], "padding": [0, 6, 0, 0] },
-					{ "type": "TextBlock", "name": "TB_CardRole", "text": "역할", "halign": "Center", "fontSize": 13, "color": [0.6, 0.63, 0.7, 1.0] }
+			{ "type": "Border", "name": "OuterFrame", "bgColor": [0.15, 0.78, 1.0, 0.85], "padding": 2, "children": [
+				{ "type": "Border", "name": "Card_BG", "bgColor": [0.05, 0.07, 0.10, 1.0], "padding": 10, "children": [
+					{ "type": "VerticalBox", "name": "Info", "children": [
+						{ "type": "Border", "name": "Portrait", "fill": true, "halign": "Fill", "valign": "Fill", "bgColor": [0.03, 0.05, 0.08, 1.0] },
+						{ "type": "TextBlock", "name": "TB_CardName", "text": "이름", "halign": "Center", "fontSize": 18, "color": [0.92, 0.96, 1.0, 1.0], "padding": [0, 8, 0, 0] },
+						{ "type": "TextBlock", "name": "TB_CardRole", "text": "역할", "halign": "Center", "fontSize": 13, "color": [0.15, 0.78, 1.0, 1.0] }
+					] }
 				] }
 			] }
 		]
