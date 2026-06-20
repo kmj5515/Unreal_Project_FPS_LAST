@@ -10,7 +10,7 @@
 				{ "type": "Border", "name": "Root_BG", "bgColor": [0.04, 0.06, 0.09, 0.99], "padding": 22, "children": [
 					{ "type": "VerticalBox", "name": "Root_VB", "valign": "Fill", "children": [
 						{ "type": "TextBlock", "name": "Text_Title", "text": "알림", "halign": "Center", "fontSize": 20, "color": [0.15, 0.78, 1.0, 1.0] },
-						{ "type": "TextBlock", "name": "Text_Body", "text": "안내 내용입니다.", "fill": true, "halign": "Center", "justify": "Center", "fontSize": 15, "color": [0.78, 0.83, 0.9, 1.0], "autoWrap": true, "padding": [0, 14] },
+						{ "type": "TextBlock", "name": "Text_Body", "text": "안내 내용입니다.", "fill": true, "halign": "Center", "justify": "Center", "fontSize": 15, "color": [0.82, 0.86, 0.93, 1.0], "autoWrap": true, "padding": [0, 14] },
 						{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Ok", "buttonText": "확인", "halign": "Center" }
 					] }
 				] }
