@@ -8,6 +8,7 @@
 class ALastFPSPlayerState;
 class UAbilitySystemComponent;
 class ULastFPSCharacterDefinition;
+class ULastFPSCharacterRoster;
 
 UCLASS()
 class LASTFPS_API ALastFPSGameModeBase : public AGameModeBase
@@ -24,14 +25,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="LastFPS|Players")
     int32 GetTotalConnectedPlayers() const;
 
-    // 캐릭터 선택 인덱스별 Pawn 클래스 목록
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
-    TArray<TSubclassOf<APawn>> CharacterPawnClasses;
-
-    /** Preferred character source. Each definition owns pawn, stats, visuals, abilities, and optional AI profile. */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
-    TArray<TObjectPtr<ULastFPSCharacterDefinition>> CharacterDefinitions;
-
+    // 캐릭터 목록은 GameInstance의 로스터(단일 소스)에서 읽는다. (위젯·PC와 공유)
     const ULastFPSCharacterDefinition* GetCharacterDefinitionForIndex(int32 CharacterIndex) const;
     bool ApplyCharacterDefinitionToAbilitySystem(
         UAbilitySystemComponent* ASC,

@@ -10,6 +10,7 @@
 class APawn;
 class UCommonActivatableWidget;
 class ULastFPSCharacterDefinition;
+class ULastFPSCharacterRoster;
 class ULastFPSHUDWidget;
 class ULastFPSNoticeWidget;
 class ULastFPSDialogueWidget;
@@ -79,10 +80,8 @@ public:
     UFUNCTION(BlueprintPure, Category="LastFPS|Character")
     const ULastFPSCharacterDefinition* GetSelectedCharacterDefinition() const;
 
-    UFUNCTION(BlueprintPure, Category="LastFPS|Character")
-    const TArray<TSubclassOf<APawn>>& GetSelectableCharacterClasses() const { return SelectableCharacterClasses; }
-
-    const TArray<TObjectPtr<ULastFPSCharacterDefinition>>& GetSelectableCharacterDefinitions() const { return SelectableCharacterDefinitions; }
+    /** 선택 가능한 캐릭터 정의 목록 — GameInstance의 로스터(단일 소스)에서 읽는다. */
+    const TArray<TObjectPtr<ULastFPSCharacterDefinition>>& GetSelectableCharacterDefinitions() const;
 
     UFUNCTION(BlueprintImplementableEvent, Category="LastFPS|Character")
     void OnSelectedCharacterIndexChanged(int32 NewSelectedCharacterIndex);
@@ -138,6 +137,9 @@ protected:
     int32 ClampSelectedCharacterIndex(int32 NewIndex) const;
     void SyncSelectedCharacterState(int32 CharacterIndex);
 
+    /** GameInstance의 캐릭터 로스터(단일 소스). 없으면 nullptr. */
+    const ULastFPSCharacterRoster* GetCharacterRoster() const;
+
     UFUNCTION(Server, Reliable)
     void ServerSetSelectedCharacterIndex(int32 NewIndex);
 
@@ -148,12 +150,6 @@ protected:
 
     UPROPERTY()
     TObjectPtr<ULastFPSHUDWidget> HUDWidget;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
-    TArray<TSubclassOf<APawn>> SelectableCharacterClasses;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
-    TArray<TObjectPtr<ULastFPSCharacterDefinition>> SelectableCharacterDefinitions;
 
     UPROPERTY(ReplicatedUsing=OnRep_SelectedCharacterIndex, BlueprintReadOnly, Category="LastFPS|Character")
     int32 SelectedCharacterIndex = 0;

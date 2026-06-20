@@ -7,6 +7,7 @@ class ULastFPSButtonBase;
 class UTextBlock;
 class ULastFPSCharacterCardWidget;
 class ULastFPSCharacterDefinition;
+class ULastFPSCharacterRoster;
 
 UCLASS()
 class LASTFPS_API ULastFPSCharacterSelectWidget : public ULastFPSActivatableWidget
@@ -40,11 +41,6 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_CharDesc;
 
-	/** 카드별 캐릭터 정의(DataAsset) 목록 — 이름/역할은 여기서 읽는다.
-	 *  PlayerController의 SelectableCharacterClasses와 인덱스 순서를 맞춰 둘 것. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|CharacterSelect")
-	TArray<TObjectPtr<ULastFPSCharacterDefinition>> CharacterDefinitions;
-
 	/** C++ 기본 구현, Blueprint에서 오버라이드 가능 */
 	UFUNCTION(BlueprintNativeEvent, Category="LastFPS|UI")
 	void OnSelectionChanged(int32 NewIndex, int32 TotalCount);
@@ -55,4 +51,10 @@ private:
 	UFUNCTION() void HandleBackClicked();
 
 	void HandleCardClicked(int32 Index);
+
+	/** 카드 선택 표시(하이라이트) 갱신 — BP 오버라이드 영향 없이 항상 C++에서 구동 */
+	void UpdateCardSelection(int32 SelectedIndex);
+
+	/** GameInstance의 캐릭터 로스터(단일 소스). 없으면 nullptr. */
+	const ULastFPSCharacterRoster* GetCharacterRoster() const;
 };

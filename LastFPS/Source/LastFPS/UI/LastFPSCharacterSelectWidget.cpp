@@ -5,6 +5,7 @@
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
 #include "Game/LastFPSCharacterDefinition.h"
+#include "Game/LastFPSCharacterRoster.h"
 
 #include "Components/TextBlock.h"
 
@@ -21,6 +22,8 @@ void ULastFPSCharacterSelectWidget::NativeConstruct()
 		Button_Back->OnClicked().AddUObject(this, &ULastFPSCharacterSelectWidget::HandleBackClicked);
 	}
 
+	const ULastFPSCharacterRoster* Roster = GetCharacterRoster();
+
 	TObjectPtr<ULastFPSCharacterCardWidget> Cards[] = { Card_0, Card_1, Card_2 };
 	for (int32 i = 0; i < 3; ++i)
 	{
@@ -29,30 +32,44 @@ void ULastFPSCharacterSelectWidget::NativeConstruct()
 			Cards[i]->CardIndex = i;
 			Cards[i]->OnCardClicked.BindUObject(this, &ULastFPSCharacterSelectWidget::HandleCardClicked);
 
-			const ULastFPSCharacterDefinition* Def = CharacterDefinitions.IsValidIndex(i) ? CharacterDefinitions[i] : nullptr;
+			const ULastFPSCharacterDefinition* Def = Roster ? Roster->GetDefinition(i) : nullptr;
 			Cards[i]->SetupCard(Def);
 		}
 	}
 
 	if (ALastFPSPlayerController* PC = GetOwningPlayer<ALastFPSPlayerController>())
 	{
-		OnSelectionChanged(PC->GetSelectedCharacterIndex(), CharacterDefinitions.Num());
+		const int32 SelectedIndex = PC->GetSelectedCharacterIndex();
+		UpdateCardSelection(SelectedIndex);
+		OnSelectionChanged(SelectedIndex, Roster ? Roster->Num() : 0);
 	}
 }
 
-void ULastFPSCharacterSelectWidget::OnSelectionChanged_Implementation(int32 NewIndex, int32 TotalCount)
+const ULastFPSCharacterRoster* ULastFPSCharacterSelectWidget::GetCharacterRoster() const
+{
+	if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
+	{
+		return GI->GetCharacterRoster();
+	}
+	return nullptr;
+}
+
+void ULastFPSCharacterSelectWidget::UpdateCardSelection(int32 SelectedIndex)
 {
 	TObjectPtr<ULastFPSCharacterCardWidget> Cards[] = { Card_0, Card_1, Card_2 };
 	for (int32 i = 0; i < 3; ++i)
 	{
 		if (Cards[i])
 		{
-			Cards[i]->SetSelected(i == NewIndex);
+			Cards[i]->SetSelected(i == SelectedIndex);
 		}
 	}
+}
 
-	const ULastFPSCharacterDefinition* Def =
-		CharacterDefinitions.IsValidIndex(NewIndex) ? CharacterDefinitions[NewIndex] : nullptr;
+void ULastFPSCharacterSelectWidget::OnSelectionChanged_Implementation(int32 NewIndex, int32 TotalCount)
+{
+	const ULastFPSCharacterRoster* Roster = GetCharacterRoster();
+	const ULastFPSCharacterDefinition* Def = Roster ? Roster->GetDefinition(NewIndex) : nullptr;
 
 	if (TB_CharName)
 	{
@@ -93,5 +110,10 @@ void ULastFPSCharacterSelectWidget::HandleCardClicked(int32 Index)
 	}
 
 	PC->SetSelectedCharacterIndex(Index);
-	OnSelectionChanged(PC->GetSelectedCharacterIndex(), CharacterDefinitions.Num());
+
+	// PC가 clamp한 최종 인덱스를 기준으로 갱신 (선택 표시는 BP 오버라이드와 무관하게 항상 반영)
+	const int32 SelectedIndex = PC->GetSelectedCharacterIndex();
+	const ULastFPSCharacterRoster* Roster = GetCharacterRoster();
+	UpdateCardSelection(SelectedIndex);
+	OnSelectionChanged(SelectedIndex, Roster ? Roster->Num() : 0);
 }
