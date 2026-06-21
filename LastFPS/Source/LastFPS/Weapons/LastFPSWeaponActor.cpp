@@ -1,10 +1,12 @@
 #include "Weapons/LastFPSWeaponActor.h"
 
+#include "Animation/AnimationAsset.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "DrawDebugHelpers.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "Weapons/LastFPSWeaponDefinition.h"
 
 ALastFPSWeaponActor::ALastFPSWeaponActor()
 {
@@ -19,10 +21,21 @@ ALastFPSWeaponActor::ALastFPSWeaponActor()
     RootComponent = WeaponMesh;
 }
 
+void ALastFPSWeaponActor::OnConstruction(const FTransform& Transform)
+{
+    Super::OnConstruction(Transform);
+
+    if (WeaponMesh)
+    {
+        WeaponMesh->SetSkeletalMesh(GetDefaultWeaponMesh());
+    }
+}
+
 void ALastFPSWeaponActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ALastFPSWeaponActor, WeaponMeshAsset);
+    DOREPLIFETIME(ALastFPSWeaponActor, WeaponDefinition);
 }
 
 void ALastFPSWeaponActor::Tick(float DeltaSeconds)
@@ -56,13 +69,24 @@ void ALastFPSWeaponActor::Tick(float DeltaSeconds)
     DrawDebugLine(World, SocketLocation, SocketLocation + SocketRotation.GetUpVector() * DebugAxisLength, FColor::Blue, false, 0.f, 0, 2.f);
 }
 
-void ALastFPSWeaponActor::InitializeWeapon(USkeletalMesh* InMesh, UParticleSystem* InMuzzleFlash, USoundBase* InFireSound)
+void ALastFPSWeaponActor::InitializeWeapon(USkeletalMesh* InMesh, UParticleSystem* InMuzzleFlash, USoundBase* InFireSound, ULastFPSWeaponDefinition* InDefinition)
 {
-    WeaponMeshAsset = InMesh;
+    WeaponDefinition = InDefinition ? InDefinition : DefaultWeaponDefinition.Get();
+    WeaponMeshAsset = InMesh ? InMesh : GetDefaultWeaponMesh();
     OnRep_WeaponMeshAsset();
 
     MuzzleFlashEffect = InMuzzleFlash;
     FireSound = InFireSound;
+}
+
+USkeletalMesh* ALastFPSWeaponActor::GetDefaultWeaponMesh() const
+{
+    if (DefaultWeaponDefinition && DefaultWeaponDefinition->SkeletalMesh)
+    {
+        return DefaultWeaponDefinition->SkeletalMesh;
+    }
+
+    return DefaultWeaponMesh;
 }
 
 void ALastFPSWeaponActor::OnRep_WeaponMeshAsset()
@@ -137,5 +161,27 @@ void ALastFPSWeaponActor::PlayFireEffects(FName MuzzleSocketName) const
             FVector::ZeroVector,
             FRotator::ZeroRotator,
             EAttachLocation::SnapToTarget);
+    }
+}
+
+void ALastFPSWeaponActor::PlayFireAnimation()
+{
+    UAnimationAsset* Animation = WeaponDefinition ? WeaponDefinition->FireAnimation.Get() : FireAnimation.Get();
+    const float PlayRate = WeaponDefinition ? WeaponDefinition->AnimationPlayRate : WeaponAnimationPlayRate;
+    if (WeaponMesh && Animation)
+    {
+        WeaponMesh->PlayAnimation(Animation, false);
+        WeaponMesh->SetPlayRate(PlayRate);
+    }
+}
+
+void ALastFPSWeaponActor::PlayReloadAnimation()
+{
+    UAnimationAsset* Animation = WeaponDefinition ? WeaponDefinition->ReloadAnimation.Get() : ReloadAnimation.Get();
+    const float PlayRate = WeaponDefinition ? WeaponDefinition->AnimationPlayRate : WeaponAnimationPlayRate;
+    if (WeaponMesh && Animation)
+    {
+        WeaponMesh->PlayAnimation(Animation, false);
+        WeaponMesh->SetPlayRate(PlayRate);
     }
 }

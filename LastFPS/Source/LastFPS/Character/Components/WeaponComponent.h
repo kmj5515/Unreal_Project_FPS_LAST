@@ -13,6 +13,7 @@ class USkeletalMesh;
 class USkeletalMeshComponent;
 class UParticleSystem;
 class USoundBase;
+class ULastFPSWeaponDefinition;
 
 // Current, Max, bIsOverheated
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnWeaponHeatChanged, float, Current, float, Max, bool, bIsOverheated);
@@ -34,6 +35,9 @@ public:
     bool CanFire() const;
     void AddHeat();
     void PlayFireEffects() const;
+
+    UFUNCTION(BlueprintCallable, Category="Weapon|Animation")
+    void PlayReloadAnimation() const;
     void FireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
 
     UFUNCTION(BlueprintCallable, Category="Weapon|IK")
@@ -44,6 +48,9 @@ public:
 
     // 런타임 무기 장착 (서버에서 호출 → Multicast로 전체 적용)
     void EquipWeapon(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass = nullptr);
+
+    UFUNCTION(BlueprintCallable, Category="Weapon")
+    void EquipWeaponDefinition(ULastFPSWeaponDefinition* NewDefinition);
 
     UFUNCTION(BlueprintCallable, Category="Weapon|Overheat")
     float GetCurrentHeat() const { return CurrentHeat; }
@@ -71,6 +78,9 @@ public:
     // 무기 BP마다 Unarmed / Rifle / Pistol 지정 (Chooser Table 분기 입력)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, ReplicatedUsing=OnRep_WeaponType, Category="Weapon")
     EMMWeaponType WeaponType = EMMWeaponType::Unarmed;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, ReplicatedUsing=OnRep_WeaponDefinition, Category="Weapon")
+    TObjectPtr<ULastFPSWeaponDefinition> WeaponDefinition;
 
     // ── 에디터 설정 ──────────────────────────────────────────────
     UPROPERTY(EditDefaultsOnly, Category="Weapon")
@@ -156,10 +166,15 @@ private:
     UFUNCTION()
     void OnRep_WeaponType();
 
+    UFUNCTION()
+    void OnRep_WeaponDefinition();
+
     void ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass);
+    void ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefinition);
+    void ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinition* NewDefinition);
 
     void AttachWeaponToOwner(ALastFPSWeaponActor* WeaponActor);
-    ALastFPSWeaponActor* SpawnWeaponActor(USkeletalMesh* NewMesh, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass);
+    ALastFPSWeaponActor* SpawnWeaponActor(USkeletalMesh* NewMesh, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass, ULastFPSWeaponDefinition* Definition = nullptr);
     void DestroyCurrentWeapon();
     void HandleFireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
     bool ValidateClientMuzzleLocation(const FVector& ClientMuzzleLocation) const;

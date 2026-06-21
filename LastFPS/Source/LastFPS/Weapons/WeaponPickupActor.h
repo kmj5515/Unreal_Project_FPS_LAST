@@ -6,9 +6,11 @@
 #include "WeaponPickupActor.generated.h"
 
 class USphereComponent;
+class USkeletalMesh;
 class USkeletalMeshComponent;
 class UAnimInstance;
 class ALastFPSWeaponActor;
+class ULastFPSWeaponDefinition;
 
 UCLASS()
 class LASTFPS_API AWeaponPickupActor : public AActor
@@ -16,6 +18,11 @@ class LASTFPS_API AWeaponPickupActor : public AActor
     GENERATED_BODY()
 
 public:
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing=OnRep_WeaponDefinition, Category="Weapon", meta=(ExposeOnSpawn="true"))
+    TObjectPtr<ULastFPSWeaponDefinition> WeaponDefinition;
+
     AWeaponPickupActor();
 
 protected:
@@ -49,6 +56,11 @@ protected:
     float PickupRadius = 100.f;
 
 private:
+    USkeletalMesh* ResolveWeaponMesh() const;
+
+    UFUNCTION()
+    void OnRep_WeaponDefinition();
+
     UFUNCTION()
     void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
                         UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,

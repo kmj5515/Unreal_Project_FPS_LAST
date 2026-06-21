@@ -1,8 +1,11 @@
 #include "Weapons/WeaponPickupActor.h"
+#include "Weapons/LastFPSWeaponActor.h"
+#include "Weapons/LastFPSWeaponDefinition.h"
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Net/UnrealNetwork.h"
 
 AWeaponPickupActor::AWeaponPickupActor()
 {
@@ -32,7 +35,7 @@ void AWeaponPickupActor::OnConstruction(const FTransform& Transform)
 
     if (PickupMesh)
     {
-        PickupMesh->SetSkeletalMesh(WeaponSkeletalMesh);
+        PickupMesh->SetSkeletalMesh(ResolveWeaponMesh());
     }
 }
 
@@ -46,7 +49,7 @@ void AWeaponPickupActor::BeginPlay()
     }
 
     OverlapSphere->SetSphereRadius(PickupRadius);
-    PickupMesh->SetSkeletalMesh(WeaponSkeletalMesh);
+    PickupMesh->SetSkeletalMesh(ResolveWeaponMesh());
 
     TArray<AActor*> OverlappingActors;
     OverlapSphere->GetOverlappingActors(OverlappingActors, ALastFPSHero::StaticClass());
@@ -80,6 +83,49 @@ void AWeaponPickupActor::TryEquipToActor(AActor* OtherActor)
 
     UWeaponComponent* WeaponComp = Hero->GetWeaponComponent();
     if (!WeaponComp) return;
-    WeaponComp->EquipWeapon(WeaponSkeletalMesh, WeaponType, WeaponAnimLayerClass, WeaponActorClass);
+
+    if (WeaponDefinition)
+    {
+        WeaponComp->EquipWeaponDefinition(WeaponDefinition);
+        Destroy();
+        return;
+    }
+
+    WeaponComp->EquipWeapon(ResolveWeaponMesh(), WeaponType, WeaponAnimLayerClass, WeaponActorClass);
     Destroy();
+}
+
+void AWeaponPickupActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(AWeaponPickupActor, WeaponDefinition);
+}
+
+USkeletalMesh* AWeaponPickupActor::ResolveWeaponMesh() const
+{
+    if (WeaponDefinition && WeaponDefinition->SkeletalMesh)
+    {
+        return WeaponDefinition->SkeletalMesh;
+    }
+
+    if (WeaponActorClass)
+    {
+        if (const ALastFPSWeaponActor* WeaponDefaults = WeaponActorClass->GetDefaultObject<ALastFPSWeaponActor>())
+        {
+            if (USkeletalMesh* ClassMesh = WeaponDefaults->GetDefaultWeaponMesh())
+            {
+                return ClassMesh;
+            }
+        }
+    }
+
+    return WeaponSkeletalMesh;
+}
+
+void AWeaponPickupActor::OnRep_WeaponDefinition()
+{
+    if (PickupMesh)
+    {
+        PickupMesh->SetSkeletalMesh(ResolveWeaponMesh());
+    }
 }

@@ -2,6 +2,7 @@
 
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Character/Components/WeaponComponent.h"
 #include "Character/LastFPSHero.h"
 #include "Engine/World.h"
 #include "Utility/LastFPSTags.h"
@@ -40,6 +41,11 @@ void UGA_Reload::ActivateAbility(
     }
 
     Hero->SetCombatState(EMMCombatState::Reloading);
+
+    if (UWeaponComponent* Weapon = Hero->GetWeaponComponent())
+    {
+        Weapon->PlayReloadAnimation();
+    }
 
     bool bWaitingForMontageEnd = false;
     if (ReloadMontage && Hero->GetMesh())

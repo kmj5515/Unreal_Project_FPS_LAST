@@ -3,6 +3,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Character/LastFPSCharacterBase.h"
 #include "Weapons/LastFPSWeaponActor.h"
+#include "Weapons/LastFPSWeaponDefinition.h"
 #include "Weapons/WeaponPickupActor.h"
 #include "Weapons/LastFPSProjectile.h"
 #include "AbilitySystemInterface.h"
@@ -26,6 +27,7 @@ void UWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
     DOREPLIFETIME(UWeaponComponent, CurrentWeapon);
     DOREPLIFETIME(UWeaponComponent, WeaponType);
     DOREPLIFETIME(UWeaponComponent, WeaponAnimLayerClass);
+    DOREPLIFETIME(UWeaponComponent, WeaponDefinition);
 }
 
 void UWeaponComponent::BeginPlay()
@@ -36,7 +38,11 @@ void UWeaponComponent::BeginPlay()
 
     if (GetOwner() && GetOwner()->HasAuthority())
     {
-        if (WeaponSkeletalMesh)
+        if (WeaponDefinition)
+        {
+            ApplyWeaponDefinition(WeaponDefinition);
+        }
+        else if (WeaponSkeletalMesh)
         {
             ApplyEquip(WeaponSkeletalMesh, WeaponType, WeaponAnimLayerClass, WeaponActorClass);
         }
@@ -123,6 +129,8 @@ void UWeaponComponent::PlayFireEffects() const
     }
 
     USkeletalMeshComponent* CurrentWeaponMesh = CurrentWeapon->GetWeaponMesh();
+    CurrentWeapon->PlayFireAnimation();
+
     if (FireSound)
     {
         UGameplayStatics::SpawnSoundAttached(FireSound, CurrentWeaponMesh, MuzzleSocketName);
@@ -137,6 +145,14 @@ void UWeaponComponent::PlayFireEffects() const
             FVector::ZeroVector,
             FRotator::ZeroRotator,
             EAttachLocation::SnapToTarget);
+    }
+}
+
+void UWeaponComponent::PlayReloadAnimation() const
+{
+    if (CurrentWeapon)
+    {
+        CurrentWeapon->PlayReloadAnimation();
     }
 }
 
@@ -211,6 +227,57 @@ void UWeaponComponent::EquipWeapon(USkeletalMesh* NewMesh, EMMWeaponType NewType
     ApplyEquip(NewMesh, NewType, NewAnimLayer, NewWeaponActorClass);
 }
 
+void UWeaponComponent::EquipWeaponDefinition(ULastFPSWeaponDefinition* NewDefinition)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority() || !NewDefinition)
+    {
+        return;
+    }
+
+    ApplyWeaponDefinition(NewDefinition);
+}
+
+void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefinition)
+{
+    WeaponDefinition = NewDefinition;
+    ApplyWeaponDefinitionValues(NewDefinition);
+
+    DestroyCurrentWeapon();
+
+    if (!WeaponSkeletalMesh)
+    {
+        OnWeaponEquippedChanged.Broadcast(false);
+        return;
+    }
+
+    CurrentWeapon = SpawnWeaponActor(WeaponSkeletalMesh, WeaponActorClass, NewDefinition);
+    OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
+}
+
+void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinition* NewDefinition)
+{
+    if (!NewDefinition)
+    {
+        return;
+    }
+
+    WeaponSkeletalMesh = NewDefinition->SkeletalMesh;
+    WeaponType = NewDefinition->WeaponType;
+    WeaponAnimLayerClass = NewDefinition->AnimLayerClass;
+    WeaponActorClass = NewDefinition->WeaponActorClass;
+    ProjectileClass = NewDefinition->ProjectileClass;
+    MuzzleSocketName = NewDefinition->MuzzleSocketName;
+    AttachSocketName = NewDefinition->AttachSocketName;
+    LeftHandIKSocketName = NewDefinition->LeftHandIKSocketName;
+    ReloadLeftHandIKTargetName = NewDefinition->ReloadLeftHandIKTargetName;
+    FireRate = NewDefinition->FireRate;
+    FireSound = NewDefinition->FireSound;
+    MuzzleFlashEffect = NewDefinition->MuzzleFlashEffect;
+    HeatPerShot = NewDefinition->HeatPerShot;
+    MaxHeat = NewDefinition->MaxHeat;
+    CooldownRate = NewDefinition->CooldownRate;
+}
+
 void UWeaponComponent::OnRep_CurrentWeapon()
 {
     if (CurrentWeapon)
@@ -227,6 +294,16 @@ void UWeaponComponent::OnRep_WeaponType()
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
 }
 
+void UWeaponComponent::OnRep_WeaponDefinition()
+{
+    ApplyWeaponDefinitionValues(WeaponDefinition);
+
+    if (CurrentWeapon)
+    {
+        AttachWeaponToOwner(CurrentWeapon);
+    }
+}
+
 void UWeaponComponent::AttachWeaponToOwner(ALastFPSWeaponActor* WeaponActor)
 {
     if (!WeaponActor) return;
@@ -238,7 +315,8 @@ void UWeaponComponent::AttachWeaponToOwner(ALastFPSWeaponActor* WeaponActor)
     // 이미 올바른 부모에 붙어있으면 재부착 생략
     if (WeaponActor->GetAttachParentActor() == OwnerCharacter
         && WeaponActor->GetRootComponent()
-        && WeaponActor->GetRootComponent()->GetAttachParent() == OwnerMesh)
+        && WeaponActor->GetRootComponent()->GetAttachParent() == OwnerMesh
+        && WeaponActor->GetRootComponent()->GetAttachSocketName() == AttachSocketName)
     {
         return;
     }
@@ -260,6 +338,7 @@ void UWeaponComponent::ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType,
         static_cast<int32>(NewType),
         NewWeaponActorClass ? *NewWeaponActorClass->GetName() : TEXT("None"));
 
+    WeaponDefinition = nullptr;
     WeaponSkeletalMesh = NewMesh;
     WeaponType = NewType;
     WeaponAnimLayerClass = NewAnimLayer;
@@ -280,7 +359,7 @@ void UWeaponComponent::ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType,
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
 }
 
-ALastFPSWeaponActor* UWeaponComponent::SpawnWeaponActor(USkeletalMesh* NewMesh, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass)
+ALastFPSWeaponActor* UWeaponComponent::SpawnWeaponActor(USkeletalMesh* NewMesh, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass, ULastFPSWeaponDefinition* Definition)
 {
     ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
     USkeletalMeshComponent* OwnerMesh = OwnerCharacter ? OwnerCharacter->GetMesh() : nullptr;
@@ -322,7 +401,7 @@ ALastFPSWeaponActor* UWeaponComponent::SpawnWeaponActor(USkeletalMesh* NewMesh, 
         return nullptr;
     }
 
-    NewWeapon->InitializeWeapon(NewMesh, MuzzleFlashEffect, FireSound);
+    NewWeapon->InitializeWeapon(NewMesh, MuzzleFlashEffect, FireSound, Definition);
 
     AttachWeaponToOwner(NewWeapon);
 

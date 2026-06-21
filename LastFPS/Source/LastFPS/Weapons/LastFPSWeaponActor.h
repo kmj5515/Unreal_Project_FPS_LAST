@@ -5,7 +5,9 @@
 #include "LastFPSWeaponActor.generated.h"
 
 class UAnimInstance;
+class UAnimationAsset;
 class UParticleSystem;
+class ULastFPSWeaponDefinition;
 class USkeletalMesh;
 class USkeletalMeshComponent;
 class USoundBase;
@@ -18,16 +20,25 @@ class LASTFPS_API ALastFPSWeaponActor : public AActor
 public:
     ALastFPSWeaponActor();
 
+    virtual void OnConstruction(const FTransform& Transform) override;
     virtual void Tick(float DeltaSeconds) override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-    void InitializeWeapon(USkeletalMesh* InMesh, UParticleSystem* InMuzzleFlash, USoundBase* InFireSound);
+    void InitializeWeapon(USkeletalMesh* InMesh, UParticleSystem* InMuzzleFlash, USoundBase* InFireSound, ULastFPSWeaponDefinition* InDefinition = nullptr);
 
     FTransform GetMuzzleTransform(FName MuzzleSocketName) const;
     bool GetSocketTransformInBoneSpace(FName SocketName, USkeletalMeshComponent* CharacterMesh, FName RelativeToBoneName, FTransform& OutTransform) const;
     void PlayFireEffects(FName MuzzleSocketName) const;
 
+    UFUNCTION(BlueprintCallable, Category="Weapon|Animation")
+    void PlayFireAnimation();
+
+    UFUNCTION(BlueprintCallable, Category="Weapon|Animation")
+    void PlayReloadAnimation();
+
     USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
+    USkeletalMesh* GetDefaultWeaponMesh() const;
+    ULastFPSWeaponDefinition* GetDefaultWeaponDefinition() const { return DefaultWeaponDefinition; }
 
 private:
     UFUNCTION()
@@ -35,6 +46,15 @@ private:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon", meta=(AllowPrivateAccess="true"))
     TObjectPtr<USkeletalMeshComponent> WeaponMesh;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon", meta=(AllowPrivateAccess="true"))
+    TObjectPtr<USkeletalMesh> DefaultWeaponMesh;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon", meta=(AllowPrivateAccess="true"))
+    TObjectPtr<ULastFPSWeaponDefinition> DefaultWeaponDefinition;
+
+    UPROPERTY(Replicated)
+    TObjectPtr<ULastFPSWeaponDefinition> WeaponDefinition;
 
     UPROPERTY(ReplicatedUsing=OnRep_WeaponMeshAsset)
     TObjectPtr<USkeletalMesh> WeaponMeshAsset;
@@ -44,6 +64,15 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<USoundBase> FireSound;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Animation", meta=(AllowPrivateAccess="true"))
+    TObjectPtr<UAnimationAsset> FireAnimation;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Animation", meta=(AllowPrivateAccess="true"))
+    TObjectPtr<UAnimationAsset> ReloadAnimation;
+
+    UPROPERTY(EditDefaultsOnly, Category="Weapon|Animation", meta=(ClampMin="0.01"))
+    float WeaponAnimationPlayRate = 1.f;
 
     UPROPERTY(EditDefaultsOnly, Category="Weapon|Debug")
     bool bDrawProjectileStartDebug = true;
