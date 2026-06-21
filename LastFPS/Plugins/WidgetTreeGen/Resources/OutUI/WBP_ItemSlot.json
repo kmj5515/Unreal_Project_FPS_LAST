@@ -1,0 +1,25 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSItemSlotWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_ItemSlot",
+	"overwrite": true,
+	"root": {
+		"type": "SizeBox", "name": "Root_Size", "width": 96, "height": 96,
+		"children": [
+			{ "type": "Border", "name": "RarityFrame", "bgColor": [0.30, 0.62, 1.0, 1.0], "padding": 2, "children": [
+				{ "type": "Border", "name": "Inner", "bgColor": [0.05, 0.07, 0.10, 1.0], "children": [
+					{ "type": "Overlay", "name": "Content", "children": [
+						{ "type": "Image", "name": "Img_Background", "halign": "Fill", "valign": "Fill" },
+						{ "type": "Image", "name": "Image_Icon", "halign": "Fill", "valign": "Fill", "padding": 14 },
+						{ "type": "Image", "name": "Img_RarityBorder", "halign": "Fill", "valign": "Fill" },
+						{ "type": "TextBlock", "name": "TB_Count", "text": "x1", "halign": "Right", "valign": "Bottom", "padding": 5, "fontSize": 13, "color": [0.92, 0.96, 1.0, 1.0] },
+						{ "type": "VerticalBox", "name": "Labels", "halign": "Fill", "valign": "Top", "padding": 4, "children": [
+							{ "type": "TextBlock", "name": "TB_ItemName", "text": "아이템", "fontSize": 11, "color": [0.82, 0.86, 0.93, 1.0] },
+							{ "type": "TextBlock", "name": "TB_Rarity", "text": "희귀", "fontSize": 9, "color": [0.30, 0.62, 1.0, 1.0] }
+						] }
+					] }
+				] }
+			] }
+		]
+	}
+}

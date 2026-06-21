@@ -20,4 +20,7 @@ private:
 
 	/** Opens a file picker and generates a Widget Blueprint from the chosen JSON file. */
 	void GenerateFromFileDialog();
+
+	/** Opens a folder picker and generates from every *.json in it (overwrite honored per file). */
+	void GenerateFromFolderDialog();
 };

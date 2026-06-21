@@ -19,6 +19,7 @@
 #include "DesktopPlatformModule.h"
 #include "IDesktopPlatform.h"
 #include "Misc/Paths.h"
+#include "HAL/FileManager.h"
 
 #define LOCTEXT_NAMESPACE "FWidgetTreeGenModule"
 
@@ -60,6 +61,12 @@ void FWidgetTreeGenModule::ExtendLastFPSMenu(FMenuBuilder& MenuBuilder)
 			LOCTEXT("GenerateFromFileTooltip", ".json 파일을 골라 즉시 위젯 블루프린트를 생성합니다."),
 			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.WidgetBlueprint"),
 			FUIAction(FExecuteAction::CreateRaw(this, &FWidgetTreeGenModule::GenerateFromFileDialog)));
+
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("GenerateFromFolderLabel", "JSON 폴더에서 일괄 생성..."),
+			LOCTEXT("GenerateFromFolderTooltip", "폴더를 골라 그 안의 모든 .json을 한 번에 생성합니다."),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.WidgetBlueprint"),
+			FUIAction(FExecuteAction::CreateRaw(this, &FWidgetTreeGenModule::GenerateFromFolderDialog)));
 	}
 	MenuBuilder.EndSection();
 }
@@ -120,6 +127,67 @@ void FWidgetTreeGenModule::GenerateFromFileDialog()
 
 	const FWidgetTreeGenResult Result = FWidgetTreeGenerator::GenerateFromJsonFile(OutFiles[0]);
 	ShowResultNotification(Result);
+}
+
+void FWidgetTreeGenModule::GenerateFromFolderDialog()
+{
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	if (!DesktopPlatform)
+	{
+		return;
+	}
+
+	const void* ParentHandle = FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr);
+
+	FString FolderPath;
+	const bool bPicked = DesktopPlatform->OpenDirectoryDialog(
+		ParentHandle,
+		TEXT("Select a folder containing widget JSON files"),
+		FPaths::ProjectDir(),
+		FolderPath);
+
+	if (!bPicked || FolderPath.IsEmpty())
+	{
+		return;
+	}
+
+	TArray<FString> JsonFiles;
+	IFileManager::Get().FindFiles(JsonFiles, *(FolderPath / TEXT("*.json")), /*Files=*/true, /*Directories=*/false);
+	if (JsonFiles.Num() == 0)
+	{
+		FNotificationInfo Info(FText::Format(
+			LOCTEXT("NoJson", "No .json files found in {0}"), FText::FromString(FolderPath)));
+		Info.ExpireDuration = 5.0f;
+		FSlateNotificationManager::Get().AddNotification(Info);
+		return;
+	}
+
+	int32 NumOk = 0;
+	TArray<FString> Failures;
+	for (const FString& FileName : JsonFiles)
+	{
+		const FString FullPath = FolderPath / FileName;
+		const FWidgetTreeGenResult Result = FWidgetTreeGenerator::GenerateFromJsonFile(FullPath);
+		if (Result.bSuccess)
+		{
+			++NumOk;
+		}
+		else
+		{
+			Failures.Add(FString::Printf(TEXT("%s: %s"), *FileName, *Result.ErrorMessage));
+		}
+	}
+
+	FString Summary = FString::Printf(TEXT("생성 완료: %d/%d"), NumOk, JsonFiles.Num());
+	if (Failures.Num() > 0)
+	{
+		Summary += TEXT("\n실패:\n") + FString::Join(Failures, TEXT("\n"));
+	}
+	FNotificationInfo Info(FText::FromString(Summary));
+	Info.ExpireDuration = Failures.Num() > 0 ? 10.0f : 5.0f;
+	FSlateNotificationManager::Get().AddNotification(Info);
+
+	UE_LOG(LogTemp, Log, TEXT("[WidgetTreeGen] Batch: %s"), *Summary);
 }
 
 #undef LOCTEXT_NAMESPACE

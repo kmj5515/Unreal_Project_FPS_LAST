@@ -1,0 +1,30 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSCharacterSelectWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_CharacterSelect",
+	"overwrite": true,
+	"root": {
+		"type": "Overlay", "name": "Root_BG",
+		"children": [
+			{ "type": "Border", "name": "BG_Fill", "halign": "Fill", "valign": "Fill", "bgColor": [0.012, 0.022, 0.038, 1.0] },
+			{ "type": "VerticalBox", "name": "Root_VB", "halign": "Center", "valign": "Center", "children": [
+				{ "type": "HorizontalBox", "name": "Cards", "halign": "Center", "padding": [0, 16], "children": [
+					{ "type": "/Game/UI/OutUI/WBP_CharacterCard.WBP_CharacterCard_C", "name": "Card_0", "padding": [10, 0] },
+					{ "type": "/Game/UI/OutUI/WBP_CharacterCard.WBP_CharacterCard_C", "name": "Card_1", "padding": [10, 0] },
+					{ "type": "/Game/UI/OutUI/WBP_CharacterCard.WBP_CharacterCard_C", "name": "Card_2", "padding": [10, 0] }
+				] },
+				{ "type": "Border", "name": "DetailBox", "halign": "Center", "bgColor": [0.05, 0.07, 0.10, 0.96], "padding": 18, "children": [
+					{ "type": "VerticalBox", "name": "Detail", "halign": "Center", "children": [
+						{ "type": "TextBlock", "name": "TB_CharName", "text": "이름", "halign": "Center", "fontSize": 24, "color": [0.92, 0.96, 1.0, 1.0] },
+						{ "type": "TextBlock", "name": "TB_CharRole", "text": "역할", "halign": "Center", "fontSize": 16, "color": [0.15, 0.78, 1.0, 1.0], "padding": [0, 4] },
+						{ "type": "TextBlock", "name": "TB_CharDesc", "text": "캐릭터 설명입니다.", "halign": "Center", "justify": "Center", "fontSize": 13, "color": [0.55, 0.62, 0.72, 1.0], "autoWrap": true }
+					] }
+				] },
+				{ "type": "HorizontalBox", "name": "ButtonRow", "halign": "Center", "padding": [0, 16], "children": [
+					{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Back", "buttonText": "뒤로", "padding": [8, 0] },
+					{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Confirm", "buttonText": "선택", "padding": [8, 0] }
+				] }
+			] }
+		]
+	}
+}

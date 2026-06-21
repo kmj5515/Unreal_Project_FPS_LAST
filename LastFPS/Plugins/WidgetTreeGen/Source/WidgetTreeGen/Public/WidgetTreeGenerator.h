@@ -22,19 +22,25 @@ public:
 	 * @param ParentClassOverride  When valid, overrides the JSON "parentClass" field.
 	 * @param SavePathOverride     When non-empty, overrides the JSON "savePath" field.
 	 * @param AssetNameOverride    When non-empty, overrides the JSON "assetName" field.
+	 * @param bOverwriteExisting   When true (or JSON "overwrite":true), an existing asset at the
+	 *                             target path is regenerated in place: only its widget tree is
+	 *                             rebuilt, while its parent class, event graph and variables are
+	 *                             preserved. When false, an existing asset is an error.
 	 */
 	static FWidgetTreeGenResult GenerateFromJsonString(
 		const FString& JsonString,
 		TSubclassOf<UUserWidget> ParentClassOverride = nullptr,
 		const FString& SavePathOverride = FString(),
-		const FString& AssetNameOverride = FString());
+		const FString& AssetNameOverride = FString(),
+		bool bOverwriteExisting = false);
 
 	/** Same as above but reads the JSON document from a file on disk. */
 	static FWidgetTreeGenResult GenerateFromJsonFile(
 		const FString& JsonFilePath,
 		TSubclassOf<UUserWidget> ParentClassOverride = nullptr,
 		const FString& SavePathOverride = FString(),
-		const FString& AssetNameOverride = FString());
+		const FString& AssetNameOverride = FString(),
+		bool bOverwriteExisting = false);
 
 	/**
 	 * Resolve a widget type string to a UClass.

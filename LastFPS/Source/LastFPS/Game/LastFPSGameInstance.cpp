@@ -1,5 +1,6 @@
 #include "Game/LastFPSGameInstance.h"
 
+#include "Game/LastFPSCharacterRoster.h"
 #include "UI/LastFPSUIManagerSubsystem.h"
 
 #include "CommonLocalPlayer.h"
@@ -203,6 +204,22 @@ bool ULastFPSGameInstance::TryGetSelectedCharacterIndex(const FString& PlayerKey
 		return true;
 	}
 	return false;
+}
+
+const ULastFPSCharacterRoster* ULastFPSGameInstance::GetCharacterRoster()
+{
+	if (CachedCharacterRoster)
+	{
+		return CachedCharacterRoster;
+	}
+
+	CachedCharacterRoster = CharacterRosterAsset.LoadSynchronous();
+	if (!CachedCharacterRoster)
+	{
+		UE_LOG(LogLastFPSTravel, Error,
+			TEXT("CharacterRoster 미지정 — DefaultGame.ini의 [/Script/LastFPS.LastFPSGameInstance] CharacterRosterAsset 경로를 설정하세요."));
+	}
+	return CachedCharacterRoster;
 }
 
 bool ULastFPSGameInstance::ResolveMapURL(const ELastFPSTravelDestination Destination, FString& OutMapURL) const

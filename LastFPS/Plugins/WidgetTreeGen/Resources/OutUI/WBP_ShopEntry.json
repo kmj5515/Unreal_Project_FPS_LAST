@@ -1,0 +1,35 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSShopEntryWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_ShopEntry",
+	"overwrite": true,
+	"root": {
+		"type": "SizeBox", "name": "Root_Size", "height": 88,
+		"children": [
+			{ "type": "HorizontalBox", "name": "Outer", "children": [
+				{ "type": "SizeBox", "name": "AccentBar", "width": 3, "children": [
+					{ "type": "Border", "name": "AccentFill", "halign": "Fill", "valign": "Fill", "bgColor": [0.15, 0.78, 1.0, 1.0] }
+				] },
+				{ "type": "Border", "name": "Root_BG", "fill": true, "halign": "Fill", "bgColor": [0.05, 0.07, 0.10, 0.96], "padding": 8, "children": [
+					{ "type": "HorizontalBox", "name": "Row", "children": [
+						{ "type": "SizeBox", "name": "IconBox", "width": 64, "height": 64, "valign": "Center", "padding": [0, 0, 12, 0], "children": [
+							{ "type": "Border", "name": "IconBG", "bgColor": [0.09, 0.12, 0.16, 1.0], "padding": 2, "children": [
+								{ "type": "Overlay", "name": "IconStack", "children": [
+									{ "type": "Image", "name": "Image_Icon", "halign": "Fill", "valign": "Fill", "padding": 4 },
+									{ "type": "Image", "name": "Img_RarityBorder", "halign": "Fill", "valign": "Fill" }
+								] }
+							] }
+						] },
+						{ "type": "VerticalBox", "name": "Info", "fill": true, "halign": "Fill", "valign": "Center", "children": [
+							{ "type": "TextBlock", "name": "TB_ItemName", "text": "아이템 이름", "fontSize": 18, "color": [0.92, 0.96, 1.0, 1.0] },
+							{ "type": "TextBlock", "name": "TB_Rarity", "text": "희귀", "fontSize": 12, "color": [0.30, 0.62, 1.0, 1.0], "padding": [0, 2] },
+							{ "type": "TextBlock", "name": "TB_Description", "text": "아이템 설명입니다.", "fontSize": 12, "color": [0.55, 0.62, 0.72, 1.0], "autoWrap": true }
+						] },
+						{ "type": "TextBlock", "name": "TB_Price", "text": "1,000", "valign": "Center", "padding": [12, 0], "fontSize": 18, "color": [1.0, 0.78, 0.30, 1.0] },
+						{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Buy", "buttonText": "구매", "valign": "Center" }
+					] }
+				] }
+			] }
+		]
+	}
+}

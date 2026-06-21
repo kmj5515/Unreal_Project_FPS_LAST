@@ -58,6 +58,7 @@ Given a JSON document, the generator:
 | `parentClass`  | document         | Full class path. Optional; defaults to `UserWidget`. Overridden by the API arg. |
 | `savePath`     | document         | Content path, e.g. `/Game/UI/Generated`. Overridden by the API arg. |
 | `assetName`    | document         | e.g. `WBP_Generated`. Overridden by the API arg. |
+| `overwrite`    | document         | `true` to regenerate an **existing** asset in place (see below). Default false. |
 | `root`         | document         | **Required.** The root node. |
 | `type`         | node (required)  | Short name (`Button`, `TextBlock`, ...) **or** a full path (`/Script/UMG.Button`, `/Game/UI/WBP_Foo.WBP_Foo_C`). |
 | `name`         | node (required)  | Becomes the widget variable name (sanitized + made unique). |
@@ -70,6 +71,22 @@ Given a JSON document, the generator:
 | `valign`       | Box/Overlay child| `Top` / `Center` / `Bottom` / `Fill`. |
 | `fill`         | Box child        | Number/`true` → slot uses the **Fill** size rule. |
 | `children`     | panel node       | Array of child nodes. Only panel widgets may have children. |
+
+#### Visual styling (optional, applied by widget type)
+
+| Field        | Applies to     | Notes |
+|--------------|----------------|-------|
+| `width` / `height` | SizeBox  | `SetWidthOverride` / `SetHeightOverride` (px). |
+| `minWidth` / `minHeight` | SizeBox | Min desired size (px). |
+| `fontSize`   | TextBlock      | Font size (px). |
+| `color`      | TextBlock / Image | Text color / image tint, `[R,G,B]` or `[R,G,B,A]` (0..1). |
+| `justify`    | TextBlock      | `Left` / `Center` / `Right`. |
+| `autoWrap`   | TextBlock      | `true` to auto-wrap. |
+| `bgColor`    | Border         | Background brush color `[R,G,B,A]`. |
+| `image`      | Image          | Texture object path, e.g. `/Game/.../T_Icon.T_Icon` → `SetBrushFromTexture`. |
+| `bgImage`    | Border         | Background texture object path → `SetBrushFromTexture`. |
+| `desiredSize`| Image          | `[W,H]` desired size override. |
+| `buttonText` | any widget with an FText `ButtonText` property | Sets the common button's label (set via reflection). |
 
 ### Widget type resolution (extensible)
 
@@ -84,6 +101,15 @@ Given a JSON document, the generator:
 `ANY_PACKAGE` is **not** used (it is deprecated in UE5).
 
 A ready-to-run sample is at `Resources/sample_widget.json`.
+
+### Regenerating an existing asset (overwrite)
+
+By default, generating onto an existing asset path is an error. Set `"overwrite": true`
+(or the `bOverwriteExisting` argument / the request panel checkbox) to **regenerate in place**:
+the existing Widget Blueprint is loaded and only its **widget tree** is rebuilt, while its
+**parent class, event graph and variables are preserved**. Note that per-widget visual styling
+(brushes, colors, fonts, sizes, common-button text) lives on the tree and is therefore reset —
+re-apply those in the designer. Close the asset editor before regenerating.
 
 ---
 

@@ -7,11 +7,11 @@ FWidgetTreeGenResult UWidgetTreeGenRequest::Generate()
 {
 	if (bReadFromFile)
 	{
-		LastResult = FWidgetTreeGenerator::GenerateFromJsonFile(JsonFilePath, ParentClass, SavePath, AssetName);
+		LastResult = FWidgetTreeGenerator::GenerateFromJsonFile(JsonFilePath, ParentClass, SavePath, AssetName, bOverwriteExisting);
 	}
 	else
 	{
-		LastResult = FWidgetTreeGenerator::GenerateFromJsonString(JsonText, ParentClass, SavePath, AssetName);
+		LastResult = FWidgetTreeGenerator::GenerateFromJsonString(JsonText, ParentClass, SavePath, AssetName, bOverwriteExisting);
 	}
 	return LastResult;
 }

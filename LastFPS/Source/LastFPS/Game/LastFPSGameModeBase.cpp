@@ -3,6 +3,7 @@
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Game/LastFPSCharacterDefinition.h"
+#include "Game/LastFPSCharacterRoster.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
 #include "Game/LastFPSPlayerState.h"
@@ -47,11 +48,6 @@ UClass* ALastFPSGameModeBase::GetDefaultPawnClassForController_Implementation(AC
                 return Definition->PawnClass;
             }
         }
-
-        if (CharacterPawnClasses.IsValidIndex(SelectedIndex) && CharacterPawnClasses[SelectedIndex])
-        {
-            return CharacterPawnClasses[SelectedIndex];
-        }
     }
 
     if (const ALastFPSPlayerController* LastPC = Cast<ALastFPSPlayerController>(InController))
@@ -67,7 +63,14 @@ UClass* ALastFPSGameModeBase::GetDefaultPawnClassForController_Implementation(AC
 
 const ULastFPSCharacterDefinition* ALastFPSGameModeBase::GetCharacterDefinitionForIndex(const int32 CharacterIndex) const
 {
-    return CharacterDefinitions.IsValidIndex(CharacterIndex) ? CharacterDefinitions[CharacterIndex] : nullptr;
+    if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
+    {
+        if (const ULastFPSCharacterRoster* Roster = GI->GetCharacterRoster())
+        {
+            return Roster->GetDefinition(CharacterIndex);
+        }
+    }
+    return nullptr;
 }
 
 bool ALastFPSGameModeBase::ApplyCharacterDefinitionToAbilitySystem(

@@ -10,6 +10,7 @@
 #include "CommonActivatableWidget.h"
 #include "Engine/World.h"
 #include "Game/LastFPSCharacterDefinition.h"
+#include "Game/LastFPSCharacterRoster.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSGameModeBase.h"
 #include "Game/LastFPSPlayerState.h"
@@ -262,12 +263,26 @@ void ALastFPSPlayerController::ShowHitMarker()
 
 // ── 캐릭터 선택 ──────────────────────────────────────────────────────
 
+const ULastFPSCharacterRoster* ALastFPSPlayerController::GetCharacterRoster() const
+{
+    if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
+    {
+        return GI->GetCharacterRoster();
+    }
+    return nullptr;
+}
+
+const TArray<TObjectPtr<ULastFPSCharacterDefinition>>& ALastFPSPlayerController::GetSelectableCharacterDefinitions() const
+{
+    static const TArray<TObjectPtr<ULastFPSCharacterDefinition>> EmptyDefinitions;
+    const ULastFPSCharacterRoster* Roster = GetCharacterRoster();
+    return Roster ? Roster->Characters : EmptyDefinitions;
+}
+
 int32 ALastFPSPlayerController::ClampSelectedCharacterIndex(const int32 NewIndex) const
 {
-    const int32 SelectableCount =
-        SelectableCharacterDefinitions.Num() > 0
-            ? SelectableCharacterDefinitions.Num()
-            : SelectableCharacterClasses.Num();
+    const ULastFPSCharacterRoster* Roster = GetCharacterRoster();
+    const int32 SelectableCount = Roster ? Roster->Num() : 0;
     const int32 MaxIndex = SelectableCount > 0 ? (SelectableCount - 1) : NewIndex;
     return FMath::Clamp(NewIndex, 0, MaxIndex);
 }
@@ -300,20 +315,13 @@ TSubclassOf<APawn> ALastFPSPlayerController::GetSelectedCharacterClass() const
     {
         return Definition->PawnClass;
     }
-
-    if (!SelectableCharacterClasses.IsValidIndex(SelectedCharacterIndex))
-    {
-        return nullptr;
-    }
-
-    return SelectableCharacterClasses[SelectedCharacterIndex];
+    return nullptr;
 }
 
 const ULastFPSCharacterDefinition* ALastFPSPlayerController::GetSelectedCharacterDefinition() const
 {
-    return SelectableCharacterDefinitions.IsValidIndex(SelectedCharacterIndex)
-        ? SelectableCharacterDefinitions[SelectedCharacterIndex]
-        : nullptr;
+    const ULastFPSCharacterRoster* Roster = GetCharacterRoster();
+    return Roster ? Roster->GetDefinition(SelectedCharacterIndex) : nullptr;
 }
 
 void ALastFPSPlayerController::ServerSetSelectedCharacterIndex_Implementation(const int32 NewIndex)

@@ -5,6 +5,8 @@
 #include "Utility/LastFPSTravelTypes.h"
 #include "LastFPSGameInstance.generated.h"
 
+class ULastFPSCharacterRoster;
+
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnLastFPSTravelPresentationChanged,
 	const FText& /*StatusText*/,
 	const FText& /*MapNameText*/);
@@ -23,6 +25,9 @@ public:
 
     void SaveSelectedCharacterIndex(const FString& PlayerKey, int32 SelectedIndex);
     bool TryGetSelectedCharacterIndex(const FString& PlayerKey, int32& OutSelectedIndex) const;
+
+    /** 선택 가능한 캐릭터 로스터(단일 소스). 미지정/로드 실패 시 nullptr. 첫 호출에서 lazy 로드 후 캐시. */
+    const ULastFPSCharacterRoster* GetCharacterRoster();
 
     UFUNCTION(BlueprintCallable, Category="LastFPS|Travel")
     void RequestTravelToDestination(ELastFPSTravelDestination Destination);
@@ -72,7 +77,15 @@ protected:
     UPROPERTY(Config, EditAnywhere, Category="LastFPS|Travel")
     FString HubMap = TEXT("/Game/Maps/Test/HubMap");
 
+    /** 캐릭터 로스터 에셋 경로 — DefaultGame.ini의 [/Script/LastFPS.LastFPSGameInstance] 에서 지정 */
+    UPROPERTY(Config, EditAnywhere, Category="LastFPS|Character")
+    TSoftObjectPtr<ULastFPSCharacterRoster> CharacterRosterAsset;
+
 private:
+    /** GetCharacterRoster의 lazy 로드 캐시 */
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSCharacterRoster> CachedCharacterRoster;
+
     UPROPERTY()
     TMap<FString, int32> SelectedCharacterIndexByPlayerKey;
 

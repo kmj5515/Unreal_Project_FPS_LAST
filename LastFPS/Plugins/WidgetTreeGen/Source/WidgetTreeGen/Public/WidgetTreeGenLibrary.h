@@ -34,7 +34,8 @@ public:
 		const FString& JsonText,
 		TSubclassOf<UUserWidget> ParentClass,
 		const FString& SavePath,
-		const FString& AssetName);
+		const FString& AssetName,
+		bool bOverwriteExisting = false);
 
 	/**
 	 * Generate a UMG Widget Blueprint from a JSON file on disk.
@@ -47,5 +48,6 @@ public:
 		const FString& JsonFilePath,
 		TSubclassOf<UUserWidget> ParentClass,
 		const FString& SavePath,
-		const FString& AssetName);
+		const FString& AssetName,
+		bool bOverwriteExisting = false);
 };
