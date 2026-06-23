@@ -70,8 +70,6 @@ ULastFPSHUDWidget::ULastFPSHUDWidget(const FObjectInitializer& ObjectInitializer
     HealthLowFillColor       = LastFPSHUDStyle::HealthLowFill();
     StaminaFillColor         = LastFPSHUDStyle::StaminaFill();
     StaminaLowFillColor      = LastFPSHUDStyle::StaminaLowFill();
-    HeatFillColor            = LastFPSHUDStyle::HeatFill();
-    HeatOverheatedFillColor  = LastFPSHUDStyle::HeatOverheated();
 }
 
 void ULastFPSHUDWidget::NativeConstruct()
@@ -80,7 +78,6 @@ void ULastFPSHUDWidget::NativeConstruct()
 
     ApplyGaugeBarBackground(PB_Health);
     ApplyGaugeBarBackground(PB_Stamina);
-    ApplyGaugeBarBackground(PB_Heat);
 
     if (HitMarkerImage)
     {
@@ -111,6 +108,13 @@ void ULastFPSHUDWidget::NativeConstruct()
 
 void ULastFPSHUDWidget::NativeDestruct()
 {
+    if (UWeaponComponent* Weapon = BoundWeaponComponent.Get())
+    {
+        Weapon->OnWeaponEquippedChanged.RemoveDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
+    }
+    BoundWeaponComponent.Reset();
+    bPawnComponentsBound = false;
+
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearTimer(HUDRefreshTimerHandle);
@@ -237,15 +241,10 @@ void ULastFPSHUDWidget::TryBindPawnComponents()
         return;
     }
 
-    Weapon->OnHeatChanged.AddDynamic(this, &ULastFPSHUDWidget::HandleHeatChanged);
-    CachedMaxHeat        = Weapon->GetMaxHeat();
-    CachedHeatOverheated = Weapon->IsOverheated();
-    HeatGauge.Initialize(Weapon->GetCurrentHeat(), CachedMaxHeat);
-    BroadcastHeatDisplay();
-
-    Weapon->OnWeaponEquippedChanged.AddDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
+    Weapon->OnWeaponEquippedChanged.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
     OnCrosshairVisibilityChanged(Weapon->HasWeapon());
 
+    BoundWeaponComponent = Weapon;
     bPawnComponentsBound = true;
 }
 
@@ -319,10 +318,6 @@ void ULastFPSHUDWidget::TickSmoothedGauges(float DeltaTime)
         BroadcastStaminaDisplay();
     }
 
-    if (HeatGauge.Tick(DeltaTime, GaugeFillDuration))
-    {
-        BroadcastHeatDisplay();
-    }
 }
 
 void ULastFPSHUDWidget::InitializeHitMarkerMaterial()
@@ -472,11 +467,6 @@ FLinearColor ULastFPSHUDWidget::ResolveStaminaFillColor() const
         : StaminaFillColor;
 }
 
-FLinearColor ULastFPSHUDWidget::ResolveHeatFillColor() const
-{
-    return CachedHeatOverheated ? HeatOverheatedFillColor : HeatFillColor;
-}
-
 void ULastFPSHUDWidget::ApplyGaugeBarBackground(UProgressBar* Bar) const
 {
     if (!Bar)
@@ -518,28 +508,6 @@ void ULastFPSHUDWidget::BroadcastStaminaDisplay()
 {
     ApplyGaugeBar(PB_Stamina, StaminaGauge.Displayed, StaminaGauge.Max, ResolveStaminaFillColor());
     OnStaminaChanged(StaminaGauge.Displayed, StaminaGauge.Max);
-}
-
-void ULastFPSHUDWidget::BroadcastHeatDisplay()
-{
-    ApplyGaugeBar(PB_Heat, HeatGauge.Displayed, CachedMaxHeat, ResolveHeatFillColor());
-    OnHeatChanged(HeatGauge.Displayed, CachedMaxHeat, CachedHeatOverheated);
-}
-
-void ULastFPSHUDWidget::HandleHeatChanged(float Current, float Max, bool bIsOverheated)
-{
-    const bool bOverheatedChanged = (bIsOverheated != CachedHeatOverheated);
-
-    CachedMaxHeat        = Max;
-    CachedHeatOverheated = bIsOverheated;
-    HeatGauge.Max        = FMath::Max(Max, KINDA_SMALL_NUMBER);
-    HeatGauge.SetTarget(Current);
-
-    if (!HeatGauge.bInterpActive || bOverheatedChanged)
-    {
-        // 오버히트 색상은 즉시 반영, heat fill만 보간
-        BroadcastHeatDisplay();
-    }
 }
 
 void ULastFPSHUDWidget::HandleWeaponEquippedChanged(bool bEquipped)

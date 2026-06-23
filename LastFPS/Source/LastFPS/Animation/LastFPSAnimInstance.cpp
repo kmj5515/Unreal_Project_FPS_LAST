@@ -20,10 +20,23 @@ void ULastFPSAnimInstance::NativeInitializeAnimation()
             if (UWeaponComponent* Weapon = Hero->GetWeaponComponent())
             {
                 WeaponType = Weapon->GetWeaponType();
-                Weapon->OnWeaponEquippedChanged.AddDynamic(this, &ULastFPSAnimInstance::OnWeaponEquipped);
+                Weapon->OnWeaponEquippedChanged.AddUniqueDynamic(this, &ULastFPSAnimInstance::OnWeaponEquipped);
             }
         }
     }
+}
+
+void ULastFPSAnimInstance::NativeUninitializeAnimation()
+{
+    if (ALastFPSHero* Hero = Cast<ALastFPSHero>(OwnerCharacter))
+    {
+        if (UWeaponComponent* Weapon = Hero->GetWeaponComponent())
+        {
+            Weapon->OnWeaponEquippedChanged.RemoveDynamic(this, &ULastFPSAnimInstance::OnWeaponEquipped);
+        }
+    }
+
+    Super::NativeUninitializeAnimation();
 }
 
 void ULastFPSAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
@@ -35,7 +48,9 @@ void ULastFPSAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
         return;
     }
 
+    UpdateYaw(DeltaSeconds);
     UpdateLocomotionState();
+    UpdateDistanceMatching();
     UpdateAirState();
     UpdateStance();
     UpdateCombatState();
@@ -47,6 +62,10 @@ void ULastFPSAnimInstance::UpdateLocomotionState()
 {
     Velocity = MovementComponent->Velocity;
     Speed = Velocity.Size2D();
+    bIsSprinting = false;
+    bWantsToSprint = false;
+    const FVector Acceleration = MovementComponent->GetCurrentAcceleration();
+    bHasAcceleration = Acceleration.SizeSquared2D() > KINDA_SMALL_NUMBER;
 
     if (Speed > 1.f)
     {
@@ -59,14 +78,134 @@ void ULastFPSAnimInstance::UpdateLocomotionState()
         Direction = 0.f;    
     }
 
-    if (Speed < 500.f)
+    if (bHasAcceleration)
     {
-        LocomotionState = EMMLocomotionState::Jog;
+        const FRotator ActorRotation = OwnerCharacter->GetActorRotation();
+        const FRotator AccelerationRotation = UKismetMathLibrary::MakeRotFromX(Acceleration);
+        StartDirection = UKismetMathLibrary::NormalizedDeltaRotator(AccelerationRotation, ActorRotation).Yaw;
     }
     else
     {
+        StartDirection = Direction;
+    }
+
+    StartCardinalDirection = DirectionToCardinalDirection(StartDirection);
+    StopCardinalDirection = DirectionToCardinalDirection(Direction);
+
+    if (ALastFPSHero* Hero = Cast<ALastFPSHero>(OwnerCharacter))
+    {
+        bIsSprinting = Hero->GetIsSprinting();
+        bWantsToSprint = Hero->GetWantsToSprint();
+    }
+
+    const bool bUseSprintLocomotion = bIsSprinting || bWantsToSprint;
+    bIsStarting = bHasAcceleration && !bUseSprintLocomotion && Speed <= StartingSpeedThreshold;
+
+    if (bUseSprintLocomotion && bHasAcceleration)
+    {
         LocomotionState = EMMLocomotionState::Sprint;
     }
+    else if (Speed <= 3.f)
+    {
+        LocomotionState = EMMLocomotionState::Idle;
+    }
+    else
+    {
+        LocomotionState = EMMLocomotionState::Jog;
+    }
+}
+
+void ULastFPSAnimInstance::UpdateDistanceMatching()
+{
+    bShouldStop = false;
+    DistanceToStop = 0.f;
+
+    if (!MovementComponent->IsMovingOnGround())
+    {
+        return;
+    }
+
+    const bool bCanPredictStop = !bHasAcceleration
+        && !bIsSprinting
+        && !bWantsToSprint
+        && Speed > 3.f;
+
+    if (!bCanPredictStop)
+    {
+        return;
+    }
+
+    const FVector Velocity2D(Velocity.X, Velocity.Y, 0.f);
+    FVector VelocityDirection;
+    float Speed2D = 0.f;
+    Velocity2D.ToDirectionAndLength(VelocityDirection, Speed2D);
+
+    if (Speed2D <= KINDA_SMALL_NUMBER)
+    {
+        return;
+    }
+
+    float BrakingFriction = MovementComponent->bUseSeparateBrakingFriction
+        ? MovementComponent->BrakingFriction
+        : MovementComponent->GroundFriction;
+    BrakingFriction = FMath::Max(0.f, BrakingFriction * MovementComponent->BrakingFrictionFactor);
+
+    const float BrakingDeceleration = FMath::Max(0.f, MovementComponent->GetMaxBrakingDeceleration());
+    const float Divisor = BrakingFriction * Speed2D + BrakingDeceleration;
+    if (Divisor <= KINDA_SMALL_NUMBER)
+    {
+        return;
+    }
+
+    const float TimeToStop = Speed2D / Divisor;
+    const FVector PredictedStopOffset =
+        Velocity2D * TimeToStop
+        + 0.5f * ((-BrakingFriction) * Velocity2D - BrakingDeceleration * VelocityDirection) * TimeToStop * TimeToStop;
+
+    DistanceToStop = PredictedStopOffset.Size2D();
+    bShouldStop = Speed >= StopPredictionMinSpeed && DistanceToStop > KINDA_SMALL_NUMBER;
+}
+
+EMMCardinalDirection ULastFPSAnimInstance::DirectionToCardinalDirection(float InDirection)
+{
+    const float NormalizedDirection = FMath::Fmod(InDirection + 360.f, 360.f);
+    const int32 DirectionIndex = FMath::FloorToInt((NormalizedDirection + 45.f) / 90.f) % 4;
+
+    switch (DirectionIndex)
+    {
+    case 1:
+        return EMMCardinalDirection::Right;
+    case 2:
+        return EMMCardinalDirection::Back;
+    case 3:
+        return EMMCardinalDirection::Left;
+    case 0:
+    default:
+        return EMMCardinalDirection::Forward;
+    }
+}
+
+void ULastFPSAnimInstance::UpdateYaw(float DeltaSeconds)
+{
+    const float CurrentActorYaw = OwnerCharacter->GetActorRotation().Yaw;
+
+    if (!bHasPreviousActorYaw || FMath::IsNearlyZero(DeltaSeconds))
+    {
+        PreviousActorYaw = CurrentActorYaw;
+        bHasPreviousActorYaw = true;
+        Yaw = 0.f;
+        return;
+    }
+
+    const float DeltaYaw = FMath::FindDeltaAngleDegrees(PreviousActorYaw, CurrentActorYaw);
+    float TargetYaw = -DeltaYaw / DeltaSeconds;
+    if (FMath::Abs(TargetYaw) <= YawDeadZone)
+    {
+        TargetYaw = 0.f;
+    }
+
+    Yaw = FMath::FInterpTo(Yaw, TargetYaw, DeltaSeconds, YawInterpSpeed);
+    PreviousActorYaw = CurrentActorYaw;
 }
 
 void ULastFPSAnimInstance::UpdateAirState()

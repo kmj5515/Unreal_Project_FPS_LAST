@@ -70,12 +70,4 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Effects")
     TObjectPtr<UParticleSystem> MuzzleFlashEffect;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Overheat", meta=(ClampMin="0.0"))
-    float HeatPerShot = 10.f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Overheat", meta=(ClampMin="0.0"))
-    float MaxHeat = 100.f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Overheat", meta=(ClampMin="0.0"))
-    float CooldownRate = 20.f;
 };

@@ -16,14 +16,12 @@
 UWeaponComponent::UWeaponComponent()
 {
     SetIsReplicatedByDefault(true);
-    PrimaryComponentTick.bCanEverTick = true;
+    PrimaryComponentTick.bCanEverTick = false;
 }
 
 void UWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-    DOREPLIFETIME(UWeaponComponent, CurrentHeat);
-    DOREPLIFETIME(UWeaponComponent, bIsOverheated);
     DOREPLIFETIME(UWeaponComponent, CurrentWeapon);
     DOREPLIFETIME(UWeaponComponent, WeaponType);
     DOREPLIFETIME(UWeaponComponent, WeaponAnimLayerClass);
@@ -54,53 +52,9 @@ void UWeaponComponent::BeginPlay()
     // 클라이언트는 OnRep_CurrentWeapon에서 attach + 브로드캐스트
 }
 
-void UWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
-{
-    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-    if (!GetOwner()->HasAuthority()) return;
-
-    CurrentHeat = FMath::Max(0.f, CurrentHeat - CooldownRate * DeltaTime);
-
-    if (bIsOverheated && CurrentHeat <= 0.f)
-    {
-        bIsOverheated = false;
-    }
-
-    OnHeatChanged.Broadcast(CurrentHeat, MaxHeat, bIsOverheated);
-
-    if (CurrentHeat <= 0.f)
-    {
-        SetComponentTickEnabled(false);
-    }
-}
-
 bool UWeaponComponent::CanFire() const
 {
-    return CurrentWeapon != nullptr && !bIsOverheated;
-}
-
-void UWeaponComponent::AddHeat()
-{
-    if (!GetOwner()->HasAuthority())
-    {
-        return;
-    }
-
-    CurrentHeat = FMath::Min(MaxHeat, CurrentHeat + HeatPerShot);
-
-    if (CurrentHeat >= MaxHeat)
-    {
-        bIsOverheated = true;
-    }
-
-    SetComponentTickEnabled(true);
-    OnHeatChanged.Broadcast(CurrentHeat, MaxHeat, bIsOverheated);
-}
-
-void UWeaponComponent::OnRep_HeatState()
-{
-    OnHeatChanged.Broadcast(CurrentHeat, MaxHeat, bIsOverheated);
+    return CurrentWeapon != nullptr;
 }
 
 FTransform UWeaponComponent::GetMuzzleTransform() const
@@ -273,9 +227,6 @@ void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
     FireRate = NewDefinition->FireRate;
     FireSound = NewDefinition->FireSound;
     MuzzleFlashEffect = NewDefinition->MuzzleFlashEffect;
-    HeatPerShot = NewDefinition->HeatPerShot;
-    MaxHeat = NewDefinition->MaxHeat;
-    CooldownRate = NewDefinition->CooldownRate;
 }
 
 void UWeaponComponent::OnRep_CurrentWeapon()
@@ -484,7 +435,6 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
     World->SpawnActor<ALastFPSProjectile>(ProjectileClass, MuzzleLocation, ProjectileRotation, SpawnParams);
-    AddHeat();
 
     if (!bHit || !HitResult.GetActor() || !DamageEffectClass)
     {

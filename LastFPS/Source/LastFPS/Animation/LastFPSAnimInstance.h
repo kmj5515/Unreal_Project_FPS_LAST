@@ -15,6 +15,7 @@ class LASTFPS_API ULastFPSAnimInstance : public UAnimInstance
 
 public:
     virtual void NativeInitializeAnimation() override;
+    virtual void NativeUninitializeAnimation() override;
     virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
 protected:
@@ -35,7 +36,49 @@ protected:
     float Direction = 0.f;
 
     UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    float StartDirection = 0.f;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    EMMCardinalDirection StartCardinalDirection = EMMCardinalDirection::Forward;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    EMMCardinalDirection StopCardinalDirection = EMMCardinalDirection::Forward;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    float Yaw = 0.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion")
+    float YawInterpSpeed = 12.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion")
+    float YawDeadZone = 1.f;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
     FVector Velocity = FVector::ZeroVector;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    bool bIsSprinting = false;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    bool bWantsToSprint = false;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    bool bHasAcceleration = false;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    bool bIsStarting = false;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion")
+    float StartingSpeedThreshold = 100.f;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|DistanceMatching")
+    bool bShouldStop = false;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|DistanceMatching")
+    float DistanceToStop = 0.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|DistanceMatching")
+    float StopPredictionMinSpeed = 150.f;
 
     // 진행 방향과 입력 방향이 반대(>90°)일 때 true — Chooser/모션매칭 분기용
     UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
@@ -90,12 +133,15 @@ protected:
 
 private:
     void UpdateLocomotionState();
+    void UpdateDistanceMatching();
+    void UpdateYaw(float DeltaSeconds);
     void UpdateAirState();
     void UpdateStance();
     void UpdateCombatState();
     void UpdatePivot();
     void UpdateHandIK();
     void DebugAimValues() const;
+    static EMMCardinalDirection DirectionToCardinalDirection(float InDirection);
 
     UFUNCTION()
     void OnWeaponEquipped(bool bEquipped);
@@ -105,4 +151,7 @@ private:
 
     UPROPERTY()
     TObjectPtr<UCharacterMovementComponent> MovementComponent;
+
+    float PreviousActorYaw = 0.f;
+    bool bHasPreviousActorYaw = false;
 };

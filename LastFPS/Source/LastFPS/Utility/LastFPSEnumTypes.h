@@ -13,6 +13,15 @@ enum class EMMLocomotionState : uint8
 };
 
 UENUM(BlueprintType)
+enum class EMMCardinalDirection : uint8
+{
+    Forward UMETA(DisplayName = "Forward"),
+    Right   UMETA(DisplayName = "Right"),
+    Back    UMETA(DisplayName = "Back"),
+    Left    UMETA(DisplayName = "Left"),
+};
+
+UENUM(BlueprintType)
 enum class EMMStance : uint8
 {
     Standing  UMETA(DisplayName = "Standing"),

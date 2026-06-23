@@ -70,6 +70,7 @@ void ALastFPSHero::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ALastFPSHero, CombatState);
+    DOREPLIFETIME(ALastFPSHero, bIsSprinting);
 }
 
 void ALastFPSHero::GiveDefaultAbilities()
@@ -140,7 +141,12 @@ void ALastFPSHero::HandleAbilityInput(const FInputActionValue& value, FGameplayT
     }
     else
     {
-        if (!ShouldCancelAbilityOnRelease(InputID))
+        if (InputID == FLastFPSTags::Get().Input_Sprint)
+        {
+            SetWantsToSprint(false);
+        }
+
+        if (!ShouldSkipAbilityCancelOnRelease(InputID))
         {
             InputReleased(InputID);
         }
@@ -151,6 +157,13 @@ void ALastFPSHero::Move(const FInputActionValue& Value)
 {
     const FVector2D MovementVector = Value.Get<FVector2D>();
     CachedMoveInput = MovementVector;
+
+    if ((bIsSprinting || bWantsToSprint) && !HasForwardSprintInput())
+    {
+        SetWantsToSprint(false);
+        CancelAbilityByTag(FLastFPSTags::Get().Input_Sprint);
+    }
+
     if (!Controller) return;
 
     const FRotator Rotation = Controller->GetControlRotation();
@@ -159,13 +172,26 @@ void ALastFPSHero::Move(const FInputActionValue& Value)
     const FVector ForwardDir = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
     const FVector RightDir   = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-    AddMovementInput(ForwardDir, MovementVector.Y);
-    AddMovementInput(RightDir,   MovementVector.X);
+    FVector2D EffectiveMovementVector = MovementVector;
+    if (bIsSprinting || bWantsToSprint)
+    {
+        EffectiveMovementVector.X = 0.f;
+        EffectiveMovementVector.Y = FMath::Max(EffectiveMovementVector.Y, 0.f);
+    }
+
+    AddMovementInput(ForwardDir, EffectiveMovementVector.Y);
+    AddMovementInput(RightDir,   EffectiveMovementVector.X);
 }
 
 void ALastFPSHero::ClearMoveInput(const FInputActionValue& Value)
 {
     CachedMoveInput = FVector2D::ZeroVector;
+
+    if (bIsSprinting || bWantsToSprint)
+    {
+        SetWantsToSprint(false);
+        CancelAbilityByTag(FLastFPSTags::Get().Input_Sprint);
+    }
 }
 
 void ALastFPSHero::Look(const FInputActionValue& Value)
@@ -175,17 +201,18 @@ void ALastFPSHero::Look(const FInputActionValue& Value)
     AddControllerPitchInput(LookVector.Y);
 }
 
-void ALastFPSHero::TryActivateAbilityByTag(FGameplayTag AbilityTag)
+bool ALastFPSHero::TryActivateAbilityByTag(FGameplayTag AbilityTag)
 {
     UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
     if (!ASC)
     {
         UE_LOG(LogTemp, Warning, TEXT("TryActivateAbilityByTag failed: ASC is null. Tag=%s"), *AbilityTag.ToString());
-        return;
+        return false;
     }
 
     UE_LOG(LogTemp, Warning, TEXT("TryActivateAbilityByTag: %s"), *AbilityTag.ToString());
 
+    bool bAlreadyActive = false;
     for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
     {
         if (!Spec.Ability)
@@ -195,6 +222,10 @@ void ALastFPSHero::TryActivateAbilityByTag(FGameplayTag AbilityTag)
         }
 
         const FGameplayTagContainer& AssetTags = Spec.Ability->GetAssetTags();
+        if (AssetTags.HasTagExact(AbilityTag) && Spec.IsActive())
+        {
+            bAlreadyActive = true;
+        }
 
         UE_LOG(LogTemp, Warning, TEXT("ASC AbilitySpec: %s | Tags=[%s] | Active=%s"),
             *Spec.Ability->GetName(),
@@ -206,6 +237,7 @@ void ALastFPSHero::TryActivateAbilityByTag(FGameplayTag AbilityTag)
     AbilityTags.AddTag(AbilityTag);
     const bool bActivated = ASC->TryActivateAbilitiesByTag(AbilityTags);
     UE_LOG(LogTemp, Warning, TEXT("TryActivateAbilitiesByTag result: %s"), bActivated ? TEXT("true") : TEXT("false"));
+    return bActivated || bAlreadyActive;
 }
 
 void ALastFPSHero::CancelAbilityByTag(FGameplayTag AbilityTag)
@@ -220,16 +252,48 @@ void ALastFPSHero::CancelAbilityByTag(FGameplayTag AbilityTag)
 
 void ALastFPSHero::InputPressed(FGameplayTag InputID)
 {
-    TryActivateAbilityByTag(InputID);
+    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
+    if (InputID == FPSTags.Input_Sprint)
+    {
+        if (!HasForwardSprintInput())
+        {
+            SetWantsToSprint(false);
+            return;
+        }
+
+        if (bIsADS)
+        {
+            SetADS(false);
+        }
+
+        SetWantsToSprint(true);
+    }
+
+    const bool bActivatedOrActive = TryActivateAbilityByTag(InputID);
+    if (InputID == FPSTags.Input_Sprint && !bActivatedOrActive && !bIsSprinting)
+    {
+        SetWantsToSprint(false);
+    }
 }
 
 void ALastFPSHero::InputReleased(FGameplayTag InputID)
 {
+    if (InputID == FLastFPSTags::Get().Input_Sprint)
+    {
+        SetWantsToSprint(false);
+    }
+
     CancelAbilityByTag(InputID);
 }
 
 void ALastFPSHero::SetADS(bool bEnabled)
 {
+    if (bEnabled && (bIsSprinting || bWantsToSprint))
+    {
+        SetWantsToSprint(false);
+        CancelAbilityByTag(FLastFPSTags::Get().Input_Sprint);
+    }
+
     bIsADS = bEnabled;
     TargetArmLength    = bIsADS ? ADSArmLength : DefaultArmLength;
     TargetSocketOffset = bIsADS ? ADSSocketOffset : DefaultSocketOffset;
@@ -255,9 +319,33 @@ void ALastFPSHero::SetADS(bool bEnabled)
     }
 }
 
-bool ALastFPSHero::ShouldCancelAbilityOnRelease(FGameplayTag InputID) const
+bool ALastFPSHero::ShouldSkipAbilityCancelOnRelease(FGameplayTag InputID) const
 {
     return InputConfig && InputConfig->ReleaseCancelInputTags.HasTagExact(InputID);
+}
+
+bool ALastFPSHero::HasForwardSprintInput() const
+{
+    return CachedMoveInput.Y > SprintForwardInputThreshold;
+}
+
+bool ALastFPSHero::CanStartSprint() const
+{
+    return HasForwardSprintInput() && !bIsADS;
+}
+
+void ALastFPSHero::SetSprinting(bool bEnabled)
+{
+    bIsSprinting = bEnabled;
+    if (!bEnabled)
+    {
+        SetWantsToSprint(false);
+    }
+}
+
+void ALastFPSHero::SetWantsToSprint(bool bEnabled)
+{
+    bWantsToSprint = bEnabled;
 }
 
 void ALastFPSHero::SetCombatState(EMMCombatState NewState)

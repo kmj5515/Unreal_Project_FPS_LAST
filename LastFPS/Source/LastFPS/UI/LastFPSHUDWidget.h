@@ -66,9 +66,6 @@ protected:
     void OnStaminaChanged(float Current, float Max);
 
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
-    void OnHeatChanged(float Current, float Max, bool bIsOverheated);
-
-    UFUNCTION(BlueprintImplementableEvent, Category="HUD")
     void OnCrosshairVisibilityChanged(bool bVisible);
 
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
@@ -125,9 +122,6 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="HUD|Gauges", meta=(BindWidgetOptional))
     TObjectPtr<UProgressBar> PB_Stamina;
 
-    UPROPERTY(BlueprintReadOnly, Category="HUD|Gauges", meta=(BindWidgetOptional))
-    TObjectPtr<UProgressBar> PB_Heat;
-
     UPROPERTY(EditDefaultsOnly, Category="HUD|Gauges", meta=(ClampMin="0.05", ClampMax="3.0"))
     float GaugeFillDuration = 0.4f;
 
@@ -148,12 +142,6 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category="HUD|Gauges|Colors")
     FLinearColor StaminaLowFillColor;
-
-    UPROPERTY(EditDefaultsOnly, Category="HUD|Gauges|Colors")
-    FLinearColor HeatFillColor;
-
-    UPROPERTY(EditDefaultsOnly, Category="HUD|Gauges|Colors")
-    FLinearColor HeatOverheatedFillColor;
 
 private:
     bool InitializeHUD();
@@ -179,16 +167,11 @@ private:
     void SetCrosshairSpread(float Spread);
     void BroadcastHealthDisplay();
     void BroadcastStaminaDisplay();
-    void BroadcastHeatDisplay();
     void ApplyGaugeBarBackground(UProgressBar* Bar) const;
     void ApplyGaugeBar(UProgressBar* Bar, float Current, float Max, const FLinearColor& FillColor) const;
     FLinearColor ResolveHealthFillColor() const;
     FLinearColor ResolveStaminaFillColor() const;
-    FLinearColor ResolveHeatFillColor() const;
     bool IsLowResource(float Current, float Max) const;
-
-    UFUNCTION()
-    void HandleHeatChanged(float Current, float Max, bool bIsOverheated);
 
     UFUNCTION()
     void HandleWeaponEquippedChanged(bool bEquipped);
@@ -206,11 +189,9 @@ private:
 
     FLastFPSSmoothedGaugeDisplay HealthGauge;
     FLastFPSSmoothedGaugeDisplay StaminaGauge;
-    FLastFPSSmoothedGaugeDisplay HeatGauge;
-    float CachedMaxHeat = 0.f;
-    bool CachedHeatOverheated = false;
 
     TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
+    TWeakObjectPtr<UWeaponComponent> BoundWeaponComponent;
 
     bool bAttributeDelegatesBound = false;
     bool bPawnComponentsBound = false;

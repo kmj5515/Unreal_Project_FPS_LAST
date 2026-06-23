@@ -33,11 +33,17 @@ public:
     FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
     FORCEINLINE UWeaponComponent* GetWeaponComponent() const { return WeaponComponent; }
     virtual bool GetIsADS() const override { return bIsADS; }
+    FORCEINLINE bool GetIsSprinting() const { return bIsSprinting; }
+    FORCEINLINE bool GetWantsToSprint() const { return bWantsToSprint; }
     FORCEINLINE EMMCombatState GetCombatState() const { return CombatState; }
     FORCEINLINE FVector2D GetCachedMoveInput() const { return CachedMoveInput; }
+    bool HasForwardSprintInput() const;
+    bool CanStartSprint() const;
 
     // GAS 어빌리티에서 카메라 줌을 제어할 수 있도록 공개
     void SetADS(bool bEnabled);
+    void SetSprinting(bool bEnabled);
+    void SetWantsToSprint(bool bEnabled);
     void SetCombatState(EMMCombatState NewState);
 
 protected:
@@ -49,7 +55,7 @@ protected:
     void Look(const FInputActionValue& Value);
     
     // 공통 GAS 입력 처리
-    void TryActivateAbilityByTag(FGameplayTag AbilityTag);
+    bool TryActivateAbilityByTag(FGameplayTag AbilityTag);
     void CancelAbilityByTag(FGameplayTag AbilityTag);
     void InputPressed(FGameplayTag InputID);
     void InputReleased(FGameplayTag InputID);
@@ -89,6 +95,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Camera")
     float CameraLagSpeed = 15.f;
 
+    UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint")
+    float SprintForwardInputThreshold = 0.5f;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
     TObjectPtr<UWeaponComponent> WeaponComponent;
 
@@ -106,6 +115,12 @@ private:
     UPROPERTY(ReplicatedUsing=OnRep_CombatState, BlueprintReadOnly, Category="Combat", meta=(AllowPrivateAccess="true"))
     EMMCombatState CombatState = EMMCombatState::Idle;
 
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Movement", meta=(AllowPrivateAccess="true"))
+    bool bIsSprinting = false;
+
+    UPROPERTY(BlueprintReadOnly, Category="Movement", meta=(AllowPrivateAccess="true"))
+    bool bWantsToSprint = false;
+
     float TargetArmLength;
     FVector TargetSocketOffset;
     float TargetFOV;
@@ -114,7 +129,7 @@ private:
     void OnRep_CombatState();
 
     void HandleAbilityInput(const FInputActionValue& value, FGameplayTag InputID);
-    bool ShouldCancelAbilityOnRelease(FGameplayTag InputID) const;
+    bool ShouldSkipAbilityCancelOnRelease(FGameplayTag InputID) const;
 
     void TickLocalMatchIntro();
 
