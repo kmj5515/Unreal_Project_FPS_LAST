@@ -4,6 +4,7 @@
 #include "UI/LastFPSHUDWidget.h"
 #include "UI/LastFPSNoticeWidget.h"
 #include "UI/LastFPSDialogueWidget.h"
+#include "UI/LastFPSQuantityDialogWidget.h"
 #include "UI/LastFPSUIManagerSubsystem.h"
 #include "UI/LastFPSUITags.h"
 
@@ -234,6 +235,29 @@ void ALastFPSPlayerController::ShowConfirm(
         {
             ConfirmWidget->OnConfirmResult.Add(OnResult);
         }
+    }
+}
+
+void ALastFPSPlayerController::ShowQuantityPrompt(
+    const FText& Title,
+    const FText& ItemName,
+    int32 UnitPrice,
+    int32 MaxQuantity,
+    FLastFPSQuantityResultDelegate OnResult)
+{
+    if (ULastFPSQuantityDialogWidget* Dialog = PushWidgetToModalLayer<ULastFPSQuantityDialogWidget>(QuantityDialogWidgetClass))
+    {
+        Dialog->SetupQuantity(Title, ItemName, UnitPrice, MaxQuantity);
+        if (OnResult.IsBound())
+        {
+            Dialog->OnQuantityResult.Add(OnResult);
+        }
+    }
+    else
+    {
+        // 클래스 미지정 또는 레이아웃 없음 → 모달이 뜨지 않으니 원인을 로그로 남긴다
+        UE_LOG(LogLastFPSPlayerController, Warning,
+            TEXT("ShowQuantityPrompt: 수량 모달을 띄우지 못했습니다. PlayerController BP의 QuantityDialogWidgetClass에 WBP_QuantityDialog 가 지정됐는지 확인하세요."));
     }
 }
 

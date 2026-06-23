@@ -36,11 +36,11 @@ public:
 	void AddCredits(int32 Amount);
 
 	/**
-	 * 구매 시도 — 잔액이 충분하면 Price 만큼 차감하고 GrantItemRowId 아이템을 1개 지급.
-	 * 잔액 부족 시 아무것도 바꾸지 않고 false. (GrantItemRowId 비면 화폐만 차감.)
+	 * 구매 시도 — 잔액이 단가(Price)×수량(Count) 이상이면 그만큼 차감하고 GrantItemRowId 아이템을 Count개 지급.
+	 * 잔액 부족 시 아무것도 바꾸지 않고 false. (GrantItemRowId 비면 화폐만 차감.) Count<=0 은 1로 취급.
 	 */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Economy")
-	bool TryPurchase(FName GrantItemRowId, int32 Price);
+	bool TryPurchase(FName GrantItemRowId, int32 Price, int32 Count = 1);
 
 	/** 보유 아이템 직접 추가(보상/디버그). RowId 비거나 Count<=0 이면 무시. */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Economy")

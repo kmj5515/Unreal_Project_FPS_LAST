@@ -4,6 +4,7 @@
 #include "LastFPSSettingsWidget.generated.h"
 
 class USlider;
+class UTextBlock;
 class ULastFPSButtonBase;
 
 /**
@@ -47,6 +48,19 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<USlider> Slider_Sensitivity;
 
+	// ── 슬라이더 옆 수치 표시 텍스트 (백분율, 선택 바인딩) ────────────
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> TB_MasterVolume;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> TB_MusicVolume;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> TB_SFXVolume;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> TB_Sensitivity;
+
 	// ── 적용 / 되돌리기 ───────────────────────────────────────────────
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<ULastFPSButtonBase> Button_Apply;
@@ -75,6 +89,12 @@ private:
 	void ApplyAndSave();
 	void RevertToSaved();
 	void SetGraphicsQuality(int32 QualityLevel);
+
+	/** 슬라이더 값을 옆 텍스트(백분율)에 반영 */
+	void RefreshSliderLabels();
+
+	/** 슬라이더가 움직일 때마다 옆 수치 텍스트 갱신 (어느 슬라이더든 전체 재반영) */
+	UFUNCTION() void HandleSliderValueChanged(float Value);
 
 	UFUNCTION() void HandleQualityLowClicked();
 	UFUNCTION() void HandleQualityMediumClicked();

@@ -1,0 +1,10 @@
+[
+	{ "Name": "Mod_Armor_01", "ModuleName": "강화 장갑판", "StatMods": [ { "Stat": "Defense", "Value": 30.0 } ], "CapacityCost": 3 },
+	{ "Name": "Mod_Amp_01", "ModuleName": "고출력 증폭기", "StatMods": [ { "Stat": "AttackDamage", "Value": 25.0 } ], "CapacityCost": 3 },
+	{ "Name": "Mod_Regen_01", "ModuleName": "나노 재생막", "StatMods": [ { "Stat": "MaxHealth", "Value": 150.0 } ], "CapacityCost": 5 },
+	{ "Name": "Mod_Thrust_01", "ModuleName": "추진 강화 모듈", "StatMods": [ { "Stat": "MoveSpeed", "Value": 40.0 } ], "CapacityCost": 2 },
+	{ "Name": "Mod_Endure_01", "ModuleName": "지구력 코어", "StatMods": [ { "Stat": "MaxStamina", "Value": 50.0 } ], "CapacityCost": 2 },
+	{ "Name": "Mod_Swift_01", "ModuleName": "질풍 모듈", "StatMods": [ { "Stat": "MoveSpeed", "Value": 60.0 }, { "Stat": "MaxStamina", "Value": 30.0 } ], "CapacityCost": 4 },
+	{ "Name": "Mod_Berserk_01", "ModuleName": "광폭 회로", "StatMods": [ { "Stat": "AttackDamage", "Value": 60.0 }, { "Stat": "MaxHealth", "Value": -100.0 } ], "CapacityCost": 6 },
+	{ "Name": "Mod_Bastion_01", "ModuleName": "철벽 프로토콜", "StatMods": [ { "Stat": "Defense", "Value": 50.0 }, { "Stat": "MaxHealth", "Value": 200.0 } ], "CapacityCost": 8 }
+]

@@ -27,21 +27,23 @@ void ULastFPSEconomySubsystem::AddCredits(int32 Amount)
 	OnCreditsChanged.Broadcast(Credits);
 }
 
-bool ULastFPSEconomySubsystem::TryPurchase(FName GrantItemRowId, int32 Price)
+bool ULastFPSEconomySubsystem::TryPurchase(FName GrantItemRowId, int32 Price, int32 Count)
 {
-	const int32 Cost = FMath::Max(0, Price);
-	if (Credits < Cost)
+	const int32 Qty       = FMath::Max(1, Count);
+	const int32 UnitCost  = FMath::Max(0, Price);
+	const int32 TotalCost = UnitCost * Qty;
+	if (Credits < TotalCost)
 	{
 		return false;
 	}
 
-	Credits -= Cost;
+	Credits -= TotalCost;
 	OnCreditsChanged.Broadcast(Credits);
 
 	// 화폐 차감 후 아이템 지급 (AddItem 이 OnInventoryChanged 브로드캐스트)
 	if (!GrantItemRowId.IsNone())
 	{
-		AddItem(GrantItemRowId, 1);
+		AddItem(GrantItemRowId, Qty);
 	}
 
 	return true;

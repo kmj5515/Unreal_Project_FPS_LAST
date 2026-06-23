@@ -3,6 +3,7 @@
 #include "Game/LastFPSGameUserSettings.h"
 #include "UI/LastFPSButtonBase.h"
 #include "Components/Slider.h"
+#include "Components/TextBlock.h"
 
 void ULastFPSSettingsWidget::NativeConstruct()
 {
@@ -14,6 +15,12 @@ void ULastFPSSettingsWidget::NativeConstruct()
 	if (Button_QualityUltra)  Button_QualityUltra->OnClicked().AddUObject(this,  &ULastFPSSettingsWidget::HandleQualityUltraClicked);
 	if (Button_Apply)         Button_Apply->OnClicked().AddUObject(this,         &ULastFPSSettingsWidget::HandleApplyClicked);
 	if (Button_Revert)        Button_Revert->OnClicked().AddUObject(this,        &ULastFPSSettingsWidget::HandleRevertClicked);
+
+	// 슬라이더가 움직일 때마다 옆 수치 텍스트 갱신
+	if (Slider_MasterVolume) Slider_MasterVolume->OnValueChanged.AddDynamic(this, &ULastFPSSettingsWidget::HandleSliderValueChanged);
+	if (Slider_MusicVolume)  Slider_MusicVolume->OnValueChanged.AddDynamic(this,  &ULastFPSSettingsWidget::HandleSliderValueChanged);
+	if (Slider_SFXVolume)    Slider_SFXVolume->OnValueChanged.AddDynamic(this,    &ULastFPSSettingsWidget::HandleSliderValueChanged);
+	if (Slider_Sensitivity)  Slider_Sensitivity->OnValueChanged.AddDynamic(this,  &ULastFPSSettingsWidget::HandleSliderValueChanged);
 
 	LoadCurrentSettings();
 }
@@ -34,6 +41,26 @@ void ULastFPSSettingsWidget::LoadCurrentSettings()
 	if (Slider_MusicVolume)  Slider_MusicVolume->SetValue(Settings->MusicVolume);
 	if (Slider_SFXVolume)    Slider_SFXVolume->SetValue(Settings->SFXVolume);
 	if (Slider_Sensitivity)  Slider_Sensitivity->SetValue(Settings->MouseSensitivity);
+
+	RefreshSliderLabels();
+}
+
+void ULastFPSSettingsWidget::RefreshSliderLabels()
+{
+	auto AsPercent = [](float V01)
+	{
+		return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(FMath::Clamp(V01, 0.f, 1.f) * 100.f)));
+	};
+
+	if (Slider_MasterVolume && TB_MasterVolume) TB_MasterVolume->SetText(AsPercent(Slider_MasterVolume->GetValue()));
+	if (Slider_MusicVolume  && TB_MusicVolume)  TB_MusicVolume->SetText(AsPercent(Slider_MusicVolume->GetValue()));
+	if (Slider_SFXVolume    && TB_SFXVolume)    TB_SFXVolume->SetText(AsPercent(Slider_SFXVolume->GetValue()));
+	if (Slider_Sensitivity  && TB_Sensitivity)  TB_Sensitivity->SetText(AsPercent(Slider_Sensitivity->GetValue()));
+}
+
+void ULastFPSSettingsWidget::HandleSliderValueChanged(float /*Value*/)
+{
+	RefreshSliderLabels();
 }
 
 void ULastFPSSettingsWidget::ApplyAndSave()

@@ -8,6 +8,7 @@ class UPanelWidget;
 class UTextBlock;
 class ULastFPSShopEntryWidget;
 class ULastFPSEconomySubsystem;
+struct FLastFPSShopItemData;
 
 /**
  * 상점 화면 — ContentScreen 크롬(타이틀/닫기) 위에 판매 항목을 나열.
@@ -26,6 +27,10 @@ protected:
 	/** 판매 항목 테이블 (RowType = FLastFPSShopItemData) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Shop", meta=(RequiredAssetDataTags="RowStructure=/Script/LastFPS.LastFPSShopItemData"))
 	TObjectPtr<UDataTable> ShopTable;
+
+	/** 아이템 정의 테이블 (RowType = FLastFPSItemData) — 스택 한도(MaxStackSize) 조회용 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Shop", meta=(RequiredAssetDataTags="RowStructure=/Script/LastFPS.LastFPSItemData"))
+	TObjectPtr<UDataTable> ItemTable;
 
 	/** 행 하나를 그릴 위젯 클래스 (WBP_ShopEntry) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Shop")
@@ -50,14 +55,36 @@ protected:
 private:
 	ULastFPSEconomySubsystem* GetEconomy() const;
 
-	/** 엔트리의 구매 버튼 클릭 처리 — 잔액 차감 + 아이템 지급(TryPurchase) */
-	void HandleItemPurchased(FName RowName, ULastFPSShopEntryWidget* Entry);
+	/**
+	 * 이 항목을 지금 몇 개까지 살 수 있는지 = min(잔액/단가, 스택여유).
+	 * 스택여유 = MaxStackSize - 현재보유. 무기 등 MaxStackSize=1 은 이미 보유 시 0(구매 불가).
+	 * (지급 아이템이 없는 화폐성 구매는 잔액 한도만 적용.)
+	 */
+	int32 ComputeMaxPurchasable(const FLastFPSShopItemData& Row) const;
+
+	/** 구매 버튼 클릭 — 구매 가능 수량을 계산해 수량 선택 모달을 띄움 */
+	void HandleBuyRequested(FName RowName, ULastFPSShopEntryWidget* Entry);
+
+	/** 수량 모달 결과 — Quantity>0 이면 그 수량만큼 구매 확정 */
+	UFUNCTION()
+	void HandleQuantityChosen(int32 Quantity);
 
 	/** 잔액 변동 시 — 잔액 텍스트 갱신 + 각 엔트리 구매 가능 여부 재평가 */
 	UFUNCTION()
 	void HandleCreditsChanged(int32 NewCredits);
 
-	/** RowName → 생성된 엔트리 (잔액 변동 시 일괄 갱신용) */
+	/** 보유 변동 시 — 스택이 찬 항목의 구매 버튼을 비활성화하도록 재평가 */
+	UFUNCTION()
+	void HandleInventoryChanged();
+
+	/** 모든 엔트리의 구매 가능 여부(잔액+스택)를 현재 상태로 갱신 */
+	void RefreshEntryStates();
+
+	/** RowName → 생성된 엔트리 (잔액/보유 변동 시 일괄 갱신용) */
 	UPROPERTY()
 	TMap<FName, TObjectPtr<ULastFPSShopEntryWidget>> EntryByRow;
+
+	/** 수량 모달이 열려 있는 동안 어떤 항목을 구매 중인지 보관 (모달은 한 번에 하나) */
+	FName PendingRowName;
+	TWeakObjectPtr<ULastFPSShopEntryWidget> PendingEntry;
 };

@@ -14,8 +14,10 @@ class ULastFPSCharacterRoster;
 class ULastFPSHUDWidget;
 class ULastFPSNoticeWidget;
 class ULastFPSDialogueWidget;
+class ULastFPSQuantityDialogWidget;
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FLastFPSConfirmResultDelegate, bool, bConfirmed);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FLastFPSQuantityResultDelegate, int32, Quantity);
 
 /**
  * 아웃게임 PlayerController.
@@ -54,6 +56,10 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
     void ShowNotice(const FText& Title, const FText& Message);
+
+    /** 수량 선택 모달 표시 — 결과(선택 수량, 취소 시 0)는 OnResult 로 전달. */
+    UFUNCTION(BlueprintCallable, Category="LastFPS|UI", meta=(AutoCreateRefTerm="OnResult"))
+    void ShowQuantityPrompt(const FText& Title, const FText& ItemName, int32 UnitPrice, int32 MaxQuantity, FLastFPSQuantityResultDelegate OnResult);
 
     /** 단방향 NPC 대화창 표시. Lines를 "다음"으로 한 줄씩 진행. */
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
@@ -105,6 +111,10 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
     TSubclassOf<ULastFPSNoticeWidget> NoticeWidgetClass;
+
+    /** 수량 선택 모달 위젯 클래스 (WBP_QuantityDialog) */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
+    TSubclassOf<ULastFPSQuantityDialogWidget> QuantityDialogWidgetClass;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
     TSubclassOf<ULastFPSDialogueWidget> DialogueWidgetClass;

@@ -76,8 +76,8 @@ void ULastFPSInventoryWidget::RebuildInventory()
 		}
 	}
 
-	// SlotCount 개 슬롯 생성 — 앞에서부터 보유 아이템으로 채우고 나머지는 빈 슬롯
-	for (int32 i = 0; i < SlotCount; ++i)
+	// 보유 아이템 개수만큼만 슬롯 생성 (빈 칸 패딩 없음)
+	for (const TPair<const FLastFPSItemData*, int32>& Owned : OwnedRows)
 	{
 		ULastFPSItemSlotWidget* SlotWidget = CreateWidget<ULastFPSItemSlotWidget>(this, SlotWidgetClass);
 		if (!SlotWidget)
@@ -85,15 +85,7 @@ void ULastFPSInventoryWidget::RebuildInventory()
 			continue;
 		}
 
-		if (OwnedRows.IsValidIndex(i))
-		{
-			SlotWidget->SetupSlot(*OwnedRows[i].Key, OwnedRows[i].Value);
-		}
-		else
-		{
-			SlotWidget->SetEmpty();
-		}
-
+		SlotWidget->SetupSlot(*Owned.Key, Owned.Value);
 		Box_Slots->AddChild(SlotWidget);
 	}
 }
