@@ -1,4 +1,5 @@
 #include "AbilitySystem/Effects/GE_UltimateCooldown.h"
+#include "GameplayEffectComponents/TargetTagsGameplayEffectComponent.h"
 #include "NativeGameplayTags.h"
 #include "Utility/LastFPSTags.h"
 
@@ -9,6 +10,9 @@ ULastFPSGE_UltimateCooldown::ULastFPSGE_UltimateCooldown()
     DurationMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(60.f));
 
     FInheritedTagContainer Tags;
-    Tags.Added.AddTag(FLastFPSTags::Get().Cooldown_Ultimate);
-    InheritableOwnedTagsContainer = Tags;
+    Tags.AddTag(FLastFPSTags::Get().Cooldown_Ultimate);
+    UTargetTagsGameplayEffectComponent* TargetTagsComponent =
+        CreateDefaultSubobject<UTargetTagsGameplayEffectComponent>(TEXT("TargetTagsGameplayEffectComponent"));
+    GEComponents.Add(TargetTagsComponent);
+    TargetTagsComponent->SetAndApplyTargetTagChanges(Tags);
 }

@@ -15,6 +15,11 @@ void FLastFPSTags::InitializeNativeTags()
     Tags.AddTag(Tags.Cooldown_Skill2, "Cooldown.Skill2", "Skill 2 cooldown");
     Tags.AddTag(Tags.Cooldown_Ultimate, "Cooldown.Ultimate", "Ultimate cooldown");
 
+    // Gameplay events
+    Tags.AddTag(Tags.Event_Montage_AbilityCommit, "Event.Montage.Ability.Commit", "Commit an ability from an ability montage");
+    Tags.AddTag(Tags.Event_Montage_AbilityEnd, "Event.Montage.Ability.End", "End an ability from an ability montage");
+    Tags.AddTag(Tags.Event_Montage_ProjectileSpawn, "Event.Montage.Projectile.Spawn", "Spawn a projectile from an ability montage");
+
     // UI
     Tags.AddTag(Tags.UI_HUD_Visible, "UI.HUD.Visible", "HUD visibility status");
 

@@ -22,6 +22,11 @@ public:
     FGameplayTag Cooldown_Skill2;
     FGameplayTag Cooldown_Ultimate;
 
+    // Gameplay events
+    FGameplayTag Event_Montage_AbilityCommit;
+    FGameplayTag Event_Montage_AbilityEnd;
+    FGameplayTag Event_Montage_ProjectileSpawn;
+
     // UI
     FGameplayTag UI_HUD_Visible;
 

@@ -1,7 +1,14 @@
 #include "Weapons/LastFPSProjectile.h"
+
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemInterface.h"
 #include "Components/BoxComponent.h"
-#include "Particles/ParticleSystemComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "Particles/ParticleSystemComponent.h"
+#include "Weapons/LastFPSProjectileVisualData.h"
 
 ALastFPSProjectile::ALastFPSProjectile()
 {
@@ -9,26 +16,202 @@ ALastFPSProjectile::ALastFPSProjectile()
 
     CollisionComp = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionComp"));
     CollisionComp->InitBoxExtent(FVector(2.5f, 1.f, 1.f));
-    CollisionComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);  // VFX 전용, 충돌 없음
+    CollisionComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    CollisionComp->SetGenerateOverlapEvents(false);
     RootComponent = CollisionComp;
 
     TrailParticle = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("TrailParticle"));
     TrailParticle->SetupAttachment(CollisionComp);
     TrailParticle->bAutoActivate = true;
 
-    ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
-    ProjectileMovement->InitialSpeed             = 30000.f;  // 300 m/s — 트레일 가시성 확보
-    ProjectileMovement->MaxSpeed                 = 30000.f;
-    ProjectileMovement->bRotationFollowsVelocity = true;
-    ProjectileMovement->ProjectileGravityScale   = 0.f;      // 데미지는 LineTrace로 처리하므로 중력 불필요
+    TrailNiagara = CreateDefaultSubobject<UNiagaraComponent>(TEXT("TrailNiagara"));
+    TrailNiagara->SetupAttachment(CollisionComp);
+    TrailNiagara->bAutoActivate = false;
 
-    InitialLifeSpan = 1.5f;  // 1.5초에 450m 이동 후 소멸
+    ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
+    ProjectileMovement->InitialSpeed = 30000.f;
+    ProjectileMovement->MaxSpeed = 30000.f;
+    ProjectileMovement->bRotationFollowsVelocity = true;
+    ProjectileMovement->ProjectileGravityScale = 0.f;
+    ProjectileMovement->bShouldBounce = false;
+
+    InitialLifeSpan = 1.5f;
 }
 
 void ALastFPSProjectile::BeginPlay()
 {
     Super::BeginPlay();
 
-    if (TrailEffect)
-        TrailParticle->SetTemplate(TrailEffect);
+    ApplyVisualData();
+}
+
+void ALastFPSProjectile::InitializeGameplayProjectile(
+    AActor* InSourceActor,
+    const TArray<TSubclassOf<UGameplayEffect>>& InEffectsOnHit,
+    ULastFPSProjectileVisualData* InVisualData)
+{
+    SourceActor = InSourceActor;
+    EffectsOnHit = InEffectsOnHit;
+    VisualData = InVisualData;
+    ApplyVisualData();
+    EnableGameplayCollision();
+}
+
+void ALastFPSProjectile::EnableGameplayCollision()
+{
+    if (!CollisionComp)
+    {
+        return;
+    }
+
+    CollisionComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    CollisionComp->SetCollisionObjectType(ECC_WorldDynamic);
+    CollisionComp->SetCollisionResponseToAllChannels(ECR_Ignore);
+    CollisionComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+    CollisionComp->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+    CollisionComp->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+    CollisionComp->SetGenerateOverlapEvents(true);
+    CollisionComp->OnComponentBeginOverlap.AddUniqueDynamic(this, &ALastFPSProjectile::OnProjectileOverlap);
+
+    if (ProjectileMovement)
+    {
+        ProjectileMovement->OnProjectileStop.AddUniqueDynamic(this, &ALastFPSProjectile::OnProjectileStop);
+    }
+}
+
+void ALastFPSProjectile::OnProjectileOverlap(
+    UPrimitiveComponent* OverlappedComponent,
+    AActor* OtherActor,
+    UPrimitiveComponent* OtherComp,
+    int32 OtherBodyIndex,
+    bool bFromSweep,
+    const FHitResult& SweepResult)
+{
+    if (bHasAppliedHit || !HasAuthority() || !OtherActor || OtherActor == SourceActor || OtherActor == GetOwner())
+    {
+        return;
+    }
+
+    for (const TSubclassOf<UGameplayEffect>& EffectClass : EffectsOnHit)
+    {
+        ApplyEffectToTarget(OtherActor, EffectClass);
+    }
+    bHasAppliedHit = true;
+    PlayImpactFeedback(SweepResult);
+    Destroy();
+}
+
+void ALastFPSProjectile::OnProjectileStop(const FHitResult& ImpactResult)
+{
+    if (HasAuthority())
+    {
+        PlayImpactFeedback(ImpactResult);
+        Destroy();
+    }
+}
+
+void ALastFPSProjectile::ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass)
+{
+    if (!SourceActor || !TargetActor || !EffectClass)
+    {
+        return;
+    }
+
+    IAbilitySystemInterface* SourceASI = Cast<IAbilitySystemInterface>(SourceActor);
+    IAbilitySystemInterface* TargetASI = Cast<IAbilitySystemInterface>(TargetActor);
+    if (!SourceASI || !TargetASI)
+    {
+        return;
+    }
+
+    UAbilitySystemComponent* SourceASC = SourceASI->GetAbilitySystemComponent();
+    UAbilitySystemComponent* TargetASC = TargetASI->GetAbilitySystemComponent();
+    if (!SourceASC || !TargetASC)
+    {
+        return;
+    }
+
+    FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
+    Context.AddSourceObject(this);
+    Context.AddInstigator(SourceActor, this);
+
+    FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(EffectClass, 1.f, Context);
+    if (Spec.IsValid())
+    {
+        TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+    }
+}
+
+void ALastFPSProjectile::ApplyVisualData()
+{
+    if (TrailNiagara)
+    {
+        if (VisualData && VisualData->TrailNiagaraSystem)
+        {
+            TrailNiagara->SetAsset(VisualData->TrailNiagaraSystem);
+            TrailNiagara->Activate(true);
+        }
+        else
+        {
+            TrailNiagara->Deactivate();
+        }
+    }
+
+    if (TrailParticle)
+    {
+        if (VisualData && VisualData->TrailNiagaraSystem)
+        {
+            TrailParticle->DeactivateSystem();
+            return;
+        }
+
+        if (VisualData && VisualData->TrailEffect)
+        {
+            TrailParticle->SetTemplate(VisualData->TrailEffect);
+            TrailParticle->ActivateSystem(true);
+            return;
+        }
+
+        if (TrailEffect)
+        {
+            TrailParticle->SetTemplate(TrailEffect);
+            TrailParticle->ActivateSystem(true);
+        }
+    }
+}
+
+void ALastFPSProjectile::PlayImpactFeedback(const FHitResult& ImpactResult)
+{
+    FVector ImpactLocation = GetActorLocation();
+    FRotator ImpactRotation = GetActorRotation();
+    if (ImpactResult.bBlockingHit)
+    {
+        ImpactLocation = ImpactResult.ImpactPoint;
+        if (!ImpactResult.ImpactNormal.IsNearlyZero())
+        {
+            ImpactRotation = ImpactResult.ImpactNormal.Rotation();
+        }
+    }
+
+    if (VisualData && VisualData->ImpactNiagaraSystem)
+    {
+        UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+            this,
+            VisualData->ImpactNiagaraSystem,
+            ImpactLocation,
+            ImpactRotation);
+    }
+    else if (VisualData && VisualData->ImpactEffect)
+    {
+        UGameplayStatics::SpawnEmitterAtLocation(
+            this,
+            VisualData->ImpactEffect,
+            ImpactLocation,
+            ImpactRotation);
+    }
+
+    if (VisualData && VisualData->ImpactSound)
+    {
+        UGameplayStatics::PlaySoundAtLocation(this, VisualData->ImpactSound, ImpactLocation);
+    }
 }

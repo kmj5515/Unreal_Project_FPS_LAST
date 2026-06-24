@@ -98,6 +98,15 @@ void ULastFPSAnimInstance::UpdateLocomotionState()
         bWantsToSprint = Hero->GetWantsToSprint();
     }
 
+    if (bHasAcceleration || bIsSprinting || bWantsToSprint)
+    {
+        OrientationWarpingAngle = Direction;
+    }
+    else if (Speed <= 1.f)
+    {
+        OrientationWarpingAngle = 0.f;
+    }
+
     const bool bUseSprintLocomotion = bIsSprinting || bWantsToSprint;
     bIsStarting = bHasAcceleration && !bUseSprintLocomotion && Speed <= StartingSpeedThreshold;
 
@@ -123,6 +132,12 @@ void ULastFPSAnimInstance::UpdateDistanceMatching()
     if (!MovementComponent->IsMovingOnGround())
     {
         return;
+    }
+
+    if (!bHasAcceleration && !bIsSprinting && !bWantsToSprint && Speed > 1.f)
+    {
+        StopOrientationWarpingAngle = Direction;
+        OrientationWarpingAngle = StopOrientationWarpingAngle;
     }
 
     const bool bCanPredictStop = !bHasAcceleration
@@ -258,11 +273,13 @@ void ULastFPSAnimInstance::UpdateCombatState()
     {
         CombatState = Hero->GetCombatState();
         bIsFiring = CombatState == EMMCombatState::Attacking;
+        bIsCasting = CombatState == EMMCombatState::Casting;
     }
     else
     {
         CombatState = EMMCombatState::Idle;
         bIsFiring = false;
+        bIsCasting = false;
     }
 }
 
@@ -307,6 +324,11 @@ void ULastFPSAnimInstance::UpdateHandIK()
 
     UWeaponComponent* Weapon = Hero->GetWeaponComponent();
     if (!Weapon || !Weapon->HasWeapon())
+    {
+        return;
+    }
+
+    if (CombatState == EMMCombatState::Casting)
     {
         return;
     }

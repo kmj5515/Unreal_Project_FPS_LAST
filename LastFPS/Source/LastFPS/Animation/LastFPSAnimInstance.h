@@ -36,6 +36,9 @@ protected:
     float Direction = 0.f;
 
     UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    float OrientationWarpingAngle = 0.f;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
     float StartDirection = 0.f;
 
     UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
@@ -77,6 +80,9 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="MM|DistanceMatching")
     float DistanceToStop = 0.f;
 
+    UPROPERTY(BlueprintReadOnly, Category="MM|DistanceMatching")
+    float StopOrientationWarpingAngle = 0.f;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|DistanceMatching")
     float StopPredictionMinSpeed = 150.f;
 
@@ -112,6 +118,9 @@ protected:
 
     UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
     bool bIsFiring = false;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
+    bool bIsCasting = false;
 
     UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
     bool bIsDead = false;

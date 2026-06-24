@@ -4,6 +4,7 @@
 #include "Character/LastFPSHero.h"
 #include "Game/LastFPSPlayerController.h"
 #include "UI/LastFPSHUDWidget.h"
+#include "AbilitySystemComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Engine/World.h"
@@ -43,6 +44,14 @@ void UGA_BasicShoot::ActivateAbility(
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
+    }
+
+    Hero->SetWantsToSprint(false);
+    if (UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr)
+    {
+        FGameplayTagContainer SprintTags;
+        SprintTags.AddTag(FLastFPSTags::Get().Input_Sprint);
+        ASC->CancelAbilities(&SprintTags);
     }
 
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))

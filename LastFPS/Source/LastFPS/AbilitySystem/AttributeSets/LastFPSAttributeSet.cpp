@@ -65,6 +65,8 @@ void ULastFPSAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
         NewValue = FMath::Clamp(NewValue, 0.f, GetMaxHealth());
     else if (Attribute == GetStaminaAttribute())
         NewValue = FMath::Clamp(NewValue, 0.f, GetMaxStamina());
+    else if (Attribute == GetMoveSpeedAttribute())
+        NewValue = FMath::Max(0.f, NewValue);
 }
 
 void ULastFPSAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
