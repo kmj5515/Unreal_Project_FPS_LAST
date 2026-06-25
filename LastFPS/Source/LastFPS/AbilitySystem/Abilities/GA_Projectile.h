@@ -41,7 +41,8 @@ private:
     UFUNCTION()
     void OnAbilityEndEvent(FGameplayEventData Payload);
 
-    FVector GetAimDirection(const ALastFPSHero* Hero) const;
+    FVector GetCameraAimDirection(const ALastFPSHero* Hero) const;
+    FVector GetAimTarget(const ALastFPSHero* Hero, const FVector& CameraAimDirection) const;
 
     UPROPERTY()
     TObjectPtr<UAbilityTask_WaitGameplayEvent> ProjectileSpawnEventTask;

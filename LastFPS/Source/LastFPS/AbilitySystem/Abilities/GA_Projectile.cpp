@@ -143,8 +143,8 @@ void UGA_Projectile::SpawnProjectile()
     }
     bProjectileSpawned = true;
 
-    const FVector AimDirection = GetAimDirection(Hero);
-    const FRotator SpawnRotation = AimDirection.Rotation();
+    const FVector CameraAimDirection = GetCameraAimDirection(Hero);
+    FRotator SpawnRotation = CameraAimDirection.Rotation();
     FVector SpawnLocation = Hero->GetActorLocation() + FVector(0.f, 0.f, 60.f);
 
     if (USkeletalMeshComponent* Mesh = Hero->GetMesh())
@@ -155,6 +155,14 @@ void UGA_Projectile::SpawnProjectile()
         }
     }
     SpawnLocation += SpawnRotation.RotateVector(ProjectileData->SpawnLocationOffset);
+
+    const FVector AimTarget = GetAimTarget(Hero, CameraAimDirection);
+    FVector AimDirection = (AimTarget - SpawnLocation).GetSafeNormal();
+    if (AimDirection.IsNearlyZero())
+    {
+        AimDirection = CameraAimDirection;
+    }
+    SpawnRotation = AimDirection.Rotation();
 
     FActorSpawnParameters SpawnParams;
     SpawnParams.Owner = Hero;
@@ -184,7 +192,7 @@ void UGA_Projectile::SpawnProjectile()
     }
 }
 
-FVector UGA_Projectile::GetAimDirection(const ALastFPSHero* Hero) const
+FVector UGA_Projectile::GetCameraAimDirection(const ALastFPSHero* Hero) const
 {
     if (!Hero)
     {
@@ -200,6 +208,55 @@ FVector UGA_Projectile::GetAimDirection(const ALastFPSHero* Hero) const
     }
 
     return Hero->GetActorForwardVector().GetSafeNormal();
+}
+
+FVector UGA_Projectile::GetAimTarget(const ALastFPSHero* Hero, const FVector& CameraAimDirection) const
+{
+    if (!Hero || !ProjectileData)
+    {
+        return FVector::ZeroVector;
+    }
+
+    FVector ViewLocation = Hero->GetActorLocation();
+    FRotator ViewRotation = Hero->GetActorRotation();
+    if (const AController* Controller = Hero->GetController())
+    {
+        Controller->GetPlayerViewPoint(ViewLocation, ViewRotation);
+    }
+
+    const FVector TraceDirection = CameraAimDirection.IsNearlyZero()
+        ? ViewRotation.Vector().GetSafeNormal()
+        : CameraAimDirection.GetSafeNormal();
+    const FVector TraceEnd = ViewLocation + TraceDirection * ProjectileData->AimTraceRange;
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return TraceEnd;
+    }
+
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ProjectileAimTrace), false, Hero);
+    QueryParams.AddIgnoredActor(Hero);
+
+    TArray<AActor*> AttachedActors;
+    Hero->GetAttachedActors(AttachedActors);
+    QueryParams.AddIgnoredActors(AttachedActors);
+
+    FCollisionObjectQueryParams ObjectParams;
+    ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
+    ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+    ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
+    ObjectParams.AddObjectTypesToQuery(ECC_PhysicsBody);
+
+    FHitResult HitResult;
+    const bool bHit = World->LineTraceSingleByObjectType(
+        HitResult,
+        ViewLocation,
+        TraceEnd,
+        ObjectParams,
+        QueryParams);
+
+    return bHit ? HitResult.ImpactPoint : TraceEnd;
 }
 
 void UGA_Projectile::OnProjectileSpawnEvent(FGameplayEventData Payload)

@@ -21,6 +21,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile", meta=(ClampMin="0.0"))
     float ProjectileSpeed = 3000.f;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Aim", meta=(ClampMin="0.0"))
+    float AimTraceRange = 10000.f;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile")
     FName SpawnSocketName = TEXT("hand_r");
 
