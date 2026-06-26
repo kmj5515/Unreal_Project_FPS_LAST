@@ -21,7 +21,7 @@
 				{ "type": "Border", "name": "BottomScrim", "halign": "Fill", "bgColor": [0.012, 0.022, 0.038, 0.82], "padding": [48, 24], "children": [
 					{ "type": "HorizontalBox", "name": "BottomRow", "children": [
 						{ "type": "VerticalBox", "name": "MapInfo", "fill": true, "halign": "Fill", "valign": "Bottom", "children": [
-							{ "type": "TextBlock", "name": "Text_Status", "text": "월드 진입 중...", "fontSize": 16, "color": [0.55, 0.62, 0.72, 1.0] },
+							{ "type": "TextBlock", "name": "Text_Status", "text": "월드 진입 중...", "fontSize": 16, "color": [0.6, 0.68, 0.78, 1.0] },
 							{ "type": "TextBlock", "name": "Text_MapName", "text": "맵 이름", "fontSize": 42, "color": [0.92, 0.96, 1.0, 1.0], "padding": [0, 2, 0, 0] }
 						] },
 

@@ -22,7 +22,7 @@
 						] },
 						{ "type": "VerticalBox", "name": "Info", "fill": true, "halign": "Fill", "valign": "Center", "children": [
 							{ "type": "TextBlock", "name": "TB_ModuleName", "text": "모듈 이름", "fontSize": 17, "color": [0.92, 0.96, 1.0, 1.0] },
-							{ "type": "TextBlock", "name": "TB_Stats", "text": "공격력 +25", "fontSize": 12, "color": [0.5, 0.57, 0.66, 1.0], "autoWrap": true }
+							{ "type": "TextBlock", "name": "TB_Stats", "text": "공격력 +25", "fontSize": 12, "color": [0.6, 0.68, 0.78, 1.0], "autoWrap": true }
 						] },
 						{ "type": "TextBlock", "name": "TB_Capacity", "text": "3", "valign": "Center", "padding": [10, 0], "fontSize": 16, "color": [0.15, 0.78, 1.0, 1.0] },
 						{ "type": "TextBlock", "name": "TB_Count", "text": "x1", "valign": "Center", "padding": [0, 0, 10, 0], "fontSize": 13, "color": [0.6, 0.68, 0.78, 1.0] },

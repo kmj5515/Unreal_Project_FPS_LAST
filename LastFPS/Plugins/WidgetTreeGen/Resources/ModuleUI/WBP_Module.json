@@ -37,7 +37,7 @@
 						] },
 						{ "type": "TextBlock", "name": "Label_Stat", "text": "스탯 보정", "fontSize": 16, "color": [0.15, 0.78, 1.0, 1.0], "padding": [0, 0, 0, 6] },
 						{ "type": "Border", "name": "StatPanel", "fill": true, "halign": "Fill", "valign": "Fill", "bgColor": [0.05, 0.07, 0.10, 0.96], "padding": 12, "children": [
-							{ "type": "TextBlock", "name": "TB_StatPreview", "text": "체력 +50\n공격력 +25", "fontSize": 14, "color": [0.85, 0.89, 0.95, 1.0], "autoWrap": true }
+							{ "type": "TextBlock", "name": "TB_StatPreview", "text": "체력 +50\n공격력 +25", "fontSize": 14, "color": [0.82, 0.86, 0.93, 1.0], "autoWrap": true }
 						] }
 					] }
 				] }

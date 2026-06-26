@@ -19,7 +19,7 @@
 						{ "type": "ScrollBox", "name": "Scroll_Quests", "halign": "Fill", "valign": "Fill", "children": [
 							{ "type": "VerticalBox", "name": "Box_QuestList" }
 						] },
-						{ "type": "TextBlock", "name": "TB_Empty", "text": "진행 중인 임무가 없습니다", "halign": "Center", "valign": "Center", "fontSize": 16, "color": [0.42, 0.49, 0.58, 1.0] }
+						{ "type": "TextBlock", "name": "TB_Empty", "text": "진행 중인 임무가 없습니다", "halign": "Center", "valign": "Center", "fontSize": 16, "color": [0.45, 0.52, 0.62, 1.0] }
 					] }
 				] }
 			] }

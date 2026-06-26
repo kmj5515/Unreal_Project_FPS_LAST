@@ -15,7 +15,7 @@
 						] },
 						{ "type": "TextBlock", "name": "Text_Body", "text": "대사 내용이 여기에 표시됩니다...", "fill": true, "fontSize": 16, "color": [0.82, 0.86, 0.93, 1.0], "autoWrap": true },
 						{ "type": "HorizontalBox", "name": "NextRow", "halign": "Right", "children": [
-							{ "type": "TextBlock", "name": "Text_NextLabel", "text": "다음", "valign": "Center", "fontSize": 13, "color": [0.55, 0.62, 0.72, 1.0], "padding": [0, 0, 8, 0] },
+							{ "type": "TextBlock", "name": "Text_NextLabel", "text": "다음", "valign": "Center", "fontSize": 13, "color": [0.6, 0.68, 0.78, 1.0], "padding": [0, 0, 8, 0] },
 							{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Next", "buttonText": "▶" }
 						] }
 					] }

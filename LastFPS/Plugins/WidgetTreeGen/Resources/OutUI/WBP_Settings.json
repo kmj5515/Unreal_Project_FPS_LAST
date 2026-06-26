@@ -17,29 +17,29 @@
 				{ "type": "Border", "name": "Panel", "bgColor": [0.05, 0.07, 0.10, 0.96], "padding": 18, "children": [
 					{ "type": "VerticalBox", "name": "Options", "children": [
 						{ "type": "HorizontalBox", "name": "QualityRow", "padding": [0, 6], "children": [
-							{ "type": "TextBlock", "name": "Label_Quality", "text": "그래픽 품질", "valign": "Center", "fontSize": 16, "color": [0.55, 0.62, 0.72, 1.0], "minWidth": 150 },
+							{ "type": "TextBlock", "name": "Label_Quality", "text": "그래픽 품질", "valign": "Center", "fontSize": 16, "color": [0.6, 0.68, 0.78, 1.0], "minWidth": 150 },
 							{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_QualityLow", "buttonText": "최하", "padding": [2, 0] },
 							{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_QualityMedium", "buttonText": "중", "padding": [2, 0] },
 							{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_QualityHigh", "buttonText": "상", "padding": [2, 0] },
 							{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_QualityUltra", "buttonText": "최상", "padding": [2, 0] }
 						] },
 						{ "type": "HorizontalBox", "name": "MasterRow", "padding": [0, 6], "children": [
-							{ "type": "TextBlock", "name": "Label_Master", "text": "마스터 볼륨", "valign": "Center", "fontSize": 16, "color": [0.55, 0.62, 0.72, 1.0], "minWidth": 150 },
+							{ "type": "TextBlock", "name": "Label_Master", "text": "마스터 볼륨", "valign": "Center", "fontSize": 16, "color": [0.6, 0.68, 0.78, 1.0], "minWidth": 150 },
 							{ "type": "Slider", "name": "Slider_MasterVolume", "fill": true, "valign": "Center" },
 							{ "type": "TextBlock", "name": "TB_MasterVolume", "text": "0%", "valign": "Center", "justify": "Right", "fontSize": 15, "color": [0.15, 0.78, 1.0, 1.0], "minWidth": 52, "padding": [12, 0, 0, 0] }
 						] },
 						{ "type": "HorizontalBox", "name": "MusicRow", "padding": [0, 6], "children": [
-							{ "type": "TextBlock", "name": "Label_Music", "text": "음악 볼륨", "valign": "Center", "fontSize": 16, "color": [0.55, 0.62, 0.72, 1.0], "minWidth": 150 },
+							{ "type": "TextBlock", "name": "Label_Music", "text": "음악 볼륨", "valign": "Center", "fontSize": 16, "color": [0.6, 0.68, 0.78, 1.0], "minWidth": 150 },
 							{ "type": "Slider", "name": "Slider_MusicVolume", "fill": true, "valign": "Center" },
 							{ "type": "TextBlock", "name": "TB_MusicVolume", "text": "0%", "valign": "Center", "justify": "Right", "fontSize": 15, "color": [0.15, 0.78, 1.0, 1.0], "minWidth": 52, "padding": [12, 0, 0, 0] }
 						] },
 						{ "type": "HorizontalBox", "name": "SFXRow", "padding": [0, 6], "children": [
-							{ "type": "TextBlock", "name": "Label_SFX", "text": "효과음 볼륨", "valign": "Center", "fontSize": 16, "color": [0.55, 0.62, 0.72, 1.0], "minWidth": 150 },
+							{ "type": "TextBlock", "name": "Label_SFX", "text": "효과음 볼륨", "valign": "Center", "fontSize": 16, "color": [0.6, 0.68, 0.78, 1.0], "minWidth": 150 },
 							{ "type": "Slider", "name": "Slider_SFXVolume", "fill": true, "valign": "Center" },
 							{ "type": "TextBlock", "name": "TB_SFXVolume", "text": "0%", "valign": "Center", "justify": "Right", "fontSize": 15, "color": [0.15, 0.78, 1.0, 1.0], "minWidth": 52, "padding": [12, 0, 0, 0] }
 						] },
 						{ "type": "HorizontalBox", "name": "SensRow", "padding": [0, 6], "children": [
-							{ "type": "TextBlock", "name": "Label_Sens", "text": "마우스 감도", "valign": "Center", "fontSize": 16, "color": [0.55, 0.62, 0.72, 1.0], "minWidth": 150 },
+							{ "type": "TextBlock", "name": "Label_Sens", "text": "마우스 감도", "valign": "Center", "fontSize": 16, "color": [0.6, 0.68, 0.78, 1.0], "minWidth": 150 },
 							{ "type": "Slider", "name": "Slider_Sensitivity", "fill": true, "valign": "Center" },
 							{ "type": "TextBlock", "name": "TB_Sensitivity", "text": "0%", "valign": "Center", "justify": "Right", "fontSize": 15, "color": [0.15, 0.78, 1.0, 1.0], "minWidth": 52, "padding": [12, 0, 0, 0] }
 						] },

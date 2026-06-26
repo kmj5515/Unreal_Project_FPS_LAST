@@ -7,7 +7,7 @@
 		"type": "VerticalBox", "name": "Root_VB", "halign": "Center",
 		"children": [
 			{ "type": "TextBlock", "name": "TB_NPCName", "text": "NPC 이름", "halign": "Center", "fontSize": 16, "color": [0.92, 0.96, 1.0, 1.0] },
-			{ "type": "TextBlock", "name": "TB_NPCRole", "text": "역할", "halign": "Center", "fontSize": 12, "color": [0.55, 0.62, 0.72, 1.0] },
+			{ "type": "TextBlock", "name": "TB_NPCRole", "text": "역할", "halign": "Center", "fontSize": 12, "color": [0.6, 0.68, 0.78, 1.0] },
 			{ "type": "Border", "name": "InteractionHint", "halign": "Center", "padding": [12, 5], "bgColor": [0.05, 0.07, 0.10, 0.9], "children": [
 				{ "type": "TextBlock", "name": "TB_InteractionLabel", "text": "[E] 상호작용", "fontSize": 13, "color": [0.15, 0.78, 1.0, 1.0] }
 			] }

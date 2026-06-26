@@ -7,6 +7,8 @@
 		"type": "Overlay", "name": "Root_BG",
 		"children": [
 			{ "type": "Border", "name": "BG_Fill", "halign": "Fill", "valign": "Fill", "bgColor": [0.012, 0.022, 0.038, 1.0] },
+			{ "type": "Image", "name": "Img_Background", "halign": "Fill", "valign": "Fill" },
+			{ "type": "Border", "name": "Scrim", "halign": "Fill", "valign": "Fill", "bgColor": [0.012, 0.022, 0.038, 0.55] },
 			{ "type": "VerticalBox", "name": "Menu", "halign": "Center", "valign": "Center", "children": [
 				{ "type": "TextBlock", "name": "Label_Title", "text": "LAST FPS", "justify": "Center", "halign": "Center", "fontSize": 60, "color": [0.92, 0.96, 1.0, 1.0] },
 				{ "type": "SizeBox", "name": "TitleUnderline", "height": 3, "padding": [0, 6, 0, 34], "children": [

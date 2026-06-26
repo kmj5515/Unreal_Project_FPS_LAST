@@ -14,8 +14,8 @@
 						{ "type": "Image", "name": "Image_Icon", "halign": "Fill", "valign": "Fill", "padding": 12 },
 						{ "type": "Image", "name": "Img_RarityBorder", "halign": "Fill", "valign": "Fill" },
 						{ "type": "VerticalBox", "name": "Labels", "halign": "Fill", "valign": "Bottom", "padding": 4, "children": [
-							{ "type": "TextBlock", "name": "TB_ModuleName", "text": "모듈", "fontSize": 11, "color": [0.88, 0.92, 0.98, 1.0] },
-							{ "type": "TextBlock", "name": "TB_Stats", "text": "+25", "fontSize": 9, "color": [0.55, 0.62, 0.72, 1.0] }
+							{ "type": "TextBlock", "name": "TB_ModuleName", "text": "모듈", "fontSize": 11, "color": [0.92, 0.96, 1.0, 1.0] },
+							{ "type": "TextBlock", "name": "TB_Stats", "text": "+25", "fontSize": 9, "color": [0.6, 0.68, 0.78, 1.0] }
 						] }
 					] }
 				] }

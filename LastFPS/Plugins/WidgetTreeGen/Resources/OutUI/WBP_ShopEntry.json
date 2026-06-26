@@ -22,8 +22,8 @@
 						] },
 						{ "type": "VerticalBox", "name": "Info", "fill": true, "halign": "Fill", "valign": "Center", "children": [
 							{ "type": "TextBlock", "name": "TB_ItemName", "text": "아이템 이름", "fontSize": 18, "color": [0.92, 0.96, 1.0, 1.0] },
-							{ "type": "TextBlock", "name": "TB_Rarity", "text": "희귀", "fontSize": 12, "color": [0.30, 0.62, 1.0, 1.0], "padding": [0, 2] },
-							{ "type": "TextBlock", "name": "TB_Description", "text": "아이템 설명입니다.", "fontSize": 12, "color": [0.55, 0.62, 0.72, 1.0], "autoWrap": true }
+							{ "type": "TextBlock", "name": "TB_Rarity", "text": "희귀", "fontSize": 12, "color": [0.6, 0.68, 0.78, 1.0], "padding": [0, 2] },
+							{ "type": "TextBlock", "name": "TB_Description", "text": "아이템 설명입니다.", "fontSize": 12, "color": [0.6, 0.68, 0.78, 1.0], "autoWrap": true }
 						] },
 						{ "type": "TextBlock", "name": "TB_Price", "text": "1,000", "valign": "Center", "padding": [12, 0], "fontSize": 18, "color": [1.0, 0.78, 0.30, 1.0] },
 						{ "type": "/Game/UI/OutUI/WBP_LastFPSButton.WBP_LastFPSButton_C", "name": "Button_Buy", "buttonText": "구매", "valign": "Center" }

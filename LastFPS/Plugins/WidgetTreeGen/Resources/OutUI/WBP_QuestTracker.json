@@ -14,7 +14,7 @@
 					{ "type": "VerticalBox", "name": "Root_VB", "children": [
 						{ "type": "TextBlock", "name": "Label_Header", "text": "임무 추적", "fontSize": 14, "color": [0.15, 0.78, 1.0, 1.0], "padding": [0, 0, 0, 4] },
 						{ "type": "VerticalBox", "name": "Box_TrackerList" },
-						{ "type": "TextBlock", "name": "TB_Empty", "text": "추적 중인 임무 없음", "fontSize": 12, "color": [0.42, 0.49, 0.58, 1.0] }
+						{ "type": "TextBlock", "name": "TB_Empty", "text": "추적 중인 임무 없음", "fontSize": 12, "color": [0.45, 0.52, 0.62, 1.0] }
 					] }
 				] }
 			] }
