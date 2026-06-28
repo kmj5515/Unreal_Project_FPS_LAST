@@ -1,0 +1,34 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "EasyCrosshairSystem",
+	"Description": "Easy crosshair designer plugin",
+	"Category": "UI",
+	"CreatedBy": "Dodge Theory",
+	"CreatedByURL": "",
+	"DocsURL": "https://docs.google.com/document/d/1mfJZbfsbUESmB5jDpeAnvA0F6B1JKp7z/edit?usp=sharing&ouid=114249014514151225693&rtpof=true&sd=true",
+	"MarketplaceURL": "",
+	"SupportURL": "mailto:dodgetheory@gmail.com",
+	"EngineVersion": "5.7.0",
+	"CanContainContent": true,
+	"Installed": true,
+	"Modules": [
+		{
+			"Name": "EasyCrosshairSystem",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64"
+			]
+		},
+		{
+			"Name": "EasyCrosshairSystemEditor",
+			"Type": "Editor",
+			"LoadingPhase": "PreDefault",
+			"PlatformAllowList": [
+				"Win64"
+			]
+		}
+	]
+}

@@ -71,7 +71,7 @@
 		},
 		{
 			"Name": "EasyCrosshairSystem",
-			"Enabled": true
+			"Enabled": false
 		}
 	]
 }
