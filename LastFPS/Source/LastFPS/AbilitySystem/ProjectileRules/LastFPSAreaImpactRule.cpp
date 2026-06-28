@@ -1,6 +1,5 @@
 #include "AbilitySystem/ProjectileRules/LastFPSAreaImpactRule.h"
-
-#include "AbilitySystemComponent.h"
+#include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 
 void ULastFPSAreaImpactRule::ExecuteImpact(const FLastFPSProjectileImpactContext& Context) const
