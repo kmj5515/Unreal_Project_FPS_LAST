@@ -68,6 +68,10 @@
 		{
 			"Name": "WidgetTreeGen",
 			"Enabled": true
+		},
+		{
+			"Name": "EasyCrosshairSystem",
+			"Enabled": true
 		}
 	]
 }
