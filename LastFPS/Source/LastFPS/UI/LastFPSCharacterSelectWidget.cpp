@@ -4,8 +4,8 @@
 #include "UI/LastFPSButtonBase.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
-#include "Game/LastFPSCharacterDefinition.h"
-#include "Game/LastFPSCharacterRoster.h"
+#include "Data/Definitions/LastFPSCharacterDefinition.h"
+#include "Data/Definitions/LastFPSCharacterRoster.h"
 
 #include "Components/TextBlock.h"
 

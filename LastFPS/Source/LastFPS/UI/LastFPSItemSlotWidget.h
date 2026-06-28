@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Inventory/LastFPSItemData.h"
+#include "Data/Tables/LastFPSItemData.h"
 #include "LastFPSItemSlotWidget.generated.h"
 
 class UTextBlock;

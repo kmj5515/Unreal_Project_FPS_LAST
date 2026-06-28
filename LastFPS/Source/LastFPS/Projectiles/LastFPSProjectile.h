@@ -11,6 +11,7 @@ class UParticleSystem;
 class UParticleSystemComponent;
 class UProjectileMovementComponent;
 class UPrimitiveComponent;
+class ULastFPSProjectileImpactRule;
 class ULastFPSProjectileVisualData;
 
 // VFX 전용 투사체 — 데미지는 GA_BasicShoot의 LineTrace가 처리
@@ -24,7 +25,8 @@ public:
 
     void InitializeGameplayProjectile(
         AActor* InSourceActor,
-        const TArray<TSubclassOf<UGameplayEffect>>& InEffectsOnHit,
+        const TArray<TObjectPtr<ULastFPSProjectileImpactRule>>& InImpactRules,
+        const TArray<TSubclassOf<UGameplayEffect>>& InLegacyEffectsOnHit,
         ULastFPSProjectileVisualData* InVisualData);
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Projectile")
@@ -59,6 +61,7 @@ private:
     void OnProjectileStop(const FHitResult& ImpactResult);
 
     void EnableGameplayCollision();
+    void ExecuteImpactRules(AActor* HitActor, const FHitResult& ImpactResult);
     void ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass);
     void ApplyVisualData();
     void PlayImpactFeedback(const FHitResult& ImpactResult);
@@ -67,7 +70,10 @@ private:
     TObjectPtr<AActor> SourceActor;
 
     UPROPERTY()
-    TArray<TSubclassOf<UGameplayEffect>> EffectsOnHit;
+    TArray<TObjectPtr<ULastFPSProjectileImpactRule>> ImpactRules;
+
+    UPROPERTY()
+    TArray<TSubclassOf<UGameplayEffect>> LegacyEffectsOnHit;
 
     UPROPERTY()
     TObjectPtr<ULastFPSProjectileVisualData> VisualData;

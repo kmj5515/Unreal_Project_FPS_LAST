@@ -1,7 +1,7 @@
 #include "UI/LastFPSQuestScreenWidget.h"
 
 #include "UI/LastFPSQuestEntryWidget.h"
-#include "Quest/LastFPSQuestData.h"
+#include "Data/Tables/LastFPSQuestData.h"
 
 #include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"

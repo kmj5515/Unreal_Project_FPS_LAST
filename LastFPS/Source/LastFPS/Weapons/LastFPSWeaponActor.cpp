@@ -6,7 +6,7 @@
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
-#include "Weapons/LastFPSWeaponDefinition.h"
+#include "Data/Definitions/LastFPSWeaponDefinition.h"
 
 ALastFPSWeaponActor::ALastFPSWeaponActor()
 {

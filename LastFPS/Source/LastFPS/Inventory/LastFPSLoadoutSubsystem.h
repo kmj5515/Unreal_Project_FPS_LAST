@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
-#include "Inventory/LastFPSModuleData.h"
+#include "Data/Tables/LastFPSModuleData.h"
 #include "LastFPSLoadoutSubsystem.generated.h"
 
 class UAbilitySystemComponent;

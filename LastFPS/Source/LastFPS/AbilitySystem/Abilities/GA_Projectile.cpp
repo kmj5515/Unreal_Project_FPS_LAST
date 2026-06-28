@@ -1,7 +1,7 @@
 #include "AbilitySystem/Abilities/GA_Projectile.h"
 
 #include "AbilitySystemComponent.h"
-#include "AbilitySystem/Abilities/LastFPSAbilityProjectileData.h"
+#include "Data/Projectiles/LastFPSAbilityProjectileData.h"
 #include "AbilitySystem/Effects/GE_Skill1Cooldown.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Animation/AnimInstance.h"
@@ -11,7 +11,7 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Utility/LastFPSTags.h"
-#include "Weapons/LastFPSProjectile.h"
+#include "Projectiles/LastFPSProjectile.h"
 
 UGA_Projectile::UGA_Projectile()
 {
@@ -183,6 +183,7 @@ void UGA_Projectile::SpawnProjectile()
     {
         Projectile->InitializeGameplayProjectile(
             Hero,
+            ProjectileData->ImpactRules,
             ProjectileData->EffectsOnHit,
             ProjectileData->VisualData);
         if (Projectile->ProjectileMovement)

@@ -1,7 +1,7 @@
 #include "UI/LastFPSInventoryWidget.h"
 
 #include "UI/LastFPSItemSlotWidget.h"
-#include "Inventory/LastFPSItemData.h"
+#include "Data/Tables/LastFPSItemData.h"
 #include "Economy/LastFPSEconomySubsystem.h"
 
 #include "Components/PanelWidget.h"

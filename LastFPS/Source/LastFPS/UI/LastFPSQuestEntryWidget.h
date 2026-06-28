@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Quest/LastFPSQuestData.h"
+#include "Data/Tables/LastFPSQuestData.h"
 #include "LastFPSQuestEntryWidget.generated.h"
 
 class UTextBlock;

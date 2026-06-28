@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Shop/LastFPSShopData.h"
+#include "Data/Tables/LastFPSShopData.h"
 #include "LastFPSShopEntryWidget.generated.h"
 
 class UTextBlock;

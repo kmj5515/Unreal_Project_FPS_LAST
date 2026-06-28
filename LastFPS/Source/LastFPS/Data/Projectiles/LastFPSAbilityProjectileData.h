@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AbilitySystem/ProjectileRules/LastFPSProjectileImpactRule.h"
 #include "Engine/DataAsset.h"
 #include "LastFPSAbilityProjectileData.generated.h"
 
@@ -30,7 +31,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile")
     FVector SpawnLocationOffset = FVector::ZeroVector;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Effects")
+    UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, Category="Projectile|Impact")
+    TArray<TObjectPtr<ULastFPSProjectileImpactRule>> ImpactRules;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Effects", meta=(DeprecatedProperty, DeprecationMessage="Use ImpactRules with ULastFPSDirectHitImpactRule instead."))
     TArray<TSubclassOf<UGameplayEffect>> EffectsOnHit;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Visual")

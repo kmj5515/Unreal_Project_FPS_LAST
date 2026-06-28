@@ -1,7 +1,7 @@
 #include "Hub/LastFPSNPCBase.h"
 
 #include "Game/LastFPSPlayerController.h"
-#include "Hub/LastFPSDialogueData.h"
+#include "Data/Tables/LastFPSDialogueData.h"
 #include "UI/LastFPSNPCMarkerWidget.h"
 
 #include "Components/CapsuleComponent.h"

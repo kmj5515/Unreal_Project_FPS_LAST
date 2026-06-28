@@ -1,8 +1,8 @@
 #include "UI/LastFPSShopScreenWidget.h"
 
 #include "UI/LastFPSShopEntryWidget.h"
-#include "Shop/LastFPSShopData.h"
-#include "Inventory/LastFPSItemData.h"
+#include "Data/Tables/LastFPSShopData.h"
+#include "Data/Tables/LastFPSItemData.h"
 #include "Economy/LastFPSEconomySubsystem.h"
 #include "Game/LastFPSPlayerController.h"
 

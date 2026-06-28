@@ -10,8 +10,8 @@
 
 #include "CommonActivatableWidget.h"
 #include "Engine/World.h"
-#include "Game/LastFPSCharacterDefinition.h"
-#include "Game/LastFPSCharacterRoster.h"
+#include "Data/Definitions/LastFPSCharacterDefinition.h"
+#include "Data/Definitions/LastFPSCharacterRoster.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSGameModeBase.h"
 #include "Game/LastFPSPlayerState.h"

@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
-#include "Inventory/LastFPSItemData.h"
+#include "Data/Tables/LastFPSItemData.h"
 #include "LastFPSShopData.generated.h"
 
 class UTexture2D;

@@ -1,6 +1,6 @@
 #include "UI/LastFPSCharacterCardWidget.h"
 
-#include "Game/LastFPSCharacterDefinition.h"
+#include "Data/Definitions/LastFPSCharacterDefinition.h"
 #include "Components/TextBlock.h"
 #include "Components/Border.h"
 #include "Input/Events.h"

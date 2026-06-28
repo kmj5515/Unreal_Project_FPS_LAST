@@ -1,6 +1,6 @@
-#include "Game/LastFPSCharacterRoster.h"
+#include "Data/Definitions/LastFPSCharacterRoster.h"
 
-#include "Game/LastFPSCharacterDefinition.h"
+#include "Data/Definitions/LastFPSCharacterDefinition.h"
 
 const ULastFPSCharacterDefinition* ULastFPSCharacterRoster::GetDefinition(int32 Index) const
 {

@@ -1,6 +1,6 @@
 #include "Weapons/WeaponPickupActor.h"
 #include "Weapons/LastFPSWeaponActor.h"
-#include "Weapons/LastFPSWeaponDefinition.h"
+#include "Data/Definitions/LastFPSWeaponDefinition.h"
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Components/SphereComponent.h"

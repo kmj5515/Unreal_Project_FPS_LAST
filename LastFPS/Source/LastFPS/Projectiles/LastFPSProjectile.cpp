@@ -1,14 +1,16 @@
-#include "Weapons/LastFPSProjectile.h"
+#include "Projectiles/LastFPSProjectile.h"
 
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/ProjectileRules/LastFPSProjectileImpactRule.h"
 #include "AbilitySystemInterface.h"
 #include "Components/BoxComponent.h"
+#include "Data/Projectiles/LastFPSProjectileImpactTypes.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Particles/ParticleSystemComponent.h"
-#include "Weapons/LastFPSProjectileVisualData.h"
+#include "Data/Projectiles/LastFPSProjectileVisualData.h"
 
 ALastFPSProjectile::ALastFPSProjectile()
 {
@@ -47,11 +49,13 @@ void ALastFPSProjectile::BeginPlay()
 
 void ALastFPSProjectile::InitializeGameplayProjectile(
     AActor* InSourceActor,
-    const TArray<TSubclassOf<UGameplayEffect>>& InEffectsOnHit,
+    const TArray<TObjectPtr<ULastFPSProjectileImpactRule>>& InImpactRules,
+    const TArray<TSubclassOf<UGameplayEffect>>& InLegacyEffectsOnHit,
     ULastFPSProjectileVisualData* InVisualData)
 {
     SourceActor = InSourceActor;
-    EffectsOnHit = InEffectsOnHit;
+    ImpactRules = InImpactRules;
+    LegacyEffectsOnHit = InLegacyEffectsOnHit;
     VisualData = InVisualData;
     ApplyVisualData();
     EnableGameplayCollision();
@@ -92,10 +96,7 @@ void ALastFPSProjectile::OnProjectileOverlap(
         return;
     }
 
-    for (const TSubclassOf<UGameplayEffect>& EffectClass : EffectsOnHit)
-    {
-        ApplyEffectToTarget(OtherActor, EffectClass);
-    }
+    ExecuteImpactRules(OtherActor, SweepResult);
     bHasAppliedHit = true;
     PlayImpactFeedback(SweepResult);
     Destroy();
@@ -103,10 +104,51 @@ void ALastFPSProjectile::OnProjectileOverlap(
 
 void ALastFPSProjectile::OnProjectileStop(const FHitResult& ImpactResult)
 {
-    if (HasAuthority())
+    if (HasAuthority() && !bHasAppliedHit)
     {
+        ExecuteImpactRules(ImpactResult.GetActor(), ImpactResult);
+        bHasAppliedHit = true;
         PlayImpactFeedback(ImpactResult);
         Destroy();
+    }
+}
+
+void ALastFPSProjectile::ExecuteImpactRules(AActor* HitActor, const FHitResult& ImpactResult)
+{
+    IAbilitySystemInterface* SourceASI = Cast<IAbilitySystemInterface>(SourceActor);
+    UAbilitySystemComponent* SourceASC = SourceASI ? SourceASI->GetAbilitySystemComponent() : nullptr;
+    if (!SourceASC)
+    {
+        return;
+    }
+
+    FLastFPSProjectileImpactContext Context;
+    Context.SourceActor = SourceActor;
+    Context.ProjectileActor = this;
+    Context.HitActor = HitActor;
+    Context.SourceASC = SourceASC;
+    Context.HitResult = ImpactResult;
+
+    bool bExecutedRule = false;
+    for (const TObjectPtr<ULastFPSProjectileImpactRule>& ImpactRule : ImpactRules)
+    {
+        if (!ImpactRule)
+        {
+            continue;
+        }
+
+        ImpactRule->ExecuteImpact(Context);
+        bExecutedRule = true;
+    }
+
+    if (bExecutedRule)
+    {
+        return;
+    }
+
+    for (const TSubclassOf<UGameplayEffect>& EffectClass : LegacyEffectsOnHit)
+    {
+        ApplyEffectToTarget(HitActor, EffectClass);
     }
 }
 

@@ -2,8 +2,8 @@
 
 #include "UI/LastFPSModuleEntryWidget.h"
 #include "UI/LastFPSModuleSlotWidget.h"
-#include "Inventory/LastFPSItemData.h"
-#include "Inventory/LastFPSModuleData.h"
+#include "Data/Tables/LastFPSItemData.h"
+#include "Data/Tables/LastFPSModuleData.h"
 #include "Inventory/LastFPSLoadoutSubsystem.h"
 #include "Economy/LastFPSEconomySubsystem.h"
 
