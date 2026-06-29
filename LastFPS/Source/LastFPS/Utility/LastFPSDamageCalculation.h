@@ -6,6 +6,16 @@
 struct FGameplayEffectSpec;
 class UGameplayEffect;
 
+UENUM(BlueprintType)
+enum class ELastFPSDamageElement : uint8
+{
+	Physical UMETA(DisplayName="Physical"),
+	Fire UMETA(DisplayName="Fire"),
+	Ice UMETA(DisplayName="Ice"),
+	Electric UMETA(DisplayName="Electric"),
+	Poison UMETA(DisplayName="Poison"),
+};
+
 USTRUCT(BlueprintType)
 struct LASTFPS_API FLastFPSDamageRange
 {
@@ -16,6 +26,9 @@ struct LASTFPS_API FLastFPSDamageRange
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Damage", meta=(ClampMin="0.0"))
 	float MaxDamage = 18.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Damage")
+	ELastFPSDamageElement DamageElement = ELastFPSDamageElement::Physical;
 
 	float Roll() const;
 };
@@ -36,6 +49,5 @@ namespace LastFPSDamage
 	LASTFPS_API void ApplySetByCallerDamage(FGameplayEffectSpec& Spec, const FLastFPSDamageResult& DamageResult);
 	LASTFPS_API void RollAndApplySetByCallerDamage(
 		FGameplayEffectSpec& Spec,
-		TSubclassOf<UGameplayEffect> EffectClass,
 		const FLastFPSDamageRange& DamageRange);
 }

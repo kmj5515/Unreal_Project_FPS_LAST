@@ -29,6 +29,9 @@ bool UGA_SkillHeal::CanActivateAbility(
     if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
         return false;
 
+    if (!ActorInfo)
+        return false;
+
     const UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get();
     if (!ASC) return false;
 
@@ -55,14 +58,11 @@ void UGA_SkillHeal::ActivateAbility(
         return;
     }
 
-    if (!HealEffect)
+    if (HealEffect)
     {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-        return;
+        const FGameplayEffectSpecHandle Spec = MakeOutgoingGameplayEffectSpec(HealEffect);
+        ApplyGameplayEffectSpecToOwner(Handle, ActorInfo, ActivationInfo, Spec);
     }
-
-    const FGameplayEffectSpecHandle Spec = MakeOutgoingGameplayEffectSpec(HealEffect);
-    ApplyGameplayEffectSpecToOwner(Handle, ActorInfo, ActivationInfo, Spec);
 
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }

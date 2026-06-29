@@ -7,7 +7,7 @@
 #include "Data/Characters/LastFPSCharacterStatData.h"
 #include "Data/Characters/LastFPSCharacterVisualData.h"
 #include "ContentBrowserModule.h"
-#include "EUW_Settings.h"
+#include "Settings/EUW_Settings.h"
 #include "Editor.h"
 #include "Engine/DataTable.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"

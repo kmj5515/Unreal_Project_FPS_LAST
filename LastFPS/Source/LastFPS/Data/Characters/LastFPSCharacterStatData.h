@@ -36,6 +36,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", meta=(ClampMin=0))
 	float Defense = 0.f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats|Damage", meta=(ClampMin=0))
+	float PhysicalDamageMultiplier = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats|Damage", meta=(ClampMin=0))
+	float FireDamageMultiplier = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats|Damage", meta=(ClampMin=0))
+	float IceDamageMultiplier = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats|Damage", meta=(ClampMin=0))
+	float ElectricDamageMultiplier = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats|Damage", meta=(ClampMin=0))
+	float PoisonDamageMultiplier = 1.f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", meta=(ClampMin=0))
 	float MoveSpeed = 500.f;
 

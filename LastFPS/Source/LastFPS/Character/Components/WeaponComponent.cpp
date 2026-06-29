@@ -463,7 +463,7 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
     FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.f, Context);
     if (Spec.IsValid())
     {
-        LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), DamageEffectClass, DamageRange);
+        LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), DamageRange);
         TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 
         if (ALastFPSCharacterBase* ShooterCharacter = Cast<ALastFPSCharacterBase>(Character))

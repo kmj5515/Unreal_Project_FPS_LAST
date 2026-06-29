@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "AttributeSet.h"
@@ -58,11 +58,31 @@ public:
     FGameplayAttributeData Defense;
     ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, Defense)
 
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_PhysicalDamageMultiplier, Category="Attributes|Damage")
+    FGameplayAttributeData PhysicalDamageMultiplier;
+    ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, PhysicalDamageMultiplier)
+
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_FireDamageMultiplier, Category="Attributes|Damage")
+    FGameplayAttributeData FireDamageMultiplier;
+    ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, FireDamageMultiplier)
+
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_IceDamageMultiplier, Category="Attributes|Damage")
+    FGameplayAttributeData IceDamageMultiplier;
+    ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, IceDamageMultiplier)
+
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_ElectricDamageMultiplier, Category="Attributes|Damage")
+    FGameplayAttributeData ElectricDamageMultiplier;
+    ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, ElectricDamageMultiplier)
+
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_PoisonDamageMultiplier, Category="Attributes|Damage")
+    FGameplayAttributeData PoisonDamageMultiplier;
+    ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, PoisonDamageMultiplier)
+
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MoveSpeed, Category="Attributes|Movement")
     FGameplayAttributeData MoveSpeed;
     ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, MoveSpeed)
 
-    // Meta attribute — 피해 계산용 임시값, 복제 안 함
+    // 데미지 계산에만 쓰는 임시 메타 어트리뷰트
     UPROPERTY(BlueprintReadOnly, Category="Attributes|Meta")
     FGameplayAttributeData Damage;
     ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, Damage)
@@ -76,6 +96,11 @@ protected:
     UFUNCTION() void OnRep_CriticalChance(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_CriticalDamagePercent(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_Defense(const FGameplayAttributeData& Old);
+    UFUNCTION() void OnRep_PhysicalDamageMultiplier(const FGameplayAttributeData& Old);
+    UFUNCTION() void OnRep_FireDamageMultiplier(const FGameplayAttributeData& Old);
+    UFUNCTION() void OnRep_IceDamageMultiplier(const FGameplayAttributeData& Old);
+    UFUNCTION() void OnRep_ElectricDamageMultiplier(const FGameplayAttributeData& Old);
+    UFUNCTION() void OnRep_PoisonDamageMultiplier(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_MoveSpeed(const FGameplayAttributeData& Old);
 
 private:

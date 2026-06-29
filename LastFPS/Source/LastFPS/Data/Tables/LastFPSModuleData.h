@@ -15,6 +15,11 @@ enum class ELastFPSModuleStat : uint8
 	MaxStamina		UMETA(DisplayName="최대 스태미나"),
 	AttackDamage	UMETA(DisplayName="공격력"),
 	Defense			UMETA(DisplayName="방어력"),
+	PhysicalDamageMultiplier UMETA(DisplayName="물리 공격 배율"),
+	FireDamageMultiplier UMETA(DisplayName="화염 공격 배율"),
+	IceDamageMultiplier UMETA(DisplayName="빙결 공격 배율"),
+	ElectricDamageMultiplier UMETA(DisplayName="전기 공격 배율"),
+	PoisonDamageMultiplier UMETA(DisplayName="독 공격 배율"),
 	MoveSpeed		UMETA(DisplayName="이동속도"),
 };
 
@@ -70,6 +75,11 @@ struct LASTFPS_API FLastFPSModuleStatTotals
 	UPROPERTY(BlueprintReadOnly, Category="Module") float MaxStamina = 0.f;
 	UPROPERTY(BlueprintReadOnly, Category="Module") float AttackDamage = 0.f;
 	UPROPERTY(BlueprintReadOnly, Category="Module") float Defense = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Module") float PhysicalDamageMultiplier = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Module") float FireDamageMultiplier = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Module") float IceDamageMultiplier = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Module") float ElectricDamageMultiplier = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Module") float PoisonDamageMultiplier = 0.f;
 	UPROPERTY(BlueprintReadOnly, Category="Module") float MoveSpeed = 0.f;
 
 	/** 보정이 하나라도 있는지 (적용 GE 생성 여부 판단용) */
@@ -77,6 +87,9 @@ struct LASTFPS_API FLastFPSModuleStatTotals
 	{
 		return !FMath::IsNearlyZero(MaxHealth) || !FMath::IsNearlyZero(MaxStamina)
 			|| !FMath::IsNearlyZero(AttackDamage) || !FMath::IsNearlyZero(Defense)
+			|| !FMath::IsNearlyZero(PhysicalDamageMultiplier) || !FMath::IsNearlyZero(FireDamageMultiplier)
+			|| !FMath::IsNearlyZero(IceDamageMultiplier) || !FMath::IsNearlyZero(ElectricDamageMultiplier)
+			|| !FMath::IsNearlyZero(PoisonDamageMultiplier)
 			|| !FMath::IsNearlyZero(MoveSpeed);
 	}
 };

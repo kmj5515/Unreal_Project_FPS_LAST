@@ -6,9 +6,7 @@
 #include "EUW_LevelHelper.h"
 #include "EUW_LevelRowWidget.generated.h"
 
-/**
- * 에디터 레벨 선택 목록의 개별 항목 위젯
- */
+/** 레벨 선택 목록의 개별 항목 위젯입니다. */
 UCLASS(Blueprintable, BlueprintType, meta=(ShowWorldContextPin, IsBlueprintBase="true"))
 class EDITORUTILITY_API UEUW_LevelRowWidget : public UEditorUtilityWidget
 {
@@ -26,7 +24,7 @@ protected:
     UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
     TObjectPtr<class UTextBlock> MapNameText;
 
-    // 풀 패스 표시를 위한 텍스트 추가
+    // 전체 경로 표시용 텍스트입니다.
     UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
     TObjectPtr<class UTextBlock> FullPathText;
 

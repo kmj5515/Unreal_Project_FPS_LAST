@@ -1,4 +1,4 @@
-#include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
+﻿#include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Net/UnrealNetwork.h"
 #include "GameplayEffectExtension.h"
 #include "GameplayEffectTypes.h"
@@ -43,6 +43,11 @@ ULastFPSAttributeSet::ULastFPSAttributeSet()
     InitCriticalChance(0.f);
     InitCriticalDamagePercent(150.f);
     InitDefense(0.f);
+    InitPhysicalDamageMultiplier(1.f);
+    InitFireDamageMultiplier(1.f);
+    InitIceDamageMultiplier(1.f);
+    InitElectricDamageMultiplier(1.f);
+    InitPoisonDamageMultiplier(1.f);
     InitMoveSpeed(500.f);
     InitDamage(0.f);
 }
@@ -59,6 +64,11 @@ void ULastFPSAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, CriticalChance,   COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, CriticalDamagePercent, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, Defense,          COND_None, REPNOTIFY_Always);
+    DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, PhysicalDamageMultiplier, COND_None, REPNOTIFY_Always);
+    DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, FireDamageMultiplier, COND_None, REPNOTIFY_Always);
+    DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, IceDamageMultiplier, COND_None, REPNOTIFY_Always);
+    DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, ElectricDamageMultiplier, COND_None, REPNOTIFY_Always);
+    DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, PoisonDamageMultiplier, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, MoveSpeed,        COND_None, REPNOTIFY_Always);
 }
 
@@ -74,6 +84,12 @@ void ULastFPSAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
         NewValue = FMath::Clamp(NewValue, 0.f, 100.f);
     else if (Attribute == GetCriticalDamagePercentAttribute())
         NewValue = FMath::Max(100.f, NewValue);
+    else if (Attribute == GetPhysicalDamageMultiplierAttribute()
+        || Attribute == GetFireDamageMultiplierAttribute()
+        || Attribute == GetIceDamageMultiplierAttribute()
+        || Attribute == GetElectricDamageMultiplierAttribute()
+        || Attribute == GetPoisonDamageMultiplierAttribute())
+        NewValue = FMath::Max(0.f, NewValue);
     else if (Attribute == GetMoveSpeedAttribute())
         NewValue = FMath::Max(0.f, NewValue);
 }
@@ -150,7 +166,7 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
         return;
 
     const float Now = GetWorld()->GetTimeSeconds();
-    // 스냅샷: 이터레이션 중 ClearRecentAttackers 호출로 인한 데이터 유실 방지
+    // ?ㅻ깄?? ?댄꽣?덉씠??以?ClearRecentAttackers ?몄텧濡??명븳 ?곗씠???좎떎 諛⑹?
     const TMap<TWeakObjectPtr<APlayerState>, float> AttackersCopy = TargetChar->GetRecentAttackers();
     for (const auto& Pair : AttackersCopy)
     {
@@ -195,4 +211,9 @@ void ULastFPSAttributeSet::OnRep_AttackDamage(const FGameplayAttributeData& Old)
 void ULastFPSAttributeSet::OnRep_CriticalChance(const FGameplayAttributeData& Old)   { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, CriticalChance, Old); }
 void ULastFPSAttributeSet::OnRep_CriticalDamagePercent(const FGameplayAttributeData& Old) { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, CriticalDamagePercent, Old); }
 void ULastFPSAttributeSet::OnRep_Defense(const FGameplayAttributeData& Old)          { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, Defense, Old); }
+void ULastFPSAttributeSet::OnRep_PhysicalDamageMultiplier(const FGameplayAttributeData& Old) { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, PhysicalDamageMultiplier, Old); }
+void ULastFPSAttributeSet::OnRep_FireDamageMultiplier(const FGameplayAttributeData& Old) { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, FireDamageMultiplier, Old); }
+void ULastFPSAttributeSet::OnRep_IceDamageMultiplier(const FGameplayAttributeData& Old) { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, IceDamageMultiplier, Old); }
+void ULastFPSAttributeSet::OnRep_ElectricDamageMultiplier(const FGameplayAttributeData& Old) { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, ElectricDamageMultiplier, Old); }
+void ULastFPSAttributeSet::OnRep_PoisonDamageMultiplier(const FGameplayAttributeData& Old) { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, PoisonDamageMultiplier, Old); }
 void ULastFPSAttributeSet::OnRep_MoveSpeed(const FGameplayAttributeData& Old)        { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, MoveSpeed, Old); }

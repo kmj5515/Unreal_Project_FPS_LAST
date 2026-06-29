@@ -27,6 +27,11 @@ bool ULastFPSCharacterStatData::ApplyToAbilitySystem(UAbilitySystemComponent* AS
 	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetCriticalChanceAttribute(), FMath::Clamp(CriticalChance, 0.f, 100.f));
 	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetCriticalDamagePercentAttribute(), FMath::Max(CriticalDamagePercent, 100.f));
 	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetDefenseAttribute(), FMath::Max(Defense, 0.f));
+	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetPhysicalDamageMultiplierAttribute(), FMath::Max(PhysicalDamageMultiplier, 0.f));
+	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetFireDamageMultiplierAttribute(), FMath::Max(FireDamageMultiplier, 0.f));
+	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetIceDamageMultiplierAttribute(), FMath::Max(IceDamageMultiplier, 0.f));
+	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetElectricDamageMultiplierAttribute(), FMath::Max(ElectricDamageMultiplier, 0.f));
+	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetPoisonDamageMultiplierAttribute(), FMath::Max(PoisonDamageMultiplier, 0.f));
 	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetMoveSpeedAttribute(), FMath::Max(MoveSpeed, 0.f));
 
 	return true;

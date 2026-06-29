@@ -5,7 +5,7 @@
 #include "LastFPSEditorUtilityLibrary.generated.h"
 
 UCLASS()
-class LASTFPSEDITOR_API ULastFPSEditorUtilityLibrary : public UBlueprintFunctionLibrary
+class EDITORUTILITY_API ULastFPSEditorUtilityLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 

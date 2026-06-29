@@ -1,12 +1,12 @@
 #include "EUW_LevelHelper.h"
 
 #if WITH_EDITOR
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Dom/JsonObject.h"
-#include "Serialization/JsonSerializer.h"
+#include "Editor.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
-#include "AssetRegistry/AssetRegistryModule.h"
-#include "Editor.h"
+#include "Serialization/JsonSerializer.h"
 
 FString UEUW_LevelHelper::GetSaveFilePath()
 {
@@ -16,11 +16,11 @@ FString UEUW_LevelHelper::GetSaveFilePath()
 void UEUW_LevelHelper::SaveEditorSettings(const FEUW_EditorSettings& Settings)
 {
     TSharedPtr<FJsonObject> RootObject = MakeShareable(new FJsonObject);
-    
-    // 경로 저장
+
+    // 경로를 저장합니다.
     RootObject->SetStringField(TEXT("searchPath"), Settings.SearchPath);
 
-    // 즐겨찾기 저장
+    // 즐겨찾기 목록을 저장합니다.
     TArray<TSharedPtr<FJsonValue>> FavoritesArray;
     for (const FName& MapName : Settings.FavoriteMaps)
     {
@@ -47,10 +47,10 @@ FEUW_EditorSettings UEUW_LevelHelper::LoadEditorSettings()
 
         if (FJsonSerializer::Deserialize(Reader, RootObject) && RootObject.IsValid())
         {
-            // 경로 로드
+            // 경로를 불러옵니다.
             RootObject->TryGetStringField(TEXT("searchPath"), Settings.SearchPath);
 
-            // 즐겨찾기 로드
+            // 즐겨찾기 목록을 불러옵니다.
             const TArray<TSharedPtr<FJsonValue>>* FavoritesArray;
             if (RootObject->TryGetArrayField(TEXT("favorites"), FavoritesArray))
             {
@@ -72,25 +72,25 @@ TArray<FEUW_MapAssetInfo> UEUW_LevelHelper::GetMapAssetsInPath(const FString& Sc
 
     FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
     TArray<FAssetData> AssetData;
-    
-    // 특정 경로 하위의 모든 에셋 검색
+
+    // 지정한 경로 아래의 모든 에셋을 검색합니다.
     AssetRegistryModule.Get().GetAssetsByPath(FName(*ScanPath), AssetData, true);
 
     for (const FAssetData& Data : AssetData)
     {
-        // UWorld 클래스만 필터링
+        // 월드 에셋만 필터링합니다.
         if (Data.AssetClassPath.GetAssetName() == TEXT("World"))
         {
             FEUW_MapAssetInfo Info;
             Info.MapName = Data.AssetName;
-            
-            // PackageName 대신 SoftObjectPath의 문자열을 사용하여 정확한 에셋 경로를 확보합니다.
+
+            // 소프트 오브젝트 경로를 사용해 정확한 에셋 경로를 확보합니다.
             Info.PackagePath = Data.GetSoftObjectPath().ToString();
-            
+
             Info.bIsFavorite = Settings.FavoriteMaps.Contains(Info.MapName);
-            
+
             MapAssets.Add(Info);
-            
+
             UE_LOG(LogTemp, Log, TEXT("LastFPS: Found Map '%s' at path '%s'"), *Info.MapName.ToString(), *Info.PackagePath);
         }
     }

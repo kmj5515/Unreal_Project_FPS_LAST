@@ -208,14 +208,13 @@ bool ALastFPSHero::TryActivateAbilityByTag(FGameplayTag AbilityTag)
         return false;
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("TryActivateAbilityByTag: %s"), *AbilityTag.ToString());
+    //UE_LOG(LogTemp, Warning, TEXT("TryActivateAbilityByTag: %s"), *AbilityTag.ToString());
 
     bool bAlreadyActive = false;
     for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
     {
         if (!Spec.Ability)
         {
-            UE_LOG(LogTemp, Warning, TEXT("ASC AbilitySpec: null ability. Handle=%s"), *Spec.Handle.ToString());
             continue;
         }
 
@@ -224,17 +223,11 @@ bool ALastFPSHero::TryActivateAbilityByTag(FGameplayTag AbilityTag)
         {
             bAlreadyActive = true;
         }
-
-        UE_LOG(LogTemp, Warning, TEXT("ASC AbilitySpec: %s | Tags=[%s] | Active=%s"),
-            *Spec.Ability->GetName(),
-            *AssetTags.ToStringSimple(),
-            Spec.IsActive() ? TEXT("true") : TEXT("false"));
     }
     
     FGameplayTagContainer AbilityTags;
     AbilityTags.AddTag(AbilityTag);
     const bool bActivated = ASC->TryActivateAbilitiesByTag(AbilityTags);
-    UE_LOG(LogTemp, Warning, TEXT("TryActivateAbilitiesByTag result: %s"), bActivated ? TEXT("true") : TEXT("false"));
     return bActivated || bAlreadyActive;
 }
 

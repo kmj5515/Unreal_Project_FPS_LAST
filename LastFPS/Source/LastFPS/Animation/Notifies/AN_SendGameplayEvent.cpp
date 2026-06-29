@@ -3,13 +3,14 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Animation/AnimSequenceBase.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/World.h"
 #include "Utility/LastFPSTags.h"
 
 UAN_SendGameplayEvent::UAN_SendGameplayEvent()
 {
 #if WITH_EDITORONLY_DATA
     NotifyColor = FColor(80, 170, 255);
-    bShouldFireInEditor = true;
+    bShouldFireInEditor = false;
 #endif
 }
 
@@ -30,6 +31,12 @@ void UAN_SendGameplayEvent::Notify(
     if (!MeshComp)
     {
         UE_LOG(LogTemp, Warning, TEXT("AN_SendGameplayEvent skipped: MeshComp is null"));
+        return;
+    }
+
+    const UWorld* World = MeshComp->GetWorld();
+    if (!World || (World->WorldType != EWorldType::Game && World->WorldType != EWorldType::PIE))
+    {
         return;
     }
 

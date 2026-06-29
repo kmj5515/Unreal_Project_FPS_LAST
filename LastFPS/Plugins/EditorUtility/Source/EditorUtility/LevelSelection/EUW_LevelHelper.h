@@ -32,24 +32,22 @@ struct FEUW_EditorSettings
     TArray<FName> FavoriteMaps;
 };
 
-/**
- * 에디터 유틸리티 툴을 위한 레벨 선택 및 즐겨찾기 헬퍼 클래스
- */
+/** 레벨 선택과 즐겨찾기 설정을 처리하는 에디터 유틸리티 헬퍼입니다. */
 UCLASS()
 class EDITORUTILITY_API UEUW_LevelHelper : public UBlueprintFunctionLibrary
 {
     GENERATED_BODY()
 
 public:
-    /** 설정(즐겨찾기 + 경로)을 JSON으로 저장 */
+    /** 설정을 파일로 저장합니다. */
     UFUNCTION(BlueprintCallable, Category = "EUW|Editor")
     static void SaveEditorSettings(const FEUW_EditorSettings& Settings);
 
-    /** 설정을 JSON에서 로드 */
+    /** 설정을 파일에서 불러옵니다. */
     UFUNCTION(BlueprintCallable, Category = "EUW|Editor")
     static FEUW_EditorSettings LoadEditorSettings();
 
-    /** 특정 경로 내의 모든 맵 에셋 정보를 가져옴 */
+    /** 지정한 경로의 모든 맵 에셋 정보를 가져옵니다. */
     UFUNCTION(BlueprintCallable, Category = "EUW|Editor")
     static TArray<FEUW_MapAssetInfo> GetMapAssetsInPath(const FString& ScanPath);
 

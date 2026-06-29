@@ -1,14 +1,14 @@
 #include "EUW_LevelSelectionWidget.h"
 
 #if WITH_EDITOR
-#include "Components/ScrollBox.h"
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
-#include "EUW_LevelRowWidget.h"
-#include "EUW_LevelHelper.h"
+#include "Components/ScrollBox.h"
 #include "Components/ScrollBoxSlot.h"
-#include "Developer/DesktopPlatform/Public/IDesktopPlatform.h"
 #include "Developer/DesktopPlatform/Public/DesktopPlatformModule.h"
+#include "Developer/DesktopPlatform/Public/IDesktopPlatform.h"
+#include "EUW_LevelHelper.h"
+#include "EUW_LevelRowWidget.h"
 #include "Framework/Application/SlateApplication.h"
 
 void UEUW_LevelSelectionWidget::NativeConstruct()
@@ -24,17 +24,16 @@ void UEUW_LevelSelectionWidget::NativeConstruct()
     {
         BrowseButton->OnClicked.AddDynamic(this, &UEUW_LevelSelectionWidget::HandleBrowseClicked);
     }
-    
+
     if (AllButton)
     {
         AllButton->OnClicked.AddDynamic(this, &UEUW_LevelSelectionWidget::HandleAllButtonClicked);
     }
-    
+
     if (FavoriteButton)
     {
         FavoriteButton->OnClicked.AddDynamic(this, &UEUW_LevelSelectionWidget::HandleFavoriteButtonClicked);
     }
-    
 
     if (PathTextBox)
     {
@@ -59,7 +58,7 @@ void UEUW_LevelSelectionWidget::RefreshMapList()
     FString CurrentPath = PathTextBox ? PathTextBox->GetText().ToString() : TEXT("/Game");
     TArray<FEUW_MapAssetInfo> MapInfos = UEUW_LevelHelper::GetMapAssetsInPath(CurrentPath);
 
-    // 1. 리스트 분리 및 필터링
+    // 즐겨찾기와 일반 목록을 분리합니다.
     TArray<FEUW_MapAssetInfo> FavoriteMaps;
     TArray<FEUW_MapAssetInfo> NormalMaps;
 
@@ -69,27 +68,29 @@ void UEUW_LevelSelectionWidget::RefreshMapList()
         {
             FavoriteMaps.Add(Info);
         }
-        else if (MapDisplayMode == EMapDisplayMode::All) // 필터링: All 모드일 때만 일반 맵 추가
+        else if (MapDisplayMode == EMapDisplayMode::All)
         {
             NormalMaps.Add(Info);
         }
     }
 
-    // 2. 각각 이름순 정렬
-    auto SortFunc = [](const FEUW_MapAssetInfo& A, const FEUW_MapAssetInfo& B) {
+    // 이름순으로 정렬합니다.
+    auto SortFunc = [](const FEUW_MapAssetInfo& A, const FEUW_MapAssetInfo& B)
+    {
         return A.MapName.ToString() < B.MapName.ToString();
     };
     FavoriteMaps.Sort(SortFunc);
     NormalMaps.Sort(SortFunc);
 
-    // 3. 위젯 추가 헬퍼 람다
-    auto AddMapRows = [this](const TArray<FEUW_MapAssetInfo>& Items) {
+    // 맵 행 위젯을 추가합니다.
+    auto AddMapRows = [this](const TArray<FEUW_MapAssetInfo>& Items)
+    {
         for (const FEUW_MapAssetInfo& Info : Items)
         {
             if (UEUW_LevelRowWidget* RowWidget = CreateWidget<UEUW_LevelRowWidget>(this, RowWidgetClass))
             {
                 RowWidget->SetMapInfo(Info);
-                
+
                 if (UPanelSlot* PanelSlot = MapScrollBox->AddChild(RowWidget))
                 {
                     if (UScrollBoxSlot* ScrollSlot = Cast<UScrollBoxSlot>(PanelSlot))
@@ -102,10 +103,7 @@ void UEUW_LevelSelectionWidget::RefreshMapList()
         }
     };
 
-    // ── 즐겨찾기 섹션 ──
     AddMapRows(FavoriteMaps);
-
-    // ── 일반 목록 섹션 (All 모드일 때만 데이터가 있음) ──
     AddMapRows(NormalMaps);
 }
 
@@ -115,12 +113,12 @@ void UEUW_LevelSelectionWidget::ChangeDisplayMode()
     {
         AllButton->SetIsEnabled(MapDisplayMode != EMapDisplayMode::All);
     }
-    
+
     if (FavoriteButton)
     {
         FavoriteButton->SetIsEnabled(MapDisplayMode != EMapDisplayMode::Favorite);
     }
-    
+
     RefreshMapList();
 }
 
@@ -134,11 +132,11 @@ void UEUW_LevelSelectionWidget::HandleBrowseClicked()
     IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
     if (DesktopPlatform)
     {
-        // 현재 경로를 OS 절대 경로로 변환
+        // 현재 경로를 운영체제 절대 경로로 변환합니다.
         FString CurrentPath = PathTextBox ? PathTextBox->GetText().ToString() : TEXT("/Game");
         FString AbsPath;
         FPackageName::TryConvertLongPackageNameToFilename(CurrentPath, AbsPath);
-        
+
         if (AbsPath.IsEmpty())
         {
             AbsPath = FPaths::ProjectContentDir();
@@ -146,10 +144,10 @@ void UEUW_LevelSelectionWidget::HandleBrowseClicked()
 
         FString ChosenFolder;
         const FString Title = TEXT("Select Level Folder");
-        
-        // OS 표준 폴더 선택 다이얼로그 호출
+
+        // 운영체제 폴더 선택 창을 엽니다.
         bool bSelected = DesktopPlatform->OpenDirectoryDialog(
-            nullptr, // ParentWindowHandle (nullptr 사용 시 메인 윈도우가 부모가 됨)
+            nullptr,
             Title,
             AbsPath,
             ChosenFolder
@@ -157,7 +155,7 @@ void UEUW_LevelSelectionWidget::HandleBrowseClicked()
 
         if (bSelected)
         {
-            // 선택된 절대 경로를 다시 언리얼 상대 경로(/Game/...)로 변환
+            // 선택한 절대 경로를 언리얼 패키지 경로로 변환합니다.
             FString PackagePath;
             if (FPackageName::TryConvertFilenameToLongPackageName(ChosenFolder, PackagePath))
             {

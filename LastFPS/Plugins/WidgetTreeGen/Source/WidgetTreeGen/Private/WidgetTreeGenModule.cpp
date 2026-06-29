@@ -4,7 +4,7 @@
 #include "WidgetTreeGenerator.h"
 #include "WidgetTreeGenRequest.h"
 
-#include "EditorUtility.h"
+#include "Core/EditorUtility.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Styling/AppStyle.h"

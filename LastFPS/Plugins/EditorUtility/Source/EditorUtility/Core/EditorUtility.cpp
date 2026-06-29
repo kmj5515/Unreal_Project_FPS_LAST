@@ -1,25 +1,31 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+#include "Core/EditorUtility.h"
 
-#include "EditorUtility.h"
-#include "ToolMenus.h"
-#include "EditorUtilitySubsystem.h"
-#include "EditorUtilityWidgetBlueprint.h"
-#include "EditorUtilityWidget.h"
-#include "EUW_Settings.h"
-#include "Editor.h"
-#include "Containers/Ticker.h"
-#include "Widgets/Docking/SDockTab.h"
-#include "Framework/Application/SlateApplication.h"
+#include "CharacterDatatAssetTool/SCharacterDataAssetTool.h"
 #include "Components/SizeBox.h"
+#include "Containers/Ticker.h"
+#include "Editor.h"
+#include "EditorUtilitySubsystem.h"
+#include "EditorUtilityWidget.h"
+#include "EditorUtilityWidgetBlueprint.h"
+#include "Engine/Texture2D.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Docking/TabManager.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "Misc/CoreDelegates.h"
+#include "Modules/ModuleManager.h"
+#include "RuntimeStats/SLastFPSRuntimeStatsEditor.h"
+#include "Settings/EUW_Settings.h"
 #include "Styling/AppStyle.h"
 #include "Styling/SlateStyle.h"
 #include "Styling/SlateStyleRegistry.h"
-#include "../CharacterDatatAssetTool/SCharacterDataAssetTool.h"
+#include "ToolMenus.h"
+#include "Widgets/Docking/SDockTab.h"
 
 #define LOCTEXT_NAMESPACE "FEditorUtilityModule"
 
 const FName FEditorUtilityModule::LevelSelectionTabName("LevelSelectionTool");
 const FName FEditorUtilityModule::CharacterDataAssetTabName("CharacterDataAssetTool");
+const FName FEditorUtilityModule::RuntimeStatsEditorTabName(TEXT("LastFPS.RuntimeStatsEditor"));
 
 FEditorUtilityModule::FOnExtendLastFPSMenu& FEditorUtilityModule::OnExtendLastFPSMenu()
 {
@@ -32,17 +38,15 @@ void FEditorUtilityModule::StartupModule()
 	FCoreDelegates::OnPostEngineInit.AddRaw(this, &FEditorUtilityModule::RegisterTabSpawner);
 	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FEditorUtilityModule::RegisterMenus));
 
-	// 스타일 세트 초기화 및 등록
 	const FName StyleSetName("LastFPSStyle");
 	StyleSetInstance = MakeShareable(new FSlateStyleSet(StyleSetName));
-	
-	// 아이콘 브러시 설정 (텍스처 로드 방식)
+
 	const FString IconPath = TEXT("/EditorUtility/Assets/Icons/CatIcon.CatIcon");
 	if (UTexture2D* IconTexture = LoadObject<UTexture2D>(nullptr, *IconPath))
 	{
 		StyleSetInstance->Set("CatIcon", new FSlateImageBrush(IconTexture, FVector2D(16.f, 16.f)));
 	}
-	
+
 	FSlateStyleRegistry::RegisterSlateStyle(*StyleSetInstance);
 }
 
@@ -60,12 +64,21 @@ void FEditorUtilityModule::ShutdownModule()
 	}
 }
 
+void FEditorUtilityModule::OpenRuntimeStatsEditor()
+{
+	if (!FGlobalTabmanager::Get()->HasTabSpawner(RuntimeStatsEditorTabName)
+		&& FModuleManager::Get().IsModuleLoaded(TEXT("EditorUtility")))
+	{
+		FEditorUtilityModule& Module = FModuleManager::LoadModuleChecked<FEditorUtilityModule>(TEXT("EditorUtility"));
+		Module.RegisterTabSpawner();
+	}
+
+	FGlobalTabmanager::Get()->TryInvokeTab(RuntimeStatsEditorTabName);
+}
+
 void FEditorUtilityModule::RegisterTabSpawner()
 {
-	if (FGlobalTabmanager::Get()->HasTabSpawner(LevelSelectionTabName))
-	{
-		UnregisterTabSpawner();
-	}
+	UnregisterTabSpawner();
 
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(LevelSelectionTabName,
 		FOnSpawnTab::CreateRaw(this, &FEditorUtilityModule::OnSpawnLevelSelectionTab))
@@ -78,12 +91,19 @@ void FEditorUtilityModule::RegisterTabSpawner()
 		.SetDisplayName(LOCTEXT("CharacterDataAssetTabTitle", "Character Data Asset Tool"))
 		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.PrimaryDataAsset"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
+
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(RuntimeStatsEditorTabName,
+		FOnSpawnTab::CreateRaw(this, &FEditorUtilityModule::OnSpawnRuntimeStatsEditorTab))
+		.SetDisplayName(LOCTEXT("RuntimeStatsEditorTabTitle", "LastFPS Runtime Stats"))
+		.SetIcon(FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.Blueprint"))
+		.SetMenuType(ETabSpawnerMenuType::Hidden);
 }
 
 void FEditorUtilityModule::UnregisterTabSpawner()
 {
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(LevelSelectionTabName);
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(CharacterDataAssetTabName);
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(RuntimeStatsEditorTabName);
 }
 
 void FEditorUtilityModule::RegisterMenus()
@@ -107,22 +127,32 @@ void FEditorUtilityModule::FillLastFPSMenu(FMenuBuilder& MenuBuilder)
 	MenuBuilder.BeginSection("LevelTools", LOCTEXT("LevelToolsSection", "Level Tools"));
 	{
 		MenuBuilder.AddMenuEntry(
-			LOCTEXT("OpenLevelSelectionToolTitle", "레벨 선택 툴"),
+			LOCTEXT("OpenLevelSelectionToolTitle", "Level Selection"),
 			LOCTEXT("OpenLevelSelectionToolTooltip", "Opens the custom level selection tool."),
 			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.World"),
 			FUIAction(FExecuteAction::CreateRaw(this, &FEditorUtilityModule::OpenLevelSelectionTool))
 		);
-		
+
 		MenuBuilder.AddMenuEntry(
-			LOCTEXT("OpenCharacterDataAssetToolTitle", "캐릭터 데이터 에셋 생성 툴"),
-			LOCTEXT("OpenCharacterDataAssetTooltip", "Opens the custom character data asset make tool."),
-			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.World"),
+			LOCTEXT("OpenCharacterDataAssetToolTitle", "Character Data Asset"),
+			LOCTEXT("OpenCharacterDataAssetTooltip", "Opens the custom character data asset tool."),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.PrimaryDataAsset"),
 			FUIAction(FExecuteAction::CreateRaw(this, &FEditorUtilityModule::OpenCharacterDataAssetTool))
 		);
 	}
 	MenuBuilder.EndSection();
 
-	// Let other editor modules (e.g. WidgetTreeGen) append their own entries.
+	MenuBuilder.BeginSection("RuntimeTools", LOCTEXT("RuntimeToolsSection", "Runtime Tools"));
+	{
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("OpenRuntimeStatsToolTitle", "Runtime Stats"),
+			LOCTEXT("OpenRuntimeStatsToolTooltip", "Opens the runtime character stats editor."),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.Blueprint"),
+			FUIAction(FExecuteAction::CreateRaw(this, &FEditorUtilityModule::OpenRuntimeStatsTool))
+		);
+	}
+	MenuBuilder.EndSection();
+
 	OnExtendLastFPSMenu().Broadcast(MenuBuilder);
 }
 
@@ -137,19 +167,17 @@ TSharedRef<SDockTab> FEditorUtilityModule::OnSpawnLevelSelectionTab(const FSpawn
 		if (WidgetBP && WidgetBP->GeneratedClass)
 		{
 			UWorld* World = GEditor->GetEditorWorldContext().World();
-			// 1. 일단 월드를 기반으로 위젯을 생성합니다 (컴파일러 제약 충족)
 			UEditorUtilityWidget* WidgetInstance = CreateWidget<UEditorUtilityWidget>(World, WidgetBP->GeneratedClass.Get());
-			
+
 			if (WidgetInstance)
 			{
-				// 2. 💡 생성 직후 Outer를 Subsystem으로 변경하여 맵 패키지 참조 체인을 끊습니다.
 				UEditorUtilitySubsystem* Subsystem = GEditor->GetEditorSubsystem<UEditorUtilitySubsystem>();
 				WidgetInstance->Rename(nullptr, Subsystem);
-
 				NewTab->SetContent(WidgetInstance->TakeWidget());
 			}
 		}
 	}
+
 	return NewTab;
 }
 
@@ -162,31 +190,40 @@ TSharedRef<SDockTab> FEditorUtilityModule::OnSpawnCharacterDataAssetTab(const FS
 		];
 }
 
+TSharedRef<SDockTab> FEditorUtilityModule::OnSpawnRuntimeStatsEditorTab(const FSpawnTabArgs& Args)
+{
+	return SNew(SDockTab)
+		.TabRole(ETabRole::NomadTab)
+		[
+			SNew(SLastFPSRuntimeStatsEditor)
+		];
+}
+
 void FEditorUtilityModule::OpenLevelSelectionTool()
 {
-	if (FGlobalTabmanager::Get()->HasTabSpawner(LevelSelectionTabName))
-	{
-		FGlobalTabmanager::Get()->TryInvokeTab(LevelSelectionTabName);
-	}
-	else
+	if (!FGlobalTabmanager::Get()->HasTabSpawner(LevelSelectionTabName))
 	{
 		RegisterTabSpawner();
-		FGlobalTabmanager::Get()->TryInvokeTab(LevelSelectionTabName);
 	}
+
+	FGlobalTabmanager::Get()->TryInvokeTab(LevelSelectionTabName);
 }
 
 void FEditorUtilityModule::OpenCharacterDataAssetTool()
 {
-	if (FGlobalTabmanager::Get()->HasTabSpawner(CharacterDataAssetTabName))
-	{
-		FGlobalTabmanager::Get()->TryInvokeTab(CharacterDataAssetTabName);
-	}
-	else
+	if (!FGlobalTabmanager::Get()->HasTabSpawner(CharacterDataAssetTabName))
 	{
 		RegisterTabSpawner();
-		FGlobalTabmanager::Get()->TryInvokeTab(CharacterDataAssetTabName);
 	}
+
+	FGlobalTabmanager::Get()->TryInvokeTab(CharacterDataAssetTabName);
+}
+
+void FEditorUtilityModule::OpenRuntimeStatsTool()
+{
+	OpenRuntimeStatsEditor();
 }
 
 #undef LOCTEXT_NAMESPACE
+
 IMPLEMENT_MODULE(FEditorUtilityModule, EditorUtility)

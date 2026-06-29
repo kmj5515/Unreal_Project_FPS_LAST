@@ -127,6 +127,11 @@ FLastFPSModuleStatTotals ULastFPSLoadoutSubsystem::ComputeBonus() const
 			case ELastFPSModuleStat::MaxStamina:   Totals.MaxStamina   += Mod.Value; break;
 			case ELastFPSModuleStat::AttackDamage: Totals.AttackDamage += Mod.Value; break;
 			case ELastFPSModuleStat::Defense:      Totals.Defense      += Mod.Value; break;
+			case ELastFPSModuleStat::PhysicalDamageMultiplier: Totals.PhysicalDamageMultiplier += Mod.Value; break;
+			case ELastFPSModuleStat::FireDamageMultiplier:     Totals.FireDamageMultiplier     += Mod.Value; break;
+			case ELastFPSModuleStat::IceDamageMultiplier:      Totals.IceDamageMultiplier      += Mod.Value; break;
+			case ELastFPSModuleStat::ElectricDamageMultiplier: Totals.ElectricDamageMultiplier += Mod.Value; break;
+			case ELastFPSModuleStat::PoisonDamageMultiplier:   Totals.PoisonDamageMultiplier   += Mod.Value; break;
 			case ELastFPSModuleStat::MoveSpeed:    Totals.MoveSpeed    += Mod.Value; break;
 			default: break;
 			}
@@ -170,6 +175,11 @@ void ULastFPSLoadoutSubsystem::ApplyToAbilitySystem(UAbilitySystemComponent* ASC
 	AddModifier(ULastFPSAttributeSet::GetMaxStaminaAttribute(),   Bonus.MaxStamina);
 	AddModifier(ULastFPSAttributeSet::GetAttackDamageAttribute(), Bonus.AttackDamage);
 	AddModifier(ULastFPSAttributeSet::GetDefenseAttribute(),      Bonus.Defense);
+	AddModifier(ULastFPSAttributeSet::GetPhysicalDamageMultiplierAttribute(), Bonus.PhysicalDamageMultiplier);
+	AddModifier(ULastFPSAttributeSet::GetFireDamageMultiplierAttribute(),     Bonus.FireDamageMultiplier);
+	AddModifier(ULastFPSAttributeSet::GetIceDamageMultiplierAttribute(),      Bonus.IceDamageMultiplier);
+	AddModifier(ULastFPSAttributeSet::GetElectricDamageMultiplierAttribute(), Bonus.ElectricDamageMultiplier);
+	AddModifier(ULastFPSAttributeSet::GetPoisonDamageMultiplierAttribute(),   Bonus.PoisonDamageMultiplier);
 	AddModifier(ULastFPSAttributeSet::GetMoveSpeedAttribute(),    Bonus.MoveSpeed);
 
 	FGameplayEffectContextHandle Context = ASC->MakeEffectContext();

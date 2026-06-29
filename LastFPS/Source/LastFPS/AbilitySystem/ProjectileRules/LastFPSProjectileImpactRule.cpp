@@ -1,5 +1,4 @@
 #include "AbilitySystem/ProjectileRules/LastFPSProjectileImpactRule.h"
-
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
 #include "DrawDebugHelpers.h"
@@ -69,7 +68,7 @@ void ULastFPSProjectileImpactRule::ApplyGameplayEffectsToTarget(
 		FGameplayEffectSpecHandle Spec = Context.SourceASC->MakeOutgoingSpec(EffectClass, 1.f, EffectContext);
 		if (Spec.IsValid())
 		{
-			LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), EffectClass, DamageRange);
+			LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), DamageRange);
 			TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 		}
 	}

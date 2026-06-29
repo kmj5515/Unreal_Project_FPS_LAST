@@ -1,15 +1,15 @@
 #include "EUW_LevelRowWidget.h"
 
 #if WITH_EDITOR
+#include "Components/Button.h"
 #include "Components/CheckBox.h"
 #include "Components/TextBlock.h"
-#include "Components/Button.h"
-#include "EUW_LevelHelper.h"
 #include "Editor.h"
-#include "FileHelpers.h"
-#include "Subsystems/AssetEditorSubsystem.h"
-#include "GameMapsSettings.h"
 #include "Engine/World.h"
+#include "EUW_LevelHelper.h"
+#include "FileHelpers.h"
+#include "GameMapsSettings.h"
+#include "Subsystems/AssetEditorSubsystem.h"
 
 void UEUW_LevelRowWidget::SetMapInfo(const FEUW_MapAssetInfo& InInfo)
 {
@@ -63,7 +63,7 @@ void UEUW_LevelRowWidget::HandleFavoriteChanged(bool bIsChecked)
     {
         Settings.FavoriteMaps.Remove(MapInfo.MapName);
     }
-    
+
     UEUW_LevelHelper::SaveEditorSettings(Settings);
 }
 
@@ -103,14 +103,14 @@ void UEUW_LevelRowWidget::HandleOpenLevelClicked()
 
     FString PathToLoad = MapInfo.PackagePath;
 
-    // 💡 크래시 방지: 한 프레임 뒤에 실행하여 UI 이벤트를 안전하게 종료시킵니다.
+    // 다음 프레임에 실행하여 사용자 인터페이스 이벤트를 안전하게 마무리합니다.
     GEditor->GetTimerManager()->SetTimerForNextTick([PathToLoad]()
     {
-        // 1. 현재 맵 변경사항 저장 확인 (사용자가 취소하면 false 반환)
+        // 현재 맵 변경 사항 저장 여부를 확인합니다.
         if (FEditorFileUtils::SaveDirtyPackages(true, true, true))
         {
-            // 2. 레벨 전환을 위한 전용 유틸리티 사용
-            // 맵(World) 자산은 일반 자산 에디터가 아닌 전용 로드 로직을 타야 안전합니다.
+            // 레벨 전환 전용 로드 함수를 사용합니다.
+            // 월드 자산은 일반 자산 편집기가 아닌 전용 로드 경로를 사용해야 안전합니다.
             UE_LOG(LogTemp, Log, TEXT("LastFPS: Loading Level: %s"), *PathToLoad);
             FEditorFileUtils::LoadMap(PathToLoad);
         }

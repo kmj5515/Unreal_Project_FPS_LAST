@@ -1,6 +1,5 @@
 #include "Utility/LastFPSDamageCalculation.h"
 
-#include "AbilitySystem/Effects/GE_DamageInstant.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayEffect.h"
@@ -24,6 +23,27 @@ float LastFPSDamage::RollDamage(const FLastFPSDamageRange& DamageRange)
 	return FMath::FRandRange(MinDamage, MaxDamage);
 }
 
+namespace
+{
+float GetElementDamageMultiplier(const ULastFPSAttributeSet& SourceAttributes, ELastFPSDamageElement DamageElement)
+{
+	switch (DamageElement)
+	{
+	case ELastFPSDamageElement::Fire:
+		return SourceAttributes.GetFireDamageMultiplier();
+	case ELastFPSDamageElement::Ice:
+		return SourceAttributes.GetIceDamageMultiplier();
+	case ELastFPSDamageElement::Electric:
+		return SourceAttributes.GetElectricDamageMultiplier();
+	case ELastFPSDamageElement::Poison:
+		return SourceAttributes.GetPoisonDamageMultiplier();
+	case ELastFPSDamageElement::Physical:
+	default:
+		return SourceAttributes.GetPhysicalDamageMultiplier();
+	}
+}
+}
+
 FLastFPSDamageResult LastFPSDamage::CalculateDamage(
 	const FGameplayEffectSpec& Spec,
 	const FLastFPSDamageRange& DamageRange)
@@ -41,6 +61,7 @@ FLastFPSDamageResult LastFPSDamage::CalculateDamage(
 	}
 
 	Result.DamageAmount += FMath::Max(SourceAttributes->GetAttackDamage(), 0.f);
+	Result.DamageAmount *= FMath::Max(GetElementDamageMultiplier(*SourceAttributes, DamageRange.DamageElement), 0.f);
 
 	const float CriticalChance = FMath::Clamp(SourceAttributes->GetCriticalChance(), 0.f, 100.f);
 	Result.bCriticalHit = CriticalChance > 0.f && FMath::FRandRange(0.f, 100.f) < CriticalChance;
@@ -61,18 +82,43 @@ void LastFPSDamage::ApplySetByCallerDamage(FGameplayEffectSpec& Spec, const FLas
 
 bool LastFPSDamage::IsDamageGameplayEffect(TSubclassOf<UGameplayEffect> EffectClass)
 {
-	return EffectClass && EffectClass->IsChildOf(ULastFPSGE_DamageInstant::StaticClass());
+	if (!EffectClass)
+	{
+		return false;
+	}
+
+	const UGameplayEffect* Effect = EffectClass->GetDefaultObject<UGameplayEffect>();
+	if (!Effect)
+	{
+		return false;
+	}
+
+	const FGameplayAttribute DamageAttribute = ULastFPSAttributeSet::GetDamageAttribute();
+	for (const FGameplayModifierInfo& Modifier : Effect->Modifiers)
+	{
+		if (Modifier.Attribute != DamageAttribute)
+		{
+			continue;
+		}
+
+		if (Modifier.ModifierMagnitude.GetMagnitudeCalculationType() != EGameplayEffectMagnitudeCalculation::SetByCaller)
+		{
+			continue;
+		}
+
+		const FSetByCallerFloat& SetByCaller = Modifier.ModifierMagnitude.GetSetByCallerFloat();
+		if (SetByCaller.DataTag == LastFPSGameplayTags::SetByCaller_Damage)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 void LastFPSDamage::RollAndApplySetByCallerDamage(
 	FGameplayEffectSpec& Spec,
-	TSubclassOf<UGameplayEffect> EffectClass,
 	const FLastFPSDamageRange& DamageRange)
 {
-	if (!IsDamageGameplayEffect(EffectClass))
-	{
-		return;
-	}
-
 	ApplySetByCallerDamage(Spec, CalculateDamage(Spec, DamageRange));
 }

@@ -180,7 +180,7 @@ void ALastFPSProjectile::ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UG
     FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(EffectClass, 1.f, Context);
     if (Spec.IsValid())
     {
-        LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), EffectClass, LegacyDamageRange);
+        LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), LegacyDamageRange);
         TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
     }
 }

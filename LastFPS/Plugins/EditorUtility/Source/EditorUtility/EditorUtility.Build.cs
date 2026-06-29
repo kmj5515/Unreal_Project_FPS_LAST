@@ -1,6 +1,5 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 using UnrealBuildTool;
+using System.IO;
 
 public class EditorUtility : ModuleRules
 {
@@ -10,13 +9,20 @@ public class EditorUtility : ModuleRules
 		
 		PublicIncludePaths.AddRange(
 			new string[] {
-				// ... add public include paths required here ...
+				ModuleDirectory,
+				Path.Combine(ModuleDirectory, "Core")
 			}
 			);
 				
 		
 		PrivateIncludePaths.AddRange(
 			new string[] {
+				ModuleDirectory,
+				Path.Combine(ModuleDirectory, "CharacterDatatAssetTool"),
+				Path.Combine(ModuleDirectory, "Core"),
+				Path.Combine(ModuleDirectory, "LevelSelection"),
+				Path.Combine(ModuleDirectory, "RuntimeStats"),
+				Path.Combine(ModuleDirectory, "Settings")
 			}
 			);
 			
@@ -42,6 +48,8 @@ public class EditorUtility : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
+				"ApplicationCore",
+				"GameplayAbilities",
 				"Slate",
 				"SlateCore",
 				"UnrealEd",
@@ -59,7 +67,6 @@ public class EditorUtility : ModuleRules
 		DynamicallyLoadedModuleNames.AddRange(
 			new string[]
 			{
-				// ... add any modules that your module loads dynamically here ...
 			}
 			);
 	}
