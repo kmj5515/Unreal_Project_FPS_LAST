@@ -2,7 +2,7 @@
 
 #include "Game/LastFPSPlayerController.h"
 #include "Data/Tables/LastFPSDialogueData.h"
-#include "UI/LastFPSNPCMarkerWidget.h"
+#include "UI/HUD/LastFPSNPCMarkerWidget.h"
 
 #include "Components/CapsuleComponent.h"
 #include "Components/SphereComponent.h"

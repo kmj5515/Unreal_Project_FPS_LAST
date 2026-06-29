@@ -1,12 +1,12 @@
 #include "Game/LastFPSPlayerController.h"
 
 #include "Hub/ILastFPSInteractable.h"
-#include "UI/LastFPSHUDWidget.h"
-#include "UI/LastFPSNoticeWidget.h"
-#include "UI/LastFPSDialogueWidget.h"
-#include "UI/LastFPSQuantityDialogWidget.h"
-#include "UI/LastFPSUIManagerSubsystem.h"
-#include "UI/LastFPSUITags.h"
+#include "UI/HUD/LastFPSHUDWidget.h"
+#include "UI/Common/LastFPSNoticeWidget.h"
+#include "UI/Dialogue/LastFPSDialogueWidget.h"
+#include "UI/Common/LastFPSQuantityDialogWidget.h"
+#include "UI/Framework/LastFPSUIManagerSubsystem.h"
+#include "UI/Framework/LastFPSUITags.h"
 
 #include "CommonActivatableWidget.h"
 #include "Engine/World.h"

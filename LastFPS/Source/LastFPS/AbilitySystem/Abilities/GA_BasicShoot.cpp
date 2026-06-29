@@ -3,7 +3,7 @@
 #include "Character/Components/WeaponComponent.h"
 #include "Character/LastFPSHero.h"
 #include "Game/LastFPSPlayerController.h"
-#include "UI/LastFPSHUDWidget.h"
+#include "UI/HUD/LastFPSHUDWidget.h"
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
