@@ -1,4 +1,5 @@
 #include "UI/LastFPSHUDWidget.h"
+#include "UI/LastFPSDamageNumberWidget.h"
 #include "UI/LastFPSSkillCooldownSlotWidget.h"
 #include "UI/LastFPSHUDStyle.h"
 #include "AbilitySystemComponent.h"
@@ -70,6 +71,7 @@ ULastFPSHUDWidget::ULastFPSHUDWidget(const FObjectInitializer& ObjectInitializer
     HealthLowFillColor       = LastFPSHUDStyle::HealthLowFill();
     StaminaFillColor         = LastFPSHUDStyle::StaminaFill();
     StaminaLowFillColor      = LastFPSHUDStyle::StaminaLowFill();
+    DamageNumberWidgetClass  = ULastFPSDamageNumberWidget::StaticClass();
 }
 
 void ULastFPSHUDWidget::NativeConstruct()
@@ -108,6 +110,12 @@ void ULastFPSHUDWidget::NativeConstruct()
 
 void ULastFPSHUDWidget::NativeDestruct()
 {
+    if (ALastFPSPlayerState* PlayerState = BoundPlayerState.Get())
+    {
+        PlayerState->OnDamageDealt.RemoveDynamic(this, &ULastFPSHUDWidget::HandleDamageDealt);
+    }
+    BoundPlayerState.Reset();
+
     if (UWeaponComponent* Weapon = BoundWeaponComponent.Get())
     {
         Weapon->OnWeaponEquippedChanged.RemoveDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
@@ -178,15 +186,15 @@ bool ULastFPSHUDWidget::TryInitSkillSlots()
     }
 
     WBP_SkillCooldownSlot_Q->ConfigureCooldownSlot(
-        FLastFPSTags::Get().Cooldown_Skill1, ULastFPSGE_Skill1Cooldown::StaticClass());
+        LastFPSGameplayTags::Cooldown_Skill1, ULastFPSGE_Skill1Cooldown::StaticClass());
     WBP_SkillCooldownSlot_Q->SetKeyLabel(FText::FromString(TEXT("Q")));
 
     WBP_SkillCooldownSlot_E->ConfigureCooldownSlot(
-        FLastFPSTags::Get().Cooldown_Skill2, ULastFPSGE_Skill2Cooldown::StaticClass());
+        LastFPSGameplayTags::Cooldown_Skill2, ULastFPSGE_Skill2Cooldown::StaticClass());
     WBP_SkillCooldownSlot_E->SetKeyLabel(FText::FromString(TEXT("E")));
 
     WBP_SkillCooldownSlot_F->ConfigureCooldownSlot(
-        FLastFPSTags::Get().Cooldown_Ultimate, ULastFPSGE_UltimateCooldown::StaticClass());
+        LastFPSGameplayTags::Cooldown_Ultimate, ULastFPSGE_UltimateCooldown::StaticClass());
     WBP_SkillCooldownSlot_F->SetKeyLabel(FText::FromString(TEXT("F")));
 
     TickSkillSlots();
@@ -262,6 +270,17 @@ bool ULastFPSHUDWidget::InitializeHUD()
         return false;
     }
 
+    if (BoundPlayerState.Get() != PS)
+    {
+        if (ALastFPSPlayerState* PreviousPlayerState = BoundPlayerState.Get())
+        {
+            PreviousPlayerState->OnDamageDealt.RemoveDynamic(this, &ULastFPSHUDWidget::HandleDamageDealt);
+        }
+
+        PS->OnDamageDealt.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleDamageDealt);
+        BoundPlayerState = PS;
+    }
+
     UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent();
     const ULastFPSAttributeSet* AS = PS->GetAttributeSet();
     if (!ASC || !AS)
@@ -304,6 +323,16 @@ void ULastFPSHUDWidget::HandleStaminaChanged(const FOnAttributeChangeData& Data)
     {
         BroadcastStaminaDisplay();
     }
+}
+
+void ULastFPSHUDWidget::HandleDamageDealt(
+    float DamageAmount,
+    float TotalDamageDealt,
+    FVector DamageWorldLocation,
+    AActor* DamageTargetActor,
+    bool bCriticalHit)
+{
+    SpawnDamageNumber(DamageAmount, TotalDamageDealt, DamageWorldLocation, DamageTargetActor, bCriticalHit);
 }
 
 void ULastFPSHUDWidget::TickSmoothedGauges(float DeltaTime)
@@ -508,6 +537,52 @@ void ULastFPSHUDWidget::BroadcastStaminaDisplay()
 {
     ApplyGaugeBar(PB_Stamina, StaminaGauge.Displayed, StaminaGauge.Max, ResolveStaminaFillColor());
     OnStaminaChanged(StaminaGauge.Displayed, StaminaGauge.Max);
+}
+
+void ULastFPSHUDWidget::SpawnDamageNumber(
+    float DamageAmount,
+    float TotalDamageDealt,
+    const FVector& DamageWorldLocation,
+    AActor* DamageTargetActor,
+    bool bCriticalHit)
+{
+    APlayerController* PC = GetOwningPlayer();
+    if (!PC || !DamageNumberWidgetClass || DamageAmount <= 0.f)
+    {
+        return;
+    }
+
+    int32 ViewportSizeX = 0;
+    int32 ViewportSizeY = 0;
+    PC->GetViewportSize(ViewportSizeX, ViewportSizeY);
+    if (ViewportSizeX <= 0 || ViewportSizeY <= 0)
+    {
+        return;
+    }
+
+    const float RandomAngle = FMath::FRandRange(0.f, 2.f * PI);
+    const float RandomDistance = FMath::FRandRange(0.f, DamageNumberRandomRadius);
+    const FVector2D RandomOffset(
+        FMath::Cos(RandomAngle) * RandomDistance,
+        FMath::Sin(RandomAngle) * RandomDistance);
+
+    ULastFPSDamageNumberWidget* DamageNumberWidget =
+        CreateWidget<ULastFPSDamageNumberWidget>(PC, DamageNumberWidgetClass);
+    if (!DamageNumberWidget)
+    {
+        return;
+    }
+
+    DamageNumberWidget->AddToViewport(20);
+    DamageNumberWidget->InitializeDamageNumber(
+        DamageAmount,
+        TotalDamageDealt,
+        DamageTargetActor,
+        DamageWorldLocation,
+        DamageNumberWorldOffset,
+        DamageNumberScreenOffset,
+        RandomOffset,
+        bCriticalHit);
 }
 
 void ULastFPSHUDWidget::HandleWeaponEquippedChanged(bool bEquipped)

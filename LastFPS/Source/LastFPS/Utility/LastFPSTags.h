@@ -2,61 +2,46 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "NativeGameplayTags.h"
 
-/**
- * 프로젝트 내의 모든 Native Gameplay Tags를 중앙 집중식으로 관리하는 싱글톤 구조체
- */
-struct FLastFPSTags
+namespace LastFPSGameplayTags
 {
-public:
-    static const FLastFPSTags& Get() { return Tags; }
-    static void InitializeNativeTags();
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Character_State_Dead);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Character_State_Crouched);
 
-    // 캐릭터 상태
-    FGameplayTag Character_State_Dead;
-    FGameplayTag Character_State_Crouched;
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill_Dash);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill1);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill2);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Ultimate);
 
-    // 쿨다운
-    FGameplayTag Cooldown_Skill_Dash;
-    FGameplayTag Cooldown_Skill1;
-    FGameplayTag Cooldown_Skill2;
-    FGameplayTag Cooldown_Ultimate;
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(SetByCaller_Damage);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(SetByCaller_CriticalHit);
 
-    // Gameplay events
-    FGameplayTag Event_Montage_AbilityCommit;
-    FGameplayTag Event_Montage_AbilityEnd;
-    FGameplayTag Event_Montage_ProjectileSpawn;
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_AbilityCommit);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_AbilityEnd);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_ProjectileSpawn);
 
-    // UI
-    FGameplayTag UI_HUD_Visible;
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(UI_HUD_Visible);
 
-    // 입력
-    FGameplayTag Input_Move;
-    FGameplayTag Input_Look;
-    FGameplayTag Input_Sprint;
-    FGameplayTag Input_ADS;
-    FGameplayTag Input_Jump;
-    FGameplayTag Input_Dash;
-    FGameplayTag Input_Fire;
-    FGameplayTag Input_Reload;
-    FGameplayTag Input_Scoreboard;
-    FGameplayTag Input_Skill1;
-    FGameplayTag Input_Skill2;
-    FGameplayTag Input_Ultimate;
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Move);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Look);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Sprint);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_ADS);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Jump);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Dash);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Fire);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Reload);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Scoreboard);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Skill1);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Skill2);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Input_Ultimate);
 
-    // 어빌리티
-    FGameplayTag Ability_Sprint;
-    FGameplayTag Ability_Jump;
-    FGameplayTag Ability_Dash;
-    FGameplayTag Ability_Fire;
-    FGameplayTag Ability_Reload;
-    FGameplayTag Ability_Skill1;
-    FGameplayTag Ability_Skill2;
-    FGameplayTag Ability_Ultimate;
-
-protected:
-    void AddTag(FGameplayTag& OutTag, const ANSICHAR* TagName, const ANSICHAR* TagComment);
-
-private:
-    static FLastFPSTags Tags;
-};
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Sprint);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Jump);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Dash);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Fire);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Reload);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Skill1);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Skill2);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Ultimate);
+}

@@ -13,6 +13,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Game/LastFPSPlayerController.h"
+#include "Utility/LastFPSDamageCalculation.h"
 
 ALastFPSCharacterBase::ALastFPSCharacterBase()
 {
@@ -388,6 +389,12 @@ void ALastFPSCharacterBase::ApplyDefaultEffects()
     for (const TSubclassOf<UGameplayEffect>& EffectClass : *EffectsToApply)
     {
         if (!EffectClass) continue;
+        if (LastFPSDamage::IsDamageGameplayEffect(EffectClass))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Skipping damage GameplayEffect in startup effects: %s"), *GetNameSafe(EffectClass));
+            continue;
+        }
+
         FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(EffectClass, 1.f, Context);
         if (Spec.IsValid())
             ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());

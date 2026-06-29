@@ -16,5 +16,12 @@ void ULastFPSDirectHitImpactRule::ExecuteImpact(const FLastFPSProjectileImpactCo
 		return;
 	}
 
-	ApplyGameplayEffectsToTarget(Context, HitActor, Effects);
+	const FVector HitLocation = Context.GetImpactLocation();
+	DrawDebugPoint(Context, HitLocation);
+	if (const AActor* ProjectileActor = Context.ProjectileActor.Get())
+	{
+		DrawDebugLine(Context, ProjectileActor->GetActorLocation(), HitLocation);
+	}
+
+	ApplyGameplayEffectsToTarget(Context, HitActor, Effects, DamageRange);
 }

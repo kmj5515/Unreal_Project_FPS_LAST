@@ -1,27 +1,26 @@
 #include "Utility/LastFPSTagFunctionLibrary.h"
 #include "Utility/LastFPSTags.h"
-#include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
 
 FGameplayTag ULastFPSTagFunctionLibrary::GetTag_CooldownSkill1()
 {
-    return FLastFPSTags::Get().Cooldown_Skill1;
+    return LastFPSGameplayTags::Cooldown_Skill1;
 }
 
 FGameplayTag ULastFPSTagFunctionLibrary::GetTag_CooldownSkillDash()
 {
-    return FLastFPSTags::Get().Cooldown_Skill_Dash;
+    return LastFPSGameplayTags::Cooldown_Skill_Dash;
 }
 
 FGameplayTag ULastFPSTagFunctionLibrary::GetTag_CooldownSkill2()
 {
-    return FLastFPSTags::Get().Cooldown_Skill2;
+    return LastFPSGameplayTags::Cooldown_Skill2;
 }
 
 FGameplayTag ULastFPSTagFunctionLibrary::GetTag_CharacterDead()
 {
-    return FLastFPSTags::Get().Character_State_Dead;
+    return LastFPSGameplayTags::Character_State_Dead;
 }
 
 bool ULastFPSTagFunctionLibrary::ActorHasMatchingGameplayTag(AActor* TargetActor, FGameplayTag TagToCheck)

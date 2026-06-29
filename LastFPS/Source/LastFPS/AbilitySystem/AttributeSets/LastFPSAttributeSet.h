@@ -46,6 +46,14 @@ public:
     FGameplayAttributeData AttackDamage;
     ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, AttackDamage)
 
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_CriticalChance, Category="Attributes|Combat")
+    FGameplayAttributeData CriticalChance;
+    ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, CriticalChance)
+
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_CriticalDamagePercent, Category="Attributes|Combat")
+    FGameplayAttributeData CriticalDamagePercent;
+    ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, CriticalDamagePercent)
+
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Defense, Category="Attributes|Combat")
     FGameplayAttributeData Defense;
     ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, Defense)
@@ -65,6 +73,8 @@ protected:
     UFUNCTION() void OnRep_Stamina(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_MaxStamina(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_AttackDamage(const FGameplayAttributeData& Old);
+    UFUNCTION() void OnRep_CriticalChance(const FGameplayAttributeData& Old);
+    UFUNCTION() void OnRep_CriticalDamagePercent(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_Defense(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_MoveSpeed(const FGameplayAttributeData& Old);
 

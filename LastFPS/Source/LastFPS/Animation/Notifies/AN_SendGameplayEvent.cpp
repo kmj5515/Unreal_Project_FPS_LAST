@@ -42,7 +42,7 @@ void UAN_SendGameplayEvent::Notify(
 
     const FGameplayTag TagToSend = EventTag.IsValid()
         ? EventTag
-        : FLastFPSTags::Get().Event_Montage_ProjectileSpawn;
+        : LastFPSGameplayTags::Event_Montage_ProjectileSpawn;
     if (!TagToSend.IsValid())
     {
         UE_LOG(LogTemp, Warning, TEXT("AN_SendGameplayEvent skipped: EventTag is invalid. Owner=%s Animation=%s"),

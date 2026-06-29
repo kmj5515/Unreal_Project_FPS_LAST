@@ -11,4 +11,9 @@ class LASTFPS_API ULastFPSGE_DamageInstant : public UGameplayEffect
 
 public:
     ULastFPSGE_DamageInstant();
+
+    virtual void PostLoad() override;
+
+private:
+    void ConfigureDamageModifier();
 };

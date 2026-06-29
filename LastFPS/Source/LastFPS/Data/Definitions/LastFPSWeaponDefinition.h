@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Utility/LastFPSDamageCalculation.h"
 #include "Utility/LastFPSEnumTypes.h"
 #include "LastFPSWeaponDefinition.generated.h"
 
@@ -63,6 +64,9 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Firing", meta=(ClampMin="0.01"))
     float FireRate = 0.1f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Damage")
+    FLastFPSDamageRange DamageRange;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Effects")
     TObjectPtr<USoundBase> FireSound;

@@ -13,6 +13,9 @@ void ULastFPSAreaImpactRule::ExecuteImpact(const FLastFPSProjectileImpactContext
 
 	TArray<FOverlapResult> Overlaps;
 	const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
+	const FVector ImpactLocation = Context.GetImpactLocation();
+
+	DrawDebugSphere(Context, ImpactLocation, Radius);
 
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ProjectileAreaImpact), false, ProjectileActor);
 	QueryParams.AddIgnoredActor(Context.ProjectileActor.Get());
@@ -27,7 +30,7 @@ void ULastFPSAreaImpactRule::ExecuteImpact(const FLastFPSProjectileImpactContext
 
 	const bool bHasOverlaps = World->OverlapMultiByObjectType(
 		Overlaps,
-		Context.GetImpactLocation(),
+		ImpactLocation,
 		FQuat::Identity,
 		ObjectParams,
 		Shape,
@@ -55,7 +58,7 @@ void ULastFPSAreaImpactRule::ExecuteImpact(const FLastFPSProjectileImpactContext
 			continue;
 		}
 
-		ApplyGameplayEffectsToTarget(Context, TargetActor, Effects);
+		ApplyGameplayEffectsToTarget(Context, TargetActor, Effects, DamageRange);
 		AppliedActors.Add(TargetActor);
 		AppliedTargets++;
 

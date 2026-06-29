@@ -17,10 +17,9 @@ UGA_BasicShoot::UGA_BasicShoot()
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
     FGameplayTagContainer Tags;
-    Tags.AddTag(FPSTags.Ability_Fire);
-    Tags.AddTag(FPSTags.Input_Fire);
+    Tags.AddTag(LastFPSGameplayTags::Ability_Fire);
+    Tags.AddTag(LastFPSGameplayTags::Input_Fire);
     SetAssetTags(Tags);
 }
 
@@ -50,7 +49,7 @@ void UGA_BasicShoot::ActivateAbility(
     if (UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr)
     {
         FGameplayTagContainer SprintTags;
-        SprintTags.AddTag(FLastFPSTags::Get().Input_Sprint);
+        SprintTags.AddTag(LastFPSGameplayTags::Input_Sprint);
         ASC->CancelAbilities(&SprintTags);
     }
 

@@ -12,10 +12,9 @@ UGA_Reload::UGA_Reload()
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
     FGameplayTagContainer Tags;
-    Tags.AddTag(FPSTags.Ability_Reload);
-    Tags.AddTag(FPSTags.Input_Reload);
+    Tags.AddTag(LastFPSGameplayTags::Ability_Reload);
+    Tags.AddTag(LastFPSGameplayTags::Input_Reload);
     SetAssetTags(Tags);
 }
 

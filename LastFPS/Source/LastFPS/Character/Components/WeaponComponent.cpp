@@ -225,6 +225,7 @@ void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
     LeftHandIKSocketName = NewDefinition->LeftHandIKSocketName;
     ReloadLeftHandIKTargetName = NewDefinition->ReloadLeftHandIKTargetName;
     FireRate = NewDefinition->FireRate;
+    DamageRange = NewDefinition->DamageRange;
     FireSound = NewDefinition->FireSound;
     MuzzleFlashEffect = NewDefinition->MuzzleFlashEffect;
 }
@@ -462,6 +463,7 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
     FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.f, Context);
     if (Spec.IsValid())
     {
+        LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), DamageEffectClass, DamageRange);
         TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 
         if (ALastFPSCharacterBase* ShooterCharacter = Cast<ALastFPSCharacterBase>(Character))

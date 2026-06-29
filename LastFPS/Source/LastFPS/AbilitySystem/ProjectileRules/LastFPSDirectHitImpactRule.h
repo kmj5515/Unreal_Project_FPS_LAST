@@ -18,6 +18,9 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Direct Hit", meta=(AllowPrivateAccess="true"))
 	TArray<TSubclassOf<UGameplayEffect>> Effects;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Direct Hit|Damage", meta=(AllowPrivateAccess="true"))
+	FLastFPSDamageRange DamageRange;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Direct Hit|Condition", meta=(AllowPrivateAccess="true"))
 	FGameplayTagContainer RequiredTargetTags;
 

@@ -1,4 +1,5 @@
 #include "AbilitySystem/ProjectileRules/LastFPSChainImpactRule.h"
+#include "AbilitySystemComponent.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 
@@ -8,6 +9,17 @@ void ULastFPSChainImpactRule::ExecuteImpact(const FLastFPSProjectileImpactContex
 	if (!InitialTarget || Radius <= 0.f || MaxChainDepth <= 0 || MaxTargetsPerChain <= 0)
 	{
 		return;
+	}
+
+	UAbilitySystemComponent* InitialTargetASC = GetAbilitySystemComponent(InitialTarget);
+	if (!DoesTargetPassTags(InitialTargetASC, RequiredTargetTags, BlockedTargetTags))
+	{
+		return;
+	}
+
+	if (bApplyToInitialTarget)
+	{
+		ApplyGameplayEffectsToTarget(Context, InitialTarget, Effects, DamageRange);
 	}
 
 	TSet<TWeakObjectPtr<AActor>> VisitedActors;
@@ -30,6 +42,8 @@ void ULastFPSChainImpactRule::ExecuteChainStep(
 	{
 		return;
 	}
+
+	DrawDebugSphere(Context, ChainSource->GetActorLocation(), Radius);
 
 	TArray<FOverlapResult> Overlaps;
 	const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
@@ -55,6 +69,26 @@ void ULastFPSChainImpactRule::ExecuteChainStep(
 		return;
 	}
 
+	const FVector ChainSourceLocation = ChainSource->GetActorLocation();
+	Overlaps.Sort([ChainSourceLocation](const FOverlapResult& A, const FOverlapResult& B)
+	{
+		const AActor* ActorA = A.GetActor();
+		const AActor* ActorB = B.GetActor();
+
+		if (!ActorA)
+		{
+			return false;
+		}
+
+		if (!ActorB)
+		{
+			return true;
+		}
+
+		return FVector::DistSquared(ChainSourceLocation, ActorA->GetActorLocation())
+			< FVector::DistSquared(ChainSourceLocation, ActorB->GetActorLocation());
+	});
+
 	int32 AppliedTargets = 0;
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
@@ -70,7 +104,8 @@ void ULastFPSChainImpactRule::ExecuteChainStep(
 			continue;
 		}
 
-		ApplyGameplayEffectsToTarget(Context, TargetActor, Effects);
+		DrawDebugLine(Context, ChainSourceLocation, TargetActor->GetActorLocation());
+		ApplyGameplayEffectsToTarget(Context, TargetActor, Effects, DamageRange);
 		VisitedActors.Add(TargetActor);
 		AppliedTargets++;
 

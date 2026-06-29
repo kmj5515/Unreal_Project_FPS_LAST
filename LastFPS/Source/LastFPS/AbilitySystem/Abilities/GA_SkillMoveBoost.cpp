@@ -12,10 +12,9 @@ UGA_SkillMoveBoost::UGA_SkillMoveBoost()
     SpeedBoostEffect = ULastFPSGE_MoveSpeedBuff::StaticClass();
     CooldownGameplayEffectClass = ULastFPSGE_Skill1Cooldown::StaticClass();
 
-    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
     FGameplayTagContainer Tags;
-    Tags.AddTag(FPSTags.Ability_Skill1);
-    Tags.AddTag(FPSTags.Input_Skill1);
+    Tags.AddTag(LastFPSGameplayTags::Ability_Skill1);
+    Tags.AddTag(LastFPSGameplayTags::Input_Skill1);
     SetAssetTags(Tags);
 }
 

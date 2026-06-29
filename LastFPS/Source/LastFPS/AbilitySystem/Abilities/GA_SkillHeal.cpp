@@ -13,10 +13,9 @@ UGA_SkillHeal::UGA_SkillHeal()
     HealEffect = ULastFPSGE_HealInstant::StaticClass();
     CooldownGameplayEffectClass = ULastFPSGE_Skill2Cooldown::StaticClass();
 
-    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
     FGameplayTagContainer Tags;
-    Tags.AddTag(FPSTags.Ability_Skill2);
-    Tags.AddTag(FPSTags.Input_Skill2);
+    Tags.AddTag(LastFPSGameplayTags::Ability_Skill2);
+    Tags.AddTag(LastFPSGameplayTags::Input_Skill2);
     SetAssetTags(Tags);
 }
 

@@ -20,10 +20,9 @@ UGA_Projectile::UGA_Projectile()
 
     CooldownGameplayEffectClass = ULastFPSGE_Skill1Cooldown::StaticClass();
 
-    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
     FGameplayTagContainer Tags;
-    Tags.AddTag(FPSTags.Ability_Skill1);
-    Tags.AddTag(FPSTags.Input_Skill1);
+    Tags.AddTag(LastFPSGameplayTags::Ability_Skill1);
+    Tags.AddTag(LastFPSGameplayTags::Input_Skill1);
     SetAssetTags(Tags);
 }
 
@@ -55,20 +54,16 @@ void UGA_Projectile::ActivateAbility(
     if (UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr)
     {
         FGameplayTagContainer SprintTags;
-        SprintTags.AddTag(FLastFPSTags::Get().Input_Sprint);
+        SprintTags.AddTag(LastFPSGameplayTags::Input_Sprint);
         ASC->CancelAbilities(&SprintTags);
     }
 
     Hero->SetCombatState(EMMCombatState::Casting);
     bProjectileSpawned = false;
-    UE_LOG(LogTemp, Warning, TEXT("GA_Projectile activated: Hero=%s Authority=%s EventTag=%s"),
-        *GetNameSafe(Hero),
-        Hero->HasAuthority() ? TEXT("true") : TEXT("false"),
-        *FLastFPSTags::Get().Event_Montage_ProjectileSpawn.ToString());
-
+    
     ProjectileSpawnEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
         this,
-        FLastFPSTags::Get().Event_Montage_ProjectileSpawn,
+        LastFPSGameplayTags::Event_Montage_ProjectileSpawn,
         nullptr,
         true,
         true);
@@ -76,13 +71,11 @@ void UGA_Projectile::ActivateAbility(
     {
         ProjectileSpawnEventTask->EventReceived.AddDynamic(this, &UGA_Projectile::OnProjectileSpawnEvent);
         ProjectileSpawnEventTask->ReadyForActivation();
-        UE_LOG(LogTemp, Warning, TEXT("GA_Projectile waiting gameplay event: %s"),
-            *FLastFPSTags::Get().Event_Montage_ProjectileSpawn.ToString());
     }
 
     AbilityEndEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
         this,
-        FLastFPSTags::Get().Event_Montage_AbilityEnd,
+        LastFPSGameplayTags::Event_Montage_AbilityEnd,
         nullptr,
         true,
         true);
@@ -90,8 +83,6 @@ void UGA_Projectile::ActivateAbility(
     {
         AbilityEndEventTask->EventReceived.AddDynamic(this, &UGA_Projectile::OnAbilityEndEvent);
         AbilityEndEventTask->ReadyForActivation();
-        UE_LOG(LogTemp, Warning, TEXT("GA_Projectile waiting ability end event: %s"),
-            *FLastFPSTags::Get().Event_Montage_AbilityEnd.ToString());
     }
 
     if (ProjectileData->CastMontage && Hero->GetMesh())
@@ -101,16 +92,7 @@ void UGA_Projectile::ActivateAbility(
             const float PlayedDuration = AnimInstance->Montage_Play(
                 ProjectileData->CastMontage,
                 ProjectileData->MontagePlayRate);
-            UE_LOG(LogTemp, Warning, TEXT("GA_Projectile Montage_Play: Montage=%s Duration=%f"),
-                *GetNameSafe(ProjectileData->CastMontage),
-                PlayedDuration);
         }
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("GA_Projectile montage skipped: CastMontage=%s Mesh=%s"),
-            *GetNameSafe(ProjectileData->CastMontage),
-            *GetNameSafe(Hero->GetMesh()));
     }
 
     if (!GetWorld())
@@ -174,10 +156,6 @@ void UGA_Projectile::SpawnProjectile()
         SpawnLocation,
         SpawnRotation,
         SpawnParams);
-
-    UE_LOG(LogTemp, Warning, TEXT("GA_Projectile SpawnActor result: Projectile=%s Location=%s"),
-        *GetNameSafe(Projectile),
-        *SpawnLocation.ToString());
 
     if (Projectile)
     {

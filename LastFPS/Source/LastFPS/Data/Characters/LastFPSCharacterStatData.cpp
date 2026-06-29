@@ -24,6 +24,8 @@ bool ULastFPSCharacterStatData::ApplyToAbilitySystem(UAbilitySystemComponent* AS
 		FMath::Clamp(Stamina, 0.f, ClampedMaxStamina));
 
 	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetAttackDamageAttribute(), FMath::Max(AttackDamage, 0.f));
+	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetCriticalChanceAttribute(), FMath::Clamp(CriticalChance, 0.f, 100.f));
+	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetCriticalDamagePercentAttribute(), FMath::Max(CriticalDamagePercent, 100.f));
 	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetDefenseAttribute(), FMath::Max(Defense, 0.f));
 	ASC->SetNumericAttributeBase(ULastFPSAttributeSet::GetMoveSpeedAttribute(), FMath::Max(MoveSpeed, 0.f));
 

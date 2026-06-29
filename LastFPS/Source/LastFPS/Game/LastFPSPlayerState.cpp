@@ -74,10 +74,50 @@ void ALastFPSPlayerState::Auth_AddFloatStat(float& Stat, float Amount)
     Stat += Amount;
 }
 
-void ALastFPSPlayerState::Auth_AddDamageDealt(float Amount)   { Auth_AddFloatStat(StatDamageDealt,     Amount); }
+void ALastFPSPlayerState::Auth_AddDamageDealt(
+    float Amount,
+    const FVector& DamageWorldLocation,
+    AActor* DamageTargetActor,
+    bool bCriticalHit)
+{
+    if (!HasAuthority() || Amount <= 0.f)
+    {
+        return;
+    }
+
+    const float OldValue = StatDamageDealt;
+    Auth_AddFloatStat(StatDamageDealt, Amount);
+
+    const float DeltaDamage = StatDamageDealt - OldValue;
+    if (DeltaDamage > 0.f)
+    {
+        if (GetNetMode() == NM_Standalone)
+        {
+            OnDamageDealt.Broadcast(DeltaDamage, StatDamageDealt, DamageWorldLocation, DamageTargetActor, bCriticalHit);
+        }
+        else
+        {
+            Client_NotifyDamageDealt(DeltaDamage, StatDamageDealt, DamageWorldLocation, DamageTargetActor, bCriticalHit);
+        }
+    }
+}
+
 void ALastFPSPlayerState::Auth_AddDamageTaken(float Amount)   { Auth_AddFloatStat(StatDamageTaken,     Amount); }
 void ALastFPSPlayerState::Auth_AddHealingReceived(float Amount) { Auth_AddFloatStat(StatHealingReceived, Amount); }
 void ALastFPSPlayerState::Auth_AddHealingGiven(float Amount)  { Auth_AddFloatStat(StatHealingGiven,    Amount); }
+
+void ALastFPSPlayerState::Client_NotifyDamageDealt_Implementation(
+    float DamageAmount,
+    float TotalDamageDealt,
+    FVector DamageWorldLocation,
+    AActor* DamageTargetActor,
+    bool bCriticalHit)
+{
+    if (DamageAmount > 0.f)
+    {
+        OnDamageDealt.Broadcast(DamageAmount, TotalDamageDealt, DamageWorldLocation, DamageTargetActor, bCriticalHit);
+    }
+}
 
 void ALastFPSPlayerState::Auth_AddKill()
 {

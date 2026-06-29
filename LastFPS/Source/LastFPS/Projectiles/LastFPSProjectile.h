@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Utility/LastFPSDamageCalculation.h"
 #include "LastFPSProjectile.generated.h"
 
 class UBoxComponent;
@@ -46,6 +47,9 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category="Projectile")
     TObjectPtr<UParticleSystem> TrailEffect;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Projectile|Damage")
+    FLastFPSDamageRange LegacyDamageRange;
 
 private:
     UFUNCTION()

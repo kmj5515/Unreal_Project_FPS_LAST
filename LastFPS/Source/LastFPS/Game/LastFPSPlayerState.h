@@ -7,6 +7,15 @@
 
 class UAbilitySystemComponent;
 class ULastFPSAttributeSet;
+class AActor;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(
+    FLastFPSDamageDealtSignature,
+    float, DamageAmount,
+    float, TotalDamageDealt,
+    FVector, DamageWorldLocation,
+    AActor*, DamageTargetActor,
+    bool, bCriticalHit);
 
 /** 개인전(FFA) 매치 통계 — 서버에서만 갱신, 복제로 클라이언트 표시 */
 UCLASS()
@@ -38,8 +47,15 @@ public:
     FORCEINLINE float GetStatHealingGiven() const { return StatHealingGiven; }
     FORCEINLINE int32 GetSelectedCharacterIndex() const { return SelectedCharacterIndex; }
 
+    UPROPERTY(BlueprintAssignable, Category="LastFPS|Damage")
+    FLastFPSDamageDealtSignature OnDamageDealt;
+
     /** GAS AttributeSet 등 서버 전용 — 권한 없으면 무시 */
-    void Auth_AddDamageDealt(float Amount);
+    void Auth_AddDamageDealt(
+        float Amount,
+        const FVector& DamageWorldLocation = FVector::ZeroVector,
+        AActor* DamageTargetActor = nullptr,
+        bool bCriticalHit = false);
     void Auth_AddDamageTaken(float Amount);
     void Auth_AddHealingReceived(float Amount);
     void Auth_AddHealingGiven(float Amount);
@@ -75,6 +91,14 @@ protected:
 
 private:
     void Auth_AddFloatStat(float& Stat, float Amount);
+
+    UFUNCTION(Client, Unreliable)
+    void Client_NotifyDamageDealt(
+        float DamageAmount,
+        float TotalDamageDealt,
+        FVector DamageWorldLocation,
+        AActor* DamageTargetActor,
+        bool bCriticalHit);
 
     bool bGASDefaultsGranted = false;
     UPROPERTY(VisibleAnywhere, Category="GAS")

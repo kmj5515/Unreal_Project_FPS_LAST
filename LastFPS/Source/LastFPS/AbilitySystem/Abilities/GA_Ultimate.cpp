@@ -10,10 +10,9 @@ UGA_Ultimate::UGA_Ultimate()
     // 다른 스킬(Q/E)과 동일하게 쿨다운 기반. CommitAbility 가 이 GE 를 적용한다.
     CooldownGameplayEffectClass = ULastFPSGE_UltimateCooldown::StaticClass();
 
-    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
     FGameplayTagContainer Tags;
-    Tags.AddTag(FPSTags.Ability_Ultimate);
-    Tags.AddTag(FPSTags.Input_Ultimate);
+    Tags.AddTag(LastFPSGameplayTags::Ability_Ultimate);
+    Tags.AddTag(LastFPSGameplayTags::Input_Ultimate);
     SetAssetTags(Tags);
 }
 

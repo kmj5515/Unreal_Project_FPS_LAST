@@ -11,10 +11,13 @@
 #include "LastFPSHUDWidget.generated.h"
 
 class UAbilitySystemComponent;
+class ULastFPSDamageNumberWidget;
 class ULastFPSSkillCooldownSlotWidget;
 class ULastFPSQuestTrackerWidget;
 class UMaterialInstanceDynamic;
 class UWeaponComponent;
+class AActor;
+class ALastFPSPlayerState;
 
 struct FLastFPSSmoothedGaugeDisplay
 {
@@ -143,6 +146,18 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="HUD|Gauges|Colors")
     FLinearColor StaminaLowFillColor;
 
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Damage")
+    TSubclassOf<ULastFPSDamageNumberWidget> DamageNumberWidgetClass;
+
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Damage")
+    FVector DamageNumberWorldOffset = FVector(0.f, 0.f, 55.f);
+
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Damage")
+    FVector2D DamageNumberScreenOffset = FVector2D(90.f, -20.f);
+
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Damage", meta=(ClampMin="0.0"))
+    float DamageNumberRandomRadius = 24.f;
+
 private:
     bool InitializeHUD();
 
@@ -151,6 +166,14 @@ private:
 
     void HandleHealthChanged(const FOnAttributeChangeData& Data);
     void HandleStaminaChanged(const FOnAttributeChangeData& Data);
+
+    UFUNCTION()
+    void HandleDamageDealt(
+        float DamageAmount,
+        float TotalDamageDealt,
+        FVector DamageWorldLocation,
+        AActor* DamageTargetActor,
+        bool bCriticalHit);
 
     bool TryInitSkillSlots();
     void TickSkillSlots();
@@ -167,6 +190,12 @@ private:
     void SetCrosshairSpread(float Spread);
     void BroadcastHealthDisplay();
     void BroadcastStaminaDisplay();
+    void SpawnDamageNumber(
+        float DamageAmount,
+        float TotalDamageDealt,
+        const FVector& DamageWorldLocation,
+        AActor* DamageTargetActor,
+        bool bCriticalHit);
     void ApplyGaugeBarBackground(UProgressBar* Bar) const;
     void ApplyGaugeBar(UProgressBar* Bar, float Current, float Max, const FLinearColor& FillColor) const;
     FLinearColor ResolveHealthFillColor() const;
@@ -192,6 +221,7 @@ private:
 
     TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
     TWeakObjectPtr<UWeaponComponent> BoundWeaponComponent;
+    TWeakObjectPtr<ALastFPSPlayerState> BoundPlayerState;
 
     bool bAttributeDelegatesBound = false;
     bool bPawnComponentsBound = false;

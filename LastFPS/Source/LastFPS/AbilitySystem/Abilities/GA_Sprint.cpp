@@ -9,10 +9,9 @@ UGA_Sprint::UGA_Sprint()
     InstancingPolicy   = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
     FGameplayTagContainer Tags;
-    Tags.AddTag(FPSTags.Ability_Sprint);
-    Tags.AddTag(FPSTags.Input_Sprint);
+    Tags.AddTag(LastFPSGameplayTags::Ability_Sprint);
+    Tags.AddTag(LastFPSGameplayTags::Input_Sprint);
     SetAssetTags(Tags);
 }
 

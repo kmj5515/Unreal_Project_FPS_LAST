@@ -27,6 +27,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", meta=(ClampMin=0))
 	float AttackDamage = 10.f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats|Critical", meta=(ClampMin=0, ClampMax=100, Units="%"))
+	float CriticalChance = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats|Critical", meta=(ClampMin=100, Units="%"))
+	float CriticalDamagePercent = 150.f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", meta=(ClampMin=0))
 	float Defense = 0.f;
 

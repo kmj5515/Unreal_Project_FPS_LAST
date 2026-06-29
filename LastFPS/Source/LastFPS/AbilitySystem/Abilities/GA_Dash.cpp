@@ -12,10 +12,9 @@ UGA_Dash::UGA_Dash()
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
     FGameplayTagContainer Tags;
-    Tags.AddTag(FPSTags.Ability_Dash);
-    Tags.AddTag(FPSTags.Input_Dash);
+    Tags.AddTag(LastFPSGameplayTags::Ability_Dash);
+    Tags.AddTag(LastFPSGameplayTags::Input_Dash);
     SetAssetTags(Tags);
 }
 

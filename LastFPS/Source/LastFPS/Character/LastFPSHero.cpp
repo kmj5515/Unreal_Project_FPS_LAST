@@ -112,16 +112,14 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent);
     if (!EIC || !InputConfig) return;
 
-    const FLastFPSTags& FPSTags = FLastFPSTags::Get(); 
-
-    EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_Move), ETriggerEvent::Triggered, this, &ALastFPSHero::Move);
-    EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_Move), ETriggerEvent::Completed, this, &ALastFPSHero::ClearMoveInput);
-    EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_Move), ETriggerEvent::Canceled, this, &ALastFPSHero::ClearMoveInput);
-    EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_Look), ETriggerEvent::Triggered, this, &ALastFPSHero::Look);
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_Move), ETriggerEvent::Triggered, this, &ALastFPSHero::Move);
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_Move), ETriggerEvent::Completed, this, &ALastFPSHero::ClearMoveInput);
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_Move), ETriggerEvent::Canceled, this, &ALastFPSHero::ClearMoveInput);
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_Look), ETriggerEvent::Triggered, this, &ALastFPSHero::Look);
     
-    EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_ADS), ETriggerEvent::Started, this, &ALastFPSHero::SetADS, true);
-    EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_ADS), ETriggerEvent::Completed, this, &ALastFPSHero::SetADS, false);
-    EIC->BindAction(InputConfig->FindNativeInputActionByTag(FPSTags.Input_ADS), ETriggerEvent::Canceled, this, &ALastFPSHero::SetADS, false);
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_ADS), ETriggerEvent::Started, this, &ALastFPSHero::SetADS, true);
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_ADS), ETriggerEvent::Completed, this, &ALastFPSHero::SetADS, false);
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_ADS), ETriggerEvent::Canceled, this, &ALastFPSHero::SetADS, false);
     
     // 어빌리티 전용 
     for (const FLastFPSInputAction& Action : InputConfig->AbilityInputActions)
@@ -141,7 +139,7 @@ void ALastFPSHero::HandleAbilityInput(const FInputActionValue& value, FGameplayT
     }
     else
     {
-        if (InputID == FLastFPSTags::Get().Input_Sprint)
+        if (InputID == LastFPSGameplayTags::Input_Sprint)
         {
             SetWantsToSprint(false);
         }
@@ -161,7 +159,7 @@ void ALastFPSHero::Move(const FInputActionValue& Value)
     if ((bIsSprinting || bWantsToSprint) && !HasForwardSprintInput())
     {
         SetWantsToSprint(false);
-        CancelAbilityByTag(FLastFPSTags::Get().Input_Sprint);
+        CancelAbilityByTag(LastFPSGameplayTags::Input_Sprint);
     }
 
     if (!Controller) return;
@@ -190,7 +188,7 @@ void ALastFPSHero::ClearMoveInput(const FInputActionValue& Value)
     if (bIsSprinting || bWantsToSprint)
     {
         SetWantsToSprint(false);
-        CancelAbilityByTag(FLastFPSTags::Get().Input_Sprint);
+        CancelAbilityByTag(LastFPSGameplayTags::Input_Sprint);
     }
 }
 
@@ -252,8 +250,7 @@ void ALastFPSHero::CancelAbilityByTag(FGameplayTag AbilityTag)
 
 void ALastFPSHero::InputPressed(FGameplayTag InputID)
 {
-    const FLastFPSTags& FPSTags = FLastFPSTags::Get();
-    if (InputID == FPSTags.Input_Sprint)
+    if (InputID == LastFPSGameplayTags::Input_Sprint)
     {
         if (!HasForwardSprintInput())
         {
@@ -270,7 +267,7 @@ void ALastFPSHero::InputPressed(FGameplayTag InputID)
     }
 
     const bool bActivatedOrActive = TryActivateAbilityByTag(InputID);
-    if (InputID == FPSTags.Input_Sprint && !bActivatedOrActive && !bIsSprinting)
+    if (InputID == LastFPSGameplayTags::Input_Sprint && !bActivatedOrActive && !bIsSprinting)
     {
         SetWantsToSprint(false);
     }
@@ -278,7 +275,7 @@ void ALastFPSHero::InputPressed(FGameplayTag InputID)
 
 void ALastFPSHero::InputReleased(FGameplayTag InputID)
 {
-    if (InputID == FLastFPSTags::Get().Input_Sprint)
+    if (InputID == LastFPSGameplayTags::Input_Sprint)
     {
         SetWantsToSprint(false);
     }
@@ -291,7 +288,7 @@ void ALastFPSHero::SetADS(bool bEnabled)
     if (bEnabled && (bIsSprinting || bWantsToSprint))
     {
         SetWantsToSprint(false);
-        CancelAbilityByTag(FLastFPSTags::Get().Input_Sprint);
+        CancelAbilityByTag(LastFPSGameplayTags::Input_Sprint);
     }
 
     bIsADS = bEnabled;

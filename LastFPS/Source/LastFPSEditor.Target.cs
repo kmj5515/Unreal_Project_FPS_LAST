@@ -11,5 +11,6 @@ public class LastFPSEditorTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.V6;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_7;
 		ExtraModuleNames.Add("LastFPS");
+		ExtraModuleNames.Add("LastFPSEditor");
 	}
 }

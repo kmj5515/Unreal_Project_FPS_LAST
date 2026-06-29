@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Utility/LastFPSDamageCalculation.h"
 #include "Utility/LastFPSEnumTypes.h"
 #include "WeaponComponent.generated.h"
 
@@ -89,6 +90,9 @@ public:
     // 최소 연사 간격 (초)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
     float FireRate = 0.1f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Damage")
+    FLastFPSDamageRange DamageRange;
 
     // ── 애니메이션 레이어 ──────────────────────────────────────────
     // 에디터에서 무기별 Layer ABP 클래스 할당 (ABP_Rifle_Layers 등)
