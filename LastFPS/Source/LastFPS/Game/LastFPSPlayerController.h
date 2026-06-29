@@ -4,7 +4,7 @@
 #include "CommonPlayerController.h"
 #include "GameplayTagContainer.h"
 #include "Hub/ILastFPSInteractable.h"
-#include "UI/LastFPSConfirmWidget.h"
+#include "UI/Common/LastFPSConfirmWidget.h"
 #include "LastFPSPlayerController.generated.h"
 
 class APawn;

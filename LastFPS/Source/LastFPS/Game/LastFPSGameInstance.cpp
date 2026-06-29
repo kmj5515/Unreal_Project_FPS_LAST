@@ -1,7 +1,7 @@
 #include "Game/LastFPSGameInstance.h"
 
 #include "Data/Definitions/LastFPSCharacterRoster.h"
-#include "UI/LastFPSUIManagerSubsystem.h"
+#include "UI/Framework/LastFPSUIManagerSubsystem.h"
 
 #include "CommonLocalPlayer.h"
 #include "Engine/Engine.h"
