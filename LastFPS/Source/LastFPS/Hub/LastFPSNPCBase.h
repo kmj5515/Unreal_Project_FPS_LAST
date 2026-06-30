@@ -30,6 +30,7 @@ public:
 	// ILastFPSInteractable
 	virtual void Interact_Implementation(APlayerController* InstigatorPC) override;
 	virtual FText GetInteractionLabel_Implementation() const override;
+	virtual void SetInteractionProgress_Implementation(float Progress) override;
 
 protected:
 	virtual void BeginPlay() override;
@@ -55,7 +56,7 @@ protected:
 
 	/** 근접 감지 반경 (cm) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC", meta=(ClampMin="50"))
-	float InteractionRadius = 250.f;
+	float InteractionRadius = 150.f;
 
 	// ── 컴포넌트 ─────────────────────────────────────────────────
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LastFPS|NPC")

@@ -46,6 +46,7 @@ void ALastFPSNPCBase::BeginPlay()
 		Marker->SetNPCInfo(DisplayName, NPCRole);
 		Marker->SetInteractionLabel(InteractionLabel);
 		Marker->SetInteractionHintVisible(false);
+		Marker->SetInteractionProgress(0.f); // 게이지 숨김 상태로 시작
 	}
 }
 
@@ -59,6 +60,14 @@ void ALastFPSNPCBase::Interact_Implementation(APlayerController* InstigatorPC)
 FText ALastFPSNPCBase::GetInteractionLabel_Implementation() const
 {
 	return InteractionLabel;
+}
+
+void ALastFPSNPCBase::SetInteractionProgress_Implementation(float Progress)
+{
+	if (ULastFPSNPCMarkerWidget* Marker = GetMarkerWidget())
+	{
+		Marker->SetInteractionProgress(Progress);
+	}
 }
 
 // ── 기본 상호작용 — BP에서 오버라이드 ───────────────────────────

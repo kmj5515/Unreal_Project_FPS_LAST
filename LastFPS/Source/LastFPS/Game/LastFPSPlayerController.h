@@ -38,6 +38,7 @@ public:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void SetupInputComponent() override;
+    virtual void PlayerTick(float DeltaTime) override;
 
     // ── UI 진입점 (Subsystem에 위임) ─────────────────────────────────
 
@@ -156,7 +157,29 @@ protected:
     UFUNCTION()
     void OnRep_SelectedCharacterIndex();
 
-    void TryInteract();
+    // ── 홀드 인터랙션 ────────────────────────────────────────────────
+    // G를 누르고 있는 동안 게이지가 차오르고(InteractHoldDuration), 가득 차면 발동.
+    // 도중에 떼거나 대상이 범위를 벗어나면 취소·리셋.
+
+    /** G 눌림 — 홀드 시작 */
+    void BeginInteractHold();
+    /** G 뗌 — 홀드 취소 */
+    void EndInteractHold();
+    /** 홀드 중단(취소) + 게이지 리셋 */
+    void CancelInteractHold();
+    /** 게이지가 가득 참 → 실제 상호작용 발동 */
+    void CompleteInteractHold(AActor* Interactable);
+    /** 현재 대상 마커 게이지에 진행도(0~1) 반영 */
+    void UpdateInteractProgress(float Progress);
+
+    /** 홀드 발동까지 필요한 시간(초) */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Interaction", meta=(ClampMin="0.05"))
+    float InteractHoldDuration = 1.0f;
+
+    bool bIsInteractHeld = false;
+    float InteractHoldElapsed = 0.f;
+    /** 홀드 중인 대상 (홀드 동안 고정 — 도중 null 되면 취소) */
+    TWeakObjectPtr<AActor> HeldInteractable;
 
     UPROPERTY()
     TObjectPtr<ULastFPSHUDWidget> HUDWidget;
