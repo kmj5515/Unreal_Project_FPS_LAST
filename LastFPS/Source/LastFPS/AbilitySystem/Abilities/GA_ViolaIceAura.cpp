@@ -78,6 +78,7 @@ void UGA_ViolaIceAura::ActivateAbility(
 			return;
 		}
 
+		ReleaseCastingState();
 		return;
 	}
 	
@@ -238,6 +239,17 @@ void UGA_ViolaIceAura::FinishAura()
 	EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
 }
 
+void UGA_ViolaIceAura::ReleaseCastingState()
+{
+	if (ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo()))
+	{
+		if (Hero->GetCombatState() == EMMCombatState::Casting)
+		{
+			Hero->SetCombatState(EMMCombatState::Idle);
+		}
+	}
+}
+
 bool UGA_ViolaIceAura::DoesTargetPassAuraTags(AActor* TargetActor) const
 {
 	UAbilitySystemComponent* TargetASC = GetAbilitySystemComponentFromActor(TargetActor);
@@ -353,6 +365,8 @@ void UGA_ViolaIceAura::OnAuraEffectEvent(FGameplayEventData)
 
 void UGA_ViolaIceAura::OnAuraMontageCompleted()
 {
+	ReleaseCastingState();
+
 	if (!bAuraEffectCommitted)
 	{
 		EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
@@ -394,13 +408,7 @@ void UGA_ViolaIceAura::EndAbility(
 		World->GetTimerManager().ClearTimer(AuraDurationTimerHandle);
 	}
 	
-	if (ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo()))
-	{
-		if (Hero->GetCombatState() == EMMCombatState::Casting)
-		{
-			Hero->SetCombatState(EMMCombatState::Idle);
-		}
-	}
+	ReleaseCastingState();
 	
 	bAuraEffectCommitted = false;
 

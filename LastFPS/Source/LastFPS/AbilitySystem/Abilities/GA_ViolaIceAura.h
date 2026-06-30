@@ -49,6 +49,7 @@ private:
 	void ApplyAuraTargetEffects();
 	void ApplyAuraTargetEffect(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass, bool bApplyDamage);
 	void FinishAura();
+	void ReleaseCastingState();
 	bool DoesTargetPassAuraTags(AActor* TargetActor) const;
 	UAbilitySystemComponent* GetAbilitySystemComponentFromActor(AActor* Actor) const;
 	FVector GetAuraOrigin() const;
