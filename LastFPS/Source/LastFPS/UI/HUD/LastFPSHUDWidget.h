@@ -13,7 +13,6 @@
 class UAbilitySystemComponent;
 class ULastFPSDamageNumberWidget;
 class ULastFPSSkillCooldownSlotWidget;
-class ULastFPSQuestTrackerWidget;
 class UMaterialInstanceDynamic;
 class UWeaponComponent;
 class AActor;
@@ -57,9 +56,6 @@ public:
 
     UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
     TObjectPtr<ULastFPSSkillCooldownSlotWidget> WBP_SkillCooldownSlot_F;
-
-    UPROPERTY(BlueprintReadOnly, Category="HUD|Quest", meta=(BindWidgetOptional))
-    TObjectPtr<ULastFPSQuestTrackerWidget> WBP_QuestTracker;
 
 protected:
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
