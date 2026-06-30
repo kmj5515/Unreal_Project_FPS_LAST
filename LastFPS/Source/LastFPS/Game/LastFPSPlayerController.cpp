@@ -178,7 +178,9 @@ void ALastFPSPlayerController::SetupInputComponent()
     if (InputComponent)
     {
         // 상호작용은 G — F는 캐릭터 Enhanced Input의 궁극기(IA_Ultimate)와 충돌하므로.
-        InputComponent->BindKey(EKeys::G, IE_Pressed, this, &ALastFPSPlayerController::TryInteract);
+        // 홀드 방식: 누르면 게이지 시작, 떼면 취소, 가득 차면 발동.
+        InputComponent->BindKey(EKeys::G, IE_Pressed, this, &ALastFPSPlayerController::BeginInteractHold);
+        InputComponent->BindKey(EKeys::G, IE_Released, this, &ALastFPSPlayerController::EndInteractHold);
 
         // ESC → 설정된 메뉴 화면 열기. 열려 있을 땐 Menu 입력모드라 PC까지 안 오고
         // CommonUI Back이 받아 닫으므로 같은 키로 토글이 성립한다.
@@ -205,19 +207,97 @@ void ALastFPSPlayerController::ClearNearestInteractable(AActor* Interactable)
     {
         NearestInteractableActor.Reset();
     }
+
+    // 홀드 중이던 대상이 범위를 벗어나면 취소.
+    if (bIsInteractHeld && HeldInteractable.Get() == Interactable)
+    {
+        CancelInteractHold();
+    }
 }
 
-void ALastFPSPlayerController::TryInteract()
+// ── 홀드 인터랙션 ────────────────────────────────────────────────────
+
+void ALastFPSPlayerController::PlayerTick(float DeltaTime)
 {
-    AActor* Actor = NearestInteractableActor.Get();
-    if (!Actor)
+    Super::PlayerTick(DeltaTime);
+
+    if (!bIsInteractHeld)
     {
         return;
     }
 
-    if (Actor->Implements<ULastFPSInteractable>())
+    AActor* Actor = HeldInteractable.Get();
+    if (!Actor)
     {
-        ILastFPSInteractable::Execute_Interact(Actor, this);
+        // 대상이 사라짐(파괴/범위 이탈) → 취소.
+        CancelInteractHold();
+        return;
+    }
+
+    InteractHoldElapsed += DeltaTime;
+    const float Progress = (InteractHoldDuration > 0.f)
+        ? FMath::Clamp(InteractHoldElapsed / InteractHoldDuration, 0.f, 1.f)
+        : 1.f;
+
+    UpdateInteractProgress(Progress);
+
+    if (Progress >= 1.f)
+    {
+        CompleteInteractHold(Actor);
+    }
+}
+
+void ALastFPSPlayerController::BeginInteractHold()
+{
+    AActor* Actor = NearestInteractableActor.Get();
+    if (!Actor || !Actor->Implements<ULastFPSInteractable>())
+    {
+        return;
+    }
+
+    bIsInteractHeld = true;
+    InteractHoldElapsed = 0.f;
+    HeldInteractable = Actor;
+    UpdateInteractProgress(0.f); // 게이지 0에서 시작
+}
+
+void ALastFPSPlayerController::EndInteractHold()
+{
+    // 가득 차기 전에 떼면 취소. (이미 완료됐으면 bIsInteractHeld=false라 무시)
+    if (bIsInteractHeld)
+    {
+        CancelInteractHold();
+    }
+}
+
+void ALastFPSPlayerController::CancelInteractHold()
+{
+    bIsInteractHeld = false;
+    InteractHoldElapsed = 0.f;
+    UpdateInteractProgress(0.f); // 게이지 리셋(숨김)
+    HeldInteractable.Reset();
+}
+
+void ALastFPSPlayerController::CompleteInteractHold(AActor* Interactable)
+{
+    bIsInteractHeld = false;
+    InteractHoldElapsed = 0.f;
+
+    if (Interactable && Interactable->Implements<ULastFPSInteractable>())
+    {
+        ILastFPSInteractable::Execute_SetInteractionProgress(Interactable, 0.f); // 게이지 리셋
+        ILastFPSInteractable::Execute_Interact(Interactable, this);
+    }
+
+    HeldInteractable.Reset();
+}
+
+void ALastFPSPlayerController::UpdateInteractProgress(float Progress)
+{
+    AActor* Actor = HeldInteractable.Get();
+    if (Actor && Actor->Implements<ULastFPSInteractable>())
+    {
+        ILastFPSInteractable::Execute_SetInteractionProgress(Actor, Progress);
     }
 }
 
