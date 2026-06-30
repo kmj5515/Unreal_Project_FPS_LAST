@@ -8,6 +8,7 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Character_State_Crouched, "Character.State.Crouch
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_Dash, "Cooldown.Skill.Dash", "Dash cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill1, "Cooldown.Skill1", "Skill 1 cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill2, "Cooldown.Skill2", "Skill 2 cooldown")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill3, "Cooldown.Skill3", "Skill 3 cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Ultimate, "Cooldown.Ultimate", "Ultimate cooldown")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(SetByCaller_Damage, "SetByCaller.Damage", "SetByCaller damage magnitude")
@@ -17,6 +18,7 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_AbilityCommit, "Event.Montage.Abili
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_AbilityEnd, "Event.Montage.Ability.End", "End an ability from an ability montage")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ProjectileSpawn, "Event.Montage.Projectile.Spawn", "Spawn a projectile from an ability montage")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ViolaIceAuraEffect, "Event.Montage.ViolaIceAura.Effect", "비올라 얼음 오라 이펙트 실행")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_IceStormSpawn, "Event.Montage.IceStorm.Spawn", "Spawn an ice storm area from an ability montage")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(UI_HUD_Visible, "UI.HUD.Visible", "HUD visibility status")
 
@@ -31,6 +33,7 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Reload, "InputTag.Reload", "Reload input")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Scoreboard, "InputTag.Scoreboard", "Scoreboard input")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Skill1, "InputTag.Skill1", "Skill 1 input")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Skill2, "InputTag.Skill2", "Skill 2 input")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Skill3, "InputTag.Skill3", "Skill 3 input")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Ultimate, "InputTag.Ultimate", "Ultimate input")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Sprint, "Ability.Sprint", "Sprint ability")
@@ -40,5 +43,6 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Fire, "Ability.Fire", "Fire ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Reload, "Ability.Reload", "Reload ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Skill1, "Ability.Skill1", "Skill 1 ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Skill2, "Ability.Skill2", "Skill 2 ability")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Skill3, "Ability.Skill3", "Skill 3 ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Ultimate, "Ability.Ultimate", "Ultimate ability")
 }
