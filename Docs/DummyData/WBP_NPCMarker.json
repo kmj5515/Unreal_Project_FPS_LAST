@@ -1,0 +1,82 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSNPCMarkerWidget",
+	"savePath": "/Game/UI/OutUI/HUD",
+	"assetName": "WBP_NPCMarker",
+	"overwrite": true,
+	"root": {
+		"type": "VerticalBox",
+		"name": "RootBox",
+		"children": [
+			{
+				"type": "TextBlock",
+				"name": "TB_NPCName",
+				"text": "NPC",
+				"fontSize": 18,
+				"justify": "Center",
+				"color": [1.0, 1.0, 1.0, 1.0],
+				"halign": "Center",
+				"padding": [0, 0, 0, 2]
+			},
+			{
+				"type": "TextBlock",
+				"name": "TB_NPCRole",
+				"text": "역할",
+				"fontSize": 11,
+				"justify": "Center",
+				"color": [0.66, 0.74, 0.85, 1.0],
+				"halign": "Center",
+				"padding": [0, 0, 0, 6]
+			},
+			{
+				"type": "HorizontalBox",
+				"name": "InteractionHint",
+				"halign": "Center",
+				"children": [
+					{
+						"type": "SizeBox",
+						"name": "HoldGaugeRoot",
+						"width": 40,
+						"height": 40,
+						"valign": "Center",
+						"padding": [0, 0, 6, 0],
+						"children": [
+							{
+								"type": "Overlay",
+								"name": "GaugeOverlay",
+								"children": [
+									{
+										"type": "Image",
+										"name": "Img_HoldGauge",
+										"color": [0.20, 0.70, 1.0, 1.0],
+										"desiredSize": [40, 40],
+										"halign": "Fill",
+										"valign": "Fill"
+									},
+									{
+										"type": "TextBlock",
+										"name": "TB_HoldKey",
+										"text": "G",
+										"fontSize": 16,
+										"justify": "Center",
+										"color": [1.0, 1.0, 1.0, 1.0],
+										"halign": "Center",
+										"valign": "Center"
+									}
+								]
+							}
+						]
+					},
+					{
+						"type": "TextBlock",
+						"name": "TB_InteractionLabel",
+						"text": "대화",
+						"fontSize": 14,
+						"justify": "Center",
+						"color": [1.0, 1.0, 1.0, 1.0],
+						"valign": "Center"
+					}
+				]
+			}
+		]
+	}
+}
