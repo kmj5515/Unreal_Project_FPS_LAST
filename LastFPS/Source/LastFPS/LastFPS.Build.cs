@@ -16,7 +16,7 @@ public class LastFPS : ModuleRules
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
 			"UMG", "Json", "JsonUtilities", "AssetRegistry", "DeveloperSettings",
 			"CommonUI", "CommonInput", "CommonGame", "ModularGameplayActors",
-			"AIModule", "Niagara"
+			"AIModule", "NavigationSystem", "Niagara"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "NetCore", "SlateCore" });
