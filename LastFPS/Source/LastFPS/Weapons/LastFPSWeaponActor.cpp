@@ -47,6 +47,7 @@ void ALastFPSWeaponActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ALastFPSWeaponActor, WeaponMeshAsset);
     DOREPLIFETIME(ALastFPSWeaponActor, WeaponDefinition);
+    DOREPLIFETIME(ALastFPSWeaponActor, bWeaponHidden);
 }
 
 void ALastFPSWeaponActor::Tick(float DeltaSeconds)
@@ -105,6 +106,28 @@ void ALastFPSWeaponActor::OnRep_WeaponMeshAsset()
     if (WeaponMesh)
     {
         WeaponMesh->SetSkeletalMesh(WeaponMeshAsset);
+        ApplyWeaponHidden();
+    }
+}
+
+void ALastFPSWeaponActor::SetWeaponHidden(bool bShouldHide)
+{
+    bWeaponHidden = bShouldHide;
+    ApplyWeaponHidden();
+}
+
+void ALastFPSWeaponActor::OnRep_WeaponHidden()
+{
+    ApplyWeaponHidden();
+}
+
+void ALastFPSWeaponActor::ApplyWeaponHidden()
+{
+    SetActorHiddenInGame(bWeaponHidden);
+
+    if (WeaponMesh)
+    {
+        WeaponMesh->SetHiddenInGame(bWeaponHidden, true);
     }
 }
 

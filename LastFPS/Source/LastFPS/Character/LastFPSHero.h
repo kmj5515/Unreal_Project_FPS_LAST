@@ -56,6 +56,8 @@ protected:
     
     // 공통 GAS 입력 처리
     bool TryActivateAbilityByTag(FGameplayTag AbilityTag);
+    bool TryConfirmActiveAbility(FGameplayTag InputID);
+    bool ShouldBlockAbilityInputRelease(FGameplayTag InputID);
     void CancelAbilityByTag(FGameplayTag AbilityTag);
     void InputPressed(FGameplayTag InputID);
     void InputReleased(FGameplayTag InputID);

@@ -5,6 +5,7 @@
 #include "AbilitySystem/Effects/GE_Skill3Cooldown.h"
 #include "Animation/AnimInstance.h"
 #include "Character/LastFPSHero.h"
+#include "Character/Components/WeaponComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
@@ -19,6 +20,7 @@ UGA_IceStorm::UGA_IceStorm()
 	ConfirmEventTag = LastFPSGameplayTags::Event_Montage_AbilityCommit;
 	SpawnEventTag = LastFPSGameplayTags::Event_Montage_IceStormSpawn;
 	AbilityEndEventTag = LastFPSGameplayTags::Event_Montage_AbilityEnd;
+	ConfirmInputTag = LastFPSGameplayTags::Input_Fire;
 	AreaEffectClass = ALastFPSAreaEffectActor::StaticClass();
 	AreaConfig.DamageRange.DamageElement = ELastFPSDamageElement::Ice;
 
@@ -73,6 +75,11 @@ void UGA_IceStorm::ActivateAbility(
 	}
 
 	Hero->SetCombatState(EMMCombatState::Casting);
+	if (UWeaponComponent* WeaponComponent = Hero->GetWeaponComponent())
+	{
+		WeaponComponent->SetWeaponHiddenForAbility(true);
+	}
+
 	StartEventTasks();
 
 	if (!PlayIceStormMontage())
@@ -94,11 +101,33 @@ void UGA_IceStorm::InputPressed(
 	}
 }
 
-void UGA_IceStorm::ConfirmIceStorm()
+bool UGA_IceStorm::CanConfirmAbilityInput(FGameplayTag InputTag) const
+{
+	const bool bMatchesConfirmInput = !ConfirmInputTag.IsValid() || ConfirmInputTag == InputTag;
+	return bMatchesConfirmInput && Phase == ELastFPSIceStormPhase::Casting && !bCommitted;
+}
+
+bool UGA_IceStorm::ConfirmAbilityInput(FGameplayTag InputTag)
+{
+	if (!CanConfirmAbilityInput(InputTag))
+	{
+		return false;
+	}
+
+	return ConfirmIceStorm();
+}
+
+bool UGA_IceStorm::ShouldBlockAbilityInputRelease(FGameplayTag InputTag) const
+{
+	const bool bOwnsInputTag = GetAssetTags().HasTagExact(InputTag);
+	return bOwnsInputTag && Phase == ELastFPSIceStormPhase::Casting && !bCommitted;
+}
+
+bool UGA_IceStorm::ConfirmIceStorm()
 {
 	if (Phase != ELastFPSIceStormPhase::Casting || bCommitted)
 	{
-		return;
+		return false;
 	}
 
 	const FGameplayAbilitySpecHandle Handle = GetCurrentAbilitySpecHandle();
@@ -108,13 +137,13 @@ void UGA_IceStorm::ConfirmIceStorm()
 	if (!CacheAimTarget())
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
+		return true;
 	}
 
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
+		return true;
 	}
 
 	bCommitted = true;
@@ -126,6 +155,8 @@ void UGA_IceStorm::ConfirmIceStorm()
 		SpawnAreaEffect();
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 	}
+
+	return true;
 }
 
 void UGA_IceStorm::CancelIceStorm()
@@ -404,6 +435,14 @@ void UGA_IceStorm::EndAbility(
 {
 	EndEventTasks();
 	ReleaseCastingState();
+
+	if (ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo()))
+	{
+		if (UWeaponComponent* WeaponComponent = Hero->GetWeaponComponent())
+		{
+			WeaponComponent->SetWeaponHiddenForAbility(false);
+		}
+	}
 
 	Phase = ELastFPSIceStormPhase::None;
 	bCommitted = false;

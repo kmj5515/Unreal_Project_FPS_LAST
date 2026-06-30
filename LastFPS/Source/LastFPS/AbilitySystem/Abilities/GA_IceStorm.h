@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AbilitySystem/Abilities/LastFPSConfirmableAbility.h"
 #include "AbilitySystem/Abilities/LastFPSGameplayAbility.h"
 #include "AbilitySystem/Actors/LastFPSAreaEffectActor.h"
 #include "GA_IceStorm.generated.h"
@@ -17,7 +18,7 @@ enum class ELastFPSIceStormPhase : uint8
 };
 
 UCLASS()
-class LASTFPS_API UGA_IceStorm : public ULastFPSGameplayAbility
+class LASTFPS_API UGA_IceStorm : public ULastFPSGameplayAbility, public ILastFPSConfirmableAbility
 {
 	GENERATED_BODY()
 
@@ -49,8 +50,12 @@ public:
 		bool bReplicateEndAbility,
 		bool bWasCancelled) override;
 
+	virtual bool CanConfirmAbilityInput(FGameplayTag InputTag) const override;
+	virtual bool ConfirmAbilityInput(FGameplayTag InputTag) override;
+	virtual bool ShouldBlockAbilityInputRelease(FGameplayTag InputTag) const override;
+
 	UFUNCTION(BlueprintCallable, Category="Ice Storm")
-	void ConfirmIceStorm();
+	bool ConfirmIceStorm();
 
 	UFUNCTION(BlueprintCallable, Category="Ice Storm")
 	void CancelIceStorm();
@@ -76,6 +81,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Ice Storm|Event")
 	FGameplayTag AbilityEndEventTag;
+
+	UPROPERTY(EditDefaultsOnly, Category="Ice Storm|Input")
+	FGameplayTag ConfirmInputTag;
 
 	UPROPERTY(EditDefaultsOnly, Category="Ice Storm|Targeting", meta=(ClampMin="0.0"))
 	float AimTraceRange = 3000.f;

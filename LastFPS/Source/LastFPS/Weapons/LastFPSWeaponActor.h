@@ -30,6 +30,7 @@ public:
     FTransform GetMuzzleTransform(FName MuzzleSocketName) const;
     bool GetSocketTransformInBoneSpace(FName SocketName, USkeletalMeshComponent* CharacterMesh, FName RelativeToBoneName, FTransform& OutTransform) const;
     void PlayFireEffects(FName MuzzleSocketName) const;
+    void SetWeaponHidden(bool bShouldHide);
 
     UFUNCTION(BlueprintCallable, Category="Weapon|Animation")
     void PlayFireAnimation();
@@ -42,6 +43,11 @@ public:
     ULastFPSWeaponDefinition* GetDefaultWeaponDefinition() const { return DefaultWeaponDefinition; }
 
 private:
+    UFUNCTION()
+    void OnRep_WeaponHidden();
+
+    void ApplyWeaponHidden();
+
     UFUNCTION()
     void OnRep_WeaponMeshAsset();
 
@@ -59,6 +65,9 @@ private:
 
     UPROPERTY(ReplicatedUsing=OnRep_WeaponMeshAsset)
     TObjectPtr<USkeletalMesh> WeaponMeshAsset;
+
+    UPROPERTY(ReplicatedUsing=OnRep_WeaponHidden)
+    bool bWeaponHidden = false;
 
     UPROPERTY(Transient)
     TObjectPtr<UParticleSystem> MuzzleFlashEffect;

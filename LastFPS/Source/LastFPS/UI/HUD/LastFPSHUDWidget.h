@@ -158,6 +158,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="HUD|Damage", meta=(ClampMin="0.0"))
     float DamageNumberRandomRadius = 24.f;
 
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Damage", meta=(ClampMin="0.0"))
+    float DamageNumberRandomRadiusOffset = 0.f;
+
 private:
     bool InitializeHUD();
 
@@ -196,6 +199,7 @@ private:
         const FVector& DamageWorldLocation,
         AActor* DamageTargetActor,
         bool bCriticalHit);
+    FVector2D MakeDamageNumberRandomOffset() const;
     void ApplyGaugeBarBackground(UProgressBar* Bar) const;
     void ApplyGaugeBar(UProgressBar* Bar, float Current, float Max, const FLinearColor& FillColor) const;
     FLinearColor ResolveHealthFillColor() const;

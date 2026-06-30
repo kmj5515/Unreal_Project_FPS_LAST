@@ -560,11 +560,7 @@ void ULastFPSHUDWidget::SpawnDamageNumber(
         return;
     }
 
-    const float RandomAngle = FMath::FRandRange(0.f, 2.f * PI);
-    const float RandomDistance = FMath::FRandRange(0.f, DamageNumberRandomRadius);
-    const FVector2D RandomOffset(
-        FMath::Cos(RandomAngle) * RandomDistance,
-        FMath::Sin(RandomAngle) * RandomDistance);
+    const FVector2D RandomOffset = MakeDamageNumberRandomOffset();
 
     ULastFPSDamageNumberWidget* DamageNumberWidget =
         CreateWidget<ULastFPSDamageNumberWidget>(PC, DamageNumberWidgetClass);
@@ -583,6 +579,16 @@ void ULastFPSHUDWidget::SpawnDamageNumber(
         DamageNumberScreenOffset,
         RandomOffset,
         bCriticalHit);
+}
+
+FVector2D ULastFPSHUDWidget::MakeDamageNumberRandomOffset() const
+{
+    const float RandomAngle = FMath::FRandRange(0.f, 2.f * PI);
+    const float RandomDistance = DamageNumberRandomRadiusOffset + FMath::FRandRange(0.f, DamageNumberRandomRadius);
+
+    return FVector2D(
+        FMath::Cos(RandomAngle) * RandomDistance,
+        FMath::Sin(RandomAngle) * RandomDistance);
 }
 
 void ULastFPSHUDWidget::HandleWeaponEquippedChanged(bool bEquipped)

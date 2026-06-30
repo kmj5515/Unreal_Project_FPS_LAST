@@ -22,9 +22,8 @@ ALastFPSAreaEffectActor::ALastFPSAreaEffectActor()
 
 	AreaSphere = CreateDefaultSubobject<USphereComponent>(TEXT("AreaSphere"));
 	AreaSphere->SetupAttachment(SceneRoot);
-	AreaSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	AreaSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
-	AreaSphere->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 
 	EffectNiagaraComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("EffectNiagaraComponent"));
 	EffectNiagaraComponent->SetupAttachment(SceneRoot);
@@ -98,6 +97,11 @@ void ALastFPSAreaEffectActor::ConfigureArea()
 	if (EffectNiagaraComponent)
 	{
 		EffectNiagaraComponent->SetAsset(AreaConfig.EffectNiagaraSystem);
+		if (!AreaConfig.DurationNiagaraParameterName.IsNone())
+		{
+			EffectNiagaraComponent->SetVariableFloat(AreaConfig.DurationNiagaraParameterName, AreaConfig.Duration);
+		}
+
 		if (AreaConfig.EffectNiagaraSystem)
 		{
 			EffectNiagaraComponent->Activate(true);

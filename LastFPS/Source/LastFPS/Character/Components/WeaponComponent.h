@@ -31,6 +31,7 @@ public:
     FTransform GetMuzzleTransform() const;
     bool CanFire() const;
     void PlayFireEffects() const;
+    void SetWeaponHiddenForAbility(bool bHidden);
 
     UFUNCTION(BlueprintCallable, Category="Weapon|Animation")
     void PlayReloadAnimation() const;
@@ -140,8 +141,11 @@ private:
     void ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinition* NewDefinition);
 
     void AttachWeaponToOwner(ALastFPSWeaponActor* WeaponActor);
+    void ApplyWeaponVisibilityOverride();
     ALastFPSWeaponActor* SpawnWeaponActor(USkeletalMesh* NewMesh, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass, ULastFPSWeaponDefinition* Definition = nullptr);
     void DestroyCurrentWeapon();
     void HandleFireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
     bool ValidateClientMuzzleLocation(const FVector& ClientMuzzleLocation) const;
+
+    int32 WeaponHiddenOverrideCount = 0;
 };

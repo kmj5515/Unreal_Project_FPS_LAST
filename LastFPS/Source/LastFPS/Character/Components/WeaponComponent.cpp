@@ -102,6 +102,15 @@ void UWeaponComponent::PlayFireEffects() const
     }
 }
 
+void UWeaponComponent::SetWeaponHiddenForAbility(bool bHidden)
+{
+    WeaponHiddenOverrideCount = bHidden
+        ? WeaponHiddenOverrideCount + 1
+        : FMath::Max(WeaponHiddenOverrideCount - 1, 0);
+
+    ApplyWeaponVisibilityOverride();
+}
+
 void UWeaponComponent::PlayReloadAnimation() const
 {
     if (CurrentWeapon)
@@ -205,6 +214,7 @@ void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefini
     }
 
     CurrentWeapon = SpawnWeaponActor(WeaponSkeletalMesh, WeaponActorClass, NewDefinition);
+    ApplyWeaponVisibilityOverride();
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
 }
 
@@ -235,6 +245,7 @@ void UWeaponComponent::OnRep_CurrentWeapon()
     if (CurrentWeapon)
     {
         AttachWeaponToOwner(CurrentWeapon);
+        ApplyWeaponVisibilityOverride();
     }
 
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
@@ -308,7 +319,16 @@ void UWeaponComponent::ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType,
     }
 
     CurrentWeapon = SpawnWeaponActor(NewMesh, NewWeaponActorClass);
+    ApplyWeaponVisibilityOverride();
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
+}
+
+void UWeaponComponent::ApplyWeaponVisibilityOverride()
+{
+    if (CurrentWeapon)
+    {
+        CurrentWeapon->SetWeaponHidden(WeaponHiddenOverrideCount > 0);
+    }
 }
 
 ALastFPSWeaponActor* UWeaponComponent::SpawnWeaponActor(USkeletalMesh* NewMesh, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass, ULastFPSWeaponDefinition* Definition)

@@ -15,6 +15,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/Abilities/LastFPSConfirmableAbility.h"
 #include "AbilitySystem/Abilities/GA_BasicShoot.h"
 #include "AbilitySystem/Abilities/GA_Ultimate.h"
 #include "Net/UnrealNetwork.h"
@@ -144,7 +145,7 @@ void ALastFPSHero::HandleAbilityInput(const FInputActionValue& value, FGameplayT
             SetWantsToSprint(false);
         }
 
-        if (!ShouldSkipAbilityCancelOnRelease(InputID))
+        if (!ShouldSkipAbilityCancelOnRelease(InputID) && !ShouldBlockAbilityInputRelease(InputID))
         {
             InputReleased(InputID);
         }
@@ -231,6 +232,60 @@ bool ALastFPSHero::TryActivateAbilityByTag(FGameplayTag AbilityTag)
     return bActivated || bAlreadyActive;
 }
 
+bool ALastFPSHero::TryConfirmActiveAbility(FGameplayTag InputID)
+{
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC)
+    {
+        return false;
+    }
+
+    for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+    {
+        if (!Spec.IsActive())
+        {
+            continue;
+        }
+
+        UGameplayAbility* ActiveAbility = Spec.GetPrimaryInstance();
+        ILastFPSConfirmableAbility* ConfirmableAbility = Cast<ILastFPSConfirmableAbility>(ActiveAbility);
+        if (!ConfirmableAbility || !ConfirmableAbility->CanConfirmAbilityInput(InputID))
+        {
+            continue;
+        }
+
+        return ConfirmableAbility->ConfirmAbilityInput(InputID);
+    }
+
+    return false;
+}
+
+bool ALastFPSHero::ShouldBlockAbilityInputRelease(FGameplayTag InputID)
+{
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC)
+    {
+        return false;
+    }
+
+    for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+    {
+        if (!Spec.IsActive())
+        {
+            continue;
+        }
+
+        UGameplayAbility* ActiveAbility = Spec.GetPrimaryInstance();
+        const ILastFPSConfirmableAbility* ConfirmableAbility = Cast<ILastFPSConfirmableAbility>(ActiveAbility);
+        if (ConfirmableAbility && ConfirmableAbility->ShouldBlockAbilityInputRelease(InputID))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void ALastFPSHero::CancelAbilityByTag(FGameplayTag AbilityTag)
 {
     UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
@@ -243,6 +298,11 @@ void ALastFPSHero::CancelAbilityByTag(FGameplayTag AbilityTag)
 
 void ALastFPSHero::InputPressed(FGameplayTag InputID)
 {
+    if (TryConfirmActiveAbility(InputID))
+    {
+        return;
+    }
+
     if (InputID == LastFPSGameplayTags::Input_Sprint)
     {
         if (!HasForwardSprintInput())
