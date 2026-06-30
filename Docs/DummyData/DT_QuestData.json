@@ -1,0 +1,10 @@
+[
+	{ "Name": "Q_Main_01", "Title": "각성 프로토콜", "Type": "Main", "Status": "Completed", "Summary": "병참 기지에서 외골격 동기화를 마친다.", "Description": "전선 복귀를 앞둔 계승자의 외골격 재동기화 절차. 병참 장교에게서 기본 보급을 수령하고 시스템 점검을 완료하라.", "RewardText": "크레딧 500", "Icon": "" },
+	{ "Name": "Q_Main_02", "Title": "첫 출격 준비", "Type": "Main", "Status": "InProgress", "Summary": "모듈을 장착하고 무장을 점검한다.", "Description": "출격 전 로드아웃 점검. 보유한 모듈을 외골격 슬롯에 장착해 전투 규격을 충족시켜라. 캐파를 초과하면 동기화가 거부된다.", "RewardText": "크레딧 800 · 정제 코어 ×2", "Icon": "" },
+	{ "Name": "Q_Main_03", "Title": "오염원 제거", "Type": "Main", "Status": "NotStarted", "Summary": "구역의 오염 발생원을 무력화한다.", "Description": "감염 구역에서 오염을 퍼뜨리는 핵심 발생원을 추적해 제거하라. 잔존 적의 저항이 거셀 것으로 예상된다.", "RewardText": "크레딧 1500 · 에픽 모듈 ×1", "Icon": "" },
+	{ "Name": "Q_Side_01", "Title": "보급선 점검", "Type": "Side", "Status": "InProgress", "Summary": "창고의 보급 재고를 확인한다.", "Description": "병참 창고의 소모품 재고가 기준치를 밑돈다. 나노 수리킷 재고를 점검하고 부족분을 병참 장교에게 보고하라.", "RewardText": "나노 수리킷 ×5", "Icon": "" },
+	{ "Name": "Q_Side_02", "Title": "사격 훈련", "Type": "Side", "Status": "Completed", "Summary": "사격장에서 명중 기준을 통과한다.", "Description": "펄스 라이플 규격 적합성 시험. 사격장 표적에 대한 최소 명중 기준을 통과하면 무장 인가가 갱신된다.", "RewardText": "크레딧 300", "Icon": "" },
+	{ "Name": "Q_Side_03", "Title": "모듈 정비", "Type": "Side", "Status": "NotStarted", "Summary": "손상된 모듈을 정비사에게 맡긴다.", "Description": "전투로 마모된 모듈의 회로 정합성이 떨어졌다. 정비사에게 의뢰해 출력을 원래 규격으로 복원하라.", "RewardText": "크레딧 400 · 정제 코어 ×1", "Icon": "" },
+	{ "Name": "Q_Side_04", "Title": "정찰 임무", "Type": "Side", "Status": "InProgress", "Summary": "전방 구역을 정찰하고 좌표를 확보한다.", "Description": "다음 작전 구역의 적 배치를 파악하기 위한 사전 정찰. 주요 거점 좌표를 확보해 작전관에게 전달하라.", "RewardText": "크레딧 600", "Icon": "" },
+	{ "Name": "Q_Side_05", "Title": "잔존 세력 소탕", "Type": "Side", "Status": "NotStarted", "Summary": "후방에 남은 적 잔존 세력을 정리한다.", "Description": "주력이 물러난 뒤에도 후방에 산개한 잔존 세력이 보급선을 위협하고 있다. 구역을 순회하며 잔당을 소탕하라.", "RewardText": "크레딧 700 · 레어 모듈 ×1", "Icon": "" }
+]
