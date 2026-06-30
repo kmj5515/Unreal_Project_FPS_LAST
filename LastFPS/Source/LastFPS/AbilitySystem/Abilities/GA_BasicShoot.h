@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Abilities/GameplayAbility.h"
+#include "AbilitySystem/Abilities/LastFPSGameplayAbility.h"
 #include "GA_BasicShoot.generated.h"
 
 class UWeaponComponent;
@@ -10,7 +10,7 @@ class UGameplayEffect;
 class UAnimMontage;
 
 UCLASS()
-class LASTFPS_API UGA_BasicShoot : public UGameplayAbility
+class LASTFPS_API UGA_BasicShoot : public ULastFPSGameplayAbility
 {
     GENERATED_BODY()
 
@@ -35,12 +35,6 @@ protected:
     // 피격 시 적용할 데미지 GE (에디터에서 할당)
     UPROPERTY(EditDefaultsOnly, Category="Shoot")
     TSubclassOf<UGameplayEffect> DamageEffectClass;
-
-    UPROPERTY(EditDefaultsOnly, Category="Shoot|Debug")
-    bool bDrawDebugShot = true;
-
-    UPROPERTY(EditDefaultsOnly, Category="Shoot|Debug", meta=(EditCondition="bDrawDebugShot", ClampMin="0.0"))
-    float DebugShotDuration = 2.f;
 
     UPROPERTY(EditDefaultsOnly, Category="Shoot|Animation")
     TObjectPtr<UAnimMontage> HipFireMontage;

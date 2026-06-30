@@ -16,6 +16,7 @@ UGA_BasicShoot::UGA_BasicShoot()
 {
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+    bDrawDebug = true;
 
     FGameplayTagContainer Tags;
     Tags.AddTag(LastFPSGameplayTags::Ability_Fire);
@@ -146,8 +147,8 @@ void UGA_BasicShoot::Fire()
         CameraLocation,
         AimRotation.Vector(),
         DamageEffectClass,
-        bDrawDebugShot,
-        DebugShotDuration);
+        ShouldDrawDebug(),
+        GetDebugDrawTime());
 
     if (!Weapon->CanFire())
     {

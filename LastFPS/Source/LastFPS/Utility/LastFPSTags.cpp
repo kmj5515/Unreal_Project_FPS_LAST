@@ -16,6 +16,7 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(SetByCaller_CriticalHit, "SetByCaller.CriticalHit
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_AbilityCommit, "Event.Montage.Ability.Commit", "Commit an ability from an ability montage")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_AbilityEnd, "Event.Montage.Ability.End", "End an ability from an ability montage")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ProjectileSpawn, "Event.Montage.Projectile.Spawn", "Spawn a projectile from an ability montage")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ViolaIceAuraEffect, "Event.Montage.ViolaIceAura.Effect", "비올라 얼음 오라 이펙트 실행")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(UI_HUD_Visible, "UI.HUD.Visible", "HUD visibility status")
 

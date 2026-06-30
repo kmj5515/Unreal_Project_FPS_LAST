@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Abilities/GameplayAbility.h"
+#include "AbilitySystem/Abilities/LastFPSGameplayAbility.h"
 #include "GA_Dash.generated.h"
 
 class ALastFPSHero;
@@ -29,7 +29,7 @@ struct FDashMontageInfo
 };
 
 UCLASS()
-class LASTFPS_API UGA_Dash : public UGameplayAbility
+class LASTFPS_API UGA_Dash : public ULastFPSGameplayAbility
 {
     GENERATED_BODY()
 

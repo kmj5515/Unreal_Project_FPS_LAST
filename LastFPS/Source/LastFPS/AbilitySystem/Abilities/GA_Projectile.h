@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbilityTypes.h"
-#include "Abilities/GameplayAbility.h"
+#include "AbilitySystem/Abilities/LastFPSGameplayAbility.h"
 #include "GA_Projectile.generated.h"
 
 class ALastFPSHero;
@@ -10,7 +10,7 @@ class UAbilityTask_WaitGameplayEvent;
 class ULastFPSAbilityProjectileData;
 
 UCLASS()
-class LASTFPS_API UGA_Projectile : public UGameplayAbility
+class LASTFPS_API UGA_Projectile : public ULastFPSGameplayAbility
 {
     GENERATED_BODY()
 

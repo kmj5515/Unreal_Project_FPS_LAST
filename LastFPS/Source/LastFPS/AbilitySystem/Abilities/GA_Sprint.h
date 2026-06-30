@@ -1,11 +1,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Abilities/GameplayAbility.h"
+#include "AbilitySystem/Abilities/LastFPSGameplayAbility.h"
 #include "GA_Sprint.generated.h"
 
 UCLASS()
-class LASTFPS_API UGA_Sprint : public UGameplayAbility
+class LASTFPS_API UGA_Sprint : public ULastFPSGameplayAbility
 {
     GENERATED_BODY()
 
