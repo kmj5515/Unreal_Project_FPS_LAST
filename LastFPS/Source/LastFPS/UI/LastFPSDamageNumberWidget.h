@@ -34,7 +34,8 @@ protected:
 private:
 	void EnsureNativeWidgets();
 	void ApplyDamageText(float DamageAmount);
-	void UpdateScreenPosition();
+	bool UpdateScreenPosition();
+	bool IsScreenPositionVisible(const FVector2D& ScreenPosition, const FVector2D& ViewportSize) const;
 	void UpdateLifetime(float DeltaTime);
 	
 	UPROPERTY(Transient, meta=(BindWidgetAnimOptional))
@@ -48,6 +49,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category="Damage Number", meta=(ClampMin="0.01"))
 	float LifeTime = 0.75f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Damage Number", meta=(ClampMin="0.0"))
+	float ScreenVisibilityPadding = 24.f;
 
 	TWeakObjectPtr<AActor> TrackedTargetActor;
 	FVector FallbackDamageWorldLocation = FVector::ZeroVector;

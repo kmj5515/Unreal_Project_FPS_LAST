@@ -2,6 +2,7 @@
 
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Blueprint/WidgetTree.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Components/TextBlock.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/PlayerController.h"
@@ -34,7 +35,12 @@ void ULastFPSDamageNumberWidget::InitializeDamageNumber(
 
 	EnsureNativeWidgets();
 	ApplyDamageText(DamageAmount);
-	UpdateScreenPosition();
+	if (!UpdateScreenPosition())
+	{
+		RemoveFromParent();
+		return;
+	}
+
 	PlayDamageNumberAnimation(bIsCritical);
 }
 
@@ -49,7 +55,12 @@ void ULastFPSDamageNumberWidget::NativeTick(const FGeometry& MyGeometry, float I
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	UpdateScreenPosition();
+	if (!UpdateScreenPosition())
+	{
+		RemoveFromParent();
+		return;
+	}
+
 	UpdateLifetime(InDeltaTime);
 }
 
@@ -91,43 +102,69 @@ void ULastFPSDamageNumberWidget::ApplyDamageText(float DamageAmount)
 	DamageTextBlock->SetText(FText::AsNumber(FMath::RoundToInt(DamageAmount)));
 }
 
-void ULastFPSDamageNumberWidget::UpdateScreenPosition()
+bool ULastFPSDamageNumberWidget::UpdateScreenPosition()
 {
 	APlayerController* PC = GetOwningPlayer();
 	if (!PC)
 	{
-		return;
+		return false;
 	}
 
 	const float ViewportScale = UWidgetLayoutLibrary::GetViewportScale(this);
 	const FVector2D ViewportSize = UWidgetLayoutLibrary::GetViewportSize(this) / FMath::Max(ViewportScale, KINDA_SMALL_NUMBER);
 	if (ViewportSize.X <= 0.f || ViewportSize.Y <= 0.f)
 	{
-		return;
+		return false;
 	}
 
 	const FVector TargetWorldLocation = TrackedTargetActor.IsValid()
 		? TrackedTargetActor->GetActorLocation()
 		: FallbackDamageWorldLocation;
-
-	FVector2D ScreenPosition = ViewportSize * 0.5f;
-
-	if (!TargetWorldLocation.IsNearlyZero())
+	if (TargetWorldLocation.IsNearlyZero())
 	{
-		FVector2D ProjectedWidgetPosition;
-		if (UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(
-			PC,
-			TargetWorldLocation + TrackedWorldOffset,
-			ProjectedWidgetPosition,
-			true))
+		return false;
+	}
+
+	const FVector TargetDisplayWorldLocation = TargetWorldLocation + TrackedWorldOffset;
+	if (PC->PlayerCameraManager)
+	{
+		const FVector CameraToTarget = TargetDisplayWorldLocation - PC->PlayerCameraManager->GetCameraLocation();
+		const FVector CameraForward = PC->PlayerCameraManager->GetCameraRotation().Vector();
+		if (FVector::DotProduct(CameraToTarget, CameraForward) <= 0.f)
 		{
-			ScreenPosition = ProjectedWidgetPosition;
+			return false;
 		}
 	}
 
+	FVector2D ScreenPosition;
+	if (!UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(
+		PC,
+		TargetDisplayWorldLocation,
+		ScreenPosition,
+		true))
+	{
+		return false;
+	}
+
 	ScreenPosition += DamageScreenOffset + DamageRandomScreenOffset;
+	if (!IsScreenPositionVisible(ScreenPosition, ViewportSize))
+	{
+		return false;
+	}
+
 	SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
 	SetPositionInViewport(ScreenPosition, false);
+	return true;
+}
+
+bool ULastFPSDamageNumberWidget::IsScreenPositionVisible(
+	const FVector2D& ScreenPosition,
+	const FVector2D& ViewportSize) const
+{
+	return ScreenPosition.X >= -ScreenVisibilityPadding
+		&& ScreenPosition.Y >= -ScreenVisibilityPadding
+		&& ScreenPosition.X <= ViewportSize.X + ScreenVisibilityPadding
+		&& ScreenPosition.Y <= ViewportSize.Y + ScreenVisibilityPadding;
 }
 
 void ULastFPSDamageNumberWidget::UpdateLifetime(float DeltaTime)
