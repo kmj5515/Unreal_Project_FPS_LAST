@@ -6,7 +6,7 @@
 
 /**
  * 순찰 NPC의 다음 순찰 지점을 선택해 Blackboard에 기록하는 BT Task.
- * - Pawn(ALastFPSPatrolNPC)의 PatrolPoints / CurrentPatrolIndex 를 읽어
+ * - Pawn(ALastFPSNPC)의 PatrolPoints / CurrentPatrolIndex 를 읽어
  *   다음 지점의 위치를 TargetLocationKey 에, 대기 시간을 WaitTimeKey 에 쓴다.
  * - 인덱스를 증가시켜 순환(loop)한다.
  * BT 배치: [SelectNextPatrolPoint] → [MoveTo: TargetLocation] → [Wait: WaitTime]

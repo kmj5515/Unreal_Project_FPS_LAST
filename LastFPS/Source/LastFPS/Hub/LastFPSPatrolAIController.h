@@ -9,7 +9,7 @@ class UBehaviorTree;
 /**
  * 순찰 NPC 전용 AIController.
  * 빙의 시 지정된 BehaviorTree를 실행한다 (Blackboard는 BT 에셋에 연결된 것을 자동 사용).
- * 의사결정/이동은 모두 BT가 담당 — Pawn(ALastFPSPatrolNPC)은 몸·상호작용만 책임.
+ * 의사결정/이동은 모두 BT가 담당 — Pawn(ALastFPSNPC)은 몸·상호작용만 책임.
  */
 UCLASS()
 class LASTFPS_API ALastFPSPatrolAIController : public AAIController

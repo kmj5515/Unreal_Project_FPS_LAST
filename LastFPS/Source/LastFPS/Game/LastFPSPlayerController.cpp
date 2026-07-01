@@ -1,10 +1,14 @@
 #include "Game/LastFPSPlayerController.h"
 
 #include "Hub/ILastFPSInteractable.h"
+#include "Data/Tables/LastFPSDialogueData.h"
 #include "UI/HUD/LastFPSHUDWidget.h"
 #include "UI/Common/LastFPSNoticeWidget.h"
 #include "UI/Dialogue/LastFPSDialogueWidget.h"
+#include "UI/Hub/LastFPSNPCInteractionWidget.h"
 #include "UI/Common/LastFPSQuantityDialogWidget.h"
+
+#include "Camera/CameraComponent.h"
 #include "UI/Framework/LastFPSUIManagerSubsystem.h"
 #include "UI/Framework/LastFPSUITags.h"
 
@@ -354,6 +358,98 @@ void ALastFPSPlayerController::ShowDialogue(const FText& Speaker, const TArray<F
     if (ULastFPSDialogueWidget* DialogueWidget = PushWidgetToModalLayer<ULastFPSDialogueWidget>(DialogueWidgetClass))
     {
         DialogueWidget->SetupDialogue(Speaker, Lines);
+    }
+}
+
+// ── NPC 상호작용 허브 (카메라 전환 + 액션 메뉴) ──────────────────────
+
+void ALastFPSPlayerController::BeginNPCInteraction(
+    AActor* NPCActor,
+    UCameraComponent* /*TalkCamera*/,
+    const FText& Name,
+    const FText& InRole,
+    const TArray<FLastFPSNPCAction>& Actions)
+{
+    // 대상이 없거나 이미 다른 NPC와 상호작용 중이면 무시.
+    if (!NPCActor || CurrentNPC.IsValid())
+    {
+        return;
+    }
+
+    CurrentNPC = NPCActor;
+    CurrentNPCName = Name;
+    PreviousViewTarget = GetViewTarget();
+
+    // NPC 카메라로 블렌드. NPCActor의 UCameraComponent를 CalcCamera가 자동으로 뷰로 사용.
+    SetViewTargetWithBlend(NPCActor, NPCCameraBlendTime);
+
+    // 허브 메뉴를 Menu 레이어에 push → 상점/모듈 화면이 그 위에 스택으로 열린다.
+    UPrimaryGameLayout* RootLayout = UPrimaryGameLayout::GetPrimaryGameLayout(this);
+    if (RootLayout && NPCInteractionWidgetClass)
+    {
+        ULastFPSNPCInteractionWidget* Hub = RootLayout->PushWidgetToLayerStack<ULastFPSNPCInteractionWidget>(
+            LastFPSUITags::Layer_Menu(), NPCInteractionWidgetClass);
+        if (Hub)
+        {
+            Hub->Setup(this, Name, InRole, Actions);
+            NPCHubWidget = Hub;
+        }
+    }
+    else
+    {
+        UE_LOG(LogLastFPSPlayerController, Warning,
+            TEXT("BeginNPCInteraction: 허브를 띄우지 못했습니다. PlayerController BP의 NPCInteractionWidgetClass에 WBP_NPCInteraction이 지정됐는지 확인하세요."));
+    }
+}
+
+void ALastFPSPlayerController::EndNPCInteraction()
+{
+    if (!CurrentNPC.IsValid() && !PreviousViewTarget.IsValid())
+    {
+        return; // 상호작용 중이 아님 (중복 호출 방지)
+    }
+
+    // 캐릭터(폰)로 시점 복귀. 이동은 허브가 닫히며 Game 입력모드로 자동 복구된다.
+    AActor* Target = PreviousViewTarget.Get();
+    if (!Target)
+    {
+        Target = GetPawn();
+    }
+    if (Target)
+    {
+        SetViewTargetWithBlend(Target, NPCCameraBlendTime);
+    }
+
+    CurrentNPC.Reset();
+    PreviousViewTarget.Reset();
+    NPCHubWidget.Reset();
+    CurrentNPCName = FText::GetEmpty();
+}
+
+void ALastFPSPlayerController::ExecuteNPCAction(const FLastFPSNPCAction& Action)
+{
+    switch (Action.Type)
+    {
+    case ELastFPSNPCActionType::Screen:
+        if (Action.ScreenTag.IsValid())
+        {
+            OpenScreen(Action.ScreenTag); // 상점/모듈/임무 등 — 허브 위에 스택으로 열림
+        }
+        break;
+
+    case ELastFPSNPCActionType::Dialogue:
+    {
+        const FLastFPSDialogueData* Dialogue = Action.DialogueRow.IsNull()
+            ? nullptr
+            : Action.DialogueRow.GetRow<FLastFPSDialogueData>(TEXT("NPC ExecuteNPCAction"));
+        if (Dialogue)
+        {
+            // 행에 화자 이름이 없으면 현재 NPC 이름을 사용.
+            const FText& Speaker = Dialogue->SpeakerName.IsEmpty() ? CurrentNPCName : Dialogue->SpeakerName;
+            ShowDialogue(Speaker, Dialogue->Lines); // Modal 레이어 → 허브 위에 표시
+        }
+        break;
+    }
     }
 }
 

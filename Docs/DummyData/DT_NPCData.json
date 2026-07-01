@@ -1,0 +1,194 @@
+[
+	{
+		"Name": "NPC_Mechanic",
+		"DisplayName": "정비병 보로스",
+		"NPCRole": "정비병",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Mechanic" }
+		]
+	},
+	{
+		"Name": "NPC_Janitor",
+		"DisplayName": "청소병 핀",
+		"NPCRole": "청소병",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Janitor" }
+		]
+	},
+	{
+		"Name": "NPC_ModuleManager",
+		"DisplayName": "모듈 관리관 세라",
+		"NPCRole": "모듈 관리",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_ModuleManager" },
+			{ "Label": "모듈", "Type": "Screen", "ScreenTag": "UI.Screen.Module", "DialogueRowName": "None" }
+		]
+	},
+	{
+		"Name": "NPC_ItemShop",
+		"DisplayName": "보급상 데크",
+		"NPCRole": "아이템 상점",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_ItemShop" },
+			{ "Label": "상점", "Type": "Screen", "ScreenTag": "UI.Screen.Shop", "DialogueRowName": "None" }
+		]
+	},
+	{
+		"Name": "NPC_Sentry_A",
+		"DisplayName": "보초병 콜",
+		"NPCRole": "보초병",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Sentry_A" }
+		]
+	},
+	{
+		"Name": "NPC_Sentry_B",
+		"DisplayName": "보초병 렌",
+		"NPCRole": "보초병",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Sentry_B" }
+		]
+	},
+	{
+		"Name": "NPC_Instructor",
+		"DisplayName": "교육 조교 탈",
+		"NPCRole": "교육 조교",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Instructor" }
+		]
+	},
+	{
+		"Name": "NPC_Trooper_A",
+		"DisplayName": "기갑병 릭",
+		"NPCRole": "기갑병",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Trooper_A" }
+		]
+	},
+	{
+		"Name": "NPC_Trooper_B",
+		"DisplayName": "기갑병 보드",
+		"NPCRole": "기갑병",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Trooper_B" }
+		]
+	},
+	{
+		"Name": "NPC_Officer",
+		"DisplayName": "기갑 장교 발렌",
+		"NPCRole": "기갑 장교",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Officer" }
+		]
+	},
+	{
+		"Name": "NPC_Civilian_A",
+		"DisplayName": "피난민 미아",
+		"NPCRole": "시민",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Civilian_A" }
+		]
+	},
+	{
+		"Name": "NPC_Civilian_B",
+		"DisplayName": "정착민 도른",
+		"NPCRole": "시민",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Civilian_B" }
+		]
+	},
+	{
+		"Name": "NPC_Civilian_C",
+		"DisplayName": "노인 하란",
+		"NPCRole": "시민",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Civilian_C" }
+		]
+	},
+	{
+		"Name": "NPC_Merchant_A",
+		"DisplayName": "행상인 코바",
+		"NPCRole": "상인",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Merchant_A" }
+		]
+	},
+	{
+		"Name": "NPC_Merchant_B",
+		"DisplayName": "밀매상 지크",
+		"NPCRole": "상인",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_Merchant_B" }
+		]
+	},
+	{
+		"Name": "NPC_ShopCustomer_A",
+		"DisplayName": "단골 타냐",
+		"NPCRole": "상점 손님",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_ShopCustomer_A" }
+		]
+	},
+	{
+		"Name": "NPC_ShopCustomer_B",
+		"DisplayName": "손님 웨스",
+		"NPCRole": "상점 손님",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_ShopCustomer_B" }
+		]
+	},
+	{
+		"Name": "NPC_ModuleCustomer_A",
+		"DisplayName": "기술광 뎁",
+		"NPCRole": "모듈 상점 손님",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_ModuleCustomer_A" }
+		]
+	},
+	{
+		"Name": "NPC_ModuleCustomer_B",
+		"DisplayName": "개조가 니케",
+		"NPCRole": "모듈 상점 손님",
+		"InteractionLabel": "대화",
+		"InteractionRadius": 150.0,
+		"Actions": [
+			{ "Label": "대화하기", "Type": "Dialogue", "ScreenTag": "", "DialogueRowName": "DLG_ModuleCustomer_B" }
+		]
+	}
+]

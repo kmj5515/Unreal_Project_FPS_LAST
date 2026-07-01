@@ -23,4 +23,7 @@ private:
 
 	/** Opens a folder picker and generates from every *.json in it (overwrite honored per file). */
 	void GenerateFromFolderDialog();
+
+	/** Generates BP_<RowName> NPC presets from the DT_NPCData configured in Project Settings. */
+	void GenerateNPCPresets();
 };
