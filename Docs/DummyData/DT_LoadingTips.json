@@ -1,0 +1,23 @@
+[
+	{ "Name": "TIP_Control_Interact", "Category": "Control", "TipTitle": "조작", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot01.TheFirstDescendant_Screenshot01", "Tip": "NPC와 대화하려면 가까이 다가가 G키로 상호작용하세요." },
+	{ "Name": "TIP_Control_Exit",     "Category": "Control", "TipTitle": "조작", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot02.TheFirstDescendant_Screenshot02", "Tip": "NPC와 대화 중에는 ESC로 언제든 빠져나올 수 있습니다." },
+	{ "Name": "TIP_Control_Reload",   "Category": "Control", "TipTitle": "조작", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot03.TheFirstDescendant_Screenshot03", "Tip": "총알이 부족하지 않도록 미리미리 장전하세요." },
+	{ "Name": "TIP_Control_Cover",    "Category": "Control", "TipTitle": "조작", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot04.TheFirstDescendant_Screenshot04", "Tip": "교전 전, 엄폐물 뒤에서 재장전하는 습관이 생존율을 높입니다." },
+
+	{ "Name": "TIP_Combat_Heat",      "Category": "Combat",  "TipTitle": "전투", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot05.TheFirstDescendant_Screenshot05", "Tip": "무리한 기동 뒤에는 외골격 히트싱크에 오염 잔재가 낍니다. 과열에 주의하세요." },
+	{ "Name": "TIP_Combat_Flank",     "Category": "Combat",  "TipTitle": "전투", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot06.TheFirstDescendant_Screenshot06", "Tip": "정면 돌파보다 측면. 오염체의 사각을 노리면 피해를 줄일 수 있습니다." },
+	{ "Name": "TIP_Combat_Supply",    "Category": "Combat",  "TipTitle": "전투", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot07.TheFirstDescendant_Screenshot07", "Tip": "탄약과 소모품은 출격 전에 넉넉히 챙기세요. 전선 한복판엔 보급이 없습니다." },
+
+	{ "Name": "TIP_Growth_Capacity",  "Category": "Growth",  "TipTitle": "성장", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot08.TheFirstDescendant_Screenshot08", "Tip": "슬롯 용량을 초과하면 모듈 동기화가 튕깁니다. 무작정 좋은 것만 꽂지 마세요." },
+	{ "Name": "TIP_Growth_Balance",   "Category": "Growth",  "TipTitle": "성장", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot09.TheFirstDescendant_Screenshot09", "Tip": "출력·방어·기동의 균형이 핵심입니다. 전투 방식에 맞춰 조합하세요." },
+	{ "Name": "TIP_Growth_Sync",      "Category": "Growth",  "TipTitle": "성장", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot10.TheFirstDescendant_Screenshot10", "Tip": "동기화율이 높다고 오염에 면역인 것은 아닙니다. 방심은 금물입니다." },
+	{ "Name": "TIP_Growth_Credit",    "Category": "Growth",  "TipTitle": "성장", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot11.TheFirstDescendant_Screenshot11", "Tip": "크레딧은 보급과 모듈에. 아껴 쓰되, 필요할 땐 과감하게." },
+
+	{ "Name": "TIP_World_Source",     "Category": "World",   "TipTitle": "월드", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot12.TheFirstDescendant_Screenshot12", "Tip": "오염원 제거가 최우선입니다. 발생원만 끊어도 구역 전체가 안정됩니다." },
+	{ "Name": "TIP_World_SubQuest",   "Category": "World",   "TipTitle": "월드", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot13.TheFirstDescendant_Screenshot13", "Tip": "여유가 되면 서브 임무도. 정찰과 소탕은 다음 출격을 수월하게 만듭니다." },
+	{ "Name": "TIP_World_TalkNPC",    "Category": "World",   "TipTitle": "월드", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot14.TheFirstDescendant_Screenshot14", "Tip": "기지의 NPC들에게 말을 걸어보세요. 보급·모듈·임무 정보를 얻을 수 있습니다." },
+
+	{ "Name": "TIP_Lore_Survive",     "Category": "Lore",    "TipTitle": "기록", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot15.TheFirstDescendant_Screenshot15", "Tip": "계승자여, 살아 돌아오는 것이 최고의 성적이다." },
+	{ "Name": "TIP_Lore_Wall",        "Category": "Lore",    "TipTitle": "기록", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot16.TheFirstDescendant_Screenshot16", "Tip": "외골격은 인류 최후의 방벽. 그리고 당신이 그 방벽이다." },
+	{ "Name": "TIP_Lore_Reclaim",     "Category": "Lore",    "TipTitle": "기록", "Image": "/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot17.TheFirstDescendant_Screenshot17", "Tip": "오염이 삼킨 땅을 되찾을 수 있는 건, 오직 계승자뿐이다." }
+]
