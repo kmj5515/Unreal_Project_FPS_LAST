@@ -31,6 +31,9 @@ struct LASTFPS_API FLastFPSAreaEffectConfig
 	TSubclassOf<UGameplayEffect> DamageEffect;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Damage")
+	TSubclassOf<UGameplayEffect> DamageCooldownEffect;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Damage")
 	FLastFPSDamageRange DamageRange;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Target Effects")
@@ -45,6 +48,15 @@ struct LASTFPS_API FLastFPSAreaEffectConfig
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|VFX")
 	TObjectPtr<UNiagaraSystem> EffectNiagaraSystem;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|VFX")
+	FName RadiusNiagaraParameterName = TEXT("User.Radius");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|VFX", meta=(ClampMin="0.0"))
+	float VisualRadius = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|VFX")
+	FName VisualRadiusNiagaraParameterName = TEXT("User.VisualRadius");
+	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|VFX")
 	FName DurationNiagaraParameterName = TEXT("User.Duration");
 
@@ -90,7 +102,7 @@ private:
 
 	void ConfigureArea();
 	void ApplyAreaEffects();
-	void ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass, bool bApplyDamage);
+	bool ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass, bool bApplyDamage);
 	void FinishArea();
 	void CollectTargets(TArray<AActor*>& OutTargets) const;
 	bool DoesTargetPassTags(AActor* TargetActor) const;

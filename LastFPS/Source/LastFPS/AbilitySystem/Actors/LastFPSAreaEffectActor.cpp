@@ -97,6 +97,22 @@ void ALastFPSAreaEffectActor::ConfigureArea()
 	if (EffectNiagaraComponent)
 	{
 		EffectNiagaraComponent->SetAsset(AreaConfig.EffectNiagaraSystem);
+		if (!AreaConfig.RadiusNiagaraParameterName.IsNone())
+		{
+			EffectNiagaraComponent->SetVariableFloat(AreaConfig.RadiusNiagaraParameterName, AreaConfig.Radius);
+		}
+
+		if (!AreaConfig.VisualRadiusNiagaraParameterName.IsNone())
+		{
+			const float VisualRadius = AreaConfig.VisualRadius > 0.f ? AreaConfig.VisualRadius : AreaConfig.Radius * 2.f;
+			EffectNiagaraComponent->SetVariableFloat(AreaConfig.VisualRadiusNiagaraParameterName, VisualRadius);
+		}
+
+		// if (!AreaConfig.DamageIntervalNiagaraParameterName.IsNone())
+		// {
+		// 	EffectNiagaraComponent->SetVariableFloat(AreaConfig.DamageIntervalNiagaraParameterName, AreaConfig.DamageInterval);
+		// }
+
 		if (!AreaConfig.DurationNiagaraParameterName.IsNone())
 		{
 			EffectNiagaraComponent->SetVariableFloat(AreaConfig.DurationNiagaraParameterName, AreaConfig.Duration);
@@ -135,29 +151,38 @@ void ALastFPSAreaEffectActor::ApplyAreaEffects()
 		}
 
 		DrawTargetDebug(TargetActor);
-		ApplyEffectToTarget(TargetActor, AreaConfig.DamageEffect, true);
+		const bool bDamageApplied = ApplyEffectToTarget(TargetActor, AreaConfig.DamageEffect, true);
+		if (bDamageApplied)
+		{
+			ApplyEffectToTarget(TargetActor, AreaConfig.DamageCooldownEffect, false);
+		}
 
 		for (const TSubclassOf<UGameplayEffect>& TargetEffect : AreaConfig.TargetEffects)
 		{
+			if (TargetEffect == AreaConfig.DamageCooldownEffect)
+			{
+				continue;
+			}
+
 			ApplyEffectToTarget(TargetActor, TargetEffect, false);
 		}
 	}
 }
 
-void ALastFPSAreaEffectActor::ApplyEffectToTarget(
+bool ALastFPSAreaEffectActor::ApplyEffectToTarget(
 	AActor* TargetActor,
 	TSubclassOf<UGameplayEffect> EffectClass,
 	bool bApplyDamage)
 {
-	if (!TargetActor || !EffectClass || !SourceASC.IsValid())
+	if (!IsValid(TargetActor) || !EffectClass || !SourceASC.IsValid())
 	{
-		return;
+		return false;
 	}
 
 	UAbilitySystemComponent* TargetASC = GetAbilitySystemComponentFromActor(TargetActor);
-	if (!TargetASC)
+	if (!IsValid(TargetASC))
 	{
-		return;
+		return false;
 	}
 
 	FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
@@ -165,9 +190,9 @@ void ALastFPSAreaEffectActor::ApplyEffectToTarget(
 	EffectContext.AddInstigator(SourceActor.Get(), this);
 
 	FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(EffectClass, 1.f, EffectContext);
-	if (!Spec.IsValid())
+	if (!Spec.IsValid() || !Spec.Data.IsValid() || !Spec.Data->Def)
 	{
-		return;
+		return false;
 	}
 
 	if (bApplyDamage || LastFPSDamage::IsDamageGameplayEffect(EffectClass))
@@ -175,7 +200,8 @@ void ALastFPSAreaEffectActor::ApplyEffectToTarget(
 		LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), AreaConfig.DamageRange);
 	}
 
-	TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+	const FActiveGameplayEffectHandle AppliedHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
+	return AppliedHandle.WasSuccessfullyApplied();
 }
 
 void ALastFPSAreaEffectActor::FinishArea()

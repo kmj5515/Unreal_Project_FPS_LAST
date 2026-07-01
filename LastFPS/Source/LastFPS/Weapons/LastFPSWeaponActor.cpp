@@ -140,10 +140,6 @@ FTransform ALastFPSWeaponActor::GetMuzzleTransform(FName MuzzleSocketName) const
 
     if (!WeaponMesh->DoesSocketExist(MuzzleSocketName))
     {
-        UE_LOG(LogTemp, Warning, TEXT("WeaponActor muzzle socket missing: Actor=%s Socket=%s Mesh=%s"),
-            *GetName(),
-            *MuzzleSocketName.ToString(),
-            WeaponMesh->GetSkeletalMeshAsset() ? *WeaponMesh->GetSkeletalMeshAsset()->GetName() : TEXT("None"));
         return WeaponMesh->GetComponentTransform();
     }
 

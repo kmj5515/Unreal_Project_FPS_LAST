@@ -1,14 +1,13 @@
 #include "AbilitySystem/Abilities/GA_ViolaIceAura.h"
 
 #include "AbilitySystemComponent.h"
-#include "AbilitySystemInterface.h"
+#include "AbilitySystem/Actors/LastFPSAreaEffectActor.h"
 #include "AbilitySystem/Effects/GE_Skill2Cooldown.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Character/LastFPSHero.h"
-#include "Engine/OverlapResult.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
-#include "GameplayEffect.h"
 #include "Utility/LastFPSTags.h"
 
 UGA_ViolaIceAura::UGA_ViolaIceAura()
@@ -18,6 +17,7 @@ UGA_ViolaIceAura::UGA_ViolaIceAura()
 	CooldownGameplayEffectClass = ULastFPSGE_Skill2Cooldown::StaticClass();
 
 	AuraEffectEventTag = LastFPSGameplayTags::Event_Montage_ViolaIceAuraEffect;
+	AuraAreaEffectClass = ALastFPSAreaEffectActor::StaticClass();
 	DamageRange.DamageElement = ELastFPSDamageElement::Ice;
 
 	FGameplayTagContainer Tags;
@@ -135,7 +135,6 @@ bool UGA_ViolaIceAura::CommitAndApplyAuraEffect()
 	bAuraEffectCommitted = true;
 	ApplyAuraEffect();
 	StartAuraLoop();
-	DrawAuraSphere();
 	return true;
 }
 
@@ -148,14 +147,14 @@ void UGA_ViolaIceAura::StartAuraLoop()
 		return;
 	}
 
-	ApplyAuraTargetEffects();
+	SpawnAuraAreaEffect();
 
-	if (DamageInterval > 0.f && (AuraDamageEffect || !AuraTargetEffects.IsEmpty()))
+	if (DamageInterval > 0.f && ShouldSpawnAuraAreaEffect())
 	{
 		World->GetTimerManager().SetTimer(
 			AuraTargetEffectTimerHandle,
 			this,
-			&UGA_ViolaIceAura::ApplyAuraTargetEffects,
+			&UGA_ViolaIceAura::SpawnAuraAreaEffect,
 			DamageInterval,
 			true);
 	}
@@ -175,63 +174,67 @@ void UGA_ViolaIceAura::StartAuraLoop()
 	}
 }
 
-void UGA_ViolaIceAura::ApplyAuraTargetEffects()
+void UGA_ViolaIceAura::SpawnAuraAreaEffect()
 {
-	DrawAuraSphere();
-
-	TArray<AActor*> TargetActors;
-	GetActorsInAuraSphere(TargetActors);
-
-	for (AActor* TargetActor : TargetActors)
+	if (!ShouldSpawnAuraAreaEffect())
 	{
-		if (!DoesTargetPassAuraTags(TargetActor))
-		{
-			continue;
-		}
-
-		DrawAuraTargetDebug(TargetActor);
-		ApplyAuraTargetEffect(TargetActor, AuraDamageEffect, true);
-
-		for (const TSubclassOf<UGameplayEffect>& TargetEffect : AuraTargetEffects)
-		{
-			ApplyAuraTargetEffect(TargetActor, TargetEffect, false);
-		}
+		return;
 	}
+
+	ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+	UWorld* World = GetWorld();
+	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
+	const TSubclassOf<ALastFPSAreaEffectActor> AreaClass = AuraAreaEffectClass
+		? AuraAreaEffectClass.Get()
+		: ALastFPSAreaEffectActor::StaticClass();
+	if (!Hero || !World || !Hero->HasAuthority() || !SourceASC || !AreaClass)
+	{
+		return;
+	}
+
+	const FTransform SpawnTransform(FRotator::ZeroRotator, GetAuraOrigin());
+	ALastFPSAreaEffectActor* AreaActor = World->SpawnActorDeferred<ALastFPSAreaEffectActor>(
+		AreaClass,
+		SpawnTransform,
+		Hero,
+		Hero,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (!AreaActor)
+	{
+		return;
+	}
+
+	AreaActor->InitializeAreaEffect(Hero, SourceASC, BuildAuraAreaConfig());
+	AreaActor->FinishSpawning(SpawnTransform);
 }
 
-void UGA_ViolaIceAura::ApplyAuraTargetEffect(
-	AActor* TargetActor,
-	TSubclassOf<UGameplayEffect> EffectClass,
-	bool bApplyDamage)
+bool UGA_ViolaIceAura::ShouldSpawnAuraAreaEffect() const
 {
-	if (!TargetActor || !EffectClass)
-	{
-		return;
-	}
+	return AuraAreaDuration > 0.f
+		&& AuraRadius > 0.f
+		&& (AuraDamageEffect || !AuraTargetEffects.IsEmpty() || AuraPulseNiagaraSystem);
+}
 
-	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
-	UAbilitySystemComponent* TargetASC = GetAbilitySystemComponentFromActor(TargetActor);
-	if (!SourceASC || !TargetASC)
-	{
-		return;
-	}
-
-	FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
-	EffectContext.AddSourceObject(this);
-	EffectContext.AddInstigator(GetAvatarActorFromActorInfo(), GetAvatarActorFromActorInfo());
-
-	FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(EffectClass, GetAbilityLevel(), EffectContext);
-	if (!Spec.IsValid())
-	{
-		return;
-	}
-
-	if (bApplyDamage || LastFPSDamage::IsDamageGameplayEffect(EffectClass))
-	{
-		LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), DamageRange);
-	}
-
-	TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+FLastFPSAreaEffectConfig UGA_ViolaIceAura::BuildAuraAreaConfig() const
+{
+	FLastFPSAreaEffectConfig AreaConfig;
+	AreaConfig.Radius = AuraRadius;
+	AreaConfig.Duration = AuraAreaDuration;
+	AreaConfig.DamageInterval = DamageInterval;
+	AreaConfig.DamageEffect = AuraDamageEffect;
+	AreaConfig.DamageCooldownEffect = AuraDamageCooldownEffect;
+	AreaConfig.DamageRange = DamageRange;
+	AreaConfig.TargetEffects = AuraTargetEffects;
+	AreaConfig.RequiredTargetTags = RequiredTargetTags;
+	AreaConfig.BlockedTargetTags = BlockedTargetTags;
+	AreaConfig.EffectNiagaraSystem = AuraPulseNiagaraSystem;
+	AreaConfig.VisualRadius = GetAuraVisualRadius();
+	AreaConfig.VisualRadiusNiagaraParameterName = AuraVisualRadiusNiagaraParameterName;
+	AreaConfig.DurationNiagaraParameterName = AuraDurationNiagaraParameterName;
+	AreaConfig.bDrawDebug = ShouldDrawDebug();
+	AreaConfig.DebugDrawTime = AuraAreaDuration;
+	AreaConfig.DebugColor = DebugColor;
+	return AreaConfig;
 }
 
 void UGA_ViolaIceAura::FinishAura()
@@ -250,109 +253,35 @@ void UGA_ViolaIceAura::ReleaseCastingState()
 	}
 }
 
-bool UGA_ViolaIceAura::DoesTargetPassAuraTags(AActor* TargetActor) const
-{
-	UAbilitySystemComponent* TargetASC = GetAbilitySystemComponentFromActor(TargetActor);
-	if (!TargetASC)
-	{
-		return false;
-	}
-
-	FGameplayTagContainer OwnedTags;
-	TargetASC->GetOwnedGameplayTags(OwnedTags);
-
-	if (!RequiredTargetTags.IsEmpty() && !OwnedTags.HasAll(RequiredTargetTags))
-	{
-		return false;
-	}
-
-	if (!BlockedTargetTags.IsEmpty() && OwnedTags.HasAny(BlockedTargetTags))
-	{
-		return false;
-	}
-
-	return true;
-}
-
-UAbilitySystemComponent* UGA_ViolaIceAura::GetAbilitySystemComponentFromActor(AActor* Actor) const
-{
-	const IAbilitySystemInterface* AbilitySystemInterface = Cast<IAbilitySystemInterface>(Actor);
-	return AbilitySystemInterface ? AbilitySystemInterface->GetAbilitySystemComponent() : nullptr;
-}
-
-FVector UGA_ViolaIceAura::GetAuraOrigin() const
+FVector UGA_ViolaIceAura::GetCurrentAvatarLocation() const
 {
 	const AActor* AvatarActor = GetAvatarActorFromActorInfo();
 	return AvatarActor ? AvatarActor->GetActorLocation() : FVector::ZeroVector;
 }
 
-void UGA_ViolaIceAura::DrawAuraSphere() const
+FVector UGA_ViolaIceAura::GetAuraSourceLocation() const
 {
-	if (AuraRadius <= 0.f)
+	const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+	USkeletalMeshComponent* MeshComponent = Hero ? Hero->GetMesh() : nullptr;
+	if (!MeshComponent || AuraOriginBoneName.IsNone())
 	{
-		return;
+		return GetCurrentAvatarLocation();
 	}
 
-	DrawDebugSphere(GetCurrentActorInfo(), GetAuraOrigin(), AuraRadius);
+	const bool bHasSocketOrBone =
+		MeshComponent->DoesSocketExist(AuraOriginBoneName) ||
+		MeshComponent->GetBoneIndex(AuraOriginBoneName) != INDEX_NONE;
+	return bHasSocketOrBone ? MeshComponent->GetSocketLocation(AuraOriginBoneName) : GetCurrentAvatarLocation();
 }
 
-void UGA_ViolaIceAura::DrawAuraTargetDebug(AActor* TargetActor) const
+FVector UGA_ViolaIceAura::GetAuraOrigin() const
 {
-	if (!TargetActor)
-	{
-		return;
-	}
-
-	const FVector TargetLocation = TargetActor->GetActorLocation();
-	DrawDebugPoint(GetCurrentActorInfo(), TargetLocation);
-	DrawDebugLine(GetCurrentActorInfo(), GetAuraOrigin(), TargetLocation);
+	return GetAuraSourceLocation();
 }
 
-void UGA_ViolaIceAura::GetActorsInAuraSphere(TArray<AActor*>& OutActors) const
+float UGA_ViolaIceAura::GetAuraVisualRadius() const
 {
-	OutActors.Reset();
-
-	const AActor* AvatarActor = GetAvatarActorFromActorInfo();
-	UWorld* World = AvatarActor ? AvatarActor->GetWorld() : GetWorld();
-	if (!World || !AvatarActor || AuraRadius <= 0.f)
-	{
-		return;
-	}
-
-	TArray<FOverlapResult> Overlaps;
-	const FCollisionShape Shape = FCollisionShape::MakeSphere(AuraRadius);
-
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ViolaIceAuraSphere), false, AvatarActor);
-	QueryParams.AddIgnoredActor(AvatarActor);
-
-	FCollisionObjectQueryParams ObjectParams;
-	ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
-
-	const bool bHasOverlaps = World->OverlapMultiByObjectType(
-		Overlaps,
-		GetAuraOrigin(),
-		FQuat::Identity,
-		ObjectParams,
-		Shape,
-		QueryParams);
-	if (!bHasOverlaps)
-	{
-		return;
-	}
-
-	TSet<TWeakObjectPtr<AActor>> UniqueActors;
-	for (const FOverlapResult& Overlap : Overlaps)
-	{
-		AActor* TargetActor = Overlap.GetActor();
-		const TWeakObjectPtr<AActor> TargetKey(TargetActor);
-		if (!TargetActor || UniqueActors.Contains(TargetKey))
-		{
-			continue;
-		}
-
-		UniqueActors.Add(TargetKey);
-		OutActors.Add(TargetActor);
-	}
+	return AuraVisualRadius > 0.f ? AuraVisualRadius : AuraRadius * 2.f;
 }
 
 void UGA_ViolaIceAura::OnAuraEffectEvent(FGameplayEventData)
@@ -407,7 +336,7 @@ void UGA_ViolaIceAura::EndAbility(
 		World->GetTimerManager().ClearTimer(AuraTargetEffectTimerHandle);
 		World->GetTimerManager().ClearTimer(AuraDurationTimerHandle);
 	}
-	
+
 	ReleaseCastingState();
 	
 	bAuraEffectCommitted = false;

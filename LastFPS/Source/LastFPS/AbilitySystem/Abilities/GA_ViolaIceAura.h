@@ -6,13 +6,13 @@
 #include "Utility/LastFPSDamageCalculation.h"
 #include "GA_ViolaIceAura.generated.h"
 
-class UAbilityTask_WaitGameplayEvent;
+class ALastFPSAreaEffectActor;
 class UAbilityTask_PlayMontageAndWait;
-class UAbilitySystemComponent;
+class UAbilityTask_WaitGameplayEvent;
 class UAnimMontage;
 class UGameplayEffect;
 class UNiagaraSystem;
-class UParticleSystem;
+struct FLastFPSAreaEffectConfig;
 
 UCLASS()
 class LASTFPS_API UGA_ViolaIceAura : public ULastFPSGameplayAbility
@@ -45,17 +45,19 @@ public:
 private:
 	void ApplyAuraEffect();
 	bool CommitAndApplyAuraEffect();
+
 	void StartAuraLoop();
-	void ApplyAuraTargetEffects();
-	void ApplyAuraTargetEffect(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass, bool bApplyDamage);
+	void SpawnAuraAreaEffect();
+	bool ShouldSpawnAuraAreaEffect() const;
+	FLastFPSAreaEffectConfig BuildAuraAreaConfig() const;
+
 	void FinishAura();
 	void ReleaseCastingState();
-	bool DoesTargetPassAuraTags(AActor* TargetActor) const;
-	UAbilitySystemComponent* GetAbilitySystemComponentFromActor(AActor* Actor) const;
+
+	FVector GetCurrentAvatarLocation() const;
+	FVector GetAuraSourceLocation() const;
 	FVector GetAuraOrigin() const;
-	void DrawAuraSphere() const;
-	void DrawAuraTargetDebug(AActor* TargetActor) const;
-	void GetActorsInAuraSphere(TArray<AActor*>& OutActors) const;
+	float GetAuraVisualRadius() const;
 
 	UFUNCTION()
 	void OnAuraEffectEvent(FGameplayEventData Payload);
@@ -83,21 +85,45 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Effect", meta=(ClampMin="0.0"))
 	float AuraDuration = 5.f;
-	
-	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Damage")
-	TSubclassOf<UGameplayEffect> AuraDamageEffect;
 
-	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Damage")
-	FLastFPSDamageRange DamageRange;
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Area")
+	TSubclassOf<ALastFPSAreaEffectActor> AuraAreaEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Range", meta=(ClampMin="0.0"))
+	float AuraRadius = 150.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Area", meta=(ClampMin="0.0"))
+	float AuraAreaDuration = 1.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Damage", meta=(ClampMin="0.01"))
 	float DamageInterval = 0.5f;
 
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Damage")
+	TSubclassOf<UGameplayEffect> AuraDamageEffect;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Damage")
+	TSubclassOf<UGameplayEffect> AuraDamageCooldownEffect;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Damage")
+	FLastFPSDamageRange DamageRange;
+
 	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Target Effects")
 	TArray<TSubclassOf<UGameplayEffect>> AuraTargetEffects;
 
-	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Range", meta=(ClampMin="0.0"))
-	float AuraRadius = 150.f;
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|VFX")
+	TObjectPtr<UNiagaraSystem> AuraPulseNiagaraSystem;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|VFX", meta=(ClampMin="0.0"))
+	float AuraVisualRadius = 300.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|VFX")
+	FName AuraVisualRadiusNiagaraParameterName = TEXT("User.VisualRadius");
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|VFX")
+	FName AuraDurationNiagaraParameterName = TEXT("User.Duration");
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Origin")
+	FName AuraOriginBoneName = TEXT("root");
 
 	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Condition")
 	FGameplayTagContainer RequiredTargetTags;
