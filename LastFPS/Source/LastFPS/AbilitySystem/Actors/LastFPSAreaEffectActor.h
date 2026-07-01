@@ -60,6 +60,9 @@ struct LASTFPS_API FLastFPSAreaEffectConfig
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|VFX")
 	FName DurationNiagaraParameterName = TEXT("User.Duration");
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|VFX")
+	FName SurfaceNormalNiagaraParameterName = TEXT("User.SurfaceNormal");
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Debug")
 	bool bDrawDebug = false;
 

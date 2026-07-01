@@ -108,14 +108,14 @@ void ALastFPSAreaEffectActor::ConfigureArea()
 			EffectNiagaraComponent->SetVariableFloat(AreaConfig.VisualRadiusNiagaraParameterName, VisualRadius);
 		}
 
-		// if (!AreaConfig.DamageIntervalNiagaraParameterName.IsNone())
-		// {
-		// 	EffectNiagaraComponent->SetVariableFloat(AreaConfig.DamageIntervalNiagaraParameterName, AreaConfig.DamageInterval);
-		// }
-
 		if (!AreaConfig.DurationNiagaraParameterName.IsNone())
 		{
 			EffectNiagaraComponent->SetVariableFloat(AreaConfig.DurationNiagaraParameterName, AreaConfig.Duration);
+		}
+
+		if (!AreaConfig.SurfaceNormalNiagaraParameterName.IsNone())
+		{
+			EffectNiagaraComponent->SetVariableVec3(AreaConfig.SurfaceNormalNiagaraParameterName, GetActorUpVector());
 		}
 
 		if (AreaConfig.EffectNiagaraSystem)
@@ -152,7 +152,13 @@ void ALastFPSAreaEffectActor::ApplyAreaEffects()
 
 		DrawTargetDebug(TargetActor);
 		const bool bDamageApplied = ApplyEffectToTarget(TargetActor, AreaConfig.DamageEffect, true);
-		if (bDamageApplied)
+		const bool bShouldApplyFollowupEffects = !AreaConfig.DamageEffect || bDamageApplied;
+		if (!bShouldApplyFollowupEffects)
+		{
+			continue;
+		}
+
+		if (AreaConfig.DamageCooldownEffect)
 		{
 			ApplyEffectToTarget(TargetActor, AreaConfig.DamageCooldownEffect, false);
 		}

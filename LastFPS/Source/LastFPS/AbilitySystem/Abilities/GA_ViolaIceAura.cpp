@@ -8,6 +8,8 @@
 #include "Character/LastFPSHero.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Utility/LastFPSTags.h"
 
 UGA_ViolaIceAura::UGA_ViolaIceAura()
@@ -134,6 +136,7 @@ bool UGA_ViolaIceAura::CommitAndApplyAuraEffect()
 
 	bAuraEffectCommitted = true;
 	ApplyAuraEffect();
+	StartAuraTrail();
 	StartAuraLoop();
 	return true;
 }
@@ -192,7 +195,7 @@ void UGA_ViolaIceAura::SpawnAuraAreaEffect()
 		return;
 	}
 
-	const FTransform SpawnTransform(FRotator::ZeroRotator, GetAuraOrigin());
+	const FTransform SpawnTransform = BuildAuraAreaSpawnTransform(Hero);
 	ALastFPSAreaEffectActor* AreaActor = World->SpawnActorDeferred<ALastFPSAreaEffectActor>(
 		AreaClass,
 		SpawnTransform,
@@ -235,6 +238,135 @@ FLastFPSAreaEffectConfig UGA_ViolaIceAura::BuildAuraAreaConfig() const
 	AreaConfig.DebugDrawTime = AuraAreaDuration;
 	AreaConfig.DebugColor = DebugColor;
 	return AreaConfig;
+}
+
+FTransform UGA_ViolaIceAura::BuildAuraAreaSpawnTransform(const AActor* SourceActor) const
+{
+	const FVector Origin = GetAuraOrigin();
+	if (!bAlignAuraAreaToGround)
+	{
+		return FTransform(FRotator::ZeroRotator, Origin);
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return FTransform(FRotator::ZeroRotator, Origin);
+	}
+
+	const FVector TraceStart = Origin + FVector::UpVector * AuraGroundTraceStartOffset;
+	const FVector TraceEnd = Origin - FVector::UpVector * AuraGroundTraceDistance;
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ViolaIceAuraGroundTrace), false, SourceActor);
+	if (SourceActor)
+	{
+		QueryParams.AddIgnoredActor(SourceActor);
+	}
+
+	FHitResult Hit;
+	if (!World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, AuraGroundTraceChannel, QueryParams))
+	{
+		return FTransform(FRotator::ZeroRotator, Origin);
+	}
+
+	const FVector SurfaceLocation = Hit.ImpactPoint + Hit.ImpactNormal * AuraGroundSurfaceOffset;
+	const FRotator SurfaceRotation = FRotationMatrix::MakeFromZ(Hit.ImpactNormal).Rotator();
+	return FTransform(SurfaceRotation, SurfaceLocation);
+}
+
+void UGA_ViolaIceAura::StartAuraTrail()
+{
+	StopAuraTrail();
+
+	if (!AuraTrailNiagaraSystem)
+	{
+		return;
+	}
+
+	const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+	USkeletalMeshComponent* MeshComponent = Hero ? Hero->GetMesh() : nullptr;
+	if (!MeshComponent)
+	{
+		return;
+	}
+
+	const FName AttachBoneName = AuraTrailAttachBoneName.IsNone() ? AuraOriginBoneName : AuraTrailAttachBoneName;
+	AuraTrailNiagaraComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+		AuraTrailNiagaraSystem,
+		MeshComponent,
+		AttachBoneName,
+		AuraTrailAttachLocationOffset,
+		AuraTrailAttachRotationOffset,
+		EAttachLocation::KeepRelativeOffset,
+		false,
+		false,
+		ENCPoolMethod::None,
+		true);
+	if (!AuraTrailNiagaraComponent)
+	{
+		return;
+	}
+
+	UpdateAuraTrailState();
+
+	if (bDeactivateAuraTrailWhenStationary)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimer(
+				AuraTrailStateTimerHandle,
+				this,
+				&UGA_ViolaIceAura::UpdateAuraTrailState,
+				FMath::Max(AuraTrailStateUpdateInterval, 0.02f),
+				true);
+		}
+	}
+}
+
+void UGA_ViolaIceAura::StopAuraTrail()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AuraTrailStateTimerHandle);
+	}
+
+	if (AuraTrailNiagaraComponent)
+	{
+		AuraTrailNiagaraComponent->Deactivate();
+		AuraTrailNiagaraComponent->DestroyComponent();
+		AuraTrailNiagaraComponent = nullptr;
+	}
+}
+
+void UGA_ViolaIceAura::UpdateAuraTrailState()
+{
+	if (!AuraTrailNiagaraComponent)
+	{
+		return;
+	}
+
+	const bool bShouldActivateTrail =
+		!bDeactivateAuraTrailWhenStationary ||
+		GetAuraTrailSpeed() >= AuraTrailMinActivationSpeed;
+	if (bShouldActivateTrail)
+	{
+		if (!AuraTrailNiagaraComponent->IsActive())
+		{
+			AuraTrailNiagaraComponent->Activate(true);
+		}
+		return;
+	}
+
+	if (AuraTrailNiagaraComponent->IsActive())
+	{
+		AuraTrailNiagaraComponent->Deactivate();
+	}
+}
+
+float UGA_ViolaIceAura::GetAuraTrailSpeed() const
+{
+	const AActor* AvatarActor = GetAvatarActorFromActorInfo();
+	return AvatarActor ? AvatarActor->GetVelocity().Size2D() : 0.f;
 }
 
 void UGA_ViolaIceAura::FinishAura()
@@ -337,6 +469,7 @@ void UGA_ViolaIceAura::EndAbility(
 		World->GetTimerManager().ClearTimer(AuraDurationTimerHandle);
 	}
 
+	StopAuraTrail();
 	ReleaseCastingState();
 	
 	bAuraEffectCommitted = false;

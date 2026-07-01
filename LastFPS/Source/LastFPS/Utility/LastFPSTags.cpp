@@ -5,6 +5,8 @@ namespace LastFPSGameplayTags
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Character_State_Dead, "Character.State.Dead", "Character is dead")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Character_State_Crouched, "Character.State.Crouched", "Character is crouching")
 
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_AuraDamageCooldown, "Status.AuraDamageCooldown", "오라 데미지 재적용 대기 상태")
+
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_Dash, "Cooldown.Skill.Dash", "Dash cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill1, "Cooldown.Skill1", "Skill 1 cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill2, "Cooldown.Skill2", "Skill 2 cooldown")

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/LastFPSGameplayAbility.h"
+#include "Engine/EngineTypes.h"
 #include "GameplayTagContainer.h"
 #include "Utility/LastFPSDamageCalculation.h"
 #include "GA_ViolaIceAura.generated.h"
@@ -11,6 +12,7 @@ class UAbilityTask_PlayMontageAndWait;
 class UAbilityTask_WaitGameplayEvent;
 class UAnimMontage;
 class UGameplayEffect;
+class UNiagaraComponent;
 class UNiagaraSystem;
 struct FLastFPSAreaEffectConfig;
 
@@ -50,6 +52,11 @@ private:
 	void SpawnAuraAreaEffect();
 	bool ShouldSpawnAuraAreaEffect() const;
 	FLastFPSAreaEffectConfig BuildAuraAreaConfig() const;
+	FTransform BuildAuraAreaSpawnTransform(const AActor* SourceActor) const;
+	void StartAuraTrail();
+	void StopAuraTrail();
+	void UpdateAuraTrailState();
+	float GetAuraTrailSpeed() const;
 
 	void FinishAura();
 	void ReleaseCastingState();
@@ -122,8 +129,44 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|VFX")
 	FName AuraDurationNiagaraParameterName = TEXT("User.Duration");
 
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Trail")
+	TObjectPtr<UNiagaraSystem> AuraTrailNiagaraSystem;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Trail")
+	FName AuraTrailAttachBoneName = TEXT("root");
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Trail")
+	FVector AuraTrailAttachLocationOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Trail")
+	FRotator AuraTrailAttachRotationOffset = FRotator::ZeroRotator;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Trail")
+	bool bDeactivateAuraTrailWhenStationary = true;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Trail", meta=(ClampMin="0.0"))
+	float AuraTrailMinActivationSpeed = 10.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Trail", meta=(ClampMin="0.02"))
+	float AuraTrailStateUpdateInterval = 0.1f;
+
 	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Origin")
 	FName AuraOriginBoneName = TEXT("root");
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Ground")
+	bool bAlignAuraAreaToGround = true;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Ground")
+	TEnumAsByte<ECollisionChannel> AuraGroundTraceChannel = ECC_Visibility;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Ground", meta=(ClampMin="0.0"))
+	float AuraGroundTraceStartOffset = 100.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Ground", meta=(ClampMin="0.0"))
+	float AuraGroundTraceDistance = 500.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Ground", meta=(ClampMin="0.0"))
+	float AuraGroundSurfaceOffset = 2.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Condition")
 	FGameplayTagContainer RequiredTargetTags;
@@ -137,8 +180,12 @@ private:
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_PlayMontageAndWait> AuraMontageTask;
 
+	UPROPERTY()
+	TObjectPtr<UNiagaraComponent> AuraTrailNiagaraComponent;
+
 	FTimerHandle AuraTargetEffectTimerHandle;
 	FTimerHandle AuraDurationTimerHandle;
+	FTimerHandle AuraTrailStateTimerHandle;
 
 	bool bAuraEffectCommitted = false;
 };
