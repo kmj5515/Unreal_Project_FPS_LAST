@@ -4,16 +4,19 @@
 #include "CommonPlayerController.h"
 #include "GameplayTagContainer.h"
 #include "Hub/ILastFPSInteractable.h"
+#include "Hub/LastFPSNPCTypes.h"
 #include "UI/Common/LastFPSConfirmWidget.h"
 #include "LastFPSPlayerController.generated.h"
 
 class APawn;
+class UCameraComponent;
 class UCommonActivatableWidget;
 class ULastFPSCharacterDefinition;
 class ULastFPSCharacterRoster;
 class ULastFPSHUDWidget;
 class ULastFPSNoticeWidget;
 class ULastFPSDialogueWidget;
+class ULastFPSNPCInteractionWidget;
 class ULastFPSQuantityDialogWidget;
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FLastFPSConfirmResultDelegate, bool, bConfirmed);
@@ -73,6 +76,17 @@ public:
     /** NPC 범위 이탈 시 호출 */
     void ClearNearestInteractable(AActor* Interactable);
 
+    // ── NPC 상호작용 허브 (카메라 전환 + 액션 메뉴) ──────────────────
+
+    /** NPC 상호작용 시작 — NPC 카메라로 블렌드 + 허브 메뉴 열기 (InteractionComponent가 호출) */
+    void BeginNPCInteraction(AActor* NPCActor, UCameraComponent* TalkCamera, const FText& Name, const FText& InRole, const TArray<FLastFPSNPCAction>& Actions);
+
+    /** NPC 상호작용 종료 — 캐릭터 카메라로 복귀 (허브 위젯 닫힐 때 호출) */
+    void EndNPCInteraction();
+
+    /** 허브 버튼 클릭 → 대화/화면 실행 (허브 위젯이 호출) */
+    void ExecuteNPCAction(const FLastFPSNPCAction& Action);
+
     // ── 캐릭터 선택 ─────────────────────────────────────────────────
 
     UFUNCTION(BlueprintCallable, Category="LastFPS|Character")
@@ -119,6 +133,14 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
     TSubclassOf<ULastFPSDialogueWidget> DialogueWidgetClass;
+
+    /** NPC 상호작용 허브 위젯 클래스 (WBP_NPCInteraction) */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
+    TSubclassOf<ULastFPSNPCInteractionWidget> NPCInteractionWidgetClass;
+
+    /** NPC 카메라 전환 블렌드 시간(초) */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Interaction", meta=(ClampMin="0"))
+    float NPCCameraBlendTime = 0.4f;
 
     /** 인게임 HUD (인게임 팀 영역, 현재 휴면) */
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
@@ -197,4 +219,14 @@ protected:
 
     /** 현재 범위 안에 있는 인터랙터블 (NPC 등) */
     TWeakObjectPtr<AActor> NearestInteractableActor;
+
+    // ── NPC 상호작용 상태 ────────────────────────────────────────────
+    /** 현재 상호작용 중인 NPC. 없으면 상호작용 아님. */
+    TWeakObjectPtr<AActor> CurrentNPC;
+    /** 상호작용 진입 전 시점(복귀용) */
+    TWeakObjectPtr<AActor> PreviousViewTarget;
+    /** 현재 NPC 이름 — 대화 화자 폴백용 */
+    FText CurrentNPCName;
+    /** 열려 있는 허브 위젯 */
+    TWeakObjectPtr<ULastFPSNPCInteractionWidget> NPCHubWidget;
 };

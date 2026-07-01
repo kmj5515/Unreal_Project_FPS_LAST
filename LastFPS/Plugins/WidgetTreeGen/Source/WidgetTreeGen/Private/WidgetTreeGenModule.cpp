@@ -3,6 +3,11 @@
 #include "WidgetTreeGenModule.h"
 #include "WidgetTreeGenerator.h"
 #include "WidgetTreeGenRequest.h"
+#include "NPCPresetGenLibrary.h"
+
+#include "Engine/DataTable.h"
+#include "UObject/SoftObjectPtr.h"
+#include "UObject/UnrealType.h"
 
 #include "Core/EditorUtility.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
@@ -69,6 +74,52 @@ void FWidgetTreeGenModule::ExtendLastFPSMenu(FMenuBuilder& MenuBuilder)
 			FUIAction(FExecuteAction::CreateRaw(this, &FWidgetTreeGenModule::GenerateFromFolderDialog)));
 	}
 	MenuBuilder.EndSection();
+
+	MenuBuilder.BeginSection("NPCPresetGen", LOCTEXT("NPCPresetGenSection", "NPC Gen"));
+	{
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("GenNPCLabel", "NPC 프리셋 생성 (DT_NPCData)"),
+			LOCTEXT("GenNPCTooltip", "Project Settings의 DT_NPCData 각 행마다 BP_<행이름> NPC 블루프린트를 생성합니다."),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.Blueprint"),
+			FUIAction(FExecuteAction::CreateRaw(this, &FWidgetTreeGenModule::GenerateNPCPresets)));
+	}
+	MenuBuilder.EndSection();
+}
+
+void FWidgetTreeGenModule::GenerateNPCPresets()
+{
+	// Project Settings → Game → LastFPS NPC 의 NPCDataTable 을 리플렉션으로 읽는다
+	// (게임 모듈에 링크하지 않기 위해 클래스 경로 + 프로퍼티 리플렉션 사용).
+	UDataTable* NPCTable = nullptr;
+	if (UClass* SettingsClass = LoadObject<UClass>(nullptr, TEXT("/Script/LastFPS.LastFPSNPCSettings")))
+	{
+		if (const UObject* Settings = SettingsClass->GetDefaultObject())
+		{
+			if (const FSoftObjectProperty* Prop = FindFProperty<FSoftObjectProperty>(SettingsClass, TEXT("NPCDataTable")))
+			{
+				const FSoftObjectPtr& SoftPtr = Prop->GetPropertyValue_InContainer(Settings);
+				NPCTable = Cast<UDataTable>(SoftPtr.ToSoftObjectPath().TryLoad());
+			}
+		}
+	}
+
+	if (!NPCTable)
+	{
+		FNotificationInfo Info(LOCTEXT("NPCNoTable",
+			"DT_NPCData를 찾지 못했습니다. Project Settings → Game → LastFPS NPC 에서 NPCDataTable을 지정하세요."));
+		Info.ExpireDuration = 8.0f;
+		FSlateNotificationManager::Get().AddNotification(Info);
+		return;
+	}
+
+	const FNPCPresetGenSummary Summary =
+		UNPCPresetGenLibrary::GenerateFromTable(NPCTable, TEXT("/Game/NPC"), TEXT("BP_"), /*bOverwriteExisting=*/false);
+
+	FNotificationInfo Info(FText::FromString(Summary.Message));
+	Info.ExpireDuration = 6.0f;
+	FSlateNotificationManager::Get().AddNotification(Info);
+
+	UE_LOG(LogTemp, Log, TEXT("[NPCPresetGen] %s"), *Summary.Message);
 }
 
 void FWidgetTreeGenModule::OpenGeneratorWindow()

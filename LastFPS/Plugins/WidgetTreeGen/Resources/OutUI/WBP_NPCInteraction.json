@@ -1,0 +1,29 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSNPCInteractionWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_NPCInteraction",
+	"overwrite": true,
+	"root": {
+		"type": "CanvasPanel", "name": "RootCanvas",
+		"children": [
+			{
+				"type": "SizeBox", "name": "Root_Size", "width": 420, "autoSize": true,
+				"position": [80, 260],
+				"children": [
+					{ "type": "Border", "name": "Frame", "bgColor": [0.15, 0.78, 1.0, 0.85], "padding": 2, "children": [
+						{ "type": "Border", "name": "Root_BG", "bgColor": [0.04, 0.06, 0.09, 0.97], "padding": 20, "children": [
+							{ "type": "VerticalBox", "name": "Root_VB", "children": [
+								{ "type": "TextBlock", "name": "TB_Name", "text": "NPC 이름", "fontSize": 20, "color": [0.15, 0.78, 1.0, 1.0] },
+								{ "type": "TextBlock", "name": "TB_Role", "text": "역할", "fontSize": 13, "color": [0.6, 0.68, 0.78, 1.0], "padding": [0, 2, 0, 0] },
+								{ "type": "SizeBox", "name": "TitleUnderline", "height": 1, "padding": [0, 8, 0, 12], "children": [
+									{ "type": "Border", "name": "TitleUnderlineFill", "halign": "Fill", "valign": "Fill", "bgColor": [0.15, 0.78, 1.0, 0.4] }
+								] },
+								{ "type": "VerticalBox", "name": "ButtonContainer" }
+							] }
+						] }
+					] }
+				]
+			}
+		]
+	}
+}

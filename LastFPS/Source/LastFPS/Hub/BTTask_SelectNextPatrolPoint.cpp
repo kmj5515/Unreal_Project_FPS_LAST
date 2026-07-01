@@ -1,6 +1,6 @@
 #include "Hub/BTTask_SelectNextPatrolPoint.h"
 
-#include "Hub/LastFPSPatrolNPC.h"
+#include "Hub/LastFPSNPC.h"
 
 #include "AIController.h"
 #include "BehaviorTree/BehaviorTree.h"
@@ -29,7 +29,7 @@ void UBTTask_SelectNextPatrolPoint::InitializeFromAsset(UBehaviorTree& Asset)
 EBTNodeResult::Type UBTTask_SelectNextPatrolPoint::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* /*NodeMemory*/)
 {
 	AAIController* AICon = OwnerComp.GetAIOwner();
-	ALastFPSPatrolNPC* NPC = AICon ? Cast<ALastFPSPatrolNPC>(AICon->GetPawn()) : nullptr;
+	ALastFPSNPC* NPC = AICon ? Cast<ALastFPSNPC>(AICon->GetPawn()) : nullptr;
 	UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
 
 	if (!NPC || !BB || NPC->PatrolPoints.Num() == 0)

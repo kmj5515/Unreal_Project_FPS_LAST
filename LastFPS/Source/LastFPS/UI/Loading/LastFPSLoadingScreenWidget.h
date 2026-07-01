@@ -8,7 +8,7 @@ class UImage;
 class UProgressBar;
 class UTextBlock;
 class UTexture2D;
-class ULastFPSLoadingScreenSet;
+class UDataTable;
 
 UCLASS()
 class LASTFPS_API ULastFPSLoadingScreenWidget : public UUserWidget
@@ -36,7 +36,7 @@ protected:
 
     void RefreshFromGameInstance();
 
-    /** LoadingSet에서 1세트를 랜덤 선택해 이미지/팁 위젯에 적용 */
+    /** TipTable에서 팁 1건을 랜덤 선택해 이미지/제목/본문 위젯에 적용 */
     void ApplyRandomTip();
 
     /** WBP_Loading에서 동일 이름으로 만들면 자동 바인딩 */
@@ -63,9 +63,12 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Loading", meta=(ClampMin="0.05"))
     float IndeterminateCycleSeconds = 1.5f;
 
-    /** 로딩마다 랜덤으로 보여줄 이미지+팁 세트 (WBP 클래스 디폴트에서 지정) */
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Loading")
-    TObjectPtr<ULastFPSLoadingScreenSet> LoadingSet;
+    /**
+     * 로딩 팁 테이블 (FLastFPSLoadingTipData, JSON) — 로딩 팁의 단일 소스.
+     * 제목/본문/이미지 전부 여기서 랜덤 선택. WBP 클래스 디폴트에서 지정.
+     */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Loading", meta=(AllowedClasses="/Script/Engine.DataTable"))
+    TSoftObjectPtr<UDataTable> TipTable;
 
 private:
     void HandleTravelPresentationChanged(const FText& StatusText, const FText& MapNameText);

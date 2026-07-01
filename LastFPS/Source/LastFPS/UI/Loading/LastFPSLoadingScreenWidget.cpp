@@ -1,11 +1,12 @@
 #include "UI/Loading/LastFPSLoadingScreenWidget.h"
 
 #include "Game/LastFPSGameInstance.h"
-#include "UI/Loading/LastFPSLoadingScreenSet.h"
+#include "Data/Tables/LastFPSLoadingTipData.h"
 
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "Engine/DataTable.h"
 #include "Engine/GameInstance.h"
 #include "Engine/Texture2D.h"
 
@@ -69,19 +70,20 @@ void ULastFPSLoadingScreenWidget::RefreshFromGameInstance()
 
 void ULastFPSLoadingScreenWidget::ApplyRandomTip()
 {
-    if (!LoadingSet)
+    UDataTable* Table = TipTable.LoadSynchronous();
+    if (!Table)
     {
         return;
     }
 
-    const FLastFPSLoadingTip* Entry = LoadingSet->PickRandomEntry();
-    if (!Entry)
+    FLastFPSLoadingTipData Tip;
+    if (!ULastFPSLoadingTipLibrary::GetRandomLoadingTip(Table, Tip))
     {
         return;
     }
 
     // 로딩 화면 위라 동기 로드의 히치는 사실상 보이지 않는다 — 선택된 1장만 즉시 올린다.
-    UTexture2D* Texture = Entry->Image.LoadSynchronous();
+    UTexture2D* Texture = Tip.Image.LoadSynchronous();
 
     if (Img_Tip)
     {
@@ -97,14 +99,14 @@ void ULastFPSLoadingScreenWidget::ApplyRandomTip()
     }
     if (Text_TipTitle)
     {
-        Text_TipTitle->SetText(Entry->TipTitle);
+        Text_TipTitle->SetText(Tip.TipTitle);
     }
     if (Text_TipBody)
     {
-        Text_TipBody->SetText(Entry->TipBody);
+        Text_TipBody->SetText(Tip.Tip);
     }
 
-    OnLoadingTipSelected(Texture, Entry->TipTitle, Entry->TipBody);
+    OnLoadingTipSelected(Texture, Tip.TipTitle, Tip.Tip);
 }
 
 void ULastFPSLoadingScreenWidget::HandleTravelPresentationChanged(const FText& StatusText, const FText& MapNameText)
