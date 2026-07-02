@@ -4,12 +4,25 @@
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
+
+void ULastFPSSkillCooldownSlotWidget::NativePreConstruct()
+{
+    Super::NativePreConstruct();
+    ApplyConfiguredSkillIconBrush();
+    ApplySkillIconTextureToMaterial();
+    ApplyConfiguredKeyLabel();
+}
 
 void ULastFPSSkillCooldownSlotWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+
+    ApplyConfiguredSkillIconBrush();
+    ApplySkillIconTextureToMaterial();
+    ApplyConfiguredKeyLabel();
 
     if (SkillIcon && bDriveCooldownMaterial)
     {
@@ -35,6 +48,9 @@ void ULastFPSSkillCooldownSlotWidget::InitializeSlotPresentation()
 
     if (SkillIcon)
     {
+        ApplyConfiguredSkillIconBrush();
+        ApplySkillIconTextureToMaterial();
+
         SkillIcon->SetVisibility(ESlateVisibility::HitTestInvisible);
         SkillIcon->SetRenderOpacity(IconReadyOpacity);
 
@@ -55,15 +71,110 @@ void ULastFPSSkillCooldownSlotWidget::InitializeSlotPresentation()
 
     if (KeyLabel)
     {
+        ApplyConfiguredKeyLabel();
         KeyLabel->SetVisibility(ESlateVisibility::HitTestInvisible);
     }
 }
 
+void ULastFPSSkillCooldownSlotWidget::SetSkillIconBrush(const FSlateBrush& Brush)
+{
+    SkillIconBrush = Brush;
+    bUseConfiguredSkillIconBrush = true;
+    ApplyConfiguredSkillIconBrush();
+    ApplySkillIconTextureToMaterial();
+    InitializeSlotPresentation();
+}
+
+void ULastFPSSkillCooldownSlotWidget::SetSkillIconTexture(UTexture2D* Texture, const bool bMatchSize)
+{
+    if (!Texture)
+    {
+        return;
+    }
+
+    SkillIconTexture = Texture;
+    if (!bApplySkillIconTextureToMaterial)
+    {
+        SkillIconBrush.SetResourceObject(Texture);
+        if (bMatchSize)
+        {
+            SkillIconBrush.ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
+        }
+
+        bUseConfiguredSkillIconBrush = true;
+        ApplyConfiguredSkillIconBrush();
+    }
+
+    ApplySkillIconTextureToMaterial();
+    InitializeSlotPresentation();
+}
+
+void ULastFPSSkillCooldownSlotWidget::SetSkillIconMaterial(UMaterialInterface* Material)
+{
+    if (!Material)
+    {
+        return;
+    }
+
+    SkillIconBrush.SetResourceObject(Material);
+    bUseConfiguredSkillIconBrush = true;
+    ApplyConfiguredSkillIconBrush();
+    ApplySkillIconTextureToMaterial();
+    InitializeSlotPresentation();
+}
+
 void ULastFPSSkillCooldownSlotWidget::SetKeyLabel(const FText& Label)
 {
+    if (bUseConfiguredKeyLabel)
+    {
+        ApplyConfiguredKeyLabel();
+        return;
+    }
+
     if (KeyLabel)
     {
         KeyLabel->SetText(Label);
+    }
+}
+
+void ULastFPSSkillCooldownSlotWidget::SetConfiguredKeyLabel(const FText& Label)
+{
+    ConfiguredKeyLabel = Label;
+    bUseConfiguredKeyLabel = true;
+    ApplyConfiguredKeyLabel();
+}
+
+void ULastFPSSkillCooldownSlotWidget::ApplyConfiguredKeyLabel()
+{
+    if (KeyLabel && bUseConfiguredKeyLabel)
+    {
+        KeyLabel->SetText(ConfiguredKeyLabel);
+    }
+}
+
+void ULastFPSSkillCooldownSlotWidget::ApplyConfiguredSkillIconBrush()
+{
+    if (SkillIcon && ShouldApplyConfiguredSkillIconBrush())
+    {
+        SkillIcon->SetBrush(SkillIconBrush);
+    }
+}
+
+bool ULastFPSSkillCooldownSlotWidget::ShouldApplyConfiguredSkillIconBrush() const
+{
+    return bUseConfiguredSkillIconBrush || SkillIconBrush.GetResourceObject() != nullptr;
+}
+
+void ULastFPSSkillCooldownSlotWidget::ApplySkillIconTextureToMaterial()
+{
+    if (!SkillIcon || !bApplySkillIconTextureToMaterial || !SkillIconTexture || SkillIconTextureParameterName.IsNone())
+    {
+        return;
+    }
+
+    if (UMaterialInstanceDynamic* MID = SkillIcon->GetDynamicMaterial())
+    {
+        MID->SetTextureParameterValue(SkillIconTextureParameterName, SkillIconTexture);
     }
 }
 
@@ -144,6 +255,7 @@ void ULastFPSSkillCooldownSlotWidget::ApplyVisual(
                 ? 0.f
                 : (bCooldownMaterialUsesRemainingFraction ? Clamped : (1.f - Clamped));
             MID->SetScalarParameterValue(CooldownMaterialParameterName, Value);
+            ApplySkillIconTextureToMaterial();
         }
     }
 
@@ -170,8 +282,7 @@ void ULastFPSSkillCooldownSlotWidget::ApplyVisual(
 }
 
 void ULastFPSSkillCooldownSlotWidget::UpdateFromASC(
-    const UAbilitySystemComponent* ASC,
-    const ULastFPSAttributeSet* /*AttributeSetOverride*/)
+    const UAbilitySystemComponent* ASC)
 {
     if (!ASC)
     {
