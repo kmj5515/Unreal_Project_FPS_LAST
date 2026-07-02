@@ -6,6 +6,8 @@
 #include "LastFPSGameInstance.generated.h"
 
 class ULastFPSCharacterRoster;
+class UDataTable;
+class UTexture2D;
 
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnLastFPSTravelPresentationChanged,
 	const FText& /*StatusText*/,
@@ -81,7 +83,18 @@ protected:
     UPROPERTY(Config, EditAnywhere, Category="LastFPS|Character")
     TSoftObjectPtr<ULastFPSCharacterRoster> CharacterRosterAsset;
 
+    /** 로딩 팁 테이블 (FLastFPSLoadingTipData) — 시작 시 이미지 프리로드용 */
+    UPROPERTY(Config, EditAnywhere, Category="LastFPS|Loading")
+    TSoftObjectPtr<UDataTable> LoadingTipTable = TSoftObjectPtr<UDataTable>(FSoftObjectPath(TEXT("/Game/Data/Loading/DT_LoadingTips.DT_LoadingTips")));
+
 private:
+    /** 시작 시 로딩 팁 이미지들을 로드·상주시켜 캐싱 (첫 로딩 화면부터 즉시 표시) */
+    void PreloadLoadingTipTextures();
+
+    /** 프리로드한 텍스처의 하드 레퍼런스 — GC 방지 + 상주 유지 */
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UTexture2D>> PreloadedLoadingTipTextures;
+
     /** GetCharacterRoster의 lazy 로드 캐시 */
     UPROPERTY(Transient)
     TObjectPtr<ULastFPSCharacterRoster> CachedCharacterRoster;

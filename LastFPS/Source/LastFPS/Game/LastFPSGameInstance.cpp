@@ -1,10 +1,13 @@
 #include "Game/LastFPSGameInstance.h"
 
 #include "Data/Definitions/LastFPSCharacterRoster.h"
+#include "Data/Tables/LastFPSLoadingTipData.h"
 #include "UI/Framework/LastFPSUIManagerSubsystem.h"
 
 #include "CommonLocalPlayer.h"
+#include "Engine/DataTable.h"
 #include "Engine/Engine.h"
+#include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/Paths.h"
@@ -151,6 +154,40 @@ void ULastFPSGameInstance::Init()
 
 	PostLoadMapDelegateHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
 		this, &ULastFPSGameInstance::HandlePostLoadMap);
+
+	// 로딩 팁 이미지를 미리 로드·상주시켜 캐싱 → 첫 로딩 화면부터 즉시 표시.
+	PreloadLoadingTipTextures();
+}
+
+void ULastFPSGameInstance::PreloadLoadingTipTextures()
+{
+	UDataTable* Table = LoadingTipTable.LoadSynchronous();
+	if (!Table)
+	{
+		return;
+	}
+
+	TArray<FLastFPSLoadingTipData*> Rows;
+	Table->GetAllRows<FLastFPSLoadingTipData>(TEXT("PreloadLoadingTips"), Rows);
+
+	PreloadedLoadingTipTextures.Reset();
+	for (const FLastFPSLoadingTipData* Row : Rows)
+	{
+		if (!Row || Row->Image.IsNull())
+		{
+			continue;
+		}
+
+		if (UTexture2D* Texture = Row->Image.LoadSynchronous())
+		{
+			// 밉을 강제 상주시키고(장시간) 하드 레퍼런스로 붙잡아 둔다 → 로딩 때 즉시 렌더 가능.
+			Texture->SetForceMipLevelsToBeResident(3600.0f);
+			Texture->WaitForStreaming();
+			PreloadedLoadingTipTextures.Add(Texture);
+		}
+	}
+
+	UE_LOG(LogLastFPSTravel, Log, TEXT("[LoadingTip] 프리로드 완료: %d개"), PreloadedLoadingTipTextures.Num());
 }
 
 void ULastFPSGameInstance::Shutdown()
