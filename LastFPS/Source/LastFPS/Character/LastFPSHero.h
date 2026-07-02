@@ -46,6 +46,14 @@ public:
     void SetWantsToSprint(bool bEnabled);
     void SetCombatState(EMMCombatState NewState);
 
+    /**
+     * 게임플레이 입력(이동/사격/궁극기/ADS/스프린트 등)을 통째로 켜고 끈다.
+     * DefaultMappingContext를 복원/제거 → Enhanced Input 액션 전체가 활성/정지된다.
+     * NPC 상호작용·컷씬 등에서 소스 레벨로 입력을 차단할 때 사용.
+     * (ESC·G 등 PlayerController가 BindKey로 건 입력은 별개라 영향 없음)
+     */
+    void SetGameplayInputEnabled(bool bEnabled);
+
 protected:
     virtual void BeginPlay() override;
     virtual void GiveDefaultAbilities() override;

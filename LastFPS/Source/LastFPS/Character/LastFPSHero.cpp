@@ -94,6 +94,43 @@ void ALastFPSHero::BeginPlay()
     }
 }
 
+void ALastFPSHero::SetGameplayInputEnabled(bool bEnabled)
+{
+    if (!DefaultMappingContext)
+    {
+        return;
+    }
+
+    const APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC)
+    {
+        return; // 로컬 조종 중이 아니면 매핑 컨텍스트를 건드릴 대상이 없다.
+    }
+
+    UEnhancedInputLocalPlayerSubsystem* Subsystem =
+        ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer());
+    if (!Subsystem)
+    {
+        return;
+    }
+
+    if (bEnabled)
+    {
+        // 상호작용 종료 → 게임 입력 복원. BeginPlay와 동일 우선순위(0)로 재추가.
+        if (!Subsystem->HasMappingContext(DefaultMappingContext))
+        {
+            Subsystem->AddMappingContext(DefaultMappingContext, 0);
+        }
+    }
+    else
+    {
+        // 상호작용 진입 → 컨텍스트 제거로 이동/사격/어빌리티 등 모든 게임 액션을 소스에서 정지.
+        Subsystem->RemoveMappingContext(DefaultMappingContext);
+        // 진입 순간 ADS 홀드가 걸려 있으면 Completed가 안 와 줌이 고착되므로 방어적으로 해제.
+        SetADS(false);
+    }
+}
+
 void ALastFPSHero::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);

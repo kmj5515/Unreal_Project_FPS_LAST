@@ -5,7 +5,25 @@
 
 #include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
+#include "Components/VerticalBoxSlot.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Input/CommonUIInputTypes.h"
+
+namespace
+{
+	// 컨테이너가 VerticalBox/HorizontalBox 어느 쪽이든 슬롯 여백을 적용.
+	void ApplyButtonSlotPadding(UPanelSlot* Slot, const FMargin& Padding)
+	{
+		if (UVerticalBoxSlot* VBSlot = Cast<UVerticalBoxSlot>(Slot))
+		{
+			VBSlot->SetPadding(Padding);
+		}
+		else if (UHorizontalBoxSlot* HBSlot = Cast<UHorizontalBoxSlot>(Slot))
+		{
+			HBSlot->SetPadding(Padding);
+		}
+	}
+}
 
 void ULastFPSNPCInteractionWidget::Setup(
 	ALastFPSPlayerController* InPC,
@@ -48,7 +66,7 @@ void ULastFPSNPCInteractionWidget::Setup(
 		}
 
 		Button->SetButtonText(Action.Label);
-		ButtonContainer->AddChild(Button);
+		ApplyButtonSlotPadding(ButtonContainer->AddChild(Button), ButtonPadding);
 
 		// 클릭 시 해당 액션 실행. Action을 값으로 캡처해 각 버튼이 자기 동작을 기억.
 		Button->OnClicked().AddWeakLambda(this, [this, Action]()
@@ -58,6 +76,28 @@ void ULastFPSNPCInteractionWidget::Setup(
 				PC->ExecuteNPCAction(Action);
 			}
 		});
+	}
+
+	// 기본 "나가기" 버튼 — 항상 맨 아래에 자동 추가. 클릭 시 허브를 닫아 상호작용 종료(=ESC와 동일).
+	if (bShowExitButton)
+	{
+		if (ULastFPSButtonBase* ExitButton = CreateWidget<ULastFPSButtonBase>(this, ActionButtonClass))
+		{
+			ExitButton->SetButtonText(ExitButtonLabel);
+			ApplyButtonSlotPadding(ButtonContainer->AddChild(ExitButton), ButtonPadding);
+			ExitButton->OnClicked().AddWeakLambda(this, [this]()
+			{
+				DeactivateWidget(); // 스택에서 pop → NativeDestruct → EndNPCInteraction
+			});
+		}
+	}
+}
+
+void ULastFPSNPCInteractionWidget::SetButtonsVisible(bool bVisible)
+{
+	if (ButtonContainer)
+	{
+		ButtonContainer->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
 }
 

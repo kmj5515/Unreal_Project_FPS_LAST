@@ -65,9 +65,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI", meta=(AutoCreateRefTerm="OnResult"))
     void ShowQuantityPrompt(const FText& Title, const FText& ItemName, int32 UnitPrice, int32 MaxQuantity, FLastFPSQuantityResultDelegate OnResult);
 
-    /** 단방향 NPC 대화창 표시. Lines를 "다음"으로 한 줄씩 진행. */
+    /** 단방향 NPC 대화창 표시. 생성된 위젯 반환(실패 시 null). */
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
-    void ShowDialogue(const FText& Speaker, const TArray<FText>& Lines);
+    ULastFPSDialogueWidget* ShowDialogue(const FText& Speaker, const TArray<FText>& Lines);
 
     // ── 상호작용 (NPC) ──────────────────────────────────────────────
 
@@ -220,13 +220,39 @@ protected:
     /** 현재 범위 안에 있는 인터랙터블 (NPC 등) */
     TWeakObjectPtr<AActor> NearestInteractableActor;
 
-    // ── NPC 상호작용 상태 ────────────────────────────────────────────
-    /** 현재 상호작용 중인 NPC. 없으면 상호작용 아님. */
-    TWeakObjectPtr<AActor> CurrentNPC;
-    /** 상호작용 진입 전 시점(복귀용) */
-    TWeakObjectPtr<AActor> PreviousViewTarget;
-    /** 현재 NPC 이름 — 대화 화자 폴백용 */
-    FText CurrentNPCName;
-    /** 열려 있는 허브 위젯 */
-    TWeakObjectPtr<ULastFPSNPCInteractionWidget> NPCHubWidget;
+    // ── NPC 상호작용 세션 (PC가 소유 — 복구 불변식 보존) ─────────────
+    /**
+     * 한 번의 NPC 상호작용 동안의 상태 묶음. 별도 UObject/Component로 빼지 않고
+     * PC(가장 오래 사는 객체)가 소유 → 입력/카메라 "반드시 복구" 불변식을 지킨다.
+     */
+    struct FNPCInteractionSession
+    {
+        bool bActive = false;                            // 진입/입력잠금의 단일 진리원
+        bool bDialogueOpen = false;                      // 대화창 열림(중복 오픈 방지)
+        TWeakObjectPtr<AActor> NPC;                      // 현재 상호작용 NPC
+        TWeakObjectPtr<AActor> PreviousViewTarget;       // 진입 전 시점(복귀용)
+        FText NPCName;                                   // 대화 화자 폴백용
+        TWeakObjectPtr<ULastFPSNPCInteractionWidget> HubWidget;
+        TWeakObjectPtr<ULastFPSDialogueWidget> Dialogue; // orphan 방지용
+
+        void Reset()
+        {
+            bActive = false;
+            bDialogueOpen = false;
+            NPC.Reset();
+            PreviousViewTarget.Reset();
+            NPCName = FText::GetEmpty();
+            HubWidget.Reset();
+            Dialogue.Reset();
+        }
+    };
+    FNPCInteractionSession InteractionSession;
+
+    /**
+     * 상호작용 UI 모드 진입/종료를 대칭으로 토글하는 단일 진입점.
+     * 이동/회전 입력 잠금 + 마우스 커서 표시를 한 곳에서 켜고/끈다(반쪽 수정·이중 제어 방지).
+     */
+    void SetInteractionInputMode(bool bEnter);
+    /** 세션 허브의 액션 버튼 표시/숨김. */
+    void SetHubButtonsVisible(bool bVisible);
 };
