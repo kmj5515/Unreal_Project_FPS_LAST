@@ -70,7 +70,17 @@ void ULastFPSLoadingScreenWidget::RefreshFromGameInstance()
 
 void ULastFPSLoadingScreenWidget::ApplyRandomTip()
 {
-    UDataTable* Table = TipTable.LoadSynchronous();
+    // 프리로드(GameInstance)와 동일한 DT를 단일 소스로 사용 → 표시 텍스처가 항상 상주 캐시와 일치.
+    // GI를 못 얻으면 위젯 자체 TipTable로 폴백.
+    UDataTable* Table = nullptr;
+    if (ULastFPSGameInstance* GI = Cast<ULastFPSGameInstance>(GetGameInstance()))
+    {
+        Table = GI->GetLoadingTipTable();
+    }
+    if (!Table)
+    {
+        Table = TipTable.LoadSynchronous();
+    }
     if (!Table)
     {
         return;

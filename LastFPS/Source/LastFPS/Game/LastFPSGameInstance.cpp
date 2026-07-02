@@ -159,11 +159,18 @@ void ULastFPSGameInstance::Init()
 	PreloadLoadingTipTextures();
 }
 
+UDataTable* ULastFPSGameInstance::GetLoadingTipTable()
+{
+	return LoadingTipTable.LoadSynchronous();
+}
+
 void ULastFPSGameInstance::PreloadLoadingTipTextures()
 {
 	UDataTable* Table = LoadingTipTable.LoadSynchronous();
 	if (!Table)
 	{
+		UE_LOG(LogLastFPSTravel, Warning,
+			TEXT("[LoadingTip] 프리로드 실패: LoadingTipTable 로드 불가. DefaultGame.ini의 [/Script/LastFPS.LastFPSGameInstance] LoadingTipTable 경로를 확인하세요."));
 		return;
 	}
 

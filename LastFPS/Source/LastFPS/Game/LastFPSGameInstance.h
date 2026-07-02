@@ -31,6 +31,9 @@ public:
     /** 선택 가능한 캐릭터 로스터(단일 소스). 미지정/로드 실패 시 nullptr. 첫 호출에서 lazy 로드 후 캐시. */
     const ULastFPSCharacterRoster* GetCharacterRoster();
 
+    /** 로딩 팁 테이블(단일 소스). 프리로드와 표시가 같은 DT를 쓰도록 위젯이 이걸 우선 참조. */
+    UDataTable* GetLoadingTipTable();
+
     UFUNCTION(BlueprintCallable, Category="LastFPS|Travel")
     void RequestTravelToDestination(ELastFPSTravelDestination Destination);
 
