@@ -166,7 +166,10 @@ private:
 	float AuraGroundTraceDistance = 500.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Ground", meta=(ClampMin="0.0"))
-	float AuraGroundSurfaceOffset = 2.f;
+	float AuraGroundSurfaceOffset = 8.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Ground", meta=(ClampMin="0.0"))
+	float AuraGroundMinimumSurfaceOffset = 6.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Viola|Ice Aura|Condition")
 	FGameplayTagContainer RequiredTargetTags;

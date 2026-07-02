@@ -145,6 +145,11 @@ void ALastFPSAreaEffectActor::ApplyAreaEffects()
 
 	for (AActor* TargetActor : TargetActors)
 	{
+		if (!DoesTargetPassShape(TargetActor))
+		{
+			continue;
+		}
+
 		if (!DoesTargetPassTags(TargetActor))
 		{
 			continue;
@@ -264,6 +269,38 @@ void ALastFPSAreaEffectActor::CollectTargets(TArray<AActor*>& OutTargets) const
 	}
 }
 
+bool ALastFPSAreaEffectActor::DoesTargetPassShape(AActor* TargetActor) const
+{
+	if (!TargetActor || AreaConfig.Shape != ELastFPSAreaEffectShape::Cone)
+	{
+		return true;
+	}
+
+	const float ConeAngleDegrees = FMath::Clamp(AreaConfig.ConeAngleDegrees, 0.f, 360.f);
+	if (ConeAngleDegrees >= 360.f)
+	{
+		return true;
+	}
+
+	FVector ToTarget = TargetActor->GetActorLocation() - GetActorLocation();
+	ToTarget.Z = 0.f;
+	if (ToTarget.IsNearlyZero())
+	{
+		return true;
+	}
+
+	FVector Forward = GetActorForwardVector();
+	Forward.Z = 0.f;
+	if (!Forward.Normalize())
+	{
+		return true;
+	}
+
+	const float Dot = FVector::DotProduct(Forward, ToTarget.GetSafeNormal());
+	const float MinDot = FMath::Cos(FMath::DegreesToRadians(ConeAngleDegrees * 0.5f));
+	return Dot >= MinDot;
+}
+
 bool ALastFPSAreaEffectActor::DoesTargetPassTags(AActor* TargetActor) const
 {
 	UAbilitySystemComponent* TargetASC = GetAbilitySystemComponentFromActor(TargetActor);
@@ -302,12 +339,43 @@ void ALastFPSAreaEffectActor::DrawAreaDebug() const
 		return;
 	}
 
+	const FColor DebugColor = AreaConfig.DebugColor.ToFColor(true);
+	if (AreaConfig.Shape == ELastFPSAreaEffectShape::Cone)
+	{
+		const FVector Origin = GetActorLocation();
+		const float HalfAngleDegrees = FMath::Clamp(AreaConfig.ConeAngleDegrees, 0.f, 360.f) * 0.5f;
+		FVector Forward = GetActorForwardVector();
+		Forward.Z = 0.f;
+		if (!Forward.Normalize())
+		{
+			Forward = FVector::ForwardVector;
+		}
+
+		const FVector LeftDirection = Forward.RotateAngleAxis(-HalfAngleDegrees, FVector::UpVector);
+		const FVector RightDirection = Forward.RotateAngleAxis(HalfAngleDegrees, FVector::UpVector);
+		DrawDebugLine(World, Origin, Origin + LeftDirection * AreaConfig.Radius, DebugColor, false, AreaConfig.DebugDrawTime, 0, 2.f);
+		DrawDebugLine(World, Origin, Origin + RightDirection * AreaConfig.Radius, DebugColor, false, AreaConfig.DebugDrawTime, 0, 2.f);
+
+		const int32 SegmentCount = FMath::Max(8, FMath::CeilToInt(AreaConfig.ConeAngleDegrees / 6.f));
+		FVector PreviousPoint = Origin + LeftDirection * AreaConfig.Radius;
+		for (int32 SegmentIndex = 1; SegmentIndex <= SegmentCount; ++SegmentIndex)
+		{
+			const float Alpha = static_cast<float>(SegmentIndex) / static_cast<float>(SegmentCount);
+			const float Angle = FMath::Lerp(-HalfAngleDegrees, HalfAngleDegrees, Alpha);
+			const FVector Direction = Forward.RotateAngleAxis(Angle, FVector::UpVector);
+			const FVector CurrentPoint = Origin + Direction * AreaConfig.Radius;
+			DrawDebugLine(World, PreviousPoint, CurrentPoint, DebugColor, false, AreaConfig.DebugDrawTime, 0, 2.f);
+			PreviousPoint = CurrentPoint;
+		}
+		return;
+	}
+
 	DrawDebugSphere(
 		World,
 		GetActorLocation(),
 		AreaConfig.Radius,
 		32,
-		AreaConfig.DebugColor.ToFColor(true),
+		DebugColor,
 		false,
 		AreaConfig.DebugDrawTime,
 		0,

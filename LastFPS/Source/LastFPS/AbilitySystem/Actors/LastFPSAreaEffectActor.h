@@ -13,13 +13,26 @@ class UNiagaraSystem;
 class USceneComponent;
 class USphereComponent;
 
+UENUM(BlueprintType)
+enum class ELastFPSAreaEffectShape : uint8
+{
+	Sphere UMETA(DisplayName="Sphere"),
+	Cone UMETA(DisplayName="Cone"),
+};
+
 USTRUCT(BlueprintType)
 struct LASTFPS_API FLastFPSAreaEffectConfig
 {
 	GENERATED_BODY()
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Area")
+	ELastFPSAreaEffectShape Shape = ELastFPSAreaEffectShape::Sphere;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Area", meta=(ClampMin="0.0"))
 	float Radius = 350.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Area", meta=(ClampMin="0.0", ClampMax="360.0", EditCondition="Shape==ELastFPSAreaEffectShape::Cone"))
+	float ConeAngleDegrees = 70.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Area", meta=(ClampMin="0.0"))
 	float Duration = 5.f;
@@ -108,6 +121,7 @@ private:
 	bool ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass, bool bApplyDamage);
 	void FinishArea();
 	void CollectTargets(TArray<AActor*>& OutTargets) const;
+	bool DoesTargetPassShape(AActor* TargetActor) const;
 	bool DoesTargetPassTags(AActor* TargetActor) const;
 	UAbilitySystemComponent* GetAbilitySystemComponentFromActor(AActor* Actor) const;
 	void DrawAreaDebug() const;

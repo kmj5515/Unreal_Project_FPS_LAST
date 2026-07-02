@@ -192,7 +192,11 @@ bool ULastFPSHUDWidget::TryInitSkillSlots()
     WBP_SkillCooldownSlot_E->ConfigureCooldownSlot(
         LastFPSGameplayTags::Cooldown_Skill2, ULastFPSGE_Skill2Cooldown::StaticClass());
     WBP_SkillCooldownSlot_E->SetKeyLabel(FText::FromString(TEXT("E")));
-
+    
+    WBP_SkillCooldownSlot_Z->ConfigureCooldownSlot(
+        LastFPSGameplayTags::Cooldown_Skill3, ULastFPSGE_Skill2Cooldown::StaticClass());
+    WBP_SkillCooldownSlot_Z->SetKeyLabel(FText::FromString(TEXT("Z")));
+    
     WBP_SkillCooldownSlot_F->ConfigureCooldownSlot(
         LastFPSGameplayTags::Cooldown_Ultimate, ULastFPSGE_UltimateCooldown::StaticClass());
     WBP_SkillCooldownSlot_F->SetKeyLabel(FText::FromString(TEXT("F")));
@@ -221,7 +225,8 @@ void ULastFPSHUDWidget::TickSkillSlots()
 
     if (WBP_SkillCooldownSlot_Q) { WBP_SkillCooldownSlot_Q->UpdateFromASC(ASC); }
     if (WBP_SkillCooldownSlot_E) { WBP_SkillCooldownSlot_E->UpdateFromASC(ASC); }
-    if (WBP_SkillCooldownSlot_F) { WBP_SkillCooldownSlot_F->UpdateFromASC(ASC, AS); }
+    if (WBP_SkillCooldownSlot_Z) { WBP_SkillCooldownSlot_Z->UpdateFromASC(ASC); }
+    if (WBP_SkillCooldownSlot_F) { WBP_SkillCooldownSlot_F->UpdateFromASC(ASC); }
 }
 
 void ULastFPSHUDWidget::TryBindPawnComponents()

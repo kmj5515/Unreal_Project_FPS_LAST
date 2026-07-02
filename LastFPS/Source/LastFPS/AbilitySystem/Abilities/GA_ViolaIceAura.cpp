@@ -269,7 +269,8 @@ FTransform UGA_ViolaIceAura::BuildAuraAreaSpawnTransform(const AActor* SourceAct
 		return FTransform(FRotator::ZeroRotator, Origin);
 	}
 
-	const FVector SurfaceLocation = Hit.ImpactPoint + Hit.ImpactNormal * AuraGroundSurfaceOffset;
+	const float SurfaceOffset = FMath::Max(AuraGroundSurfaceOffset, AuraGroundMinimumSurfaceOffset);
+	const FVector SurfaceLocation = Hit.ImpactPoint + Hit.ImpactNormal * SurfaceOffset;
 	const FRotator SurfaceRotation = FRotationMatrix::MakeFromZ(Hit.ImpactNormal).Rotator();
 	return FTransform(SurfaceRotation, SurfaceLocation);
 }

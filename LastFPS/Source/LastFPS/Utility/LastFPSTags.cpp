@@ -20,6 +20,7 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_AbilityCommit, "Event.Montage.Abili
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_AbilityEnd, "Event.Montage.Ability.End", "End an ability from an ability montage")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ProjectileSpawn, "Event.Montage.Projectile.Spawn", "Spawn a projectile from an ability montage")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ViolaIceAuraEffect, "Event.Montage.ViolaIceAura.Effect", "비올라 얼음 오라 이펙트 실행")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ViolaFrostStormEffect, "Event.Montage.ViolaFrostStorm.Effect", "비올라 냉기 폭풍 효과 실행")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_IceStormSpawn, "Event.Montage.IceStorm.Spawn", "Spawn an ice storm area from an ability montage")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(UI_HUD_Visible, "UI.HUD.Visible", "HUD visibility status")
