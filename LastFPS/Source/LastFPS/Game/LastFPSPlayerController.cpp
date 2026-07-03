@@ -212,7 +212,30 @@ void ALastFPSPlayerController::HandleEscMenu()
 
     if (EscMenuScreenTag.IsValid())
     {
-        OpenScreen(EscMenuScreenTag);
+        if (UCommonActivatableWidget* Screen = OpenScreen(EscMenuScreenTag))
+        {
+            // 열릴 때 커서 강제 ON — 모달을 낀 상점 흐름 뒤 굳은 캡처/커서 상태를 덮어쓴다.
+            SetEscMenuInputMode(true);
+            // 닫힐 때 게임 입력(에임/이동)으로 복귀.
+            Screen->OnDeactivated().AddWeakLambda(this, [this]() { SetEscMenuInputMode(false); });
+        }
+    }
+}
+
+void ALastFPSPlayerController::SetEscMenuInputMode(bool bMenuOpen)
+{
+    if (bMenuOpen)
+    {
+        bShowMouseCursor = true;
+        FInputModeGameAndUI Mode;
+        Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+        Mode.SetHideCursorDuringCapture(false);
+        SetInputMode(Mode);
+    }
+    else
+    {
+        bShowMouseCursor = false;
+        SetInputMode(FInputModeGameOnly());
     }
 }
 
