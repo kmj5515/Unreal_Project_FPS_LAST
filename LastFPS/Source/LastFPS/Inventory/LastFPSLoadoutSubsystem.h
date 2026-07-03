@@ -92,6 +92,12 @@ protected:
 private:
 	ULastFPSEconomySubsystem* GetEconomy() const;
 
+	/**
+	 * 시작 시 DT_ModuleData 의 모든 행이 DT_ItemData 에 대응 행을 갖는지 검증(에러 로그).
+	 * 대응 행이 없는 모듈은 소유 판정/표시가 불가능해 인벤토리에 나타나지 않으므로 조기 경고.
+	 */
+	void ValidateModuleReferences() const;
+
 	/** 슬롯별 장착 모듈 행 이름 (크기 = SlotCount, 빈 칸 = NAME_None) */
 	UPROPERTY()
 	TArray<FName> EquippedModules;
