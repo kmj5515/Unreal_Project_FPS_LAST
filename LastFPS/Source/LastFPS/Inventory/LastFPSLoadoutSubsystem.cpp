@@ -44,7 +44,6 @@ void ULastFPSLoadoutSubsystem::ValidateModuleReferences() const
 	Table->ForeachRow<FLastFPSModuleData>(Ctx,
 		[Economy, &Broken](const FName& RowName, const FLastFPSModuleData&)
 		{
-			// ItemTable 미설정이면 Economy 가 검증 불가라 false 를 돌려주므로, 그 경우는 건너뛴다.
 			if (!Economy->HasItemDefinition(RowName))
 			{
 				++Broken;

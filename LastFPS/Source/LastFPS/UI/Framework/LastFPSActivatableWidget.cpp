@@ -11,7 +11,8 @@
 ULastFPSActivatableWidget::ULastFPSActivatableWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	bIsBackHandler = true;
+	// CommonUI Back 액션 미구성 → back-handler 로 등록하지 않는다(닫기는 raw ESC).
+	bIsBackHandler = false;
 }
 
 TOptional<FUIInputConfig> ULastFPSActivatableWidget::GetDesiredInputConfig() const
@@ -23,10 +24,17 @@ TOptional<FUIInputConfig> ULastFPSActivatableWidget::GetDesiredInputConfig() con
 
 bool ULastFPSActivatableWidget::NativeOnHandleBackAction()
 {
-	// 화면(메뉴)의 기본 Back = 자신을 pop. 모달(공지/확인/수량/대화)은 각자 오버라이드해
-	// 결과를 브로드캐스트한 뒤 닫는다. 이 함수가 모든 Back(ESC/추후 패드 B)의 단일 종료 지점.
+	// Back/ESC 단일 종료 지점. 모달은 오버라이드해 결과 브로드캐스트 후 닫음.
 	DeactivateWidget();
 	return true;
+}
+
+void ULastFPSActivatableWidget::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+
+	// BP 직렬화 값이 생성자 설정을 덮을 수 있어 여기서 재차 강제.
+	bIsBackHandler = false;
 }
 
 void ULastFPSActivatableWidget::NativeOnActivated()
@@ -42,8 +50,7 @@ void ULastFPSActivatableWidget::NativeOnDeactivated()
 {
 	Super::NativeOnDeactivated();
 
-	// 스택에서 제거가 끝난 뒤 조회하도록 다음 틱으로 미룬 후, 아래 레이어 최상위 위젯으로 포커스 복원.
-	// 타이머는 (파괴될 수 있는) 위젯이 아니라 영속적인 PlayerController/Layout 기준으로 안전하게 실행.
+	// 스택 제거 완료 후(다음 틱) 아래 레이어 최상위 위젯으로 포커스 복원.
 	UWorld* World = GetWorld();
 	if (!World)
 	{
@@ -68,11 +75,9 @@ void ULastFPSActivatableWidget::NativeOnDeactivated()
 
 FReply ULastFPSActivatableWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if (bIsBackHandler && InKeyEvent.GetKey() == EKeys::Escape)
+	if (bCloseOnEscape && InKeyEvent.GetKey() == EKeys::Escape)
 	{
-		// CommonUI Back 액션이 미구성이라 raw ESC로 폴백하되, 종료는 단일 지점인
-		// NativeOnHandleBackAction 에 위임한다 → 모달별 결과 브로드캐스트(취소/확인)가
-		// 일관되게 실행된다. (추후 CommonUI Back 액션을 등록하면 이 raw 경로만 제거하면 됨.)
+		// raw ESC → 단일 종료 지점(NativeOnHandleBackAction)으로 위임.
 		if (NativeOnHandleBackAction())
 		{
 			return FReply::Handled();

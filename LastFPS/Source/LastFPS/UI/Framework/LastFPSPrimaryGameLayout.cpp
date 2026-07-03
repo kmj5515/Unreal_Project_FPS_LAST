@@ -74,8 +74,7 @@ ULastFPSPrimaryGameLayout::ULastFPSPrimaryGameLayout(const FObjectInitializer& O
 
 void ULastFPSPrimaryGameLayout::RestoreFocusToTopActiveWidget()
 {
-	// Game(HUD) 레이어는 제외 — 메뉴/모달이 모두 닫힌 상태에서는 포커스를 넘기지 않아
-	// ESC가 PlayerController(ESC 메뉴 토글)로 흐르도록 둔다.
+	// Game(HUD) 레이어 제외 — 메뉴가 다 닫히면 ESC 가 PC(ESC 메뉴)로 흐르도록.
 	const FGameplayTag LayerOrder[] = {
 		LastFPSUITags::Layer_Modal(),
 		LastFPSUITags::Layer_Menu(),

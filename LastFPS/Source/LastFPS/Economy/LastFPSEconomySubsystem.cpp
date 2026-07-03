@@ -74,8 +74,7 @@ bool ULastFPSEconomySubsystem::TryPurchase(FName GrantItemRowId, int32 Price, in
 	const int32 UnitCost  = FMath::Max(0, Price);
 	const int32 TotalCost = UnitCost * Qty;
 
-	// 지급 대상이 있으면 차감 "전에" 정의를 검증 — 깨진 참조에 크레딧만 날아가는 유령 구매 차단.
-	// (ItemTable 미설정 시엔 검증 불가라 통과시키되, 아래 AddItem 에서도 재검사.)
+	// 차감 전에 정의 검증 — 깨진 참조에 크레딧만 날아가는 유령 구매 차단.
 	if (!GrantItemRowId.IsNone() && GetItemTable() && !HasItemDefinition(GrantItemRowId))
 	{
 		UE_LOG(LogLastFPSEconomy, Error,
@@ -107,8 +106,7 @@ void ULastFPSEconomySubsystem::AddItem(FName ItemRowId, int32 Count)
 		return;
 	}
 
-	// 보상/디버그 경로에서도 정의 없는 아이템은 지급하지 않는다(유령 아이템 방지).
-	// ItemTable 미설정 시엔 검증 불가라 그대로 지급(셋업 단계 허용).
+	// 정의 없는 아이템은 지급하지 않는다(유령 아이템 방지). ItemTable 미설정 시엔 통과.
 	if (GetItemTable() && !HasItemDefinition(ItemRowId))
 	{
 		UE_LOG(LogLastFPSEconomy, Error,
