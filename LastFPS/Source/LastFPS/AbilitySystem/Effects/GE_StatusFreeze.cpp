@@ -2,6 +2,8 @@
 
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "GameplayEffectTypes.h"
+#include "GameplayEffectComponents/TargetTagsGameplayEffectComponent.h"
+#include "Utility/LastFPSTags.h"
 
 ULastFPSGE_StatusFreeze::ULastFPSGE_StatusFreeze()
 {
@@ -12,6 +14,14 @@ ULastFPSGE_StatusFreeze::ULastFPSGE_StatusFreeze()
     StackLimitCount = 1;
     StackDurationRefreshPolicy =
         EGameplayEffectStackingDurationPolicy::RefreshOnSuccessfulApplication;
+
+    FInheritedTagContainer Tags;
+    Tags.AddTag(LastFPSGameplayTags::Status_Freeze);
+
+    UTargetTagsGameplayEffectComponent* TargetTagsComponent =
+        CreateDefaultSubobject<UTargetTagsGameplayEffectComponent>(TEXT("TargetTagsGameplayEffectComponent"));
+    GEComponents.Add(TargetTagsComponent);
+    TargetTagsComponent->SetAndApplyTargetTagChanges(Tags);
 
     FGameplayModifierInfo Mod;
     Mod.Attribute = ULastFPSAttributeSet::GetMoveSpeedAttribute();

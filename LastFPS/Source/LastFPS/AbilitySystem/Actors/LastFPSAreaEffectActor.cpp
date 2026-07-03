@@ -211,7 +211,7 @@ bool ALastFPSAreaEffectActor::ApplyEffectToTarget(
 		LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), AreaConfig.DamageRange);
 	}
 
-	const FActiveGameplayEffectHandle AppliedHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
+	const FActiveGameplayEffectHandle AppliedHandle = TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 	return AppliedHandle.WasSuccessfullyApplied();
 }
 

@@ -11,9 +11,11 @@
 #include "Inventory/LastFPSLoadoutSubsystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "GameplayEffect.h"
 #include "Kismet/GameplayStatics.h"
 #include "Game/LastFPSPlayerController.h"
 #include "Utility/LastFPSDamageCalculation.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 ALastFPSCharacterBase::ALastFPSCharacterBase()
 {
@@ -151,6 +153,16 @@ void ALastFPSCharacterBase::Client_NotifyHitMarker_Implementation()
     }
 }
 
+void ALastFPSCharacterBase::Multicast_SetStatusOverlayMaterial_Implementation(
+    UMaterialInterface* OverlayMaterial,
+    FName MixParameterName,
+    float MixValue,
+    bool bInterpolateMix,
+    float MixInterpSpeed)
+{
+    ApplyStatusOverlayMaterial(OverlayMaterial, MixParameterName, MixValue, bInterpolateMix, MixInterpSpeed);
+}
+
 void ALastFPSCharacterBase::RecordAttacker(APlayerState* Attacker)
 {
     if (!Attacker) return;
@@ -210,6 +222,17 @@ void ALastFPSCharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
         }
         MoveSpeedDelegateHandle.Reset();
     }
+
+    if (UAbilitySystemComponent* ASC = BoundAttributeASC.Get())
+    {
+        UnbindStatusOverlayMaterials(ASC);
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(StatusOverlayMixInterpolationTimerHandle);
+    }
+
     BoundAttributeASC.Reset();
     Super::EndPlay(EndPlayReason);
 }
@@ -245,6 +268,8 @@ void ALastFPSCharacterBase::InitAbilitySystem()
     {
         if (UAbilitySystemComponent* PreviousASC = BoundAttributeASC.Get())
         {
+            UnbindStatusOverlayMaterials(PreviousASC);
+
             if (MoveSpeedDelegateHandle.IsValid())
             {
                 PreviousASC->GetGameplayAttributeValueChangeDelegate(
@@ -278,6 +303,9 @@ void ALastFPSCharacterBase::InitAbilitySystem()
             ULastFPSAttributeSet::GetHealthAttribute())
             .AddUObject(this, &ALastFPSCharacterBase::OnHealthChanged);
     }
+
+    BindStatusOverlayMaterials(ASC);
+    RefreshStatusOverlayMaterial();
 
     const bool bDefaultsAlreadyGranted = PS ? PS->HasGrantedGASDefaults() : bOwnedGASDefaultsGranted;
     if (HasAuthority() && !bDefaultsAlreadyGranted)
@@ -350,6 +378,300 @@ void ALastFPSCharacterBase::UpdateAliveCollisionState(bool bAlive)
 void ALastFPSCharacterBase::OnMoveSpeedChanged(const FOnAttributeChangeData& Data)
 {
     GetCharacterMovement()->MaxWalkSpeed = Data.NewValue;
+}
+
+void ALastFPSCharacterBase::BindStatusOverlayMaterials(UAbilitySystemComponent* ASC)
+{
+    if (!ASC)
+    {
+        return;
+    }
+
+    if (!StatusOverlayConfig)
+    {
+        return;
+    }
+
+    for (const FLastFPSStatusOverlayMaterial& OverlayConfig : StatusOverlayConfig->OverlayMaterials)
+    {
+        if (!OverlayConfig.OverlayMaterial)
+        {
+            continue;
+        }
+
+        TArray<FGameplayTag> TagsToBind;
+        if (OverlayConfig.StatusTag.IsValid())
+        {
+            TagsToBind.Add(OverlayConfig.StatusTag);
+        }
+        if (OverlayConfig.StackTag.IsValid())
+        {
+            TagsToBind.AddUnique(OverlayConfig.StackTag);
+        }
+
+        for (const FGameplayTag& TagToBind : TagsToBind)
+        {
+            if (StatusOverlayDelegateHandles.Contains(TagToBind))
+            {
+                continue;
+            }
+
+            FDelegateHandle DelegateHandle = ASC->RegisterGameplayTagEvent(
+                TagToBind,
+                EGameplayTagEventType::AnyCountChange)
+                .AddUObject(this, &ALastFPSCharacterBase::OnStatusOverlayTagChanged);
+
+            StatusOverlayDelegateHandles.Add(TagToBind, DelegateHandle);
+        }
+    }
+}
+
+void ALastFPSCharacterBase::UnbindStatusOverlayMaterials(UAbilitySystemComponent* ASC)
+{
+    if (!ASC)
+    {
+        StatusOverlayDelegateHandles.Reset();
+        return;
+    }
+
+    for (const TPair<FGameplayTag, FDelegateHandle>& DelegatePair : StatusOverlayDelegateHandles)
+    {
+        ASC->RegisterGameplayTagEvent(DelegatePair.Key, EGameplayTagEventType::AnyCountChange)
+            .Remove(DelegatePair.Value);
+    }
+
+    StatusOverlayDelegateHandles.Reset();
+}
+
+void ALastFPSCharacterBase::OnStatusOverlayTagChanged(FGameplayTag, int32)
+{
+    RefreshStatusOverlayMaterial();
+}
+
+void ALastFPSCharacterBase::RefreshStatusOverlayMaterial()
+{
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    USkeletalMeshComponent* MeshComp = GetMesh();
+    if (!ASC || !MeshComp)
+    {
+        return;
+    }
+
+    const FLastFPSStatusOverlayMaterial* BestOverlay = nullptr;
+    if (StatusOverlayConfig)
+    {
+        for (const FLastFPSStatusOverlayMaterial& OverlayConfig : StatusOverlayConfig->OverlayMaterials)
+        {
+            if (!IsStatusOverlayActive(ASC, OverlayConfig))
+            {
+                continue;
+            }
+
+            if (!BestOverlay || OverlayConfig.Priority > BestOverlay->Priority)
+            {
+                BestOverlay = &OverlayConfig;
+            }
+        }
+    }
+
+    if (!BestOverlay)
+    {
+        ApplyStatusOverlayMaterial(nullptr, NAME_None, 0.f, false, 0.f);
+        if (HasAuthority())
+        {
+            Multicast_SetStatusOverlayMaterial(nullptr, NAME_None, 0.f, false, 0.f);
+        }
+        return;
+    }
+
+    const float MixValue = GetStatusOverlayMix(ASC, *BestOverlay);
+    ApplyStatusOverlayMaterial(
+        BestOverlay->OverlayMaterial,
+        BestOverlay->StackMixParameterName,
+        MixValue,
+        BestOverlay->bInterpolateStackMix,
+        BestOverlay->StackMixInterpSpeed);
+    if (HasAuthority())
+    {
+        Multicast_SetStatusOverlayMaterial(
+            BestOverlay->OverlayMaterial,
+            BestOverlay->StackMixParameterName,
+            MixValue,
+            BestOverlay->bInterpolateStackMix,
+            BestOverlay->StackMixInterpSpeed);
+    }
+}
+
+bool ALastFPSCharacterBase::IsStatusOverlayActive(
+    UAbilitySystemComponent* ASC,
+    const FLastFPSStatusOverlayMaterial& OverlayConfig) const
+{
+    if (!ASC || !OverlayConfig.OverlayMaterial)
+    {
+        return false;
+    }
+
+    return (OverlayConfig.StatusTag.IsValid() && ASC->GetTagCount(OverlayConfig.StatusTag) > 0)
+        || GetStatusOverlayStackCount(ASC, OverlayConfig) > 0;
+}
+
+float ALastFPSCharacterBase::GetStatusOverlayMix(
+    UAbilitySystemComponent* ASC,
+    const FLastFPSStatusOverlayMaterial& OverlayConfig) const
+{
+    if (!ASC)
+    {
+        return 0.f;
+    }
+
+    if (OverlayConfig.StatusTag.IsValid() && ASC->GetTagCount(OverlayConfig.StatusTag) > 0)
+    {
+        return OverlayConfig.StackMixEndValue;
+    }
+
+    const int32 StackCount = GetStatusOverlayStackCount(ASC, OverlayConfig);
+    const int32 StackCountForFullMix = GetStatusOverlayFullStackCount(OverlayConfig);
+    const float StackAlpha = FMath::Clamp(
+        static_cast<float>(StackCount) / static_cast<float>(StackCountForFullMix),
+        0.f,
+        1.f);
+    return FMath::Lerp(OverlayConfig.StackMixStartValue, OverlayConfig.StackMixEndValue, StackAlpha);
+}
+
+int32 ALastFPSCharacterBase::GetStatusOverlayStackCount(
+    UAbilitySystemComponent* ASC,
+    const FLastFPSStatusOverlayMaterial& OverlayConfig) const
+{
+    if (!ASC || !OverlayConfig.StackTag.IsValid())
+    {
+        return 0;
+    }
+
+    FGameplayTagContainer StackTags;
+    StackTags.AddTag(OverlayConfig.StackTag);
+    const FGameplayEffectQuery StackQuery = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(StackTags);
+    return ASC->GetAggregatedStackCount(StackQuery);
+}
+
+int32 ALastFPSCharacterBase::GetStatusOverlayFullStackCount(const FLastFPSStatusOverlayMaterial& OverlayConfig) const
+{
+    if (const UGameplayEffect* StackEffect = OverlayConfig.StackEffectClass.GetDefaultObject())
+    {
+        const int32 StackLimitCount = StackEffect->GetStackLimitCount();
+        if (StackLimitCount > 0)
+        {
+            const int32 OverflowStepCount = StackEffect->OverflowEffects.IsEmpty() ? 0 : 1;
+            return StackLimitCount + OverflowStepCount;
+        }
+    }
+
+    return 1;
+}
+
+void ALastFPSCharacterBase::ApplyStatusOverlayMaterial(
+    UMaterialInterface* OverlayMaterial,
+    FName MixParameterName,
+    float MixValue,
+    bool bInterpolateMix,
+    float MixInterpSpeed)
+{
+    USkeletalMeshComponent* MeshComp = GetMesh();
+    if (!MeshComp)
+    {
+        return;
+    }
+
+    UWorld* World = GetWorld();
+
+    if (!OverlayMaterial)
+    {
+        if (World)
+        {
+            World->GetTimerManager().ClearTimer(StatusOverlayMixInterpolationTimerHandle);
+        }
+
+        MeshComp->SetOverlayMaterial(nullptr);
+        ActiveStatusOverlayMID = nullptr;
+        ActiveStatusOverlaySourceMaterial = nullptr;
+        ActiveStatusOverlayMixParameterName = NAME_None;
+        ActiveStatusOverlayMixValue = 0.f;
+        TargetStatusOverlayMixValue = 0.f;
+        ActiveStatusOverlayMixInterpSpeed = 0.f;
+        return;
+    }
+
+    const bool bCreateNewMaterial = !ActiveStatusOverlayMID || ActiveStatusOverlaySourceMaterial.Get() != OverlayMaterial;
+    if (bCreateNewMaterial)
+    {
+        ActiveStatusOverlaySourceMaterial = OverlayMaterial;
+        ActiveStatusOverlayMID = UMaterialInstanceDynamic::Create(OverlayMaterial, this);
+        ActiveStatusOverlayMixValue = 0.f;
+    }
+
+    ActiveStatusOverlayMixParameterName = MixParameterName;
+    TargetStatusOverlayMixValue = MixValue;
+    ActiveStatusOverlayMixInterpSpeed = FMath::Max(0.f, MixInterpSpeed);
+
+    if (ActiveStatusOverlayMID && !MixParameterName.IsNone())
+    {
+        if (bInterpolateMix
+            && ActiveStatusOverlayMixInterpSpeed > 0.f
+            && !FMath::IsNearlyEqual(ActiveStatusOverlayMixValue, TargetStatusOverlayMixValue, KINDA_SMALL_NUMBER)
+            && World)
+        {
+            ActiveStatusOverlayMID->SetScalarParameterValue(MixParameterName, ActiveStatusOverlayMixValue);
+            World->GetTimerManager().SetTimer(
+                StatusOverlayMixInterpolationTimerHandle,
+                this,
+                &ALastFPSCharacterBase::UpdateStatusOverlayMixInterpolation,
+                0.016f,
+                true);
+        }
+        else
+        {
+            if (World)
+            {
+                World->GetTimerManager().ClearTimer(StatusOverlayMixInterpolationTimerHandle);
+            }
+
+            ActiveStatusOverlayMixValue = TargetStatusOverlayMixValue;
+            ActiveStatusOverlayMID->SetScalarParameterValue(MixParameterName, ActiveStatusOverlayMixValue);
+        }
+    }
+    else if (World)
+    {
+        World->GetTimerManager().ClearTimer(StatusOverlayMixInterpolationTimerHandle);
+    }
+
+    MeshComp->SetOverlayMaterial(ActiveStatusOverlayMID ? ActiveStatusOverlayMID.Get() : OverlayMaterial);
+}
+
+void ALastFPSCharacterBase::UpdateStatusOverlayMixInterpolation()
+{
+    UWorld* World = GetWorld();
+    if (!World || !ActiveStatusOverlayMID || ActiveStatusOverlayMixParameterName.IsNone())
+    {
+        if (World)
+        {
+            World->GetTimerManager().ClearTimer(StatusOverlayMixInterpolationTimerHandle);
+        }
+        return;
+    }
+
+    const float DeltaTime = World->GetDeltaSeconds();
+    ActiveStatusOverlayMixValue = FMath::FInterpTo(
+        ActiveStatusOverlayMixValue,
+        TargetStatusOverlayMixValue,
+        DeltaTime,
+        ActiveStatusOverlayMixInterpSpeed);
+
+    if (FMath::IsNearlyEqual(ActiveStatusOverlayMixValue, TargetStatusOverlayMixValue, 0.001f))
+    {
+        ActiveStatusOverlayMixValue = TargetStatusOverlayMixValue;
+        World->GetTimerManager().ClearTimer(StatusOverlayMixInterpolationTimerHandle);
+    }
+
+    ActiveStatusOverlayMID->SetScalarParameterValue(ActiveStatusOverlayMixParameterName, ActiveStatusOverlayMixValue);
 }
 
 void ALastFPSCharacterBase::GiveDefaultAbilities()

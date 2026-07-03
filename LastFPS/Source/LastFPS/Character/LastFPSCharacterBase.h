@@ -3,8 +3,9 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
-#include "GameplayTagContainer.h"
 #include "GameplayEffectTypes.h"
+#include "TimerManager.h"
+#include "Data/Status/LastFPSStatusOverlayConfig.h"
 #include "LastFPSCharacterBase.generated.h"
 
 class UAbilitySystemComponent;
@@ -12,6 +13,9 @@ class ULastFPSAttributeSet;
 class ULastFPSCharacterDefinition;
 class UGameplayEffect;
 class UGameplayAbility;
+class ULastFPSStatusOverlayConfig;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
 class USoundBase;
 class APlayerState;
 
@@ -49,6 +53,14 @@ public:
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayHitSound();
 
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_SetStatusOverlayMaterial(
+        UMaterialInterface* OverlayMaterial,
+        FName MixParameterName,
+        float MixValue,
+        bool bInterpolateMix,
+        float MixInterpSpeed);
+
     /** 서버: 명중 처리 후 발사자 클라이언트에서만 히트마커 표시 */
     UFUNCTION(Client, Reliable)
     void Client_NotifyHitMarker();
@@ -76,6 +88,21 @@ protected:
     void OnHealthChanged(const FOnAttributeChangeData& Data);
     void UpdateAliveCollisionState(bool bAlive);
     void OnMoveSpeedChanged(const FOnAttributeChangeData& Data);
+    void BindStatusOverlayMaterials(UAbilitySystemComponent* ASC);
+    void UnbindStatusOverlayMaterials(UAbilitySystemComponent* ASC);
+    void OnStatusOverlayTagChanged(FGameplayTag StatusTag, int32 NewCount);
+    void RefreshStatusOverlayMaterial();
+    bool IsStatusOverlayActive(UAbilitySystemComponent* ASC, const FLastFPSStatusOverlayMaterial& OverlayConfig) const;
+    float GetStatusOverlayMix(UAbilitySystemComponent* ASC, const FLastFPSStatusOverlayMaterial& OverlayConfig) const;
+    int32 GetStatusOverlayStackCount(UAbilitySystemComponent* ASC, const FLastFPSStatusOverlayMaterial& OverlayConfig) const;
+    int32 GetStatusOverlayFullStackCount(const FLastFPSStatusOverlayMaterial& OverlayConfig) const;
+    void ApplyStatusOverlayMaterial(
+        UMaterialInterface* OverlayMaterial,
+        FName MixParameterName,
+        float MixValue,
+        bool bInterpolateMix,
+        float MixInterpSpeed);
+    void UpdateStatusOverlayMixInterpolation();
     const ULastFPSCharacterDefinition* ResolveCharacterDefinition() const;
     void ApplyCharacterVisuals(const ULastFPSCharacterDefinition* Definition);
 
@@ -110,8 +137,24 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="GAS")
     TArray<TSubclassOf<UGameplayEffect>> DefaultEffects;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Status Overlay")
+    TObjectPtr<ULastFPSStatusOverlayConfig> StatusOverlayConfig;
+
     FDelegateHandle MoveSpeedDelegateHandle;
     FDelegateHandle HealthDelegateHandle;
+    TMap<FGameplayTag, FDelegateHandle> StatusOverlayDelegateHandles;
+
+    UPROPERTY()
+    TObjectPtr<UMaterialInstanceDynamic> ActiveStatusOverlayMID;
+
+    UPROPERTY()
+    TObjectPtr<UMaterialInterface> ActiveStatusOverlaySourceMaterial;
+
+    FTimerHandle StatusOverlayMixInterpolationTimerHandle;
+    FName ActiveStatusOverlayMixParameterName = NAME_None;
+    float ActiveStatusOverlayMixValue = 0.f;
+    float TargetStatusOverlayMixValue = 0.f;
+    float ActiveStatusOverlayMixInterpSpeed = 0.f;
 
 private:
     TMap<TWeakObjectPtr<APlayerState>, float> RecentAttackers;
