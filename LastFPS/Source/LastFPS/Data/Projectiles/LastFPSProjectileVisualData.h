@@ -21,10 +21,16 @@ public:
     TObjectPtr<UNiagaraSystem> TrailNiagaraSystem;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Visual")
+    FVector TrailEffectScale = FVector::OneVector;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Visual")
     TObjectPtr<UParticleSystem> ImpactEffect;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Visual")
     TObjectPtr<UNiagaraSystem> ImpactNiagaraSystem;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Visual")
+    FVector ImpactEffectScale = FVector::OneVector;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Audio")
     TObjectPtr<USoundBase> ImpactSound;

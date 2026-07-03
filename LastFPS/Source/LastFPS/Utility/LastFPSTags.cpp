@@ -48,4 +48,6 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Skill1, "Ability.Skill1", "Skill 1 abilit
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Skill2, "Ability.Skill2", "Skill 2 ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Skill3, "Ability.Skill3", "Skill 3 ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Ultimate, "Ability.Ultimate", "Ultimate ability")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_ProbePassive, "Ability.Passive.Probe", "프로브 패시브 어빌리티")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Trigger_SpawnProbe, "Ability.Trigger.SpawnProbe", "프로브 생성 트리거 어빌리티")
 }

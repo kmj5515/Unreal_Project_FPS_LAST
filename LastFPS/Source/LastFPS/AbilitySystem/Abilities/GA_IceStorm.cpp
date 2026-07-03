@@ -9,6 +9,9 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "TimerManager.h"
 #include "Utility/LastFPSTags.h"
 
 UGA_IceStorm::UGA_IceStorm()
@@ -65,6 +68,8 @@ void UGA_IceStorm::ActivateAbility(
 	bAreaSpawned = false;
 	Phase = ELastFPSIceStormPhase::Casting;
 	CachedTargetLocation = FVector::ZeroVector;
+	CachedTargetTransform = FTransform::Identity;
+	bHasCachedTargetTransform = false;
 
 	Hero->SetWantsToSprint(false);
 	if (UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr)
@@ -81,6 +86,7 @@ void UGA_IceStorm::ActivateAbility(
 	}
 
 	StartEventTasks();
+	StartTargetingIndicator();
 
 	if (!PlayIceStormMontage())
 	{
@@ -148,6 +154,7 @@ bool UGA_IceStorm::ConfirmIceStorm()
 
 	bCommitted = true;
 	Phase = ELastFPSIceStormPhase::Executing;
+	StopTargetingIndicator();
 	DrawTargetDebug();
 
 	if (!JumpToMontageSection(FireSectionName))
@@ -258,6 +265,9 @@ bool UGA_IceStorm::CacheAimTarget()
 
 	const FVector CameraAimDirection = GetCameraAimDirection(Hero);
 	CachedTargetLocation = GetAimTarget(Hero, CameraAimDirection);
+	CachedTargetTransform = BuildTargetGroundTransform(Hero, CachedTargetLocation);
+	CachedTargetLocation = CachedTargetTransform.GetLocation();
+	bHasCachedTargetTransform = true;
 	return true;
 }
 
@@ -328,6 +338,163 @@ FVector UGA_IceStorm::GetAimTarget(const ALastFPSHero* Hero, const FVector& Came
 	return bHit ? HitResult.ImpactPoint : TraceEnd;
 }
 
+FTransform UGA_IceStorm::BuildTargetGroundTransform(const ALastFPSHero* Hero, const FVector& TargetLocation) const
+{
+	if (!bProjectTargetToGround)
+	{
+		return FTransform(FRotator::ZeroRotator, TargetLocation);
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return FTransform(FRotator::ZeroRotator, TargetLocation);
+	}
+
+	const FVector TraceStart = TargetLocation + FVector::UpVector * GroundTraceStartOffset;
+	const FVector TraceEnd = TargetLocation - FVector::UpVector * GroundTraceDistance;
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(IceStormGroundTrace), false, Hero);
+	if (Hero)
+	{
+		QueryParams.AddIgnoredActor(Hero);
+
+		TArray<AActor*> AttachedActors;
+		Hero->GetAttachedActors(AttachedActors);
+		QueryParams.AddIgnoredActors(AttachedActors);
+	}
+
+	FHitResult HitResult;
+	if (!World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, GroundTraceChannel, QueryParams))
+	{
+		return FTransform(FRotator::ZeroRotator, TargetLocation);
+	}
+
+	const FVector SurfaceLocation = HitResult.ImpactPoint + HitResult.ImpactNormal * GroundSurfaceOffset;
+	const FRotator SurfaceRotation = FRotationMatrix::MakeFromZ(HitResult.ImpactNormal).Rotator();
+	return FTransform(SurfaceRotation, SurfaceLocation);
+}
+
+void UGA_IceStorm::StartTargetingIndicator()
+{
+	StopTargetingIndicator();
+
+	if (!ShouldShowTargetingIndicator() || !TargetingIndicatorNiagaraSystem)
+	{
+		return;
+	}
+
+	UpdateTargetingIndicator();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			TargetingIndicatorTimerHandle,
+			this,
+			&UGA_IceStorm::UpdateTargetingIndicator,
+			TargetingIndicatorUpdateInterval,
+			true);
+	}
+}
+
+void UGA_IceStorm::UpdateTargetingIndicator()
+{
+	if (!ShouldShowTargetingIndicator() || !TargetingIndicatorNiagaraSystem)
+	{
+		StopTargetingIndicator();
+		return;
+	}
+
+	const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+	if (!Hero)
+	{
+		StopTargetingIndicator();
+		return;
+	}
+
+	const FVector CameraAimDirection = GetCameraAimDirection(Hero);
+	const FVector AimTarget = GetAimTarget(Hero, CameraAimDirection);
+	const FTransform GroundTransform = BuildTargetGroundTransform(Hero, AimTarget);
+	const FTransform IndicatorTransform = BuildTargetingIndicatorTransform(GroundTransform);
+
+	if (!TargetingIndicatorNiagaraComponent)
+	{
+		TargetingIndicatorNiagaraComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this,
+			TargetingIndicatorNiagaraSystem,
+			IndicatorTransform.GetLocation(),
+			IndicatorTransform.GetRotation().Rotator(),
+			FVector::OneVector,
+			true,
+			true,
+			ENCPoolMethod::None,
+			true);
+	}
+
+	if (!TargetingIndicatorNiagaraComponent)
+	{
+		return;
+	}
+
+	TargetingIndicatorNiagaraComponent->SetWorldTransform(IndicatorTransform);
+	ApplyTargetingIndicatorParameters(IndicatorTransform);
+}
+
+void UGA_IceStorm::StopTargetingIndicator()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(TargetingIndicatorTimerHandle);
+	}
+
+	if (TargetingIndicatorNiagaraComponent)
+	{
+		TargetingIndicatorNiagaraComponent->Deactivate();
+		TargetingIndicatorNiagaraComponent->DestroyComponent();
+		TargetingIndicatorNiagaraComponent = nullptr;
+	}
+}
+
+bool UGA_IceStorm::ShouldShowTargetingIndicator() const
+{
+	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+	return ActorInfo
+		&& ActorInfo->IsLocallyControlled()
+		&& Phase == ELastFPSIceStormPhase::Casting
+		&& !bCommitted;
+}
+
+FTransform UGA_IceStorm::BuildTargetingIndicatorTransform(const FTransform& GroundTransform) const
+{
+	const FVector IndicatorLocation = GroundTransform.TransformPosition(TargetingIndicatorLocationOffset);
+	const FQuat IndicatorRotation = GroundTransform.GetRotation() * TargetingIndicatorRotationOffset.Quaternion();
+	return FTransform(IndicatorRotation, IndicatorLocation, TargetingIndicatorScale);
+}
+
+void UGA_IceStorm::ApplyTargetingIndicatorParameters(const FTransform& IndicatorTransform)
+{
+	if (!TargetingIndicatorNiagaraComponent)
+	{
+		return;
+	}
+
+	if (!TargetingIndicatorRadiusNiagaraParameterName.IsNone())
+	{
+		TargetingIndicatorNiagaraComponent->SetVariableFloat(TargetingIndicatorRadiusNiagaraParameterName, AreaConfig.Radius);
+	}
+
+	if (!TargetingIndicatorVisualRadiusNiagaraParameterName.IsNone())
+	{
+		const float VisualRadius = AreaConfig.VisualRadius > 0.f ? AreaConfig.VisualRadius : AreaConfig.Radius * 2.f;
+		TargetingIndicatorNiagaraComponent->SetVariableFloat(TargetingIndicatorVisualRadiusNiagaraParameterName, VisualRadius);
+	}
+
+	if (!TargetingIndicatorSurfaceNormalNiagaraParameterName.IsNone())
+	{
+		TargetingIndicatorNiagaraComponent->SetVariableVec3(TargetingIndicatorSurfaceNormalNiagaraParameterName, IndicatorTransform.GetUnitAxis(EAxis::Z));
+	}
+}
+
 void UGA_IceStorm::SpawnAreaEffect()
 {
 	if (bAreaSpawned || !bCommitted)
@@ -347,7 +514,9 @@ void UGA_IceStorm::SpawnAreaEffect()
 		return;
 	}
 
-	const FTransform SpawnTransform(FRotator::ZeroRotator, CachedTargetLocation);
+	const FTransform SpawnTransform = bHasCachedTargetTransform
+		? CachedTargetTransform
+		: FTransform(FRotator::ZeroRotator, CachedTargetLocation);
 	ALastFPSAreaEffectActor* AreaActor = World->SpawnActorDeferred<ALastFPSAreaEffectActor>(
 		AreaClass,
 		SpawnTransform,
@@ -434,6 +603,7 @@ void UGA_IceStorm::EndAbility(
 	bool bWasCancelled)
 {
 	EndEventTasks();
+	StopTargetingIndicator();
 	ReleaseCastingState();
 
 	if (ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo()))
@@ -448,6 +618,8 @@ void UGA_IceStorm::EndAbility(
 	bCommitted = false;
 	bAreaSpawned = false;
 	CachedTargetLocation = FVector::ZeroVector;
+	CachedTargetTransform = FTransform::Identity;
+	bHasCachedTargetTransform = false;
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

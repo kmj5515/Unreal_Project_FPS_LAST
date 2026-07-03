@@ -1,13 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AbilitySystem/Abilities/LastFPSGameplayAbility.h"
+#include "AbilitySystem/Abilities/LastFPSActiveGameplayAbility.h"
 #include "GA_SkillHeal.generated.h"
 
 class UGameplayEffect;
 
 UCLASS()
-class LASTFPS_API UGA_SkillHeal : public ULastFPSGameplayAbility
+class LASTFPS_API UGA_SkillHeal : public ULastFPSActiveGameplayAbility
 {
     GENERATED_BODY()
 

@@ -187,8 +187,12 @@ void ALastFPSProjectile::ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UG
 
 void ALastFPSProjectile::ApplyVisualData()
 {
+    const FVector TrailEffectScale = VisualData ? VisualData->TrailEffectScale : FVector::OneVector;
+
     if (TrailNiagara)
     {
+        TrailNiagara->SetRelativeScale3D(TrailEffectScale);
+
         if (VisualData && VisualData->TrailNiagaraSystem)
         {
             TrailNiagara->SetAsset(VisualData->TrailNiagaraSystem);
@@ -202,6 +206,8 @@ void ALastFPSProjectile::ApplyVisualData()
 
     if (TrailParticle)
     {
+        TrailParticle->SetRelativeScale3D(TrailEffectScale);
+
         if (VisualData && VisualData->TrailNiagaraSystem)
         {
             TrailParticle->DeactivateSystem();
@@ -242,7 +248,8 @@ void ALastFPSProjectile::PlayImpactFeedback(const FHitResult& ImpactResult)
             this,
             VisualData->ImpactNiagaraSystem,
             ImpactLocation,
-            ImpactRotation);
+            ImpactRotation,
+            VisualData->ImpactEffectScale);
     }
     else if (VisualData && VisualData->ImpactEffect)
     {
@@ -250,7 +257,8 @@ void ALastFPSProjectile::PlayImpactFeedback(const FHitResult& ImpactResult)
             this,
             VisualData->ImpactEffect,
             ImpactLocation,
-            ImpactRotation);
+            ImpactRotation,
+            VisualData->ImpactEffectScale);
     }
 
     if (VisualData && VisualData->ImpactSound)

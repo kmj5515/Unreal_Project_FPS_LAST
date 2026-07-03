@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AbilitySystem/Abilities/LastFPSGameplayAbility.h"
+#include "AbilitySystem/Abilities/LastFPSActiveGameplayAbility.h"
 #include "Engine/EngineTypes.h"
 #include "GameplayTagContainer.h"
 #include "Utility/LastFPSDamageCalculation.h"
@@ -17,7 +17,7 @@ class UNiagaraSystem;
 struct FLastFPSAreaEffectConfig;
 
 UCLASS()
-class LASTFPS_API UGA_ViolaIceAura : public ULastFPSGameplayAbility
+class LASTFPS_API UGA_ViolaIceAura : public ULastFPSActiveGameplayAbility
 {
 	GENERATED_BODY()
 

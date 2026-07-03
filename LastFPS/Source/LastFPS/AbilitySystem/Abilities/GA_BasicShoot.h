@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AbilitySystem/Abilities/LastFPSGameplayAbility.h"
+#include "AbilitySystem/Abilities/LastFPSActiveGameplayAbility.h"
 #include "GA_BasicShoot.generated.h"
 
 class UWeaponComponent;
@@ -10,7 +10,7 @@ class UGameplayEffect;
 class UAnimMontage;
 
 UCLASS()
-class LASTFPS_API UGA_BasicShoot : public ULastFPSGameplayAbility
+class LASTFPS_API UGA_BasicShoot : public ULastFPSActiveGameplayAbility
 {
     GENERATED_BODY()
 

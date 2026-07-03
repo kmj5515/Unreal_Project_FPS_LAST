@@ -1,13 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AbilitySystem/Abilities/LastFPSGameplayAbility.h"
+#include "AbilitySystem/Abilities/LastFPSActiveGameplayAbility.h"
 #include "GA_Reload.generated.h"
 
 class UAnimMontage;
 
 UCLASS()
-class LASTFPS_API UGA_Reload : public ULastFPSGameplayAbility
+class LASTFPS_API UGA_Reload : public ULastFPSActiveGameplayAbility
 {
     GENERATED_BODY()
 

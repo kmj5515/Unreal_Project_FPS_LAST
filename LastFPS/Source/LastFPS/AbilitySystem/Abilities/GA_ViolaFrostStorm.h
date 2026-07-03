@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AbilitySystem/Abilities/LastFPSGameplayAbility.h"
+#include "AbilitySystem/Abilities/LastFPSActiveGameplayAbility.h"
 #include "AbilitySystem/Actors/LastFPSAreaEffectActor.h"
 #include "GA_ViolaFrostStorm.generated.h"
 
@@ -11,7 +11,7 @@ class UAbilityTask_WaitGameplayEvent;
 class UAnimMontage;
 
 UCLASS()
-class LASTFPS_API UGA_ViolaFrostStorm : public ULastFPSGameplayAbility
+class LASTFPS_API UGA_ViolaFrostStorm : public ULastFPSActiveGameplayAbility
 {
 	GENERATED_BODY()
 

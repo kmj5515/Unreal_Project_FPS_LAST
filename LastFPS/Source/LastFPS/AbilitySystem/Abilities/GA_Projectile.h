@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbilityTypes.h"
-#include "AbilitySystem/Abilities/LastFPSGameplayAbility.h"
+#include "AbilitySystem/Abilities/LastFPSActiveGameplayAbility.h"
 #include "GA_Projectile.generated.h"
 
 class ALastFPSHero;
@@ -10,7 +10,7 @@ class UAbilityTask_WaitGameplayEvent;
 class ULastFPSAbilityProjectileData;
 
 UCLASS()
-class LASTFPS_API UGA_Projectile : public ULastFPSGameplayAbility
+class LASTFPS_API UGA_Projectile : public ULastFPSActiveGameplayAbility
 {
     GENERATED_BODY()
 
@@ -40,9 +40,6 @@ private:
 
     UFUNCTION()
     void OnAbilityEndEvent(FGameplayEventData Payload);
-
-    FVector GetCameraAimDirection(const ALastFPSHero* Hero) const;
-    FVector GetAimTarget(const ALastFPSHero* Hero, const FVector& CameraAimDirection) const;
 
     UPROPERTY()
     TObjectPtr<UAbilityTask_WaitGameplayEvent> ProjectileSpawnEventTask;
