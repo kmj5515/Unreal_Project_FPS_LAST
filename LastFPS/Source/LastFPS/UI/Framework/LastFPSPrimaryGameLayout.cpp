@@ -2,6 +2,7 @@
 
 #include "UI/Framework/LastFPSUITags.h"
 
+#include "CommonActivatableWidget.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
@@ -69,4 +70,28 @@ void ULastFPSPrimaryGameLayout::EnsureLayersRegistered()
 ULastFPSPrimaryGameLayout::ULastFPSPrimaryGameLayout(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
+}
+
+void ULastFPSPrimaryGameLayout::RestoreFocusToTopActiveWidget()
+{
+	// Game(HUD) 레이어는 제외 — 메뉴/모달이 모두 닫힌 상태에서는 포커스를 넘기지 않아
+	// ESC가 PlayerController(ESC 메뉴 토글)로 흐르도록 둔다.
+	const FGameplayTag LayerOrder[] = {
+		LastFPSUITags::Layer_Modal(),
+		LastFPSUITags::Layer_Menu(),
+		LastFPSUITags::Layer_GameMenu(),
+	};
+
+	for (const FGameplayTag& LayerTag : LayerOrder)
+	{
+		if (const UCommonActivatableWidgetContainerBase* Layer = GetLayerWidget(LayerTag))
+		{
+			if (UCommonActivatableWidget* Active = Layer->GetActiveWidget())
+			{
+				Active->SetIsFocusable(true);
+				Active->SetKeyboardFocus();
+				return;
+			}
+		}
+	}
 }
