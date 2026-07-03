@@ -1,5 +1,11 @@
 #include "Economy/LastFPSEconomySubsystem.h"
 
+#include "Data/Tables/LastFPSItemData.h"
+#include "Data/Tables/LastFPSShopData.h"
+#include "Engine/DataTable.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogLastFPSEconomy, Log, All);
+
 void ULastFPSEconomySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -9,11 +15,46 @@ void ULastFPSEconomySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	OwnedItems.Reset();
 	for (const TPair<FName, int32>& Seed : StartingOwnedItems)
 	{
-		if (!Seed.Key.IsNone() && Seed.Value > 0)
+		if (Seed.Key.IsNone() || Seed.Value <= 0)
 		{
-			OwnedItems.Add(Seed.Key, Seed.Value);
+			continue;
 		}
+		// 시드 아이템도 정의 검증 — 오타 시드가 유령으로 들어가지 않도록.
+		if (!HasItemDefinition(Seed.Key) && GetItemTable())
+		{
+			UE_LOG(LogLastFPSEconomy, Error,
+				TEXT("StartingOwnedItems 의 '%s' 가 DT_ItemData 에 없음 — 시드 무시."), *Seed.Key.ToString());
+			continue;
+		}
+		OwnedItems.Add(Seed.Key, Seed.Value);
 	}
+
+	ValidateReferences();
+}
+
+const UDataTable* ULastFPSEconomySubsystem::GetItemTable() const
+{
+	return ItemTable.LoadSynchronous();
+}
+
+bool ULastFPSEconomySubsystem::IsItemTableConfigured() const
+{
+	return GetItemTable() != nullptr;
+}
+
+bool ULastFPSEconomySubsystem::HasItemDefinition(FName ItemRowId) const
+{
+	if (ItemRowId.IsNone())
+	{
+		return false;
+	}
+	const UDataTable* Table = GetItemTable();
+	if (!Table)
+	{
+		return false; // 테이블 미설정 → 검증 불가(호출부에서 미설정 상황을 따로 처리)
+	}
+	static const FString Context(TEXT("ULastFPSEconomySubsystem::HasItemDefinition"));
+	return Table->FindRow<FLastFPSItemData>(ItemRowId, Context, /*bWarnIfRowMissing=*/false) != nullptr;
 }
 
 void ULastFPSEconomySubsystem::AddCredits(int32 Amount)
@@ -32,6 +73,16 @@ bool ULastFPSEconomySubsystem::TryPurchase(FName GrantItemRowId, int32 Price, in
 	const int32 Qty       = FMath::Max(1, Count);
 	const int32 UnitCost  = FMath::Max(0, Price);
 	const int32 TotalCost = UnitCost * Qty;
+
+	// 지급 대상이 있으면 차감 "전에" 정의를 검증 — 깨진 참조에 크레딧만 날아가는 유령 구매 차단.
+	// (ItemTable 미설정 시엔 검증 불가라 통과시키되, 아래 AddItem 에서도 재검사.)
+	if (!GrantItemRowId.IsNone() && GetItemTable() && !HasItemDefinition(GrantItemRowId))
+	{
+		UE_LOG(LogLastFPSEconomy, Error,
+			TEXT("구매 거부: GrantItemRowId '%s' 가 DT_ItemData 에 없음(깨진 상점 참조)."), *GrantItemRowId.ToString());
+		return false;
+	}
+
 	if (Credits < TotalCost)
 	{
 		return false;
@@ -56,6 +107,15 @@ void ULastFPSEconomySubsystem::AddItem(FName ItemRowId, int32 Count)
 		return;
 	}
 
+	// 보상/디버그 경로에서도 정의 없는 아이템은 지급하지 않는다(유령 아이템 방지).
+	// ItemTable 미설정 시엔 검증 불가라 그대로 지급(셋업 단계 허용).
+	if (GetItemTable() && !HasItemDefinition(ItemRowId))
+	{
+		UE_LOG(LogLastFPSEconomy, Error,
+			TEXT("지급 거부: '%s' 가 DT_ItemData 에 없음."), *ItemRowId.ToString());
+		return;
+	}
+
 	OwnedItems.FindOrAdd(ItemRowId) += Count;
 	OnInventoryChanged.Broadcast();
 }
@@ -64,4 +124,45 @@ int32 ULastFPSEconomySubsystem::GetItemCount(FName ItemRowId) const
 {
 	const int32* Found = OwnedItems.Find(ItemRowId);
 	return Found ? *Found : 0;
+}
+
+void ULastFPSEconomySubsystem::ValidateReferences() const
+{
+#if !UE_BUILD_SHIPPING
+	const UDataTable* Items = GetItemTable();
+	if (!Items)
+	{
+		UE_LOG(LogLastFPSEconomy, Warning,
+			TEXT("ItemTable(DT_ItemData) 미설정 — 참조 검증을 건너뜀. Project Settings/DefaultGame.ini 에서 지정 필요."));
+		return;
+	}
+
+	int32 Broken = 0;
+
+	// 상점 판매 항목의 GrantItemRowId 가 모두 DT_ItemData 에 존재하는지.
+	if (const UDataTable* Shop = ShopTable.LoadSynchronous())
+	{
+		static const FString Ctx(TEXT("ULastFPSEconomySubsystem::ValidateReferences|Shop"));
+		Shop->ForeachRow<FLastFPSShopItemData>(Ctx,
+			[this, &Broken](const FName& RowName, const FLastFPSShopItemData& Row)
+			{
+				if (!Row.GrantItemRowId.IsNone() && !HasItemDefinition(Row.GrantItemRowId))
+				{
+					++Broken;
+					UE_LOG(LogLastFPSEconomy, Error,
+						TEXT("[Shop] 행 '%s' 의 GrantItemRowId '%s' 가 DT_ItemData 에 없음."),
+						*RowName.ToString(), *Row.GrantItemRowId.ToString());
+				}
+			});
+	}
+
+	if (Broken == 0)
+	{
+		UE_LOG(LogLastFPSEconomy, Log, TEXT("경제 테이블 참조 검증 통과 — 깨진 상점 참조 없음."));
+	}
+	else
+	{
+		UE_LOG(LogLastFPSEconomy, Error, TEXT("경제 테이블 참조 검증: 깨진 참조 %d건."), Broken);
+	}
+#endif
 }

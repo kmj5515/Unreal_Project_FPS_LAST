@@ -6,12 +6,56 @@
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Economy/LastFPSEconomySubsystem.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogLastFPSLoadout, Log, All);
+
 void ULastFPSLoadoutSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
+	// Economy 를 먼저 초기화하도록 순서를 명시(모듈 검증이 Economy->HasItemDefinition 를 사용).
+	Collection.InitializeDependency<ULastFPSEconomySubsystem>();
+
 	Super::Initialize(Collection);
 
 	// 슬롯 배열을 빈 칸(NAME_None)으로 초기화
 	EquippedModules.Init(NAME_None, FMath::Max(1, SlotCount));
+
+	ValidateModuleReferences();
+}
+
+void ULastFPSLoadoutSubsystem::ValidateModuleReferences() const
+{
+#if !UE_BUILD_SHIPPING
+	const UDataTable* Table = ModuleTable.LoadSynchronous();
+	if (!Table)
+	{
+		UE_LOG(LogLastFPSLoadout, Warning,
+			TEXT("ModuleTable(DT_ModuleData) 미설정 — 모듈 참조 검증을 건너뜀."));
+		return;
+	}
+
+	const ULastFPSEconomySubsystem* Economy = GetEconomy();
+	if (!Economy || !Economy->IsItemTableConfigured())
+	{
+		// ItemTable 미설정 시 HasItemDefinition 이 전부 false 라 오탐이 되므로 검증을 건너뛴다.
+		return;
+	}
+
+	int32 Broken = 0;
+	static const FString Ctx(TEXT("ULastFPSLoadoutSubsystem::ValidateModuleReferences"));
+	Table->ForeachRow<FLastFPSModuleData>(Ctx,
+		[Economy, &Broken](const FName& RowName, const FLastFPSModuleData&)
+		{
+			// ItemTable 미설정이면 Economy 가 검증 불가라 false 를 돌려주므로, 그 경우는 건너뛴다.
+			if (!Economy->HasItemDefinition(RowName))
+			{
+				++Broken;
+				UE_LOG(LogLastFPSLoadout, Error,
+					TEXT("[Module] 행 '%s' 에 대응하는 DT_ItemData 행이 없음 — 인벤토리에 표시/장착 불가."),
+					*RowName.ToString());
+			}
+		});
+
+	UE_LOG(LogLastFPSLoadout, Log, TEXT("모듈 테이블 참조 검증: 깨진 참조 %d건."), Broken);
+#endif
 }
 
 ULastFPSEconomySubsystem* ULastFPSLoadoutSubsystem::GetEconomy() const

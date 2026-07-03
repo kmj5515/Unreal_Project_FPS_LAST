@@ -18,6 +18,14 @@ class LASTFPS_API ULastFPSPrimaryGameLayout : public UPrimaryGameLayout
 public:
 	ULastFPSPrimaryGameLayout(const FObjectInitializer& ObjectInitializer);
 
+	/**
+	 * 가장 위 레이어(Modal→Menu→GameMenu)부터 최초로 발견되는 활성 위젯에 키보드 포커스를 준다.
+	 * 모달이 닫힌 뒤 그 아래 화면(다른 레이어라 재활성화되지 않음)으로 포커스를 되돌려
+	 * ESC가 위젯 대신 PlayerController로 새는 것을 막는다. 열린 메뉴가 없으면(HUD만 남으면)
+	 * 아무 것도 포커스하지 않아 ESC가 정상적으로 PC(ESC 메뉴 토글)로 흐른다.
+	 */
+	void RestoreFocusToTopActiveWidget();
+
 protected:
 	virtual void NativeOnInitialized() override;
 
