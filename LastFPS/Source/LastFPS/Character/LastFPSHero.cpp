@@ -297,6 +297,34 @@ bool ALastFPSHero::TryConfirmActiveAbility(FGameplayTag InputID)
     return false;
 }
 
+bool ALastFPSHero::TryCancelActiveAbility(FGameplayTag InputID)
+{
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!ASC)
+    {
+        return false;
+    }
+
+    for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+    {
+        if (!Spec.IsActive())
+        {
+            continue;
+        }
+
+        UGameplayAbility* ActiveAbility = Spec.GetPrimaryInstance();
+        ILastFPSConfirmableAbility* ConfirmableAbility = Cast<ILastFPSConfirmableAbility>(ActiveAbility);
+        if (!ConfirmableAbility || !ConfirmableAbility->CanCancelAbilityInput(InputID))
+        {
+            continue;
+        }
+
+        return ConfirmableAbility->CancelAbilityInput(InputID);
+    }
+
+    return false;
+}
+
 bool ALastFPSHero::ShouldBlockAbilityInputRelease(FGameplayTag InputID)
 {
     UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
@@ -335,6 +363,11 @@ void ALastFPSHero::CancelAbilityByTag(FGameplayTag AbilityTag)
 
 void ALastFPSHero::InputPressed(FGameplayTag InputID)
 {
+    if (TryCancelActiveAbility(InputID))
+    {
+        return;
+    }
+
     if (TryConfirmActiveAbility(InputID))
     {
         return;
@@ -356,6 +389,11 @@ void ALastFPSHero::InputPressed(FGameplayTag InputID)
         SetWantsToSprint(true);
     }
 
+    if (ShouldCancelFireBeforeAbilityInput(InputID))
+    {
+        CancelAbilityByTag(LastFPSGameplayTags::Input_Fire);
+    }
+
     const bool bActivatedOrActive = TryActivateAbilityByTag(InputID);
     if (InputID == LastFPSGameplayTags::Input_Sprint && !bActivatedOrActive && !bIsSprinting)
     {
@@ -375,6 +413,11 @@ void ALastFPSHero::InputReleased(FGameplayTag InputID)
 
 void ALastFPSHero::SetADS(bool bEnabled)
 {
+    if (bEnabled && TryCancelActiveAbility(LastFPSGameplayTags::Input_ADS))
+    {
+        return;
+    }
+
     if (bEnabled && (bIsSprinting || bWantsToSprint))
     {
         SetWantsToSprint(false);
@@ -404,6 +447,14 @@ void ALastFPSHero::SetADS(bool bEnabled)
             Movement->MaxWalkSpeed = PreADSWalkSpeed > 0.f ? PreADSWalkSpeed : 600.f;
         }
     }
+}
+
+bool ALastFPSHero::ShouldCancelFireBeforeAbilityInput(FGameplayTag InputID) const
+{
+    return InputID == LastFPSGameplayTags::Input_Skill1
+        || InputID == LastFPSGameplayTags::Input_Skill2
+        || InputID == LastFPSGameplayTags::Input_Skill3
+        || InputID == LastFPSGameplayTags::Input_Ultimate;
 }
 
 bool ALastFPSHero::ShouldSkipAbilityCancelOnRelease(FGameplayTag InputID) const

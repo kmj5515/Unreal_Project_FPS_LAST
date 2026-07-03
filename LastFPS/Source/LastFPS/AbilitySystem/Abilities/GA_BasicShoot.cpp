@@ -192,6 +192,31 @@ void UGA_BasicShoot::LocalFire(UWeaponComponent* Weapon)
     }
 }
 
+void UGA_BasicShoot::StopFireMontage() const
+{
+    const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+    if (!Hero || !Hero->GetMesh())
+    {
+        return;
+    }
+
+    UAnimInstance* AnimInstance = Hero->GetMesh()->GetAnimInstance();
+    if (!AnimInstance)
+    {
+        return;
+    }
+
+    if (HipFireMontage && AnimInstance->Montage_IsPlaying(HipFireMontage))
+    {
+        AnimInstance->Montage_Stop(CancelMontageBlendOutTime, HipFireMontage);
+    }
+
+    if (ADSFireMontage && ADSFireMontage != HipFireMontage && AnimInstance->Montage_IsPlaying(ADSFireMontage))
+    {
+        AnimInstance->Montage_Stop(CancelMontageBlendOutTime, ADSFireMontage);
+    }
+}
+
 void UGA_BasicShoot::FinishAbility()
 {
     EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
@@ -208,6 +233,11 @@ void UGA_BasicShoot::EndAbility(
     {
         GetWorld()->GetTimerManager().ClearTimer(FireTimerHandle);
         GetWorld()->GetTimerManager().ClearTimer(FinishAbilityTimerHandle);
+    }
+
+    if (bWasCancelled)
+    {
+        StopFireMontage();
     }
 
     if (ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo()))

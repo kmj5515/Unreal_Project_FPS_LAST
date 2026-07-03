@@ -65,6 +65,7 @@ protected:
     // 공통 GAS 입력 처리
     bool TryActivateAbilityByTag(FGameplayTag AbilityTag);
     bool TryConfirmActiveAbility(FGameplayTag InputID);
+    bool TryCancelActiveAbility(FGameplayTag InputID);
     bool ShouldBlockAbilityInputRelease(FGameplayTag InputID);
     void CancelAbilityByTag(FGameplayTag AbilityTag);
     void InputPressed(FGameplayTag InputID);
@@ -139,6 +140,7 @@ private:
     void OnRep_CombatState();
 
     void HandleAbilityInput(const FInputActionValue& value, FGameplayTag InputID);
+    bool ShouldCancelFireBeforeAbilityInput(FGameplayTag InputID) const;
     bool ShouldSkipAbilityCancelOnRelease(FGameplayTag InputID) const;
 
     void TickLocalMatchIntro();

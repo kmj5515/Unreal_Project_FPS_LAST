@@ -42,6 +42,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Shoot|Animation")
     TObjectPtr<UAnimMontage> ADSFireMontage;
 
+    UPROPERTY(EditDefaultsOnly, Category="Shoot|Animation", meta=(ClampMin="0.0"))
+    float CancelMontageBlendOutTime = 0.05f;
+
     UPROPERTY(EditDefaultsOnly, Category="Shoot|State", meta=(ClampMin="0.0"))
     float MinAttackStateDuration = 0.12f;
 
@@ -51,6 +54,7 @@ private:
 
     // 로컬 클라이언트: 사운드 + 머즐플래시 즉시 재생 (클라이언트 예측)
     void LocalFire(UWeaponComponent* Weapon);
+    void StopFireMontage() const;
 
     // 서버 전용: LineTrace 히트 판정 + 데미지 GE 적용 + VFX 투사체 스폰
     UWeaponComponent* GetWeaponComponent() const;

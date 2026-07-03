@@ -24,6 +24,7 @@ UGA_IceStorm::UGA_IceStorm()
 	SpawnEventTag = LastFPSGameplayTags::Event_Montage_IceStormSpawn;
 	AbilityEndEventTag = LastFPSGameplayTags::Event_Montage_AbilityEnd;
 	ConfirmInputTag = LastFPSGameplayTags::Input_Fire;
+	CancelInputTag = LastFPSGameplayTags::Input_ADS;
 	AreaEffectClass = ALastFPSAreaEffectActor::StaticClass();
 	AreaConfig.DamageRange.DamageElement = ELastFPSDamageElement::Ice;
 
@@ -121,6 +122,23 @@ bool UGA_IceStorm::ConfirmAbilityInput(FGameplayTag InputTag)
 	}
 
 	return ConfirmIceStorm();
+}
+
+bool UGA_IceStorm::CanCancelAbilityInput(FGameplayTag InputTag) const
+{
+	const bool bMatchesCancelInput = CancelInputTag.IsValid() && CancelInputTag == InputTag;
+	return bMatchesCancelInput && Phase == ELastFPSIceStormPhase::Casting && !bCommitted;
+}
+
+bool UGA_IceStorm::CancelAbilityInput(FGameplayTag InputTag)
+{
+	if (!CanCancelAbilityInput(InputTag))
+	{
+		return false;
+	}
+
+	CancelIceStorm();
+	return true;
 }
 
 bool UGA_IceStorm::ShouldBlockAbilityInputRelease(FGameplayTag InputTag) const
@@ -230,6 +248,21 @@ bool UGA_IceStorm::PlayIceStormMontage()
 	}
 
 	return true;
+}
+
+void UGA_IceStorm::StopIceStormMontage() const
+{
+	const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+	if (!IceStormMontage || !Hero || !Hero->GetMesh())
+	{
+		return;
+	}
+
+	UAnimInstance* AnimInstance = Hero->GetMesh()->GetAnimInstance();
+	if (AnimInstance && AnimInstance->Montage_IsPlaying(IceStormMontage))
+	{
+		AnimInstance->Montage_Stop(CancelMontageBlendOutTime, IceStormMontage);
+	}
 }
 
 bool UGA_IceStorm::JumpToMontageSection(FName SectionName) const
@@ -605,6 +638,11 @@ void UGA_IceStorm::EndAbility(
 	EndEventTasks();
 	StopTargetingIndicator();
 	ReleaseCastingState();
+
+	if (bWasCancelled)
+	{
+		StopIceStormMontage();
+	}
 
 	if (ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo()))
 	{

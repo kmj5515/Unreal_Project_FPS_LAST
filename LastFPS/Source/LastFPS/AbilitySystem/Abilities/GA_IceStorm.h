@@ -55,6 +55,8 @@ public:
 
 	virtual bool CanConfirmAbilityInput(FGameplayTag InputTag) const override;
 	virtual bool ConfirmAbilityInput(FGameplayTag InputTag) override;
+	virtual bool CanCancelAbilityInput(FGameplayTag InputTag) const override;
+	virtual bool CancelAbilityInput(FGameplayTag InputTag) override;
 	virtual bool ShouldBlockAbilityInputRelease(FGameplayTag InputTag) const override;
 
 	UFUNCTION(BlueprintCallable, Category="Ice Storm")
@@ -69,6 +71,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Ice Storm|Animation", meta=(ClampMin="0.01"))
 	float MontagePlayRate = 1.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Ice Storm|Animation", meta=(ClampMin="0.0"))
+	float CancelMontageBlendOutTime = 0.1f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Ice Storm|Animation")
 	FName CastSectionName = TEXT("CastLoop");
@@ -87,6 +92,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Ice Storm|Input")
 	FGameplayTag ConfirmInputTag;
+
+	UPROPERTY(EditDefaultsOnly, Category="Ice Storm|Input")
+	FGameplayTag CancelInputTag;
 
 	UPROPERTY(EditDefaultsOnly, Category="Ice Storm|Targeting", meta=(ClampMin="0.0"))
 	float AimTraceRange = 3000.f;
@@ -139,6 +147,7 @@ protected:
 private:
 	void StartEventTasks();
 	bool PlayIceStormMontage();
+	void StopIceStormMontage() const;
 	bool JumpToMontageSection(FName SectionName) const;
 	bool CacheAimTarget();
 	FVector GetCameraAimDirection(const ALastFPSHero* Hero) const;
