@@ -161,6 +161,14 @@ protected:
     /** ESC 입력 핸들러 — EscMenuScreenTag가 있으면 연다 */
     void HandleEscMenu();
 
+    /**
+     * ESC 메뉴 여닫을 때 커서/입력 모드를 명시적으로 강제한다.
+     * ESC 메뉴는 NPC 상호작용(SetInteractionInputMode) 경로를 안 거치므로, 모달을 낀 상점 흐름
+     * 뒤 굳어버린 마우스 캡처/커서 상태를 여기서 덮어써 커서가 반드시 보이도록 한다.
+     * bMenuOpen=true → 커서 표시 + GameAndUI, false → 커서 숨김 + GameOnly.
+     */
+    void SetEscMenuInputMode(bool bMenuOpen);
+
     /** 인게임 HUD push (휴면). 레이아웃 준비 전이면 재시도. */
     void TryPushHUDToUILayout();
 
