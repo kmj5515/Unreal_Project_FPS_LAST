@@ -23,7 +23,10 @@ TOptional<FUIInputConfig> ULastFPSActivatableWidget::GetDesiredInputConfig() con
 
 bool ULastFPSActivatableWidget::NativeOnHandleBackAction()
 {
-	return Super::NativeOnHandleBackAction();
+	// 화면(메뉴)의 기본 Back = 자신을 pop. 모달(공지/확인/수량/대화)은 각자 오버라이드해
+	// 결과를 브로드캐스트한 뒤 닫는다. 이 함수가 모든 Back(ESC/추후 패드 B)의 단일 종료 지점.
+	DeactivateWidget();
+	return true;
 }
 
 void ULastFPSActivatableWidget::NativeOnActivated()
@@ -67,8 +70,13 @@ FReply ULastFPSActivatableWidget::NativeOnKeyDown(const FGeometry& InGeometry, c
 {
 	if (bIsBackHandler && InKeyEvent.GetKey() == EKeys::Escape)
 	{
-		DeactivateWidget();   // 레이어 스택에서 pop → 입력모드 복귀
-		return FReply::Handled();
+		// CommonUI Back 액션이 미구성이라 raw ESC로 폴백하되, 종료는 단일 지점인
+		// NativeOnHandleBackAction 에 위임한다 → 모달별 결과 브로드캐스트(취소/확인)가
+		// 일관되게 실행된다. (추후 CommonUI Back 액션을 등록하면 이 raw 경로만 제거하면 됨.)
+		if (NativeOnHandleBackAction())
+		{
+			return FReply::Handled();
+		}
 	}
 
 	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
