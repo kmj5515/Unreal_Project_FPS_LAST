@@ -72,18 +72,24 @@ ULastFPSPrimaryGameLayout::ULastFPSPrimaryGameLayout(const FObjectInitializer& O
 {
 }
 
+// 커서 소유 판정에 쓰는 "메뉴류" 레이어 순서 — Game(HUD) 은 제외한다. Index 는 이 순서를 따른다.
+static FGameplayTag MenuLikeLayerTag(int32 Index)
+{
+	switch (Index)
+	{
+	case 0:  return LastFPSUITags::Layer_Modal();
+	case 1:  return LastFPSUITags::Layer_Menu();
+	case 2:  return LastFPSUITags::Layer_GameMenu();
+	default: return FGameplayTag();
+	}
+}
+
 void ULastFPSPrimaryGameLayout::RestoreFocusToTopActiveWidget()
 {
 	// Game(HUD) 레이어 제외 — 메뉴가 다 닫히면 ESC 가 PC(ESC 메뉴)로 흐르도록.
-	const FGameplayTag LayerOrder[] = {
-		LastFPSUITags::Layer_Modal(),
-		LastFPSUITags::Layer_Menu(),
-		LastFPSUITags::Layer_GameMenu(),
-	};
-
-	for (const FGameplayTag& LayerTag : LayerOrder)
+	for (int32 i = 0; i < NumMenuLikeLayers; ++i)
 	{
-		if (const UCommonActivatableWidgetContainerBase* Layer = GetLayerWidget(LayerTag))
+		if (const UCommonActivatableWidgetContainerBase* Layer = GetLayerWidget(MenuLikeLayerTag(i)))
 		{
 			if (UCommonActivatableWidget* Active = Layer->GetActiveWidget())
 			{
@@ -93,4 +99,28 @@ void ULastFPSPrimaryGameLayout::RestoreFocusToTopActiveWidget()
 			}
 		}
 	}
+}
+
+bool ULastFPSPrimaryGameLayout::HasActiveMenuLikeWidget()
+{
+	for (int32 i = 0; i < NumMenuLikeLayers; ++i)
+	{
+		if (const UCommonActivatableWidgetContainerBase* Layer = GetLayerWidget(MenuLikeLayerTag(i)))
+		{
+			if (Layer->GetActiveWidget() != nullptr)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+UCommonActivatableWidgetContainerBase* ULastFPSPrimaryGameLayout::GetMenuLikeLayerContainer(int32 Index)
+{
+	if (Index < 0 || Index >= NumMenuLikeLayers)
+	{
+		return nullptr;
+	}
+	return GetLayerWidget(MenuLikeLayerTag(Index));
 }

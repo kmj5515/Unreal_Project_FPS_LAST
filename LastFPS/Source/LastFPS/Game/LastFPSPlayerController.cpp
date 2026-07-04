@@ -14,6 +14,11 @@
 #include "UI/Framework/LastFPSUITags.h"
 
 #include "CommonActivatableWidget.h"
+#include "UI/Framework/LastFPSPrimaryGameLayout.h"
+#include "Widgets/CommonActivatableWidgetContainer.h"
+#include "Input/CommonUIActionRouterBase.h"
+#include "Input/CommonUIInputTypes.h"
+#include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
 #include "Data/Definitions/LastFPSCharacterRoster.h"
@@ -68,6 +73,7 @@ void ALastFPSPlayerController::BeginPlay()
 
     CacheUIConfigFromGameMode();
     OpenInitialScreen();
+    TryBindMenuLayerInputSync();
 
     OnSelectedCharacterIndexChanged(SelectedCharacterIndex);
 }
@@ -78,6 +84,7 @@ void ALastFPSPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
     {
         World->GetTimerManager().ClearTimer(InitialScreenRetryTimerHandle);
         World->GetTimerManager().ClearTimer(HUDPushRetryTimerHandle);
+        World->GetTimerManager().ClearTimer(MenuLayerSyncBindRetryTimerHandle);
     }
 
     Super::EndPlay(EndPlayReason);
@@ -175,6 +182,98 @@ void ALastFPSPlayerController::TryPushHUDToUILayout()
     bHUDWidgetPushed = (HUDWidget != nullptr);
 }
 
+// ── 커서/입력 config 단일 소유 ───────────────────────────────────────
+
+void ALastFPSPlayerController::TryBindMenuLayerInputSync()
+{
+    if (bMenuLayerSyncBound)
+    {
+        return;
+    }
+
+    ULastFPSPrimaryGameLayout* Layout =
+        Cast<ULastFPSPrimaryGameLayout>(UPrimaryGameLayout::GetPrimaryGameLayout(this));
+    if (!Layout)
+    {
+        // 레이아웃(레이어 컨테이너) 준비 전 → 준비될 때까지 재시도.
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().SetTimer(
+                MenuLayerSyncBindRetryTimerHandle, this,
+                &ALastFPSPlayerController::TryBindMenuLayerInputSync, 0.1f, true);
+        }
+        return;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(MenuLayerSyncBindRetryTimerHandle);
+    }
+
+    // Modal/Menu/GameMenu 표시위젯 변경(전이 완료 시 발화)에 구독 → GetActiveWidget 확정 후라 타이밍 안전.
+    for (int32 i = 0; i < ULastFPSPrimaryGameLayout::NumMenuLikeLayers; ++i)
+    {
+        if (UCommonActivatableWidgetContainerBase* Container = Layout->GetMenuLikeLayerContainer(i))
+        {
+            Container->OnDisplayedWidgetChanged().AddUObject(
+                this, &ALastFPSPlayerController::HandleMenuLayerDisplayedWidgetChanged);
+        }
+    }
+
+    bMenuLayerSyncBound = true;
+
+    // 초기 상태 1회 정렬(허브 진입 직후 메뉴가 없으면 게임 config 로 맞춤).
+    ApplyInputConfigForMenuState();
+}
+
+void ALastFPSPlayerController::HandleMenuLayerDisplayedWidgetChanged(UCommonActivatableWidget* /*NewWidget*/)
+{
+    ApplyInputConfigForMenuState();
+}
+
+void ALastFPSPlayerController::ApplyInputConfigForMenuState()
+{
+    if (!IsLocalController())
+    {
+        return;
+    }
+
+    ULastFPSPrimaryGameLayout* Layout =
+        Cast<ULastFPSPrimaryGameLayout>(UPrimaryGameLayout::GetPrimaryGameLayout(this));
+    if (!Layout)
+    {
+        return;
+    }
+
+    ULocalPlayer* LP = GetLocalPlayer();
+    UCommonUIActionRouterBase* Router = LP ? LP->GetSubsystem<UCommonUIActionRouterBase>() : nullptr;
+    if (!Router)
+    {
+        return;
+    }
+
+    // PC 가 커서/입력 config 의 유일한 writer(DefaultGame.ini 의 bEnableDefaultInputConfig=False 로
+    // CommonUI 폴백 OFF). 위젯 config 에 의존하지 않고 "메뉴류가 있나"만 보고 양방향 확정 적용
+    // → CommonUI 멀티루트/leaf 불확실성 우회. 라우터 API 로 내부 캐시까지 갱신해 재desync 방지.
+    if (Layout->HasActiveMenuLikeWidget())
+    {
+        // 메뉴/모달 있음 → 커서 표시 + 게임입력 차단.
+        Router->SetActiveUIInputConfig(
+            FUIInputConfig(ECommonInputMode::Menu, EMouseCaptureMode::NoCapture), this);
+    }
+    else
+    {
+        // 게임뷰만 → 커서 숨김 + 게임입력(마우스 캡처).
+        Router->SetActiveUIInputConfig(
+            FUIInputConfig(
+                ECommonInputMode::Game,
+                EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown,
+                EMouseLockMode::LockOnCapture,
+                /*bHideCursorDuringViewportCapture*/ true),
+            this);
+    }
+}
+
 // ── 입력 · 상호작용 ──────────────────────────────────────────────────
 
 void ALastFPSPlayerController::SetupInputComponent()
@@ -212,30 +311,11 @@ void ALastFPSPlayerController::HandleEscMenu()
 
     if (EscMenuScreenTag.IsValid())
     {
-        if (UCommonActivatableWidget* Screen = OpenScreen(EscMenuScreenTag))
-        {
-            // 열릴 때 커서 강제 ON — 모달을 낀 상점 흐름 뒤 굳은 캡처/커서 상태를 덮어쓴다.
-            SetEscMenuInputMode(true);
-            // 닫힐 때 게임 입력(에임/이동)으로 복귀.
-            Screen->OnDeactivated().AddWeakLambda(this, [this]() { SetEscMenuInputMode(false); });
-        }
-    }
-}
-
-void ALastFPSPlayerController::SetEscMenuInputMode(bool bMenuOpen)
-{
-    if (bMenuOpen)
-    {
-        bShowMouseCursor = true;
-        FInputModeGameAndUI Mode;
-        Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-        Mode.SetHideCursorDuringCapture(false);
-        SetInputMode(Mode);
-    }
-    else
-    {
-        bShowMouseCursor = false;
-        SetInputMode(FInputModeGameOnly());
+        // 커서/입력 모드는 여기서 손대지 않는다. ESC 메뉴 화면은 ULastFPSActivatableWidget 계열이라
+        // GetDesiredInputConfig()=Menu 가 활성화 시 자동 적용되고, 닫히면 CommonUI 가 스택 아래
+        // (최종적으로 HUD 의 Game)로 되돌린다. PC 가 커서를 별도로 토글하면 이 단일 소스와 충돌해
+        // "위젯 보이는데 커서 없음/위젯 없는데 커서 남음" desync 가 생긴다.
+        OpenScreen(EscMenuScreenTag);
     }
 }
 
@@ -406,30 +486,16 @@ ULastFPSDialogueWidget* ALastFPSPlayerController::ShowDialogue(const FText& Spea
 
 void ALastFPSPlayerController::SetInteractionInputMode(bool bEnter)
 {
-    // 상호작용 UI 모드 진입(true)/종료(false)를 대칭으로 토글하는 단일 진입점.
-    //  - 게임플레이 입력(이동/회전/사격/궁극기/ADS/스프린트)은 캐릭터의 매핑 컨텍스트를
-    //    통째로 제거/복원해 소스에서 차단한다. (CommonUI Menu 모드는 이들을 확실히 막지 못함)
-    //  - 마우스 커서 + 입력 모드는 여기서 관리(GameAndUI는 CommonUI Menu와 일치 → 충돌 없음).
+    // 게임플레이 입력(이동/회전/사격/궁극기/ADS/스프린트) 차단만 이 함수가 담당한다.
+    // 캐릭터의 매핑 컨텍스트를 통째로 제거/복원해 소스에서 막는다. (CommonUI Menu 모드는
+    // 이 게임 매핑을 확실히 막지 못하므로 여기서 별도 처리 — CommonUI 커서 관리와 겹치지 않는 관심사.)
+    //
+    // 커서/입력 모드는 여기서 손대지 않는다. NPC 허브 위젯(ULastFPSActivatableWidget)의
+    // GetDesiredInputConfig()=Menu 가 활성/파괴에 맞춰 CommonUI 를 통해 커서를 자동으로 켜고 끈다.
+    // PC 가 SetInputMode/bShowMouseCursor 로 이중 제어하면 그 단일 소스와 충돌해 desync 가 난다.
     if (ALastFPSHero* Hero = Cast<ALastFPSHero>(GetPawn()))
     {
         Hero->SetGameplayInputEnabled(!bEnter);
-    }
-
-    bShowMouseCursor = bEnter;
-
-    if (bEnter)
-    {
-        // GameAndUI + DoNotLock + "캡처 시 커서 숨김 끄기" →
-        // 클릭해도 뷰포트가 커서를 숨기고 중앙으로 recenter 하지 않는다(버튼 클릭이 자연스러움).
-        FInputModeGameAndUI Mode;
-        Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-        Mode.SetHideCursorDuringCapture(false);
-        SetInputMode(Mode);
-    }
-    else
-    {
-        // 게임 입력/캡처로 즉시 복귀 → 커서가 (클릭을 기다리지 않고) 바로 사라진다.
-        SetInputMode(FInputModeGameOnly());
     }
 }
 

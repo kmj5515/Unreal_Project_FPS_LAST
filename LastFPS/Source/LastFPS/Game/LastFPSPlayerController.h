@@ -158,19 +158,24 @@ protected:
     UFUNCTION()
     void OpenInitialScreen();
 
-    /** ESC 입력 핸들러 — EscMenuScreenTag가 있으면 연다 */
+    /** ESC 입력 핸들러 — EscMenuScreenTag가 있으면 연다. 커서/입력 모드는 CommonUI 입력설정 스택이 관리 */
     void HandleEscMenu();
-
-    /**
-     * ESC 메뉴 여닫을 때 커서/입력 모드를 명시적으로 강제한다.
-     * ESC 메뉴는 NPC 상호작용(SetInteractionInputMode) 경로를 안 거치므로, 모달을 낀 상점 흐름
-     * 뒤 굳어버린 마우스 캡처/커서 상태를 여기서 덮어써 커서가 반드시 보이도록 한다.
-     * bMenuOpen=true → 커서 표시 + GameAndUI, false → 커서 숨김 + GameOnly.
-     */
-    void SetEscMenuInputMode(bool bMenuOpen);
 
     /** 인게임 HUD push (휴면). 레이아웃 준비 전이면 재시도. */
     void TryPushHUDToUILayout();
+
+    // ── 커서/입력 config 단일 소유 ──────────────────────────────────
+    // "메뉴류가 있으면 커서 표시, 없으면 숨김" 불변식을 PC 가 단독 소유.
+    // Modal/Menu/GameMenu 표시위젯 변경 이벤트에 구독해 전이마다 재적용한다.
+
+    /** 레이아웃 준비되면 메뉴 레이어 이벤트에 1회 구독. 준비 전이면 재시도. */
+    void TryBindMenuLayerInputSync();
+
+    /** 메뉴 레이어 표시위젯이 바뀔 때 → 입력 config 재평가. */
+    void HandleMenuLayerDisplayedWidgetChanged(UCommonActivatableWidget* NewWidget);
+
+    /** 메뉴류가 있으면 Menu config, 없으면 Game config 를 적용. */
+    void ApplyInputConfigForMenuState();
 
     template<typename TWidget>
     TWidget* PushWidgetToModalLayer(TSubclassOf<TWidget> WidgetClass);
@@ -219,7 +224,9 @@ protected:
 
     FTimerHandle InitialScreenRetryTimerHandle;
     FTimerHandle HUDPushRetryTimerHandle;
+    FTimerHandle MenuLayerSyncBindRetryTimerHandle;
     bool bHUDWidgetPushed = false;
+    bool bMenuLayerSyncBound = false;
 
     /** GameMode에서 읽어와 캐시한 진입/ESC 화면 태그 */
     FGameplayTag InitialScreenTag;
@@ -257,8 +264,8 @@ protected:
     FNPCInteractionSession InteractionSession;
 
     /**
-     * 상호작용 UI 모드 진입/종료를 대칭으로 토글하는 단일 진입점.
-     * 이동/회전 입력 잠금 + 마우스 커서 표시를 한 곳에서 켜고/끈다(반쪽 수정·이중 제어 방지).
+     * NPC 상호작용 진입/종료 시 게임플레이 입력(이동/회전/사격 등) 매핑만 켜고/끈다.
+     * 커서/입력 모드는 CommonUI 입력설정 스택(허브 위젯 GetDesiredInputConfig)이 단독 관리 — 여기서 안 만짐.
      */
     void SetInteractionInputMode(bool bEnter);
     /** 세션 허브의 액션 버튼 표시/숨김. */

@@ -138,29 +138,10 @@ void ULastFPSHUDWidget::NativeDestruct()
 
 TOptional<FUIInputConfig> ULastFPSHUDWidget::GetDesiredInputConfig() const
 {
-    // 메뉴/모달이 열려 있으면 HUD 는 입력 config 를 주장하지 않는다(메뉴에 양보 → 커서 유지).
-    // 전투(메뉴 없음)에서만 아래 Game+Capture 적용.
-    if (UPrimaryGameLayout* Layout = UPrimaryGameLayout::GetPrimaryGameLayout(GetOwningPlayer()))
-    {
-        auto LayerHasActiveWidget = [Layout](const FGameplayTag& LayerTag) -> bool
-        {
-            const UCommonActivatableWidgetContainerBase* Container = Layout->GetLayerWidget(LayerTag);
-            return Container && Container->GetActiveWidget() != nullptr;
-        };
-
-        if (LayerHasActiveWidget(LastFPSUITags::Layer_Modal())
-            || LayerHasActiveWidget(LastFPSUITags::Layer_Menu())
-            || LayerHasActiveWidget(LastFPSUITags::Layer_GameMenu()))
-        {
-            return TOptional<FUIInputConfig>();
-        }
-    }
-
-    return FUIInputConfig(
-        ECommonInputMode::Game,
-        EMouseCaptureMode::CapturePermanently_IncludingInitialMouseDown,
-        EMouseLockMode::LockOnCapture,
-        true);
+    // HUD 는 입력 config 를 주장하지 않는다(empty). 커서/입력의 단일 소유는
+    // PlayerController(ApplyInputConfigForMenuState). HUD 가 Game config 를 주장하면
+    // 메뉴와 경쟁해 커서 desync 가 난다.
+    return TOptional<FUIInputConfig>();
 }
 
 void ULastFPSHUDWidget::RetryInitialize()
