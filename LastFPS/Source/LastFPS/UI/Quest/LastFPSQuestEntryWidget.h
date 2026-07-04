@@ -7,11 +7,13 @@
 
 class UTextBlock;
 class UImage;
+class UButton;
+class ULastFPSQuestSubsystem;
 
 /**
  * WBP_QuestEntry 의 Parent — 퀘스트 목록의 한 줄.
- * Designer: TB_Title / TB_Summary / TB_Status / TB_Reward / Img_Icon (모두 선택).
- * 상태별 색상 등 스타일링은 OnQuestDisplayed(BP 이벤트)에서.
+ * Designer(모두 선택): TB_Title / TB_Summary / TB_Status / TB_Reward / TB_Progress / Img_Icon / Btn_Claim.
+ * 정적 정의는 행에서, 런타임 상태·진행·수령가능은 QuestSubsystem 에서 읽는다.
  */
 UCLASS()
 class LASTFPS_API ULastFPSQuestEntryWidget : public UUserWidget
@@ -19,14 +21,19 @@ class LASTFPS_API ULastFPSQuestEntryWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	/** 행 데이터로 표시 내용 채우기 */
-	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
-	void SetupQuest(const FLastFPSQuestData& InQuest);
+	/** 정적 정의(행) + 런타임 상태(서브시스템)로 표시 내용 채우기. Btn_Claim → TryClaimReward 배선. */
+	void SetupQuest(ULastFPSQuestSubsystem* InSubsystem, FName InQuestId, const FLastFPSQuestData& InQuest);
 
 protected:
-	/** 상태 텍스트/색상 등 BP 측 스타일링 훅 */
+	virtual void NativeDestruct() override;
+
+	/** 상태 텍스트/색상 등 BP 측 스타일링 훅 (런타임 상태 전달) */
 	UFUNCTION(BlueprintImplementableEvent, Category="LastFPS|Quest")
 	void OnQuestDisplayed(ELastFPSQuestType Type, ELastFPSQuestStatus Status);
+
+	/** 보상 수령 버튼 클릭 → 서브시스템에 수령 요청 */
+	UFUNCTION()
+	void HandleClaimClicked();
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_Title;
@@ -40,8 +47,20 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_Reward;
 
+	/** 목표 진행도 표시 ("2/3" 등) */
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> TB_Progress;
+
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UImage> Img_Icon;
+
+	/** 완료 시에만 활성/표시되는 보상 수령 버튼 */
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UButton> Btn_Claim;
+
+private:
+	TWeakObjectPtr<ULastFPSQuestSubsystem> OwningSubsystem;
+	FName BoundQuestId;
 
 public:
 	/** 상태 enum → 표시 텍스트 (목록/HUD 공용) */

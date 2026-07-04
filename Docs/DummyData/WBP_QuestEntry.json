@@ -1,0 +1,51 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSQuestEntryWidget",
+	"savePath": "/Game/UI/OutUI/Quest",
+	"assetName": "WBP_QuestEntry",
+	"overwrite": true,
+	"root": {
+		"type": "HorizontalBox",
+		"name": "Row_Root",
+		"children": [
+			{
+				"type": "Image",
+				"name": "Img_Icon",
+				"desiredSize": [56, 56],
+				"padding": [12, 12],
+				"valign": "Center"
+			},
+			{
+				"type": "VerticalBox",
+				"name": "Col_Main",
+				"fill": 1,
+				"padding": [4, 10],
+				"valign": "Center",
+				"children": [
+					{ "type": "TextBlock", "name": "TB_Title", "text": "퀘스트 제목", "fontSize": 20, "color": [0.95, 0.96, 1.0] },
+					{ "type": "TextBlock", "name": "TB_Summary", "text": "한 줄 목표 요약", "fontSize": 13, "color": [0.70, 0.74, 0.80], "padding": [0, 3], "autoWrap": true },
+					{ "type": "TextBlock", "name": "TB_Progress", "text": "0/0", "fontSize": 13, "color": [0.45, 0.86, 0.52], "padding": [0, 2] }
+				]
+			},
+			{
+				"type": "VerticalBox",
+				"name": "Col_Side",
+				"padding": [12, 10],
+				"halign": "Right",
+				"valign": "Center",
+				"children": [
+					{ "type": "TextBlock", "name": "TB_Status", "text": "진행중", "fontSize": 14, "color": [0.36, 0.68, 0.89], "justify": "Right" },
+					{ "type": "TextBlock", "name": "TB_Reward", "text": "보상", "fontSize": 12, "color": [0.94, 0.78, 0.31], "padding": [0, 4], "justify": "Right" },
+					{
+						"type": "Button",
+						"name": "Btn_Claim",
+						"halign": "Right",
+						"padding": [0, 4],
+						"children": [
+							{ "type": "TextBlock", "name": "TB_ClaimLabel", "text": "보상 수령", "fontSize": 14, "color": [0.03, 0.05, 0.07] }
+						]
+					}
+				]
+			}
+		]
+	}
+}
