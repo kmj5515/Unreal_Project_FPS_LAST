@@ -27,6 +27,10 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<ULastFPSButtonBase> Button_Inventory;
 
+	/** 소모품/재료 화면 (인벤토리에서 분리). WBP에 두면 자동 바인딩. */
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<ULastFPSButtonBase> Button_Consumable;
+
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<ULastFPSButtonBase> Button_Missions;
 
@@ -45,6 +49,7 @@ protected:
 
 private:
 	UFUNCTION() void HandleInventoryClicked();
+	UFUNCTION() void HandleConsumableClicked();
 	UFUNCTION() void HandleMissionsClicked();
 	UFUNCTION() void HandleShopClicked();
 	UFUNCTION() void HandleModuleClicked();

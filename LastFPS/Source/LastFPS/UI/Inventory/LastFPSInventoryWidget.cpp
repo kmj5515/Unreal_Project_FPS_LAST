@@ -41,6 +41,12 @@ void ULastFPSInventoryWidget::HandleInventoryChanged()
 	RebuildInventory();
 }
 
+void ULastFPSInventoryWidget::SetAllowedTypes(const TArray<ELastFPSItemType>& InTypes)
+{
+	AllowedTypes = InTypes;
+	RebuildInventory();
+}
+
 void ULastFPSInventoryWidget::RebuildInventory()
 {
 	if (!Box_Slots || !SlotWidgetClass)
@@ -70,6 +76,12 @@ void ULastFPSInventoryWidget::RebuildInventory()
 
 				if (const FLastFPSItemData* Row = ItemTable->FindRow<FLastFPSItemData>(RowId, TEXT("ULastFPSInventoryWidget::RebuildInventory"), /*bWarnIfRowMissing=*/false))
 				{
+					// 카테고리 탭 필터 — AllowedTypes 가 비어 있으면 전체 표시.
+					if (AllowedTypes.Num() > 0 && !AllowedTypes.Contains(Row->ItemType))
+					{
+						continue;
+					}
+
 					OwnedRows.Add(TPair<const FLastFPSItemData*, int32>(Row, Count));
 				}
 			}

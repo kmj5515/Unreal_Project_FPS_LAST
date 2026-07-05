@@ -21,6 +21,7 @@ void ULastFPSLobbyWidget::NativeConstruct()
 	}
 
 	if (Button_Inventory)   Button_Inventory->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleInventoryClicked);
+	if (Button_Consumable)  Button_Consumable->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleConsumableClicked);
 	if (Button_Missions)    Button_Missions->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleMissionsClicked);
 	if (Button_Shop)        Button_Shop->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleShopClicked);
 	if (Button_Module)      Button_Module->OnClicked().AddUObject(this, &ULastFPSLobbyWidget::HandleModuleClicked);
@@ -29,6 +30,7 @@ void ULastFPSLobbyWidget::NativeConstruct()
 }
 
 void ULastFPSLobbyWidget::HandleInventoryClicked()   { OpenScreenOrNotice(LastFPSUITags::Screen_Inventory(), NSLOCTEXT("LastFPS", "Lobby_Inventory", "인벤토리")); }
+void ULastFPSLobbyWidget::HandleConsumableClicked()  { OpenScreenOrNotice(LastFPSUITags::Screen_Consumable(), NSLOCTEXT("LastFPS", "Lobby_Consumable", "소모품")); }
 void ULastFPSLobbyWidget::HandleMissionsClicked()    { OpenScreenOrNotice(LastFPSUITags::Screen_Mission(),   NSLOCTEXT("LastFPS", "Lobby_Missions", "임무")); }
 void ULastFPSLobbyWidget::HandleShopClicked()        { OpenScreenOrNotice(LastFPSUITags::Screen_Shop(),      NSLOCTEXT("LastFPS", "Lobby_Shop", "상점")); }
 void ULastFPSLobbyWidget::HandleModuleClicked()      { OpenScreenOrNotice(LastFPSUITags::Screen_Module(),    NSLOCTEXT("LastFPS", "Lobby_Module", "모듈")); }
