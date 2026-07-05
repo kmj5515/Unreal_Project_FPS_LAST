@@ -1,12 +1,17 @@
 #include "UI/Inventory/LastFPSInventoryWidget.h"
 
 #include "UI/Inventory/LastFPSItemSlotWidget.h"
+#include "UI/Inventory/LastFPSWeaponPreviewWidget.h"
+#include "UI/Framework/LastFPSUITags.h"
 #include "Data/Tables/LastFPSItemData.h"
+#include "Data/Definitions/LastFPSWeaponDefinition.h"
 #include "Economy/LastFPSEconomySubsystem.h"
 
 #include "Components/PanelWidget.h"
 #include "Engine/DataTable.h"
 #include "Engine/GameInstance.h"
+#include "GameFramework/PlayerController.h"
+#include "PrimaryGameLayout.h"
 
 void ULastFPSInventoryWidget::NativeConstruct()
 {
@@ -39,6 +44,61 @@ ULastFPSEconomySubsystem* ULastFPSInventoryWidget::GetEconomy() const
 void ULastFPSInventoryWidget::HandleInventoryChanged()
 {
 	RebuildInventory();
+}
+
+FReply ULastFPSInventoryWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	if (InKeyEvent.GetKey() == EKeys::F1)
+	{
+		if (TryOpenWeaponPreview())
+		{
+			return FReply::Handled();
+		}
+	}
+
+	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
+}
+
+bool ULastFPSInventoryWidget::TryOpenWeaponPreview()
+{
+	if (HoveredItemRowId.IsNone() || !ItemTable || !PreviewWidgetClass)
+	{
+		return false;
+	}
+
+	const FLastFPSItemData* Row = ItemTable->FindRow<FLastFPSItemData>(
+		HoveredItemRowId, TEXT("ULastFPSInventoryWidget::TryOpenWeaponPreview"), /*bWarnIfRowMissing=*/false);
+	if (!Row || Row->ItemType != ELastFPSItemType::Weapon)
+	{
+		return false;
+	}
+
+	// 무기 정의가 연결돼 있어야 3D/스탯을 보여줄 수 있다.
+	ULastFPSWeaponDefinition* Def = Row->WeaponDefinition.LoadSynchronous();
+	if (!Def)
+	{
+		return false;
+	}
+
+	APlayerController* PC = GetOwningPlayer();
+	UPrimaryGameLayout* Layout = PC ? UPrimaryGameLayout::GetPrimaryGameLayout(PC) : nullptr;
+	if (!Layout)
+	{
+		return false;
+	}
+
+	// Modal 레이어에 프리뷰 오버레이 push (인벤토리는 아래 Menu 레이어에 그대로 남음).
+	const FLastFPSItemData ItemCopy = *Row;
+	const FName RowId = HoveredItemRowId;
+	Layout->PushWidgetToLayerStack<ULastFPSWeaponPreviewWidget>(
+		LastFPSUITags::Layer_Modal(),
+		PreviewWidgetClass,
+		[Def, ItemCopy, RowId](ULastFPSWeaponPreviewWidget& Widget)
+		{
+			Widget.Setup(Def, ItemCopy, RowId);
+		});
+
+	return true;
 }
 
 void ULastFPSInventoryWidget::SetAllowedTypes(const TArray<ELastFPSItemType>& InTypes)

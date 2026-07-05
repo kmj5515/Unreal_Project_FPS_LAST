@@ -55,4 +55,14 @@ void ULastFPSItemTooltipWidget::SetupTooltip(const FLastFPSItemData& InItem, FNa
 			? ESlateVisibility::Collapsed
 			: ESlateVisibility::HitTestInvisible);
 	}
+
+	// "상세 보기(F1)" 힌트는 F1 프리뷰가 실제로 열리는 아이템(무기 + WeaponDefinition 연결)에만 보인다.
+	if (TB_Detail)
+	{
+		const bool bHasDetailView =
+			(InItem.ItemType == ELastFPSItemType::Weapon) && !InItem.WeaponDefinition.IsNull();
+		TB_Detail->SetVisibility(bHasDetailView
+			? ESlateVisibility::HitTestInvisible
+			: ESlateVisibility::Collapsed);
+	}
 }

@@ -8,6 +8,7 @@ class UDataTable;
 class UPanelWidget;
 class ULastFPSItemSlotWidget;
 class ULastFPSEconomySubsystem;
+class ULastFPSWeaponPreviewWidget;
 
 /**
  * 인벤토리 화면 — ContentScreen 크롬 위에 보유 아이템 슬롯 나열.
@@ -26,6 +27,9 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
+	/** F1: 현재 hover 중인 무기 아이템의 상세 프리뷰를 연다. */
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+
 	/** 아이템 정의 테이블 (RowType = FLastFPSItemData) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory", meta=(RequiredAssetDataTags="RowStructure=/Script/LastFPS.LastFPSItemData"))
 	TObjectPtr<UDataTable> ItemTable;
@@ -33,6 +37,10 @@ protected:
 	/** 슬롯 1칸 위젯 클래스 (WBP_ItemSlot) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory")
 	TSubclassOf<ULastFPSItemSlotWidget> SlotWidgetClass;
+
+	/** F1 상세 프리뷰로 열 위젯 클래스 (WBP_WeaponPreview). 미지정 시 F1 무시. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory")
+	TSubclassOf<ULastFPSWeaponPreviewWidget> PreviewWidgetClass;
 
 	/** 슬롯을 담을 컨테이너 (WrapBox 권장) */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
@@ -66,6 +74,9 @@ private:
 	/** 슬롯 hover 진입/이탈 — 현재 hover 아이템 추적 */
 	void HandleSlotHovered(FName RowId);
 	void HandleSlotUnhovered(FName RowId);
+
+	/** 현재 hover 아이템이 무기면 프리뷰 오버레이를 Modal 레이어에 push. 열었으면 true. */
+	bool TryOpenWeaponPreview();
 
 	/** 마우스가 올라가 있는 아이템 (F1 프리뷰 대상) */
 	FName HoveredItemRowId;

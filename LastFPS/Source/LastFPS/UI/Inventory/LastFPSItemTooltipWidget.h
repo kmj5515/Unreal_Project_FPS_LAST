@@ -37,4 +37,8 @@ protected:
 	/** 모듈 스탯 보정 요약 (예: "공격력 +10"). 스탯이 없으면 숨김. */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_Stats;
+
+	/** "상세 보기(F1)" 힌트 — F1 상세 프리뷰가 있는 아이템(무기+WeaponDefinition)에만 표시. */
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> TB_Detail;
 };
