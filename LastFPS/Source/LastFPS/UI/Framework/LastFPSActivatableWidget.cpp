@@ -5,7 +5,9 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Input/CommonUIInputTypes.h"
+#include "Kismet/GameplayStatics.h"
 #include "PrimaryGameLayout.h"
+#include "Sound/SoundBase.h"
 #include "TimerManager.h"
 
 ULastFPSActivatableWidget::ULastFPSActivatableWidget(const FObjectInitializer& ObjectInitializer)
@@ -41,6 +43,11 @@ void ULastFPSActivatableWidget::NativeOnActivated()
 {
 	Super::NativeOnActivated();
 
+	if (ActivateSound)
+	{
+		UGameplayStatics::PlaySound2D(this, ActivateSound);
+	}
+
 	// 키 입력(ESC)을 받으려면 포커스가 필요. CommonUI Back이 미구성이라 직접 확보.
 	SetIsFocusable(true);
 	SetKeyboardFocus();
@@ -49,6 +56,11 @@ void ULastFPSActivatableWidget::NativeOnActivated()
 void ULastFPSActivatableWidget::NativeOnDeactivated()
 {
 	Super::NativeOnDeactivated();
+
+	if (DeactivateSound)
+	{
+		UGameplayStatics::PlaySound2D(this, DeactivateSound);
+	}
 
 	// 스택 제거 완료 후(다음 틱) 아래 레이어 최상위 위젯으로 포커스 복원.
 	UWorld* World = GetWorld();

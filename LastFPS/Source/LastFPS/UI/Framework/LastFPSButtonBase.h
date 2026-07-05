@@ -4,6 +4,7 @@
 #include "LastFPSButtonBase.generated.h"
 
 class UTextBlock;
+class USoundBase;
 
 /**
  * 프로젝트 공통 버튼 베이스.
@@ -28,6 +29,17 @@ public:
 
 protected:
 	virtual void NativePreConstruct() override;
+
+	/** 클릭 시 재생할 UI 사운드 (비우면 무음). */
+	UPROPERTY(EditDefaultsOnly, Category="LastFPS|Button|Sound")
+	TObjectPtr<USoundBase> PressedSound;
+
+	/** 마우스 hover 시 재생할 UI 사운드 (비우면 무음). */
+	UPROPERTY(EditDefaultsOnly, Category="LastFPS|Button|Sound")
+	TObjectPtr<USoundBase> HoveredSound;
+
+	virtual void NativeOnClicked() override;
+	virtual void NativeOnHovered() override;
 
 	/** WBP에 동일 이름으로 TextBlock을 두면 자동 바인딩 */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))

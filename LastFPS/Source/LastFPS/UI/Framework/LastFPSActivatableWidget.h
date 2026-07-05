@@ -4,6 +4,8 @@
 #include "CommonActivatableWidget.h"
 #include "LastFPSActivatableWidget.generated.h"
 
+class USoundBase;
+
 /** 프로젝트 공통 Activatable 베이스 (Modal / Menu / HUD) */
 UCLASS(Abstract)
 class LASTFPS_API ULastFPSActivatableWidget : public UCommonActivatableWidget
@@ -33,4 +35,12 @@ protected:
 	/** ESC로 이 위젯을 닫을지. bIsBackHandler(CommonUI Back)와 분리. */
 	UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
 	bool bCloseOnEscape = true;
+
+	/** 활성화(열림) 시 재생할 UI 사운드 (비우면 무음). HUD 등 무음 위젯은 비워 둠. */
+	UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI|Sound")
+	TObjectPtr<USoundBase> ActivateSound;
+
+	/** 비활성화(닫힘) 시 재생할 UI 사운드 (비우면 무음). */
+	UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI|Sound")
+	TObjectPtr<USoundBase> DeactivateSound;
 };
