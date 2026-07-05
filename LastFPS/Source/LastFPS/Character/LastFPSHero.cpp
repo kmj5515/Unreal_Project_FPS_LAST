@@ -39,14 +39,8 @@ ALastFPSHero::ALastFPSHero()
     FollowCamera->bUsePawnControlRotation = false;
     FollowCamera->FieldOfView             = DefaultFOV;
 
-    // Action TPS: 캐릭터가 컨트롤러 Yaw를 즉시 따라감 (디비전/퍼스트 디센던트 스타일)
-    bUseControllerRotationPitch = false;
-    bUseControllerRotationYaw   = true;
-    bUseControllerRotationRoll  = false;
+    ApplyRotationModeSettings();
 
-    GetCharacterMovement()->bOrientRotationToMovement     = false;
-    GetCharacterMovement()->bUseControllerDesiredRotation = false;
-    GetCharacterMovement()->RotationRate                  = FRotator(0.f, 500.f, 0.f);
     GetCharacterMovement()->MaxWalkSpeed              = 600.f;
     GetCharacterMovement()->MaxWalkSpeedCrouched      = 200.f;
     GetCharacterMovement()->JumpZVelocity             = 700.f;
@@ -83,6 +77,8 @@ void ALastFPSHero::BeginPlay()
 {
     Super::BeginPlay();
 
+    ApplyRotationModeSettings();
+
     if (APlayerController* PC = Cast<APlayerController>(GetController()))
     {
         if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
@@ -116,7 +112,7 @@ void ALastFPSHero::SetGameplayInputEnabled(bool bEnabled)
 
     if (bEnabled)
     {
-        // 상호작용 종료 → 게임 입력 복원. BeginPlay와 동일 우선순위(0)로 재추가.
+        // 상호작용 종료 시 게임 입력을 복원한다. BeginPlay와 동일 우선순위로 다시 추가한다.
         if (!Subsystem->HasMappingContext(DefaultMappingContext))
         {
             Subsystem->AddMappingContext(DefaultMappingContext, 0);
@@ -124,9 +120,9 @@ void ALastFPSHero::SetGameplayInputEnabled(bool bEnabled)
     }
     else
     {
-        // 상호작용 진입 → 컨텍스트 제거로 이동/사격/어빌리티 등 모든 게임 액션을 소스에서 정지.
+        // 상호작용 진입 시 게임 입력 컨텍스트를 제거해 이동과 전투 입력을 막는다.
         Subsystem->RemoveMappingContext(DefaultMappingContext);
-        // 진입 순간 ADS 홀드가 걸려 있으면 Completed가 안 와 줌이 고착되므로 방어적으로 해제.
+        // ADS 홀드 중 컨텍스트가 제거되면 해제 입력이 오지 않을 수 있어 방어적으로 해제한다.
         SetADS(false);
     }
 }
@@ -143,6 +139,28 @@ void ALastFPSHero::TickCameraInterp(float DeltaTime)
     CameraBoom->SocketOffset = FMath::VInterpTo(CameraBoom->SocketOffset, TargetSocketOffset, DeltaTime, ADSInterpSpeed);
     FollowCamera->FieldOfView = FMath::FInterpTo(FollowCamera->FieldOfView, TargetFOV, DeltaTime, ADSInterpSpeed);
 }
+
+void ALastFPSHero::ApplyRotationModeSettings()
+{
+    bUseControllerRotationPitch = false;
+    bUseControllerRotationRoll = false;
+
+    const bool bUseControllerYawRotation = ShouldUseControllerYawRotationMode();
+    bUseControllerRotationYaw = bUseControllerYawRotation;
+
+    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+    {
+        Movement->bOrientRotationToMovement = !bUseControllerYawRotation;
+        Movement->bUseControllerDesiredRotation = false;
+        Movement->RotationRate = FRotator(0.f, 500.f, 0.f);
+    }
+}
+
+bool ALastFPSHero::ShouldUseControllerYawRotationMode() const
+{
+    return bUseControllerYawRotationInFreeMovement || bIsADS || CombatState == EMMCombatState::Attacking;
+}
+
 void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -154,12 +172,12 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_Move), ETriggerEvent::Completed, this, &ALastFPSHero::ClearMoveInput);
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_Move), ETriggerEvent::Canceled, this, &ALastFPSHero::ClearMoveInput);
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_Look), ETriggerEvent::Triggered, this, &ALastFPSHero::Look);
-    
+
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_ADS), ETriggerEvent::Started, this, &ALastFPSHero::SetADS, true);
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_ADS), ETriggerEvent::Completed, this, &ALastFPSHero::SetADS, false);
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_ADS), ETriggerEvent::Canceled, this, &ALastFPSHero::SetADS, false);
     
-    // 어빌리티 전용 
+    // 어빌리티 전용
     for (const FLastFPSInputAction& Action : InputConfig->AbilityInputActions)
     {
         EIC->BindAction(Action.InputAction, ETriggerEvent::Triggered, this, &ALastFPSHero::HandleAbilityInput, Action.InputTag);
@@ -428,6 +446,7 @@ void ALastFPSHero::SetADS(bool bEnabled)
     TargetArmLength    = bIsADS ? ADSArmLength : DefaultArmLength;
     TargetSocketOffset = bIsADS ? ADSSocketOffset : DefaultSocketOffset;
     TargetFOV          = bIsADS ? ADSFOV : DefaultFOV;
+    ApplyRotationModeSettings();
 
     if (CameraBoom)
     {
@@ -494,10 +513,12 @@ void ALastFPSHero::SetCombatState(EMMCombatState NewState)
     }
 
     CombatState = NewState;
+    ApplyRotationModeSettings();
 }
 
 void ALastFPSHero::OnRep_CombatState()
 {
+    ApplyRotationModeSettings();
 }
 
 void ALastFPSHero::Multicast_PlayWeaponFireEffects_Implementation()

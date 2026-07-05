@@ -43,6 +43,7 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Ultimate, "InputTag.Ultimate", "Ultimate in
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Sprint, "Ability.Sprint", "Sprint ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Jump, "Ability.Jump", "Jump ability")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_DoubleJump, "Ability.DoubleJump", "Double jump ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Dash, "Ability.Dash", "Dash ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Fire, "Ability.Fire", "Fire ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Reload, "Ability.Reload", "Reload ability")
