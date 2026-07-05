@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Animation/AnimInstance.h"
+#include "Engine/EngineTypes.h"
 #include "Utility/LastFPSEnumTypes.h"
 #include "LastFPSAnimInstance.generated.h"
 
@@ -48,6 +49,15 @@ protected:
     EMMCardinalDirection StopCardinalDirection = EMMCardinalDirection::Forward;
 
     UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    EMMCardinalDirection LocomotionCardinalDirection = EMMCardinalDirection::Forward;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion", meta=(ClampMin="0.0", UIMin="0.0", ClampMax="44.0", UIMax="30.0"))
+    float CardinalDirectionHysteresis = 10.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion", meta=(ClampMin="0.0", UIMin="0.0"))
+    float CardinalDirectionMinSpeed = 20.f;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
     float Yaw = 0.f;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion")
@@ -58,6 +68,15 @@ protected:
 
     UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
     FVector Velocity = FVector::ZeroVector;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    FVector LocomotionDirection = FVector::ForwardVector;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    FVector DisplacementSinceLastUpdate = FVector::ZeroVector;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+    float DisplacementSpeed = 0.f;
 
     UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
     bool bIsSprinting = false;
@@ -85,6 +104,18 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|DistanceMatching")
     float StopPredictionMinSpeed = 150.f;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|DistanceMatching")
+    bool bHasGroundDistance = false;
+
+    UPROPERTY(BlueprintReadOnly, Category="MM|DistanceMatching")
+    float GroundDistance = 0.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|DistanceMatching", meta=(ClampMin="0.0", UIMin="0.0"))
+    float GroundDistanceTraceLength = 2000.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|DistanceMatching")
+    TEnumAsByte<ECollisionChannel> GroundDistanceTraceChannel = ECC_Visibility;
 
     // 진행 방향과 입력 방향이 반대(>90°)일 때 true — Chooser/모션매칭 분기용
     UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
@@ -128,6 +159,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Debug")
     bool bDebugAimValues = false;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Debug")
+    bool bDebugAirState = false;
+
     UPROPERTY(BlueprintReadOnly, Category="MM|IK")
     FTransform LeftHandIKTransform = FTransform::Identity;
 
@@ -141,8 +175,11 @@ protected:
     bool bUseReloadLeftHandIKTarget = true;
 
 private:
+    bool RefreshOwnerReferences();
+    void UpdateDisplacement(float DeltaSeconds);
     void UpdateLocomotionState();
     void UpdateDistanceMatching();
+    void UpdateGroundDistance();
     void UpdateYaw(float DeltaSeconds);
     void UpdateAirState();
     void UpdateStance();
@@ -150,7 +187,11 @@ private:
     void UpdatePivot();
     void UpdateHandIK();
     void DebugAimValues() const;
-    static EMMCardinalDirection DirectionToCardinalDirection(float InDirection);
+    EMMCardinalDirection DirectionToCardinalDirection(float InDirection) const;
+    EMMCardinalDirection DirectionToStableCardinalDirection(float InDirection, EMMCardinalDirection CurrentDirection) const;
+    float CardinalDirectionToAngle(EMMCardinalDirection InDirection) const;
+    EMMAirState ResolveAirState(const UCharacterMovementComponent& InMovementComponent);
+    FString GetAirStateName(EMMAirState InAirState) const;
 
     UFUNCTION()
     void OnWeaponEquipped(bool bEquipped);
@@ -162,5 +203,8 @@ private:
     TObjectPtr<UCharacterMovementComponent> MovementComponent;
 
     float PreviousActorYaw = 0.f;
+    FVector PreviousActorLocation = FVector::ZeroVector;
     bool bHasPreviousActorYaw = false;
+    bool bHasPreviousActorLocation = false;
+    bool bHasLoggedAirState = false;
 };

@@ -72,6 +72,8 @@ protected:
     void InputReleased(FGameplayTag InputID);
 
     void TickCameraInterp(float DeltaTime);
+    void ApplyRotationModeSettings();
+    bool ShouldUseControllerYawRotationMode() const;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera")
     TObjectPtr<USpringArmComponent> CameraBoom;
@@ -108,6 +110,9 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint")
     float SprintForwardInputThreshold = 0.5f;
+
+    UPROPERTY(EditDefaultsOnly, Category="Movement|Rotation")
+    bool bUseControllerYawRotationInFreeMovement = true;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
     TObjectPtr<UWeaponComponent> WeaponComponent;
