@@ -12,7 +12,7 @@
 
 namespace
 {
-	ULastFPSQuestSubsystem* GetQuestSubsystem(const UWidget* Widget)
+	ULastFPSQuestSubsystem* GetTrackerQuestSubsystem(const UWidget* Widget)
 	{
 		if (const UWorld* World = Widget ? Widget->GetWorld() : nullptr)
 		{
@@ -29,7 +29,7 @@ void ULastFPSQuestTrackerWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (ULastFPSQuestSubsystem* Subsystem = GetQuestSubsystem(this))
+	if (ULastFPSQuestSubsystem* Subsystem = GetTrackerQuestSubsystem(this))
 	{
 		Subsystem->OnQuestStateChanged.AddDynamic(this, &ULastFPSQuestTrackerWidget::HandleQuestStateChanged);
 	}
@@ -39,7 +39,7 @@ void ULastFPSQuestTrackerWidget::NativeConstruct()
 
 void ULastFPSQuestTrackerWidget::NativeDestruct()
 {
-	if (ULastFPSQuestSubsystem* Subsystem = GetQuestSubsystem(this))
+	if (ULastFPSQuestSubsystem* Subsystem = GetTrackerQuestSubsystem(this))
 	{
 		Subsystem->OnQuestStateChanged.RemoveDynamic(this, &ULastFPSQuestTrackerWidget::HandleQuestStateChanged);
 	}
@@ -63,7 +63,7 @@ void ULastFPSQuestTrackerWidget::RebuildTracker()
 
 	int32 NumRows = 0;
 
-	ULastFPSQuestSubsystem* Subsystem = GetQuestSubsystem(this);
+	ULastFPSQuestSubsystem* Subsystem = GetTrackerQuestSubsystem(this);
 	const UDataTable* Table = Subsystem ? Subsystem->GetQuestTable() : nullptr;
 
 	if (Table && EntryWidgetClass)
