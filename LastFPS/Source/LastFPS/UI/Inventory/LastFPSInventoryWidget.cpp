@@ -57,7 +57,7 @@ void ULastFPSInventoryWidget::RebuildInventory()
 	Box_Slots->ClearChildren();
 
 	// 보유 아이템(RowId→Count)을 ItemTable 정의로 해석. RowId 안정 정렬로 표시 순서 고정.
-	TArray<TPair<const FLastFPSItemData*, int32>> OwnedRows;
+	TArray<TTuple<FName, const FLastFPSItemData*, int32>> OwnedRows;
 	if (ULastFPSEconomySubsystem* Econ = GetEconomy())
 	{
 		if (ItemTable)
@@ -82,14 +82,14 @@ void ULastFPSInventoryWidget::RebuildInventory()
 						continue;
 					}
 
-					OwnedRows.Add(TPair<const FLastFPSItemData*, int32>(Row, Count));
+					OwnedRows.Add(MakeTuple(RowId, Row, Count));
 				}
 			}
 		}
 	}
 
 	// 보유 아이템 개수만큼만 슬롯 생성 (빈 칸 패딩 없음)
-	for (const TPair<const FLastFPSItemData*, int32>& Owned : OwnedRows)
+	for (const TTuple<FName, const FLastFPSItemData*, int32>& Owned : OwnedRows)
 	{
 		ULastFPSItemSlotWidget* SlotWidget = CreateWidget<ULastFPSItemSlotWidget>(this, SlotWidgetClass);
 		if (!SlotWidget)
@@ -97,7 +97,23 @@ void ULastFPSInventoryWidget::RebuildInventory()
 			continue;
 		}
 
-		SlotWidget->SetupSlot(*Owned.Key, Owned.Value);
+		SlotWidget->OnHovered.BindUObject(this, &ULastFPSInventoryWidget::HandleSlotHovered);
+		SlotWidget->OnUnhovered.BindUObject(this, &ULastFPSInventoryWidget::HandleSlotUnhovered);
+		SlotWidget->SetupSlot(*Owned.Get<1>(), Owned.Get<0>(), Owned.Get<2>());
 		Box_Slots->AddChild(SlotWidget);
+	}
+}
+
+void ULastFPSInventoryWidget::HandleSlotHovered(FName RowId)
+{
+	HoveredItemRowId = RowId;
+}
+
+void ULastFPSInventoryWidget::HandleSlotUnhovered(FName RowId)
+{
+	// 다른 슬롯으로 이미 이동한 경우(다음 슬롯 Enter 가 먼저 온 경우)는 덮어쓰지 않는다.
+	if (HoveredItemRowId == RowId)
+	{
+		HoveredItemRowId = NAME_None;
 	}
 }

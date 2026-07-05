@@ -53,10 +53,20 @@ protected:
 	UFUNCTION(BlueprintCallable, Category="Inventory")
 	void RebuildInventory();
 
+	/** 현재 마우스가 올라가 있는 아이템 행 이름 (없으면 NAME_None) — F1 프리뷰 등에서 사용. */
+	FName GetHoveredItemRowId() const { return HoveredItemRowId; }
+
 private:
 	ULastFPSEconomySubsystem* GetEconomy() const;
 
 	/** 보유 변동 시 슬롯 재구성 */
 	UFUNCTION()
 	void HandleInventoryChanged();
+
+	/** 슬롯 hover 진입/이탈 — 현재 hover 아이템 추적 */
+	void HandleSlotHovered(FName RowId);
+	void HandleSlotUnhovered(FName RowId);
+
+	/** 마우스가 올라가 있는 아이템 (F1 프리뷰 대상) */
+	FName HoveredItemRowId;
 };

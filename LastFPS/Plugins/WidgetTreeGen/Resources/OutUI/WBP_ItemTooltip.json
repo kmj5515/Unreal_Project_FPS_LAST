@@ -1,0 +1,18 @@
+{
+	"parentClass": "/Script/LastFPS.LastFPSItemTooltipWidget",
+	"savePath": "/Game/UI/OutUI",
+	"assetName": "WBP_ItemTooltip",
+	"overwrite": false,
+	"root": {
+		"type": "SizeBox", "name": "Root_Size", "minWidth": 220, "children": [
+			{ "type": "Border", "name": "BG", "bgColor": [0.05, 0.07, 0.10, 0.96], "padding": [12, 10, 12, 10], "children": [
+				{ "type": "VerticalBox", "name": "Body", "children": [
+					{ "type": "TextBlock", "name": "TB_ItemName", "text": "아이템 이름", "fontSize": 15, "color": [0.95, 0.97, 1.0, 1.0] },
+					{ "type": "TextBlock", "name": "TB_Rarity", "text": "희귀", "fontSize": 10, "color": [0.60, 0.68, 0.78, 1.0], "padding": [0, 2, 0, 6] },
+					{ "type": "TextBlock", "name": "TB_Description", "text": "아이템 설명 텍스트입니다.", "fontSize": 11, "color": [0.82, 0.86, 0.92, 1.0], "autoWrap": true },
+					{ "type": "TextBlock", "name": "TB_Stats", "text": "공격력 +10", "fontSize": 11, "color": [0.55, 0.90, 0.70, 1.0], "padding": [0, 6, 0, 0] }
+				] }
+			] }
+		]
+	}
+}

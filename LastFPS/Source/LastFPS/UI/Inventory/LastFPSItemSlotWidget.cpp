@@ -1,10 +1,27 @@
 #include "UI/Inventory/LastFPSItemSlotWidget.h"
 
+#include "UI/Inventory/LastFPSItemTooltipWidget.h"
+
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 
-void ULastFPSItemSlotWidget::SetupSlot(const FLastFPSItemData& InItem, int32 Count)
+void ULastFPSItemSlotWidget::SetupSlot(const FLastFPSItemData& InItem, FName InRowId, int32 Count)
 {
+	ItemRowId = InRowId;
+
+	// hover(마우스 진입/이탈) 이벤트와 툴팁이 동작하려면 슬롯 루트가 히트테스트 가능해야 한다.
+	SetVisibility(ESlateVisibility::Visible);
+
+	// 공용 툴팁 위젯을 만들어 이 슬롯에 붙인다(hover 시 UMG 가 자동 표시/추적).
+	if (TooltipWidgetClass)
+	{
+		if (ULastFPSItemTooltipWidget* Tooltip = CreateWidget<ULastFPSItemTooltipWidget>(this, TooltipWidgetClass))
+		{
+			Tooltip->SetupTooltip(InItem, InRowId);
+			SetToolTip(Tooltip);
+		}
+	}
+
 	// 배경 숨기고 희귀도 테두리 표시
 	if (Img_Background)
 	{
@@ -49,6 +66,18 @@ void ULastFPSItemSlotWidget::SetupSlot(const FLastFPSItemData& InItem, int32 Cou
 			TB_Count->SetVisibility(ESlateVisibility::Hidden);
 		}
 	}
+}
+
+void ULastFPSItemSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
+	OnHovered.ExecuteIfBound(ItemRowId);
+}
+
+void ULastFPSItemSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseLeave(InMouseEvent);
+	OnUnhovered.ExecuteIfBound(ItemRowId);
 }
 
 void ULastFPSItemSlotWidget::SetEmpty()
