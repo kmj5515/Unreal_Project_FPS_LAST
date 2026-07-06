@@ -57,6 +57,9 @@ public:
 	/** RowId 가 DT_ItemData 에 실제 정의된 아이템인지. (ItemTable 미설정 시 검증 불가 → false) */
 	bool HasItemDefinition(FName ItemRowId) const;
 
+	/** RowId 의 표시 이름 (DT_ItemData.ItemName). 정의가 없으면 RowId 문자열로 폴백. */
+	FText GetItemDisplayName(FName ItemRowId) const;
+
 	/** DT_ItemData 가 설정·로드 가능한지. 검증 로직이 "미설정"과 "행 없음"을 구분하는 데 사용. */
 	bool IsItemTableConfigured() const;
 

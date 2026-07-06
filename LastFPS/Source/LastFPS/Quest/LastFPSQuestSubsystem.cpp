@@ -304,6 +304,35 @@ void ULastFPSQuestSubsystem::NotifyRewardGranted(const FLastFPSQuestData& Def) c
 	if (ALastFPSPlayerController* PC = Cast<ALastFPSPlayerController>(GI->GetFirstLocalPlayerController()))
 	{
 		const FText Title = NSLOCTEXT("LastFPS", "Quest_RewardTitle", "보상 수령");
-		PC->ShowNotice(Title, Def.Title);
+		PC->ShowNotice(Title, BuildRewardMessage(Def));
 	}
+}
+
+FText ULastFPSQuestSubsystem::BuildRewardMessage(const FLastFPSQuestData& Def) const
+{
+	// 실제 지급된 구조화 보상(Reward)을 소스로 내역을 만든다 — RewardText 수기 표기와의 드리프트 방지.
+	TArray<FString> Lines;
+	if (Def.Reward.Credits > 0)
+	{
+		Lines.Add(FString::Printf(TEXT("크레딧 +%d"), Def.Reward.Credits));
+	}
+
+	const ULastFPSEconomySubsystem* Economy = GetEconomy();
+	for (const FLastFPSItemGrant& Grant : Def.Reward.Items)
+	{
+		const FText Name = Economy ? Economy->GetItemDisplayName(Grant.RowId) : FText::FromName(Grant.RowId);
+		Lines.Add(FString::Printf(TEXT("%s ×%d"), *Name.ToString(), Grant.Count));
+	}
+
+	FString RewardBlock = FString::Join(Lines, TEXT("\n"));
+	if (RewardBlock.IsEmpty() && !Def.RewardText.IsEmpty())
+	{
+		RewardBlock = Def.RewardText.ToString(); // 구조화 보상 없음 → 수기 표기 폴백
+	}
+
+	if (RewardBlock.IsEmpty())
+	{
+		return Def.Title; // 보상 정보 자체가 없으면 기존 동작(제목만)
+	}
+	return FText::FromString(FString::Printf(TEXT("%s\n\n%s"), *Def.Title.ToString(), *RewardBlock));
 }

@@ -7,6 +7,7 @@
 class ULastFPSWeaponDefinition;
 class UTextBlock;
 class UImage;
+class ULastFPSButtonBase;
 class ALastFPSWeaponPreviewRig;
 
 /**
@@ -60,6 +61,13 @@ protected:
 
 	/** 오른쪽 3D 프리뷰 표시용 (P3: SceneCapture RenderTarget 을 연결). */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UImage> Image_Preview;
+
+	/** 닫기 버튼 (선택, 공용 버튼) — 클릭 시 이 오버레이를 닫는다. ESC 와 동일 동작. */
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<ULastFPSButtonBase> Btn_Close;
+
+	/** 닫기 버튼 클릭 핸들러 — Modal 레이어에서 자신을 pop. */
+	UFUNCTION()
+	void HandleCloseClicked();
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULastFPSWeaponDefinition> WeaponDef;

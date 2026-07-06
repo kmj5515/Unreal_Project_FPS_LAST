@@ -108,6 +108,9 @@ private:
 	/** 완료 토스트 (로컬 PC 의 ShowNotice). */
 	void NotifyRewardGranted(const FLastFPSQuestData& Def) const;
 
+	/** 수령 알림 본문 — 제목 + 지급된 보상(크레딧/아이템) 내역. 구조화 보상이 비면 RewardText 폴백. */
+	FText BuildRewardMessage(const FLastFPSQuestData& Def) const;
+
 	TMap<FName, FLastFPSQuestRuntimeState> RuntimeStates;
 	bool bInventorySubscribed = false;
 };

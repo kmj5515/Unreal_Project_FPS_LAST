@@ -5,6 +5,7 @@
 
 #include "Components/TextBlock.h"
 #include "Components/Image.h"
+#include "UI/Framework/LastFPSButtonBase.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
@@ -28,6 +29,16 @@ void ULastFPSWeaponPreviewWidget::NativeConstruct()
 	Super::NativeConstruct();
 	PopulateStats();
 	SpawnPreviewRig();
+
+	if (Btn_Close)
+	{
+		Btn_Close->OnClicked().AddUObject(this, &ULastFPSWeaponPreviewWidget::HandleCloseClicked);
+	}
+}
+
+void ULastFPSWeaponPreviewWidget::HandleCloseClicked()
+{
+	DeactivateWidget(); // Modal 레이어에서 자신을 pop (ESC 와 동일).
 }
 
 void ULastFPSWeaponPreviewWidget::NativeDestruct()

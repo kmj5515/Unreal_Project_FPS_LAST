@@ -57,6 +57,22 @@ bool ULastFPSEconomySubsystem::HasItemDefinition(FName ItemRowId) const
 	return Table->FindRow<FLastFPSItemData>(ItemRowId, Context, /*bWarnIfRowMissing=*/false) != nullptr;
 }
 
+FText ULastFPSEconomySubsystem::GetItemDisplayName(FName ItemRowId) const
+{
+	if (const UDataTable* Table = GetItemTable())
+	{
+		static const FString Context(TEXT("ULastFPSEconomySubsystem::GetItemDisplayName"));
+		if (const FLastFPSItemData* Row = Table->FindRow<FLastFPSItemData>(ItemRowId, Context, /*bWarnIfRowMissing=*/false))
+		{
+			if (!Row->ItemName.IsEmpty())
+			{
+				return Row->ItemName;
+			}
+		}
+	}
+	return FText::FromName(ItemRowId); // 정의 없음/이름 비어있음 → RowId 폴백
+}
+
 void ULastFPSEconomySubsystem::AddCredits(int32 Amount)
 {
 	if (Amount <= 0)
