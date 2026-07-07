@@ -43,6 +43,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory")
 	TSubclassOf<ULastFPSWeaponPreviewWidget> PreviewWidgetClass;
 
+	/** 프리뷰 3D 리그로 스폰할 클래스 (BP_PreviewRig). 미지정 시 C++ 베이스로 폴백. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory")
+	TSubclassOf<ALastFPSWeaponPreviewRig> PreviewRigClass;
+
 	/** 슬롯을 담을 컨테이너 (WrapBox 권장) */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UPanelWidget> Box_Slots;

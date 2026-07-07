@@ -73,8 +73,13 @@ ALastFPSWeaponPreviewRig* ULastFPSInventoryWidget::EnsurePreviewRig()
 
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	TSubclassOf<ALastFPSWeaponPreviewRig> RigClass = PreviewRigClass;
+	if (!RigClass)
+	{
+		RigClass = ALastFPSWeaponPreviewRig::StaticClass();
+	}
 	PreviewRig = World->SpawnActor<ALastFPSWeaponPreviewRig>(
-		ALastFPSWeaponPreviewRig::StaticClass(), FVector(0.f, 0.f, 100000.f), FRotator::ZeroRotator, Params);
+		RigClass, FVector(0.f, 0.f, 100000.f), FRotator::ZeroRotator, Params);
 	if (!PreviewRig)
 	{
 		return nullptr;

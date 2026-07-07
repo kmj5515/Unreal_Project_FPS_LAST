@@ -2,6 +2,7 @@
 
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
@@ -32,7 +33,8 @@ ALastFPSWeaponPreviewRig::ALastFPSWeaponPreviewRig()
 	Capture->FOVAngle = 35.f;
 	Capture->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
 	Capture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList; // 허브 배경 제외, 무기만
-	Capture->bCaptureEveryFrame = true;
+	// 온디맨드 캡처 — 초기화·회전 시에만 찍는다.
+	Capture->bCaptureEveryFrame = false;
 	Capture->bCaptureOnMovement = false;
 	Capture->bAlwaysPersistRenderingState = true;
 
@@ -97,6 +99,12 @@ void ALastFPSWeaponPreviewRig::RefreshCapture()
 		{
 			Capture->ShowOnlyComponent(WeaponMeshComp);
 		}
+		// BP에 붙인 스태틱 메시 소품도 함께 캡처.
+		TInlineComponentArray<UStaticMeshComponent*> Props(this);
+		for (UStaticMeshComponent* Prop : Props)
+		{
+			Capture->ShowOnlyComponent(Prop);
+		}
 		Capture->CaptureScene();
 	}
 }
@@ -106,5 +114,10 @@ void ALastFPSWeaponPreviewRig::AddYaw(float DeltaDegrees)
 	if (Pivot)
 	{
 		Pivot->AddLocalRotation(FRotator(0.f, DeltaDegrees, 0.f));
+	}
+
+	if (Capture)
+	{
+		Capture->CaptureScene();
 	}
 }
