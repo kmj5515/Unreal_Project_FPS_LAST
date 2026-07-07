@@ -10,17 +10,19 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 
-void ULastFPSWeaponPreviewWidget::Setup(ULastFPSWeaponDefinition* InWeaponDef, const FLastFPSItemData& InItem, FName InRowId)
+void ULastFPSWeaponPreviewWidget::Setup(ULastFPSWeaponDefinition* InWeaponDef, const FLastFPSItemData& InItem, FName InRowId, ALastFPSWeaponPreviewRig* InRig)
 {
 	WeaponDef = InWeaponDef;
 	CachedItem = InItem;
 	CachedRowId = InRowId;
+	Rig = InRig;
 
 	// Setup 은 push 시점(위젯 construct 이전일 수 있음)에 호출된다. 실제 텍스트는
 	// 바인딩이 끝난 NativeConstruct 에서 채운다. 이미 construct 됐다면 즉시 반영.
 	if (IsConstructed())
 	{
 		PopulateStats();
+		BindPreviewRig();
 	}
 }
 
@@ -28,7 +30,7 @@ void ULastFPSWeaponPreviewWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	PopulateStats();
-	SpawnPreviewRig();
+	BindPreviewRig();
 
 	if (Btn_Close)
 	{
@@ -43,41 +45,21 @@ void ULastFPSWeaponPreviewWidget::HandleCloseClicked()
 
 void ULastFPSWeaponPreviewWidget::NativeDestruct()
 {
-	if (Rig)
-	{
-		Rig->Destroy();
-		Rig = nullptr;
-	}
+	// 리그는 인벤토리가 소유·재사용 → 여기서 파괴하지 않는다.
+	Rig = nullptr;
 
 	Super::NativeDestruct();
 }
 
-void ULastFPSWeaponPreviewWidget::SpawnPreviewRig()
+void ULastFPSWeaponPreviewWidget::BindPreviewRig()
 {
-	if (!WeaponDef || !Image_Preview)
+	if (!Rig || !WeaponDef || !Image_Preview)
 	{
 		return;
 	}
 
-	UWorld* World = GetWorld();
 	USkeletalMesh* Mesh = WeaponDef->SkeletalMesh;
-	if (!World || !Mesh)
-	{
-		return;
-	}
-
-	TSubclassOf<ALastFPSWeaponPreviewRig> RigClass = PreviewRigClass;
-	if (!RigClass)
-	{
-		RigClass = ALastFPSWeaponPreviewRig::StaticClass();
-	}
-
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	// 허브 지오메트리와 겹치지 않도록 멀리 오프스크린에 스폰(로컬 전용, 비복제).
-	const FVector SpawnLoc(0.f, 0.f, 100000.f);
-	Rig = World->SpawnActor<ALastFPSWeaponPreviewRig>(RigClass, SpawnLoc, FRotator::ZeroRotator, Params);
-	if (!Rig)
+	if (!Mesh)
 	{
 		return;
 	}

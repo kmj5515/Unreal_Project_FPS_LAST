@@ -23,8 +23,8 @@ class LASTFPS_API ULastFPSWeaponPreviewWidget : public ULastFPSActivatableWidget
 	GENERATED_BODY()
 
 public:
-	/** 표시할 무기 정의/아이템 주입 (인벤토리 F1 핸들러가 push 시 호출). */
-	void Setup(ULastFPSWeaponDefinition* InWeaponDef, const FLastFPSItemData& InItem, FName InRowId);
+	/** 표시할 무기 정의/아이템 + 인벤토리가 소유·예열한 리그 주입 (F1 핸들러가 push 시 호출). */
+	void Setup(ULastFPSWeaponDefinition* InWeaponDef, const FLastFPSItemData& InItem, FName InRowId, ALastFPSWeaponPreviewRig* InRig);
 
 protected:
 	virtual void NativeConstruct() override;
@@ -38,12 +38,8 @@ protected:
 	/** 보관된 무기 정의/아이템으로 왼쪽 스탯 패널 채우기. */
 	void PopulateStats();
 
-	/** 오프스크린 리그 스폰 + RenderTarget 을 Image_Preview 에 연결. */
-	void SpawnPreviewRig();
-
-	/** 프리뷰 리그 액터 클래스 (미지정 시 C++ 기본 리그). */
-	UPROPERTY(EditDefaultsOnly, Category="Preview")
-	TSubclassOf<ALastFPSWeaponPreviewRig> PreviewRigClass;
+	/** 주입된 리그에 무기 메시 세팅 + RenderTarget 을 Image_Preview 에 연결. */
+	void BindPreviewRig();
 
 	/** 드래그 픽셀당 회전 각도(도). */
 	UPROPERTY(EditDefaultsOnly, Category="Preview")

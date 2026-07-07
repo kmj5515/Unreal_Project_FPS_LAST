@@ -9,6 +9,7 @@ class UPanelWidget;
 class ULastFPSItemSlotWidget;
 class ULastFPSEconomySubsystem;
 class ULastFPSWeaponPreviewWidget;
+class ALastFPSWeaponPreviewRig;
 
 /**
  * 인벤토리 화면 — ContentScreen 크롬 위에 보유 아이템 슬롯 나열.
@@ -78,6 +79,13 @@ private:
 	/** 현재 hover 아이템이 무기면 프리뷰 오버레이를 Modal 레이어에 push. 열었으면 true. */
 	bool TryOpenWeaponPreview();
 
+	/** 프리뷰용 리그를 인벤토리 수명 동안 유지·재사용 — 없으면 스폰·예열. 첫 프리뷰 흰색 방지. */
+	ALastFPSWeaponPreviewRig* EnsurePreviewRig();
+
 	/** 마우스가 올라가 있는 아이템 (F1 프리뷰 대상) */
 	FName HoveredItemRowId;
+
+	/** 프리뷰용 오프스크린 리그 (인벤토리 수명 동안 재사용). */
+	UPROPERTY(Transient)
+	TObjectPtr<ALastFPSWeaponPreviewRig> PreviewRig;
 };

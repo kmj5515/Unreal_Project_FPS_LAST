@@ -7,7 +7,6 @@
 class USceneCaptureComponent2D;
 class USkeletalMeshComponent;
 class USkeletalMesh;
-class UPointLightComponent;
 class UTextureRenderTarget2D;
 
 /**
@@ -32,12 +31,13 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	/** show-only 목록을 무기 컴포넌트로 다시 잡고 1회 캡처 — 첫 오픈 미표시 방지. */
+	void RefreshCapture();
+
 	UPROPERTY(VisibleAnywhere) TObjectPtr<USceneComponent> RootScene;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<USceneComponent> Pivot;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<USkeletalMeshComponent> WeaponMeshComp;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<USceneCaptureComponent2D> Capture;
-	UPROPERTY(VisibleAnywhere) TObjectPtr<UPointLightComponent> KeyLight;
-	UPROPERTY(VisibleAnywhere) TObjectPtr<UPointLightComponent> FillLight;
 
 	UPROPERTY(Transient) TObjectPtr<UTextureRenderTarget2D> RenderTarget;
 

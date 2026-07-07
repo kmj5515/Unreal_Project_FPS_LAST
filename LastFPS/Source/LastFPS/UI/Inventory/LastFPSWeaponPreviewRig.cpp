@@ -2,8 +2,9 @@
 
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Components/PointLightComponent.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 #include "Kismet/KismetRenderingLibrary.h"
 
 ALastFPSWeaponPreviewRig::ALastFPSWeaponPreviewRig()
@@ -21,6 +22,8 @@ ALastFPSWeaponPreviewRig::ALastFPSWeaponPreviewRig()
 	WeaponMeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
 	WeaponMeshComp->SetupAttachment(Pivot);
 	WeaponMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// 오프스크린에서도 포즈 갱신 — 없으면 첫 캡처에 무기가 안 보임.
+	WeaponMeshComp->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 
 	// 카메라는 무기를 -X 쪽에서 바라본다(+X 축을 향해 촬영).
 	Capture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Capture"));
@@ -31,29 +34,18 @@ ALastFPSWeaponPreviewRig::ALastFPSWeaponPreviewRig()
 	Capture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList; // 허브 배경 제외, 무기만
 	Capture->bCaptureEveryFrame = true;
 	Capture->bCaptureOnMovement = false;
+	Capture->bAlwaysPersistRenderingState = true;
 
-	// show-only 리스트는 월드 조명을 배제하므로 리그 자체 조명을 둔다.
-	KeyLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("KeyLight"));
-	KeyLight->SetupAttachment(RootScene);
-	KeyLight->SetRelativeLocation(FVector(-120.f, 120.f, 160.f));
-	KeyLight->SetIntensity(60000.f);
-	KeyLight->SetAttenuationRadius(1500.f);
-
-	FillLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("FillLight"));
-	FillLight->SetupAttachment(RootScene);
-	FillLight->SetRelativeLocation(FVector(-120.f, -140.f, 80.f));
-	FillLight->SetIntensity(30000.f);
-	FillLight->SetAttenuationRadius(1500.f);
+	// 노출 고정 — 안 하면 첫 프레임 빈 씬에서 자동노출이 화면을 하얗게 날린다.
+	Capture->PostProcessSettings.bOverride_AutoExposureMinBrightness = true;
+	Capture->PostProcessSettings.AutoExposureMinBrightness = 1.f;
+	Capture->PostProcessSettings.bOverride_AutoExposureMaxBrightness = true;
+	Capture->PostProcessSettings.AutoExposureMaxBrightness = 1.f;
 }
 
 void ALastFPSWeaponPreviewRig::BeginPlay()
 {
 	Super::BeginPlay();
-
-	if (Capture)
-	{
-		Capture->ShowOnlyActors.AddUnique(this);
-	}
 }
 
 UTextureRenderTarget2D* ALastFPSWeaponPreviewRig::InitPreview(USkeletalMesh* WeaponMesh)
@@ -61,6 +53,12 @@ UTextureRenderTarget2D* ALastFPSWeaponPreviewRig::InitPreview(USkeletalMesh* Wea
 	if (WeaponMeshComp && WeaponMesh)
 	{
 		WeaponMeshComp->SetSkeletalMeshAsset(WeaponMesh);
+		WeaponMeshComp->SetForcedLOD(1);
+	}
+
+	if (Pivot)
+	{
+		Pivot->SetRelativeRotation(FRotator::ZeroRotator);
 	}
 
 	if (!RenderTarget)
@@ -70,11 +68,37 @@ UTextureRenderTarget2D* ALastFPSWeaponPreviewRig::InitPreview(USkeletalMesh* Wea
 
 	if (Capture)
 	{
-		Capture->ShowOnlyActors.AddUnique(this);
 		Capture->TextureTarget = RenderTarget;
 	}
 
+	RefreshCapture();
+	// 첫 초기화 땐 메시 프록시가 아직이라 show-only에 안 잡힐 수 있어 다음 틱에 한 번 더 잡는다.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(this, &ALastFPSWeaponPreviewRig::RefreshCapture);
+	}
+
 	return RenderTarget;
+}
+
+void ALastFPSWeaponPreviewRig::RefreshCapture()
+{
+	if (WeaponMeshComp)
+	{
+		WeaponMeshComp->SetVisibility(true, true);
+		WeaponMeshComp->MarkRenderStateDirty();
+	}
+
+	if (Capture)
+	{
+		Capture->ShowOnlyActors.Empty();
+		Capture->ShowOnlyComponents.Empty();
+		if (WeaponMeshComp)
+		{
+			Capture->ShowOnlyComponent(WeaponMeshComp);
+		}
+		Capture->CaptureScene();
+	}
 }
 
 void ALastFPSWeaponPreviewRig::AddYaw(float DeltaDegrees)
