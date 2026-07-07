@@ -6,6 +6,7 @@
 #include "Animation/LastFPSLocomotionAnimationSet.h"
 #include "Animation/LastFPSLocomotionAnimationSetTools.h"
 #include "Data/Tables/LastFPSCharacterMasterData.h"
+#include "Data/Characters/LastFPSCharacterAcceleratorData.h"
 #include "Data/Characters/LastFPSCharacterStatData.h"
 #include "Data/Characters/LastFPSCharacterVisualData.h"
 #include "ContentBrowserModule.h"
@@ -698,6 +699,7 @@ void SCharacterDataAssetTool::ApplyRowToDefinition(
 	Definition->PawnClass = Row.PawnClass.LoadSynchronous();
 	Definition->StatData = Row.StatData.LoadSynchronous();
 	Definition->VisualData = Row.VisualData.LoadSynchronous();
+	Definition->AcceleratorData = Row.AcceleratorData.LoadSynchronous();
 	Definition->AbilitySet = Row.AbilitySet.LoadSynchronous();
 	Definition->AIProfile = Row.AIProfile.LoadSynchronous();
 }

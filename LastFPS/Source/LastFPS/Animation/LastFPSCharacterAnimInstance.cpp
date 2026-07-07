@@ -6,17 +6,6 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
-namespace
-{
-FString GetCardinalDirectionDebugName(EMMCardinalDirection Direction)
-{
-	const UEnum* DirectionEnum = StaticEnum<EMMCardinalDirection>();
-	return DirectionEnum
-		       ? DirectionEnum->GetNameStringByValue(static_cast<int64>(Direction))
-		       : TEXT("Unknown");
-}
-}
-
 void ULastFPSCharacterAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
@@ -122,6 +111,8 @@ void ULastFPSCharacterAnimInstance::ResetAnimState()
 	bCachedHasMovementInput = false;
 	CachedMoveInput = FVector2D::ZeroVector;
 	bCachedIsMovingOnGround = false;
+	bCachedHasMovementComponent = false;
+	bCachedOrientToMovement = false;
 	bCachedIsFalling = false;
 	bCachedIsCrouching = false;
 	bCachedUseSeparateBrakingFriction = false;
@@ -129,6 +120,9 @@ void ULastFPSCharacterAnimInstance::ResetAnimState()
 	CachedBrakingFriction = 0.f;
 	CachedBrakingFrictionFactor = 0.f;
 	CachedMaxBrakingDeceleration = 0.f;
+	CachedBrakingDecelerationWalking = 0.f;
+	CachedMaxWalkSpeed = 0.f;
+	CachedGravityZ = 0.f;
 	CachedActorLocation = FVector::ZeroVector;
 	CachedActorForwardVector = FVector::ForwardVector;
 	CachedVelocity = FVector::ZeroVector;
@@ -201,6 +195,7 @@ void ULastFPSCharacterAnimInstance::CacheThreadSafeInputs()
 	CachedDirectionBaseRotation = CachedActorRotation;
 	CachedVelocity = MovementComponent->Velocity;
 	CachedAcceleration = MovementComponent->GetCurrentAcceleration();
+	bCachedHasMovementComponent = true;
 	bCachedIsMovingOnGround = MovementComponent->IsMovingOnGround();
 	bCachedOrientToMovement = MovementComponent->bOrientRotationToMovement;
 	bCachedIsFalling = MovementComponent->IsFalling();
@@ -210,6 +205,9 @@ void ULastFPSCharacterAnimInstance::CacheThreadSafeInputs()
 	CachedBrakingFriction = MovementComponent->BrakingFriction;
 	CachedBrakingFrictionFactor = MovementComponent->BrakingFrictionFactor;
 	CachedMaxBrakingDeceleration = MovementComponent->GetMaxBrakingDeceleration();
+	CachedBrakingDecelerationWalking = MovementComponent->BrakingDecelerationWalking;
+	CachedMaxWalkSpeed = MovementComponent->MaxWalkSpeed;
+	CachedGravityZ = MovementComponent->GetGravityZ();
 	bCachedIsSprinting = false;
 	bCachedWantsToSprint = false;
 	bCachedWantsToWalk = false;
@@ -249,13 +247,11 @@ void ULastFPSCharacterAnimInstance::UpdateThreadSafeLocomotionState(float DeltaS
 {
 	UpdateThreadSafeMovementValues();
 
-	const TCHAR* StartDirectionSource = TEXT("None");
-	const bool bHasStartDirection = UpdateThreadSafeDirectionValues(StartDirectionSource);
+	const bool bHasStartDirection = UpdateThreadSafeDirectionValues();
 	const bool bHasStartIntent = bHasStartDirection || bCachedHasMovementInput;
 
 	UpdateThreadSafeStartRequest(DeltaSeconds, bHasStartIntent);
 	UpdateThreadSafeCardinalDirections();
-	LogDirectionValues(StartDirectionSource);
 	UpdateThreadSafeOrientationWarping();
 	UpdateThreadSafeLocomotionMode();
 }
@@ -273,7 +269,6 @@ void ULastFPSCharacterAnimInstance::UpdateThreadSafeMovementValues()
 	bWantsToSprint = bCachedWantsToSprint;
 	bWantsToWalk = bCachedWantsToWalk;
 	bHasMovementInput = bCachedHasMovementInput;
-
 	bHasAcceleration = CachedAcceleration.SizeSquared2D() > KINDA_SMALL_NUMBER;
 	bHasVelocity = !FMath::IsNearlyEqual(LocalVelocity.SizeSquared2D(), 0.f, VelocityNearlyZeroTolerance);
 	LocomotionAngle = bHasVelocity ? GetVelocityDirectionAngle() : 0.f;
@@ -282,18 +277,10 @@ void ULastFPSCharacterAnimInstance::UpdateThreadSafeMovementValues()
 		                        CachedDirectionBaseRotation.Yaw)) <= DirectionBaseAlignmentTolerance;
 }
 
-bool ULastFPSCharacterAnimInstance::UpdateThreadSafeDirectionValues(const TCHAR*& OutStartDirectionSource)
+bool ULastFPSCharacterAnimInstance::UpdateThreadSafeDirectionValues()
 {
 	Direction = LocomotionAngle;
 	StartDirection = GetStartDirectionAngle();
-
-	if (!bDirectionBaseAligned)
-	{
-		OutStartDirectionSource = TEXT("PredictedPostRotationAngle");
-		return bHasVelocity || bHasAcceleration;
-	}
-
-	OutStartDirectionSource = TEXT("PostRotationAngle");
 
 	return bHasVelocity || bHasAcceleration;
 }
@@ -304,7 +291,7 @@ void ULastFPSCharacterAnimInstance::UpdateThreadSafeCardinalDirections()
 	{
 		// 무기 장착(strafe): 카메라 고정이라 입력 방향이 곧 start 방향 (A→Left, D→Right).
 		EMMCardinalDirection InputCardinal = EMMCardinalDirection::Forward;
-		if (bIsStarting && bHasLatchedStartCardinalDirection)
+		if (bHasLatchedStartCardinalDirection)
 		{
 			StartCardinalDirection = LatchedStartCardinalDirection;
 		}
@@ -330,33 +317,6 @@ void ULastFPSCharacterAnimInstance::UpdateThreadSafeCardinalDirections()
 			                              LocomotionCardinalDirection,
 			                              CardinalDirectionHysteresis)
 		                              : EMMCardinalDirection::Forward;
-}
-
-void ULastFPSCharacterAnimInstance::LogDirectionValues(const TCHAR* StartDirectionSource) const
-{
-	if (bDebugDirectionValues)
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("Direction Debug | LocomotionAngle=%.2f | StartDirection=%.2f StartCardinal=%s StartSource=%s | StopDirection=%.2f StopCardinal=%s | Direction=%.2f LoopCardinal=%s | MoveInput=X=%.2f Y=%.2f | HasAccel=%s HasMoveInput=%s DirectionBaseAligned=%s ActorYaw=%.2f BaseYaw=%.2f Speed=%.2f"),
-			LocomotionAngle,
-			StartDirection,
-			*GetCardinalDirectionDebugName(StartCardinalDirection),
-			StartDirectionSource,
-			Direction,
-			*GetCardinalDirectionDebugName(StopCardinalDirection),
-			Direction,
-			*GetCardinalDirectionDebugName(LocomotionCardinalDirection),
-			CachedMoveInput.X,
-			CachedMoveInput.Y,
-			bHasAcceleration ? TEXT("true") : TEXT("false"),
-			bHasMovementInput ? TEXT("true") : TEXT("false"),
-			bDirectionBaseAligned ? TEXT("true") : TEXT("false"),
-			CachedActorRotation.Yaw,
-			CachedDirectionBaseRotation.Yaw,
-			Speed);
-	}
 }
 
 void ULastFPSCharacterAnimInstance::UpdateThreadSafeOrientationWarping()
@@ -403,7 +363,7 @@ void ULastFPSCharacterAnimInstance::UpdateThreadSafeStartRequest(float DeltaSeco
 
 void ULastFPSCharacterAnimInstance::UpdateThreadSafeLocomotionMode()
 {
-	const bool bShouldIdle = !bHasVelocity && !bHasAcceleration;
+	const bool bShouldIdle = !bHasVelocity && !bHasAcceleration && !bHasMovementInput;
 
 	if (IsUsingSprintLocomotion() && (bHasAcceleration || bHasMovementInput))
 	{
@@ -443,14 +403,7 @@ void ULastFPSCharacterAnimInstance::UpdateThreadSafeDistanceMatching(float Delta
 		return;
 	}
 
-	// if (Speed > 1.f)
-	// {
-	// 	StopOrientationWarpingAngle = Direction;
-	// 	OrientationWarpingAngle = StopOrientationWarpingAngle;
-	// }
-
 	const bool bCanPredictStop = Speed > 3.f;
-
 	if (!bCanPredictStop)
 	{
 		if (StopRequestRemainingTime > 0.f)

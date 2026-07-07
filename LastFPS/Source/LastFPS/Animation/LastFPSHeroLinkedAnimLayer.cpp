@@ -1,18 +1,59 @@
 #include "Animation/LastFPSHeroLinkedAnimLayer.h"
-
 #include "Animation/LastFPSAnimInstance.h"
 #include "Animation/AnimSequenceBase.h"
 #include "Components/SkeletalMeshComponent.h"
 
-namespace
+namespace 
 {
-FString GetLinkedLayerCardinalDirectionName(EMMCardinalDirection Direction)
-{
-	const UEnum* DirectionEnum = StaticEnum<EMMCardinalDirection>();
-	return DirectionEnum
-		       ? DirectionEnum->GetNameStringByValue(static_cast<int64>(Direction))
-		       : TEXT("Unknown");
+	FString GetLinkedLayerCardinalDirectionName(EMMCardinalDirection Direction)
+	{
+		const UEnum* DirectionEnum = StaticEnum<EMMCardinalDirection>();
+		return DirectionEnum
+				   ? DirectionEnum->GetNameStringByValue(static_cast<int64>(Direction))
+				   : TEXT("Unknown");
+	}
 }
+
+void ULastFPSHeroLinkedAnimLayer::NativeUpdateAnimation(float DeltaSeconds)
+{
+	Super::NativeUpdateAnimation(DeltaSeconds);
+
+	const ULastFPSAnimInstance* HeroAnimInstance = GetHeroAnimInstance();
+	if (!HeroAnimInstance)
+	{
+		CachedHeroLocomotionState = EMMLocomotionState::Idle;
+		CachedHeroStartCardinalDirection = EMMCardinalDirection::Forward;
+		CachedHeroStopCardinalDirection = EMMCardinalDirection::Forward;
+		CachedHeroLocomotionCardinalDirection = EMMCardinalDirection::Forward;
+		CachedHeroVelocity2D = FVector::ZeroVector;
+		CachedHeroLocomotionAngle = 0.f;
+		CachedHeroDisplacementSinceLastUpdate = 0.f;
+		CachedHeroDisplacementSpeed = 0.f;
+		bCachedHeroHasAcceleration = false;
+		bCachedHeroHasVelocity = false;
+		bCachedHeroShouldStop = false;
+		bCachedHeroHasGroundDistance = false;
+		CachedHeroDistanceToStop = 0.f;
+		CachedHeroGroundDistance = 0.f;
+		CachedHeroGroundFriction = 0.f;
+		return;
+	}
+
+	CachedHeroLocomotionState = HeroAnimInstance->GetLocomotionState();
+	CachedHeroStartCardinalDirection = HeroAnimInstance->GetStartCardinalDirection();
+	CachedHeroStopCardinalDirection = HeroAnimInstance->GetStopCardinalDirection();
+	CachedHeroLocomotionCardinalDirection = HeroAnimInstance->GetLocomotionCardinalDirection();
+	CachedHeroVelocity2D = HeroAnimInstance->GetVelocity2D();
+	CachedHeroLocomotionAngle = HeroAnimInstance->GetLocomotionAngle();
+	CachedHeroDisplacementSinceLastUpdate = HeroAnimInstance->GetDisplacementSinceLastUpdate();
+	CachedHeroDisplacementSpeed = HeroAnimInstance->GetDisplacementSpeed();
+	bCachedHeroHasAcceleration = HeroAnimInstance->HasAcceleration();
+	bCachedHeroHasVelocity = HeroAnimInstance->HasVelocity();
+	bCachedHeroShouldStop = HeroAnimInstance->ShouldStop();
+	bCachedHeroHasGroundDistance = HeroAnimInstance->HasGroundDistance();
+	CachedHeroDistanceToStop = HeroAnimInstance->GetDistanceToStop();
+	CachedHeroGroundDistance = HeroAnimInstance->GetGroundDistance();
+	CachedHeroGroundFriction = HeroAnimInstance->GetGroundFriction();
 }
 
 ULastFPSAnimInstance* ULastFPSHeroLinkedAnimLayer::GetHeroAnimInstance() const
@@ -23,24 +64,77 @@ ULastFPSAnimInstance* ULastFPSHeroLinkedAnimLayer::GetHeroAnimInstance() const
 
 EMMLocomotionState ULastFPSHeroLinkedAnimLayer::GetHeroLocomotionState() const
 {
-	const ULastFPSAnimInstance* HeroAnimInstance = GetHeroAnimInstance();
-	if (!HeroAnimInstance)
-	{
-		return EMMLocomotionState::Idle;
-	}
-
-	return HeroAnimInstance->GetLocomotionState();
+	return CachedHeroLocomotionState;
 }
 
 EMMCardinalDirection ULastFPSHeroLinkedAnimLayer::GetHeroStartCardinalDirection() const
 {
-	const ULastFPSAnimInstance* HeroAnimInstance = GetHeroAnimInstance();
-	if (!HeroAnimInstance)
-	{
-		return EMMCardinalDirection::Forward;
-	}
+	return CachedHeroStartCardinalDirection;
+}
 
-	return HeroAnimInstance->GetStartCardinalDirection();
+EMMCardinalDirection ULastFPSHeroLinkedAnimLayer::GetHeroStopCardinalDirection() const
+{
+	return CachedHeroStopCardinalDirection;
+}
+
+EMMCardinalDirection ULastFPSHeroLinkedAnimLayer::GetHeroLocomotionCardinalDirection() const
+{
+	return CachedHeroLocomotionCardinalDirection;
+}
+
+FVector ULastFPSHeroLinkedAnimLayer::GetHeroVelocity2D() const
+{
+	return CachedHeroVelocity2D;
+}
+
+float ULastFPSHeroLinkedAnimLayer::GetHeroLocomotionAngle() const
+{
+	return CachedHeroLocomotionAngle;
+}
+
+float ULastFPSHeroLinkedAnimLayer::GetHeroDisplacementSinceLastUpdate() const
+{
+	return CachedHeroDisplacementSinceLastUpdate;
+}
+
+float ULastFPSHeroLinkedAnimLayer::GetHeroDisplacementSpeed() const
+{
+	return CachedHeroDisplacementSpeed;
+}
+
+bool ULastFPSHeroLinkedAnimLayer::HeroHasAcceleration() const
+{
+	return bCachedHeroHasAcceleration;
+}
+
+bool ULastFPSHeroLinkedAnimLayer::HeroHasVelocity() const
+{
+	return bCachedHeroHasVelocity;
+}
+
+bool ULastFPSHeroLinkedAnimLayer::ShouldHeroStop() const
+{
+	return bCachedHeroShouldStop;
+}
+
+bool ULastFPSHeroLinkedAnimLayer::HeroHasGroundDistance() const
+{
+	return bCachedHeroHasGroundDistance;
+}
+
+float ULastFPSHeroLinkedAnimLayer::GetHeroDistanceToStop() const
+{
+	return CachedHeroDistanceToStop;
+}
+
+float ULastFPSHeroLinkedAnimLayer::GetHeroGroundDistance() const
+{
+	return CachedHeroGroundDistance;
+}
+
+float ULastFPSHeroLinkedAnimLayer::GetHeroGroundFriction() const
+{
+	return CachedHeroGroundFriction;
 }
 
 UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::GetIdleAnimation() const

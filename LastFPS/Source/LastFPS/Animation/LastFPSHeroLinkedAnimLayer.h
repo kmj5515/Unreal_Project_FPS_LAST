@@ -13,6 +13,9 @@ class LASTFPS_API ULastFPSHeroLinkedAnimLayer : public ULastFPSBaseAnimInstance
 {
 	GENERATED_BODY()
 
+public:
+	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
 	TObjectPtr<ULastFPSLocomotionAnimationSet> LocomotionSet;
@@ -23,7 +26,52 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|LinkedLayer|Debug")
 	bool bDebugSequenceSelection = true;
 
-	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer", meta=(BlueprintThreadSafe))
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
+	EMMLocomotionState CachedHeroLocomotionState = EMMLocomotionState::Idle;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
+	EMMCardinalDirection CachedHeroStartCardinalDirection = EMMCardinalDirection::Forward;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
+	EMMCardinalDirection CachedHeroStopCardinalDirection = EMMCardinalDirection::Forward;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
+	EMMCardinalDirection CachedHeroLocomotionCardinalDirection = EMMCardinalDirection::Forward;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
+	FVector CachedHeroVelocity2D = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
+	float CachedHeroLocomotionAngle = 0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
+	float CachedHeroDisplacementSinceLastUpdate = 0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
+	float CachedHeroDisplacementSpeed = 0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
+	bool bCachedHeroHasAcceleration = false;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
+	bool bCachedHeroHasVelocity = false;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|DistanceMatching")
+	bool bCachedHeroShouldStop = false;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|DistanceMatching")
+	bool bCachedHeroHasGroundDistance = false;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|DistanceMatching")
+	float CachedHeroDistanceToStop = 0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|DistanceMatching")
+	float CachedHeroGroundDistance = 0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|LinkedLayer|Movement")
+	float CachedHeroGroundFriction = 0.f;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer")
 	ULastFPSAnimInstance* GetHeroAnimInstance() const;
 
 	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
@@ -31,6 +79,45 @@ protected:
 
 	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
 	EMMCardinalDirection GetHeroStartCardinalDirection() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	EMMCardinalDirection GetHeroStopCardinalDirection() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	EMMCardinalDirection GetHeroLocomotionCardinalDirection() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	FVector GetHeroVelocity2D() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	float GetHeroLocomotionAngle() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	float GetHeroDisplacementSinceLastUpdate() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	float GetHeroDisplacementSpeed() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	bool HeroHasAcceleration() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	bool HeroHasVelocity() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|DistanceMatching", meta=(BlueprintThreadSafe))
+	bool ShouldHeroStop() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|DistanceMatching", meta=(BlueprintThreadSafe))
+	bool HeroHasGroundDistance() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|DistanceMatching", meta=(BlueprintThreadSafe))
+	float GetHeroDistanceToStop() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|DistanceMatching", meta=(BlueprintThreadSafe))
+	float GetHeroGroundDistance() const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Movement", meta=(BlueprintThreadSafe))
+	float GetHeroGroundFriction() const;
 
 	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
 	UAnimSequenceBase* GetIdleAnimation() const;

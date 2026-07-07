@@ -34,6 +34,72 @@ public:
 	UFUNCTION(BlueprintPure, Category="MM|Locomotion", meta=(BlueprintThreadSafe))
 	EMMCardinalDirection GetStartCardinalDirection() const { return StartCardinalDirection; }
 
+	UFUNCTION(BlueprintPure, Category="MM|Locomotion", meta=(BlueprintThreadSafe))
+	EMMCardinalDirection GetStopCardinalDirection() const { return StopCardinalDirection; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Locomotion", meta=(BlueprintThreadSafe))
+	EMMCardinalDirection GetLocomotionCardinalDirection() const { return LocomotionCardinalDirection; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Locomotion", meta=(BlueprintThreadSafe))
+	float GetLocomotionAngle() const { return LocomotionAngle; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Locomotion", meta=(BlueprintThreadSafe))
+	FVector GetVelocity2D() const { return CharacterVelocity2D; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Locomotion", meta=(BlueprintThreadSafe))
+	FVector GetVelocity() const { return Velocity; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Locomotion", meta=(BlueprintThreadSafe))
+	FVector GetAcceleration() const { return CachedAcceleration; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Locomotion", meta=(BlueprintThreadSafe))
+	FVector GetAcceleration2D() const { return FVector(CachedAcceleration.X, CachedAcceleration.Y, 0.f); }
+
+	UFUNCTION(BlueprintPure, Category="MM|Locomotion", meta=(BlueprintThreadSafe))
+	float GetDisplacementSinceLastUpdate() const { return DisplacementSinceLastUpdate; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Locomotion", meta=(BlueprintThreadSafe))
+	float GetDisplacementSpeed() const { return DisplacementSpeed; }
+
+	UFUNCTION(BlueprintPure, Category="MM|DistanceMatching", meta=(BlueprintThreadSafe))
+	bool ShouldStop() const { return bShouldStop; }
+
+	UFUNCTION(BlueprintPure, Category="MM|DistanceMatching", meta=(BlueprintThreadSafe))
+	float GetDistanceToStop() const { return DistanceToStop; }
+
+	UFUNCTION(BlueprintPure, Category="MM|DistanceMatching", meta=(BlueprintThreadSafe))
+	bool HasGroundDistance() const { return bHasGroundDistance; }
+
+	UFUNCTION(BlueprintPure, Category="MM|DistanceMatching", meta=(BlueprintThreadSafe))
+	float GetGroundDistance() const { return GroundDistance; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Movement", meta=(BlueprintThreadSafe))
+	float GetGroundFriction() const { return CachedGroundFriction; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Movement", meta=(BlueprintThreadSafe))
+	bool UsesSeparateBrakingFriction() const { return bCachedUseSeparateBrakingFriction; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Movement", meta=(BlueprintThreadSafe))
+	float GetBrakingFriction() const { return CachedBrakingFriction; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Movement", meta=(BlueprintThreadSafe))
+	float GetBrakingFrictionFactor() const { return CachedBrakingFrictionFactor; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Movement", meta=(BlueprintThreadSafe))
+	float GetMaxBrakingDeceleration() const { return CachedMaxBrakingDeceleration; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Movement", meta=(BlueprintThreadSafe))
+	float GetBrakingDecelerationWalking() const { return CachedBrakingDecelerationWalking; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Movement", meta=(BlueprintThreadSafe))
+	float GetMaxWalkSpeed() const { return CachedMaxWalkSpeed; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Movement", meta=(BlueprintThreadSafe))
+	float GetGravityZ() const { return CachedGravityZ; }
+
+	UFUNCTION(BlueprintPure, Category="MM|Movement", meta=(BlueprintThreadSafe))
+	bool HasMovementComponent() const { return bCachedHasMovementComponent; }
+
 protected:
 	UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
 	EMMLocomotionState LocomotionState = EMMLocomotionState::Idle;
@@ -191,9 +257,6 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
 	bool bIsDead = false;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Debug")
-	bool bDebugDirectionValues = true;
-
 	UPROPERTY()
 	TObjectPtr<ACharacter> OwnerCharacter;
 
@@ -220,7 +283,7 @@ private:
 	void UpdateThreadSafeDisplacement(float DeltaSeconds);
 	void UpdateThreadSafeLocomotionState(float DeltaSeconds);
 	void UpdateThreadSafeMovementValues();
-	bool UpdateThreadSafeDirectionValues(const TCHAR*& OutStartDirectionSource);
+	bool UpdateThreadSafeDirectionValues();
 	void UpdateThreadSafeCardinalDirections();
 	void UpdateThreadSafeOrientationWarping();
 	void UpdateThreadSafeStartRequest(float DeltaSeconds, bool bHasStartIntent);
@@ -236,7 +299,6 @@ private:
 	float GetVelocityDirectionAngle() const;
 	float GetStartDirectionAngle() const;
 	bool IsUsingSprintLocomotion() const;
-	void LogDirectionValues(const TCHAR* StartDirectionSource) const;
 
 	float PreviousActorYaw = 0.f;
 	FVector PreviousActorLocation = FVector::ZeroVector;
@@ -250,6 +312,7 @@ private:
 	EMMCardinalDirection LatchedStartCardinalDirection = EMMCardinalDirection::Forward;
 	bool bHasThreadSafeInputs = false;
 	bool bCachedIsMovingOnGround = false;
+	bool bCachedHasMovementComponent = false;
 	bool bCachedOrientToMovement = false;
 	bool bCachedIsFalling = false;
 	bool bCachedIsCrouching = false;
@@ -258,6 +321,9 @@ private:
 	float CachedBrakingFriction = 0.f;
 	float CachedBrakingFrictionFactor = 0.f;
 	float CachedMaxBrakingDeceleration = 0.f;
+	float CachedBrakingDecelerationWalking = 0.f;
+	float CachedMaxWalkSpeed = 0.f;
+	float CachedGravityZ = 0.f;
 	FVector CachedActorLocation = FVector::ZeroVector;
 	FVector CachedActorForwardVector = FVector::ForwardVector;
 	FVector CachedVelocity = FVector::ZeroVector;

@@ -66,6 +66,83 @@ EMMCardinalDirection ULastFPSBaseAnimInstance::DirectionToStableCardinalDirectio
 	return DirectionToCardinalDirection(InDirection);
 }
 
+EMMCardinalDirection ULastFPSBaseAnimInstance::CalculateLocomotionDirection(
+	float CurrentLocomotionAngle,
+	float BackwardMin,
+	float BackwardMax,
+	float ForwardMin,
+	float ForwardMax,
+	EMMCardinalDirection CurrentDirection,
+	float DeadZone)
+{
+	const float Angle = FRotator::NormalizeAxis(CurrentLocomotionAngle);
+	const float ClampedDeadZone = FMath::Max(0.f, DeadZone);
+
+	const auto IsForward = [Angle](float Min, float Max)
+	{
+		return Angle >= Min && Angle <= Max;
+	};
+
+	const auto IsBackward = [Angle](float Min, float Max)
+	{
+		return Angle <= Min || Angle >= Max;
+	};
+
+	const auto IsLeft = [Angle](float BackMin, float FwdMin)
+	{
+		return Angle > BackMin && Angle < FwdMin;
+	};
+
+	const auto IsRight = [Angle](float FwdMax, float BackMax)
+	{
+		return Angle > FwdMax && Angle < BackMax;
+	};
+
+	switch (CurrentDirection)
+	{
+	case EMMCardinalDirection::Forward:
+		if (IsForward(ForwardMin - ClampedDeadZone, ForwardMax + ClampedDeadZone))
+		{
+			return CurrentDirection;
+		}
+		break;
+	case EMMCardinalDirection::Back:
+		if (IsBackward(BackwardMin + ClampedDeadZone, BackwardMax - ClampedDeadZone))
+		{
+			return CurrentDirection;
+		}
+		break;
+	case EMMCardinalDirection::Left:
+		if (IsLeft(BackwardMin - ClampedDeadZone, ForwardMin + ClampedDeadZone))
+		{
+			return CurrentDirection;
+		}
+		break;
+	case EMMCardinalDirection::Right:
+		if (IsRight(ForwardMax - ClampedDeadZone, BackwardMax + ClampedDeadZone))
+		{
+			return CurrentDirection;
+		}
+		break;
+	default:
+		break;
+	}
+
+	if (IsForward(ForwardMin, ForwardMax))
+	{
+		return EMMCardinalDirection::Forward;
+	}
+
+	if (IsBackward(BackwardMin, BackwardMax))
+	{
+		return EMMCardinalDirection::Back;
+	}
+
+	return Angle < 0.f
+		       ? EMMCardinalDirection::Left
+		       : EMMCardinalDirection::Right;
+}
+
 float ULastFPSBaseAnimInstance::CardinalDirectionToAngle(EMMCardinalDirection InDirection) const
 {
 	switch (InDirection)
