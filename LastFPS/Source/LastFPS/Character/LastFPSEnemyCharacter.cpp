@@ -16,7 +16,6 @@ void ALastFPSEnemyCharacter::PossessedBy(AController* NewController)
         return;
     }
 
-    const float ClampedMax = FMath::Max(1.f, MaxHealthOverride);
-    AttributeSet->SetMaxHealth(ClampedMax);
-    AttributeSet->SetHealth(ClampedMax);
+    AttributeSet->SetMaxHealth(MaxHealth);
+    AttributeSet->SetHealth(MaxHealth);
 }

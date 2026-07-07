@@ -16,5 +16,5 @@ protected:
     virtual void PossessedBy(AController* NewController) override;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Stats")
-    float MaxHealthOverride = 10000.f;
+    float MaxHealth = 10000.f;
 };
