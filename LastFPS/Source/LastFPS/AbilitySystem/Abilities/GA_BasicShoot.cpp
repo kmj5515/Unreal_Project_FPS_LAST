@@ -71,6 +71,7 @@ void UGA_BasicShoot::ActivateAbility(
     }
 
     Hero->SetCombatState(EMMCombatState::Attacking);
+    Hero->MarkCombatEngaged();
     Fire();
 
     if (bIsAutoFire)
@@ -110,12 +111,14 @@ void UGA_BasicShoot::Fire()
         return;
     }
 
-    const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+    ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
     if (!Hero || !Hero->IsAlive())
     {
         EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, true);
         return;
     }
+
+    Hero->MarkCombatEngaged();
 
     UWeaponComponent* Weapon = CachedWeapon.Get();
     if (!Weapon || !Weapon->CanFire())

@@ -9,6 +9,7 @@
 class ALastFPSProjectile;
 class ALastFPSWeaponActor;
 class AWeaponPickupActor;
+class UAnimInstance;
 class UGameplayEffect;
 class USkeletalMesh;
 class USkeletalMeshComponent;
@@ -18,7 +19,7 @@ class ULastFPSWeaponDefinition;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponEquippedChanged, bool, bEquipped);
 
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+UCLASS(BlueprintType, Blueprintable, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class LASTFPS_API UWeaponComponent : public UActorComponent
 {
     GENERATED_BODY()
@@ -48,6 +49,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="Weapon")
     void EquipWeaponDefinition(ULastFPSWeaponDefinition* NewDefinition);
+
+    UFUNCTION(BlueprintCallable, Category="Weapon")
+    void UnequipWeapon();
 
     // 무기 장착/해제 시 HUD에 알림
     UPROPERTY(BlueprintAssignable, Category="Weapon")
@@ -97,8 +101,11 @@ public:
 
     // ── 애니메이션 레이어 ──────────────────────────────────────────
     // 에디터에서 무기별 Layer ABP 클래스 할당 (ABP_Rifle_Layers 등)
-    UPROPERTY(EditDefaultsOnly, Replicated, Category="Weapon|Animation")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category="Weapon|Animation")
     TSubclassOf<UAnimInstance> WeaponAnimLayerClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Animation")
+    TSubclassOf<UAnimInstance> UnarmedAnimLayerClass;
 
     // ── 발사 이펙트 ───────────────────────────────────────────────
     UPROPERTY(EditDefaultsOnly, Category="Weapon|Effects")
@@ -112,6 +119,9 @@ public:
 
     UFUNCTION(Server, Reliable)
     void Server_TestEquipWeapon();
+
+    UFUNCTION(Server, Reliable)
+    void Server_UnequipWeapon();
 
     UFUNCTION(Server, Reliable)
     void Server_FireFromClientAim(FVector_NetQuantize ClientMuzzleLocation, FVector_NetQuantize ClientCameraLocation, FVector_NetQuantizeNormal ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
@@ -139,6 +149,8 @@ private:
     void ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass);
     void ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefinition);
     void ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinition* NewDefinition);
+    void ApplyAnimLayerClass(TSubclassOf<UAnimInstance> AnimLayerClass) const;
+    TSubclassOf<UAnimInstance> ResolveCurrentAnimLayerClass() const;
 
     void AttachWeaponToOwner(ALastFPSWeaponActor* WeaponActor);
     void ApplyWeaponVisibilityOverride();

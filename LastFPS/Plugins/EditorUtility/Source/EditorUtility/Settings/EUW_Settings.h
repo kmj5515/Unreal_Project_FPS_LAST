@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Animation/LastFPSLocomotionAnimationSet.h"
 #include "Engine/DeveloperSettings.h"
 #include "EUW_Settings.generated.h"
 
@@ -29,6 +30,18 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category="Character Data Asset Tool")
 	FString CharacterAbilitySetOutputRoot = TEXT("/Game/Data/Characters");
+
+	UPROPERTY(Config, EditAnywhere, Category="Character Data Asset Tool")
+	TSoftObjectPtr<ULastFPSLocomotionAnimationSet> LocomotionAnimationSet;
+
+	UPROPERTY(Config, EditAnywhere, Category="Character Data Asset Tool")
+	FString LocomotionAnimationSourceRoot = TEXT("/Game/Characters/Player/Animations/MotionMatching");
+
+	UPROPERTY(Config, EditAnywhere, Category="Character Data Asset Tool")
+	FString LocomotionAnimationNameFilter = TEXT("Unarmed");
+
+	UPROPERTY(Config, EditAnywhere, Category="Character Data Asset Tool")
+	FString LocomotionAnimationPrefixFilter = TEXT("MF_");
 
 	static const UEUW_Settings* Get() { return GetDefault<UEUW_Settings>(); }
 };

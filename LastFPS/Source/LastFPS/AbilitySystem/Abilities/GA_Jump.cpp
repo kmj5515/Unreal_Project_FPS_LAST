@@ -1,4 +1,5 @@
 #include "AbilitySystem/Abilities/GA_Jump.h"
+#include "Character/LastFPSHero.h"
 #include "Utility/LastFPSTags.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -67,6 +68,10 @@ void UGA_Jump::ActivateAbility(
 
     ApplyJumpSettings(*Character);
     Character->Jump();
+    if (ALastFPSHero* Hero = Cast<ALastFPSHero>(Character))
+    {
+        Hero->NotifyJumpStarted();
+    }
 }
 
 void UGA_Jump::EndAbility(

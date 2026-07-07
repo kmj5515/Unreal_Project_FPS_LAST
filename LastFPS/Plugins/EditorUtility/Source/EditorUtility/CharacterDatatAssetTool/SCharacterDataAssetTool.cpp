@@ -3,6 +3,8 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Character/LastFPSAbilitySet.h"
 #include "Character/LastFPSAIProfile.h"
+#include "Animation/LastFPSLocomotionAnimationSet.h"
+#include "Animation/LastFPSLocomotionAnimationSetTools.h"
 #include "Data/Tables/LastFPSCharacterMasterData.h"
 #include "Data/Characters/LastFPSCharacterStatData.h"
 #include "Data/Characters/LastFPSCharacterVisualData.h"
@@ -113,6 +115,83 @@ void SCharacterDataAssetTool::Construct(const FArguments& InArgs)
 					LOCTEXT("GenerateAbilityButton", "Generate AbilitySet"),
 					&SCharacterDataAssetTool::GenerateCharacterAbilitySet)
 			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 8.f, 0.f, 8.f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("LocomotionAnimationSetLabel", "Locomotion Animation Set"))
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f, 0.f, 12.f)
+			[
+				SNew(SObjectPropertyEntryBox)
+				.AllowedClass(ULastFPSLocomotionAnimationSet::StaticClass())
+				.ObjectPath(this, &SCharacterDataAssetTool::GetLocomotionAnimationSetObjectPath)
+				.OnObjectChanged(this, &SCharacterDataAssetTool::SetLocomotionAnimationSet)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f, 0.f, 8.f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("LocomotionAnimationNameFilterLabel", "Locomotion Animation Name Filter"))
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f, 0.f, 16.f)
+			[
+				SNew(SEditableTextBox)
+				.Text_Lambda([this]()
+				{
+					return FText::FromString(LocomotionAnimationNameFilter);
+				})
+				.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type)
+				{
+					LocomotionAnimationNameFilter = NewText.ToString();
+					SaveSettings();
+				})
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f, 0.f, 8.f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("LocomotionAnimationPrefixFilterLabel", "Locomotion Animation Prefix Filter"))
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f, 0.f, 16.f)
+			[
+				SNew(SEditableTextBox)
+				.Text_Lambda([this]()
+				{
+					return FText::FromString(LocomotionAnimationPrefixFilter);
+				})
+				.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type)
+				{
+					LocomotionAnimationPrefixFilter = NewText.ToString();
+					SaveSettings();
+				})
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			[
+				DrawFolderPickerSection(
+					LOCTEXT("LocomotionAnimationSourceRootLabel", "Locomotion Animation Source Root"),
+					&SCharacterDataAssetTool::LocomotionAnimationSourceRoot,
+					LOCTEXT("AutoFillLocomotionAnimationSetButton", "Auto Fill Locomotion Set"),
+					&SCharacterDataAssetTool::AutoFillLocomotionAnimationSet,
+					false)
+			]
 		]
 	];
 }
@@ -136,12 +215,25 @@ void SCharacterDataAssetTool::LoadSettings()
 		AbilitySetOutputRoot = Settings->CharacterAbilitySetOutputRoot.IsEmpty()
 			                       ? AbilitySetOutputRoot
 			                       : Settings->CharacterAbilitySetOutputRoot;
+		LocomotionAnimationSetObjectPath = Settings->LocomotionAnimationSet.ToSoftObjectPath().ToString();
+		LocomotionAnimationSourceRoot = Settings->LocomotionAnimationSourceRoot.IsEmpty()
+			                                ? LocomotionAnimationSourceRoot
+			                                : Settings->LocomotionAnimationSourceRoot;
+		LocomotionAnimationNameFilter = Settings->LocomotionAnimationNameFilter;
+		LocomotionAnimationPrefixFilter = Settings->LocomotionAnimationPrefixFilter;
 		MasterTable = Settings->CharacterMasterTable.LoadSynchronous();
+		LocomotionAnimationSet = Settings->LocomotionAnimationSet.LoadSynchronous();
 	}
 
 	if (!MasterTable.IsValid() && !MasterTableObjectPath.IsEmpty())
 	{
 		MasterTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, *MasterTableObjectPath));
+	}
+
+	if (!LocomotionAnimationSet.IsValid() && !LocomotionAnimationSetObjectPath.IsEmpty())
+	{
+		LocomotionAnimationSet = Cast<ULastFPSLocomotionAnimationSet>(
+			StaticLoadObject(ULastFPSLocomotionAnimationSet::StaticClass(), nullptr, *LocomotionAnimationSetObjectPath));
 	}
 }
 
@@ -153,6 +245,11 @@ void SCharacterDataAssetTool::SaveSettings() const
 		Settings->CharacterDefinitionOutputRoot = DefinitionOutputRoot;
 		Settings->CharacterStatOutputRoot = StatOutputRoot;
 		Settings->CharacterAbilitySetOutputRoot = AbilitySetOutputRoot;
+		Settings->LocomotionAnimationSet = TSoftObjectPtr<ULastFPSLocomotionAnimationSet>(
+			FSoftObjectPath(LocomotionAnimationSetObjectPath));
+		Settings->LocomotionAnimationSourceRoot = LocomotionAnimationSourceRoot;
+		Settings->LocomotionAnimationNameFilter = LocomotionAnimationNameFilter;
+		Settings->LocomotionAnimationPrefixFilter = LocomotionAnimationPrefixFilter;
 		Settings->SaveConfig();
 	}
 }
@@ -168,6 +265,18 @@ void SCharacterDataAssetTool::SetMasterTable(const FAssetData& AssetData)
 FString SCharacterDataAssetTool::GetMasterTableObjectPath() const
 {
 	return MasterTableObjectPath;
+}
+
+void SCharacterDataAssetTool::SetLocomotionAnimationSet(const FAssetData& AssetData)
+{
+	LocomotionAnimationSet = Cast<ULastFPSLocomotionAnimationSet>(AssetData.GetAsset());
+	LocomotionAnimationSetObjectPath = AssetData.IsValid() ? AssetData.GetSoftObjectPath().ToString() : FString();
+	SaveSettings();
+}
+
+FString SCharacterDataAssetTool::GetLocomotionAnimationSetObjectPath() const
+{
+	return LocomotionAnimationSetObjectPath;
 }
 
 void SCharacterDataAssetTool::RefreshRowNames()
@@ -352,7 +461,8 @@ TSharedRef<SWidget> SCharacterDataAssetTool::DrawFolderPickerSection(
 	const FText& LabelText,
 	FString SCharacterDataAssetTool::*OutputRootMember,
 	const FText& GenerateButtonText,
-	FReply (SCharacterDataAssetTool::*OnGenerateClicked)())
+	FReply (SCharacterDataAssetTool::*OnGenerateClicked)(),
+	bool bRequiresCharacterRow)
 {
 	return SNew(SVerticalBox)
 
@@ -400,9 +510,9 @@ TSharedRef<SWidget> SCharacterDataAssetTool::DrawFolderPickerSection(
 				SNew(SButton)
 				.ContentPadding(FMargin(12.f, 4.f))
 				.Text(GenerateButtonText)
-				.IsEnabled_Lambda([this, OutputRootMember]()
+				.IsEnabled_Lambda([this, OutputRootMember, bRequiresCharacterRow]()
 				{
-					return CanGenerate() && !(this->*OutputRootMember).IsEmpty();
+					return (!bRequiresCharacterRow || CanGenerate()) && !(this->*OutputRootMember).IsEmpty();
 				})
 				.OnClicked(this, OnGenerateClicked)
 			]
@@ -530,6 +640,41 @@ FReply SCharacterDataAssetTool::GenerateCharacterAbilitySet()
 		GEditor->SyncBrowserToObjects(ObjectsToSync);
 	}
 
+	return FReply::Handled();
+}
+
+FReply SCharacterDataAssetTool::AutoFillLocomotionAnimationSet()
+{
+	ULastFPSLocomotionAnimationSet* AnimationSet = LocomotionAnimationSet.Get();
+	if (!AnimationSet && !LocomotionAnimationSetObjectPath.IsEmpty())
+	{
+		AnimationSet = Cast<ULastFPSLocomotionAnimationSet>(
+			StaticLoadObject(ULastFPSLocomotionAnimationSet::StaticClass(), nullptr, *LocomotionAnimationSetObjectPath));
+		LocomotionAnimationSet = AnimationSet;
+	}
+
+	if (!AnimationSet || LocomotionAnimationSourceRoot.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Locomotion animation auto fill failed: AnimationSet or source root is empty."));
+		return FReply::Handled();
+	}
+
+	const int32 AssignedCount = ULastFPSLocomotionAnimationSetTools::AutoFillLocomotionAnimationSetWithFilters(
+		AnimationSet,
+		LocomotionAnimationSourceRoot,
+		LocomotionAnimationNameFilter,
+		LocomotionAnimationPrefixFilter,
+		true,
+		true);
+
+	if (AssignedCount > 0)
+	{
+		TArray<UObject*> ObjectsToSync;
+		ObjectsToSync.Add(AnimationSet);
+		GEditor->SyncBrowserToObjects(ObjectsToSync);
+	}
+
+	SaveSettings();
 	return FReply::Handled();
 }
 

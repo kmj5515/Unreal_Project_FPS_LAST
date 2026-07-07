@@ -1,210 +1,69 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Animation/AnimInstance.h"
-#include "Engine/EngineTypes.h"
-#include "Utility/LastFPSEnumTypes.h"
+#include "Animation/LastFPSCharacterAnimInstance.h"
 #include "LastFPSAnimInstance.generated.h"
 
 class ACharacter;
-class UCharacterMovementComponent;
 
 UCLASS()
-class LASTFPS_API ULastFPSAnimInstance : public UAnimInstance
+class LASTFPS_API ULastFPSAnimInstance : public ULastFPSCharacterAnimInstance
 {
-    GENERATED_BODY()
-
-public:
-    virtual void NativeInitializeAnimation() override;
-    virtual void NativeUninitializeAnimation() override;
-    virtual void NativeUpdateAnimation(float DeltaSeconds) override;
+	GENERATED_BODY()
 
 protected:
-    // ── Locomotion ──────────────────────────────────────────────
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    EMMLocomotionState LocomotionState = EMMLocomotionState::Idle;
+	UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+	bool bJumpStartRequested = false;
 
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    EMMStance Stance = EMMStance::Standing;
+	UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+	bool bJumpApexRequested = false;
 
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    EMMAirState AirState = EMMAirState::Grounded;
+	UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
+	int32 JumpStartSequence = 0;
 
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    float Speed = 0.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion", meta=(ClampMin="0.0", UIMin="0.0"))
+	float JumpStartRequestHoldTime = 0.15f;
 
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    float Direction = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
+	EMMWeaponType WeaponType = EMMWeaponType::Unarmed;
 
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    float OrientationWarpingAngle = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
+	EMMCombatState CombatState = EMMCombatState::Idle;
 
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    float StartDirection = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
+	bool bIsFiring = false;
 
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    EMMCardinalDirection StartCardinalDirection = EMMCardinalDirection::Forward;
+	UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
+	bool bIsCasting = false;
 
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    EMMCardinalDirection StopCardinalDirection = EMMCardinalDirection::Forward;
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK")
+	FTransform LeftHandIKTransform = FTransform::Identity;
 
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    EMMCardinalDirection LocomotionCardinalDirection = EMMCardinalDirection::Forward;
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK")
+	float LeftHandIKAlpha = 0.f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion", meta=(ClampMin="0.0", UIMin="0.0", ClampMax="44.0", UIMax="30.0"))
-    float CardinalDirectionHysteresis = 10.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|IK")
+	FName RightHandBoneName = TEXT("hand_r");
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion", meta=(ClampMin="0.0", UIMin="0.0"))
-    float CardinalDirectionMinSpeed = 20.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|IK")
+	bool bUseReloadLeftHandIKTarget = true;
 
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    float Yaw = 0.f;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion")
-    float YawInterpSpeed = 12.f;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion")
-    float YawDeadZone = 1.f;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    FVector Velocity = FVector::ZeroVector;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    FVector LocomotionDirection = FVector::ForwardVector;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    FVector DisplacementSinceLastUpdate = FVector::ZeroVector;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    float DisplacementSpeed = 0.f;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    bool bIsSprinting = false;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    bool bWantsToSprint = false;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    bool bHasAcceleration = false;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    bool bIsStarting = false;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion")
-    float StartingSpeedThreshold = 100.f;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|DistanceMatching")
-    bool bShouldStop = false;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|DistanceMatching")
-    float DistanceToStop = 0.f;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|DistanceMatching")
-    float StopOrientationWarpingAngle = 0.f;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|DistanceMatching")
-    float StopPredictionMinSpeed = 150.f;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|DistanceMatching")
-    bool bHasGroundDistance = false;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|DistanceMatching")
-    float GroundDistance = 0.f;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|DistanceMatching", meta=(ClampMin="0.0", UIMin="0.0"))
-    float GroundDistanceTraceLength = 2000.f;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|DistanceMatching")
-    TEnumAsByte<ECollisionChannel> GroundDistanceTraceChannel = ECC_Visibility;
-
-    // 진행 방향과 입력 방향이 반대(>90°)일 때 true — Chooser/모션매칭 분기용
-    UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
-    bool bIsPivoting = false;
-
-    // Pivot 감지 임계치 — VelDir·AccDir < 이 값이면 Pivot으로 판정 (기본 -0.5 = 약 120°)
-    UPROPERTY(EditDefaultsOnly, Category="MM|Locomotion")
-    float PivotDotThreshold = -0.5f;
-
-    // Pivot 판정 최소 속도 — 너무 느릴 땐 Pivot 무시
-    UPROPERTY(EditDefaultsOnly, Category="MM|Locomotion")
-    float PivotMinSpeed = 100.f;
-
-    // ── Combat ──────────────────────────────────────────────────
-    UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
-    EMMAimMode AimMode = EMMAimMode::Hip;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
-    EMMWeaponType WeaponType = EMMWeaponType::Unarmed;
-    
-    UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
-    EMMCombatState CombatState = EMMCombatState::Idle;
-    
-    // Aim Offset 용 (-90 ~ 90)
-    UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
-    float AimPitch = 0.f;
-
-    // 컨트롤러 Yaw - 캐릭터 Yaw (-180 ~ 180). 즉시 동기 상태에선 ~0
-    UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
-    float AimYaw = 0.f;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
-    bool bIsFiring = false;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
-    bool bIsCasting = false;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|Combat")
-    bool bIsDead = false;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Debug")
-    bool bDebugAimValues = false;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Debug")
-    bool bDebugAirState = false;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|IK")
-    FTransform LeftHandIKTransform = FTransform::Identity;
-
-    UPROPERTY(BlueprintReadOnly, Category="MM|IK")
-    float LeftHandIKAlpha = 0.f;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|IK")
-    FName RightHandBoneName = TEXT("hand_r");
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|IK")
-    bool bUseReloadLeftHandIKTarget = true;
+	virtual void ResetAnimState() override;
+	virtual void OnOwnerCharacterChanged(ACharacter* PreviousCharacter, ACharacter* NewCharacter) override;
+	virtual void CacheMovementModeFlags() override;
+	virtual void UpdateGameThreadCharacterState(float DeltaSeconds) override;
+	virtual void UpdateThreadSafeCharacterState(float DeltaSeconds) override;
+	virtual void UpdateCombatState() override;
 
 private:
-    bool RefreshOwnerReferences();
-    void UpdateDisplacement(float DeltaSeconds);
-    void UpdateLocomotionState();
-    void UpdateDistanceMatching();
-    void UpdateGroundDistance();
-    void UpdateYaw(float DeltaSeconds);
-    void UpdateAirState();
-    void UpdateStance();
-    void UpdateCombatState();
-    void UpdatePivot();
-    void UpdateHandIK();
-    void DebugAimValues() const;
-    EMMCardinalDirection DirectionToCardinalDirection(float InDirection) const;
-    EMMCardinalDirection DirectionToStableCardinalDirection(float InDirection, EMMCardinalDirection CurrentDirection) const;
-    float CardinalDirectionToAngle(EMMCardinalDirection InDirection) const;
-    EMMAirState ResolveAirState(const UCharacterMovementComponent& InMovementComponent);
-    FString GetAirStateName(EMMAirState InAirState) const;
+	void UpdateJumpStartRequest(float DeltaSeconds);
+	void UpdateHandIK();
 
-    UFUNCTION()
-    void OnWeaponEquipped(bool bEquipped);
+	UFUNCTION()
+	void OnWeaponEquipped(bool bEquipped);
 
-    UPROPERTY()
-    TObjectPtr<ACharacter> OwnerCharacter;
-
-    UPROPERTY()
-    TObjectPtr<UCharacterMovementComponent> MovementComponent;
-
-    float PreviousActorYaw = 0.f;
-    FVector PreviousActorLocation = FVector::ZeroVector;
-    bool bHasPreviousActorYaw = false;
-    bool bHasPreviousActorLocation = false;
-    bool bHasLoggedAirState = false;
+	int32 ObservedJumpStartSequence = 0;
+	int32 CachedJumpStartSequence = 0;
+	bool bHasObservedJumpStartSequence = false;
+	float JumpStartRequestRemainingTime = 0.f;
 };
