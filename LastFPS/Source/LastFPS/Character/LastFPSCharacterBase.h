@@ -19,6 +19,9 @@ class UMaterialInstanceDynamic;
 class USoundBase;
 class APlayerState;
 
+class ALastFPSCharacterBase;
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnLastFPSCharacterDeath, ALastFPSCharacterBase* /*DeadChar*/);
+
 UCLASS(Abstract)
 class LASTFPS_API ALastFPSCharacterBase : public ACharacter, public IAbilitySystemInterface
 {
@@ -72,6 +75,12 @@ public:
     void ClearRecentAttackers();
     const TMap<TWeakObjectPtr<APlayerState>, float>& GetRecentAttackers() const { return RecentAttackers; }
 
+    // 서버: HP 0 도달 시 1회 호출되는 사망 훅. 래치되어 중복 호출은 무시된다.
+    void HandleDeath();
+
+    // 서버 사망 시 브로드캐스트. 드랍/미션 등이 구독한다.
+    FOnLastFPSCharacterDeath OnDeath;
+
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -117,6 +126,7 @@ protected:
     TObjectPtr<ULastFPSAttributeSet> AttributeSet;
 
     bool bOwnedGASDefaultsGranted = false;
+    bool bHasDied = false;
     TWeakObjectPtr<UAbilitySystemComponent> BoundAttributeASC;
 
     /** BP/에디터에서 캐릭터별 닉네임 지정. 비어 있으면 GetPlayerName() */

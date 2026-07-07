@@ -178,6 +178,15 @@ void ALastFPSCharacterBase::ClearRecentAttackers()
     RecentAttackers.Reset();
 }
 
+void ALastFPSCharacterBase::HandleDeath()
+{
+    if (!HasAuthority() || bHasDied)
+        return;
+
+    bHasDied = true;
+    OnDeath.Broadcast(this);
+}
+
 void ALastFPSCharacterBase::BeginPlay()
 {
     Super::BeginPlay();

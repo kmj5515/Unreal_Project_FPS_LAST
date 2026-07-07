@@ -64,6 +64,9 @@ public:
     void Auth_AddAssist();
     void Auth_SetSelectedCharacterIndex(int32 NewIndex);
 
+    // 서버: 이 플레이어 소유 클라의 로컬 Economy 에 인게임 드랍 아이템 지급.
+    void Auth_GrantItem(FName ItemRowId, int32 Count);
+
 protected:
     UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Stats")
     int32 StatKills = 0;
@@ -99,6 +102,12 @@ private:
         FVector DamageWorldLocation,
         AActor* DamageTargetActor,
         bool bCriticalHit);
+
+    // 아이템/화폐 상태라 Reliable (데미지 알림과 달리).
+    UFUNCTION(Client, Reliable)
+    void Client_GrantItem(FName ItemRowId, int32 Count);
+
+    void GrantItemLocal(FName ItemRowId, int32 Count);
 
     bool bGASDefaultsGranted = false;
     UPROPERTY(VisibleAnywhere, Category="GAS")

@@ -1,7 +1,9 @@
 #include "Game/LastFPSPlayerState.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
+#include "Economy/LastFPSEconomySubsystem.h"
 #include "Net/UnrealNetwork.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 
 ALastFPSPlayerState::ALastFPSPlayerState()
@@ -100,6 +102,29 @@ void ALastFPSPlayerState::Auth_AddDamageDealt(
             Client_NotifyDamageDealt(DeltaDamage, StatDamageDealt, DamageWorldLocation, DamageTargetActor, bCriticalHit);
         }
     }
+}
+
+void ALastFPSPlayerState::Auth_GrantItem(FName ItemRowId, int32 Count)
+{
+    if (!HasAuthority() || ItemRowId.IsNone() || Count <= 0)
+        return;
+
+    if (GetNetMode() == NM_Standalone)
+        GrantItemLocal(ItemRowId, Count);
+    else
+        Client_GrantItem(ItemRowId, Count);   // 호스트 자기 폰이면 로컬 실행됨
+}
+
+void ALastFPSPlayerState::Client_GrantItem_Implementation(FName ItemRowId, int32 Count)
+{
+    GrantItemLocal(ItemRowId, Count);
+}
+
+void ALastFPSPlayerState::GrantItemLocal(FName ItemRowId, int32 Count)
+{
+    if (UGameInstance* GI = GetGameInstance())
+        if (ULastFPSEconomySubsystem* Econ = GI->GetSubsystem<ULastFPSEconomySubsystem>())
+            Econ->AddItem(ItemRowId, Count);
 }
 
 void ALastFPSPlayerState::Auth_AddDamageTaken(float Amount)   { Auth_AddFloatStat(StatDamageTaken,     Amount); }
