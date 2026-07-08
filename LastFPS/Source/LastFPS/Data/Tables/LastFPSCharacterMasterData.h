@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 #include "Character/LastFPSCharacterTypes.h"
+#include "Data/Characters/LastFPSCharacterAcceleratorData.h"
 #include "LastFPSCharacterMasterData.generated.h"
 
 class APawn;
@@ -57,6 +58,9 @@ struct LASTFPS_API FLastFPSCharacterMasterData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character|Visual")
 	TSoftObjectPtr<ULastFPSCharacterVisualData> VisualData;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character|Accelerator")
+	TSoftObjectPtr<ULastFPSCharacterAcceleratorData> AcceleratorData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character|GAS")
 	TSoftObjectPtr<ULastFPSAbilitySet> AbilitySet;

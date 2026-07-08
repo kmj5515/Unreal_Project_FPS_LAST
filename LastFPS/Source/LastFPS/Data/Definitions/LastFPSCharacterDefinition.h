@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Character/LastFPSCharacterTypes.h"
+#include "Data/Characters/LastFPSCharacterAcceleratorData.h"
 #include "LastFPSCharacterDefinition.generated.h"
 
 class APawn;
@@ -44,6 +45,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character|Visual")
 	TObjectPtr<ULastFPSCharacterVisualData> VisualData;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character|Accelerator")
+	TObjectPtr<ULastFPSCharacterAcceleratorData> AcceleratorData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character|GAS")
 	TObjectPtr<ULastFPSAbilitySet> AbilitySet;

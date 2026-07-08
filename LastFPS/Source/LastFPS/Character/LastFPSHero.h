@@ -35,8 +35,15 @@ public:
     virtual bool GetIsADS() const override { return bIsADS; }
     FORCEINLINE bool GetIsSprinting() const { return bIsSprinting; }
     FORCEINLINE bool GetWantsToSprint() const { return bWantsToSprint; }
+    FORCEINLINE bool GetWantsToWalk() const { return bWantsToWalk; }
     FORCEINLINE EMMCombatState GetCombatState() const { return CombatState; }
     FORCEINLINE FVector2D GetCachedMoveInput() const { return CachedMoveInput; }
+    FORCEINLINE FRotator GetLocomotionDirectionBaseRotation() const
+    {
+        return bHasMoveInputAction ? LocomotionDirectionBaseRotation : GetActorRotation();
+    }
+    FORCEINLINE bool HasMoveInputAction() const { return bHasMoveInputAction; }
+    FORCEINLINE int32 GetJumpStartSequence() const { return JumpStartSequence; }
     bool HasForwardSprintInput() const;
     bool CanStartSprint() const;
 
@@ -44,7 +51,9 @@ public:
     void SetADS(bool bEnabled);
     void SetSprinting(bool bEnabled);
     void SetWantsToSprint(bool bEnabled);
+    void SetWantsToWalk(bool bEnabled);
     void SetCombatState(EMMCombatState NewState);
+    void NotifyJumpStarted();
 
     /**
      * 게임플레이 입력(이동/사격/궁극기/ADS/스프린트 등)을 통째로 켜고 끈다.
@@ -56,7 +65,9 @@ public:
 
 protected:
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void GiveDefaultAbilities() override;
+    virtual void OnCombatEngagedChanged() override;
 
     void Move(const FInputActionValue& Value);
     void ClearMoveInput(const FInputActionValue& Value);
@@ -74,6 +85,8 @@ protected:
     void TickCameraInterp(float DeltaTime);
     void ApplyRotationModeSettings();
     bool ShouldUseControllerYawRotationMode() const;
+    bool ShouldOrientRotationToMovement() const;
+    bool HasEquippedWeapon() const;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera")
     TObjectPtr<USpringArmComponent> CameraBoom;
@@ -111,10 +124,10 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint")
     float SprintForwardInputThreshold = 0.5f;
 
-    UPROPERTY(EditDefaultsOnly, Category="Movement|Rotation")
-    bool bUseControllerYawRotationInFreeMovement = true;
+    UPROPERTY(EditDefaultsOnly, Category="Movement|Walk")
+    float WalkMaxWalkSpeed = 250.f;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|Weapon", meta=(AllowPrivateAccess="true"))
     TObjectPtr<UWeaponComponent> WeaponComponent;
 
     UPROPERTY(EditDefaultsOnly, Category="Input")
@@ -126,16 +139,25 @@ protected:
 private:
     bool bIsADS = false;
     float PreADSWalkSpeed = 0.f;
+    float PreWalkMaxWalkSpeed = 0.f;
     FVector2D CachedMoveInput = FVector2D::ZeroVector;
+    FRotator LocomotionDirectionBaseRotation = FRotator::ZeroRotator;
+    bool bHasMoveInputAction = false;
 
     UPROPERTY(ReplicatedUsing=OnRep_CombatState, BlueprintReadOnly, Category="Combat", meta=(AllowPrivateAccess="true"))
     EMMCombatState CombatState = EMMCombatState::Idle;
+
+    UPROPERTY(Replicated, BlueprintReadOnly, Category="Movement", meta=(AllowPrivateAccess="true"))
+    int32 JumpStartSequence = 0;
 
     UPROPERTY(Replicated, BlueprintReadOnly, Category="Movement", meta=(AllowPrivateAccess="true"))
     bool bIsSprinting = false;
 
     UPROPERTY(BlueprintReadOnly, Category="Movement", meta=(AllowPrivateAccess="true"))
     bool bWantsToSprint = false;
+
+    UPROPERTY(BlueprintReadOnly, Category="Movement", meta=(AllowPrivateAccess="true"))
+    bool bWantsToWalk = false;
 
     float TargetArmLength;
     FVector TargetSocketOffset;
@@ -144,9 +166,13 @@ private:
     UFUNCTION()
     void OnRep_CombatState();
 
+    UFUNCTION()
+    void HandleWeaponEquippedChanged(bool bEquipped);
+
     void HandleAbilityInput(const FInputActionValue& value, FGameplayTag InputID);
     bool ShouldCancelFireBeforeAbilityInput(FGameplayTag InputID) const;
     bool ShouldSkipAbilityCancelOnRelease(FGameplayTag InputID) const;
+    void RestoreWalkSpeed();
 
     void TickLocalMatchIntro();
 

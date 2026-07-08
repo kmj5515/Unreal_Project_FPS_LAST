@@ -16,6 +16,7 @@
 #include "Game/LastFPSPlayerController.h"
 #include "Utility/LastFPSDamageCalculation.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Net/UnrealNetwork.h"
 
 ALastFPSCharacterBase::ALastFPSCharacterBase()
 {
@@ -27,6 +28,12 @@ ALastFPSCharacterBase::ALastFPSCharacterBase()
 
     OwnedAttributeSet = CreateDefaultSubobject<ULastFPSAttributeSet>(TEXT("OwnedAttributeSet"));
     OwnedAbilitySystemComponent->AddAttributeSetSubobject(OwnedAttributeSet.Get());
+}
+
+void ALastFPSCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(ALastFPSCharacterBase, bIsInCombat);
 }
 
 UAbilitySystemComponent* ALastFPSCharacterBase::GetAbilitySystemComponent() const
@@ -137,6 +144,60 @@ FString ALastFPSCharacterBase::GetKillFeedDisplayNameForPlayerState(const APlaye
     return PS->GetPlayerName();
 }
 
+void ALastFPSCharacterBase::MarkCombatEngaged()
+{
+    if (!IsAlive())
+    {
+        return;
+    }
+
+    if (!bIsInCombat)
+    {
+        bIsInCombat = true;
+        OnCombatEngagedChanged();
+    }
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    World->GetTimerManager().ClearTimer(CombatEngagedTimerHandle);
+    if (CombatEngagedDuration <= 0.f)
+    {
+        ClearCombatEngaged();
+        return;
+    }
+
+    World->GetTimerManager().SetTimer(
+        CombatEngagedTimerHandle,
+        this,
+        &ALastFPSCharacterBase::ClearCombatEngaged,
+        CombatEngagedDuration,
+        false);
+}
+
+void ALastFPSCharacterBase::ClearCombatEngaged()
+{
+    if (!bIsInCombat)
+    {
+        return;
+    }
+
+    bIsInCombat = false;
+    OnCombatEngagedChanged();
+}
+
+void ALastFPSCharacterBase::OnRep_IsInCombat()
+{
+    OnCombatEngagedChanged();
+}
+
+void ALastFPSCharacterBase::OnCombatEngagedChanged()
+{
+}
+
 void ALastFPSCharacterBase::Multicast_PlayHitSound_Implementation()
 {
     if (HitSound)
@@ -240,6 +301,7 @@ void ALastFPSCharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearTimer(StatusOverlayMixInterpolationTimerHandle);
+        World->GetTimerManager().ClearTimer(CombatEngagedTimerHandle);
     }
 
     BoundAttributeASC.Reset();
@@ -359,6 +421,15 @@ void ALastFPSCharacterBase::OnHealthChanged(const FOnAttributeChangeData& Data)
 
 void ALastFPSCharacterBase::UpdateAliveCollisionState(bool bAlive)
 {
+    if (!bAlive)
+    {
+        ClearCombatEngaged();
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().ClearTimer(CombatEngagedTimerHandle);
+        }
+    }
+
     if (UCapsuleComponent* Capsule = GetCapsuleComponent())
     {
         Capsule->SetCollisionEnabled(bAlive ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
