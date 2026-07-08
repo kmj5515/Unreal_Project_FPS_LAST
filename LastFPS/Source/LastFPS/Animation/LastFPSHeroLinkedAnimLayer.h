@@ -20,9 +20,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
 	TObjectPtr<ULastFPSLocomotionAnimationSet> LocomotionSet;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
-	FLastFPSHeroLinkedLocomotionSequences LocomotionSequences;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|LinkedLayer|Debug")
 	bool bDebugSequenceSelection = true;
 
@@ -141,6 +138,18 @@ protected:
 	UAnimSequenceBase* GetJogStopAnimation(EMMCardinalDirection Direction) const;
 
 	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	UAnimSequenceBase* GetPivotAnimation(EMMCardinalDirection Direction) const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	UAnimSequenceBase* GetTurnInPlaceAnimation(EMMCardinalDirection Direction) const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	UAnimSequenceBase* GetTurnInPlace90Animation(EMMCardinalDirection Direction) const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	UAnimSequenceBase* GetTurnInPlace180Animation(EMMCardinalDirection Direction) const;
+
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
 	UAnimSequenceBase* GetSprintLoopAnimation() const;
 
 	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
@@ -158,8 +167,16 @@ protected:
 	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
 	UAnimSequenceBase* GetJumpFallLandAnimation() const;
 
+	UFUNCTION(BlueprintPure, Category="MM|LinkedLayer|Locomotion", meta=(BlueprintThreadSafe))
+	UAnimSequenceBase* GetJumpAdditiveRecoveryAnimation() const;
+
 	UAnimSequenceBase* SelectDirectionalSequence(
 		const FLastFPSDirectionalSequenceSet& SequenceSet,
+		EMMCardinalDirection Direction,
+		const TCHAR* ContextName) const;
+
+	UAnimSequenceBase* SelectLeftRightSequence(
+		const FLastFPSLeftRightSequenceSet& SequenceSet,
 		EMMCardinalDirection Direction,
 		const TCHAR* ContextName) const;
 

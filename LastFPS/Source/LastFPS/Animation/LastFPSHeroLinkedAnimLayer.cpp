@@ -172,6 +172,26 @@ UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::GetJogStopAnimation(EMMCardinalD
 	return SelectDirectionalSequence(GetActiveLocomotionSequences().JogStop, Direction, TEXT("JogStop"));
 }
 
+UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::GetPivotAnimation(EMMCardinalDirection Direction) const
+{
+	return SelectDirectionalSequence(GetActiveLocomotionSequences().Pivot, Direction, TEXT("Pivot"));
+}
+
+UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::GetTurnInPlaceAnimation(EMMCardinalDirection Direction) const
+{
+	return GetTurnInPlace90Animation(Direction);
+}
+
+UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::GetTurnInPlace90Animation(EMMCardinalDirection Direction) const
+{
+	return SelectLeftRightSequence(GetActiveLocomotionSequences().TurnInPlace.Turn90, Direction, TEXT("TurnInPlace90"));
+}
+
+UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::GetTurnInPlace180Animation(EMMCardinalDirection Direction) const
+{
+	return SelectLeftRightSequence(GetActiveLocomotionSequences().TurnInPlace.Turn180, Direction, TEXT("TurnInPlace180"));
+}
+
 UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::GetSprintLoopAnimation() const
 {
 	return GetSequence(GetActiveLocomotionSequences().SprintLoop);
@@ -200,6 +220,11 @@ UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::GetJumpFallLoopAnimation() const
 UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::GetJumpFallLandAnimation() const
 {
 	return GetSequence(GetActiveLocomotionSequences().JumpFallLand);
+}
+
+UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::GetJumpAdditiveRecoveryAnimation() const
+{
+	return GetSequence(GetActiveLocomotionSequences().JumpAdditiveRecovery);
 }
 
 UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::SelectDirectionalSequence(
@@ -249,6 +274,33 @@ UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::SelectDirectionalSequence(
 	return Sequence;
 }
 
+UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::SelectLeftRightSequence(
+	const FLastFPSLeftRightSequenceSet& SequenceSet,
+	EMMCardinalDirection Direction,
+	const TCHAR* ContextName) const
+{
+	const bool bUseLeft = Direction == EMMCardinalDirection::Left;
+	const TObjectPtr<UAnimSequenceBase>& PreferredSequence = bUseLeft ? SequenceSet.Left : SequenceSet.Right;
+	const TObjectPtr<UAnimSequenceBase>& FallbackSequence = bUseLeft ? SequenceSet.Right : SequenceSet.Left;
+	UAnimSequenceBase* Sequence = GetSequence(PreferredSequence ? PreferredSequence : FallbackSequence);
+
+	if (bDebugSequenceSelection)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("Linked Anim Sequence Selection | Context=%s | Requested=%s | Selected=%s | Fallback=%s | Left=%s | Right=%s"),
+			ContextName,
+			*GetLinkedLayerCardinalDirectionName(Direction),
+			*GetNameSafe(Sequence),
+			PreferredSequence ? TEXT("false") : TEXT("true"),
+			*GetNameSafe(SequenceSet.Left.Get()),
+			*GetNameSafe(SequenceSet.Right.Get()));
+	}
+
+	return Sequence;
+}
+
 UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::GetSequence(
 	const TObjectPtr<UAnimSequenceBase>& Sequence) const
 {
@@ -257,5 +309,6 @@ UAnimSequenceBase* ULastFPSHeroLinkedAnimLayer::GetSequence(
 
 const FLastFPSHeroLinkedLocomotionSequences& ULastFPSHeroLinkedAnimLayer::GetActiveLocomotionSequences() const
 {
-	return LocomotionSet ? LocomotionSet->LocomotionSequences : LocomotionSequences;
+	static const FLastFPSHeroLinkedLocomotionSequences EmptySequences;
+	return LocomotionSet ? LocomotionSet->GetLocomotionSequences() : EmptySequences;
 }

@@ -39,7 +39,16 @@ ALastFPSHero::ALastFPSHero()
     FollowCamera->bUsePawnControlRotation = false;
     FollowCamera->FieldOfView             = DefaultFOV;
 
-    ApplyRotationModeSettings();
+    bUseControllerRotationPitch = false;
+    bUseControllerRotationRoll = false;
+    bUseControllerRotationYaw = false;
+
+    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+    {
+        Movement->bOrientRotationToMovement = true;
+        Movement->bUseControllerDesiredRotation = false;
+        Movement->RotationRate = FRotator(0.f, 500.f, 0.f);
+    }
 
     GetCharacterMovement()->MaxWalkSpeed              = 600.f;
     GetCharacterMovement()->MaxWalkSpeedCrouched      = 200.f;
@@ -83,6 +92,16 @@ void ALastFPSHero::OnCombatEngagedChanged()
 void ALastFPSHero::BeginPlay()
 {
     Super::BeginPlay();
+
+    bUseControllerRotationPitch = false;
+    bUseControllerRotationRoll = false;
+    bUseControllerRotationYaw = false;
+
+    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+    {
+        Movement->bOrientRotationToMovement = true;
+        Movement->bUseControllerDesiredRotation = false;
+    }
 
     if (WeaponComponent)
     {
@@ -180,48 +199,12 @@ void ALastFPSHero::ApplyRotationModeSettings()
 
 bool ALastFPSHero::ShouldUseControllerYawRotationMode() const
 {
-    return bIsADS || IsInCombat() || CombatState == EMMCombatState::Attacking;
+    return HasEquippedWeapon() || CombatState == EMMCombatState::Attacking;
 }
 
 bool ALastFPSHero::ShouldOrientRotationToMovement() const
 {
-    return !ShouldUseControllerYawRotationMode() && !ShouldUseWeaponStrafeRotationMode();
-}
-
-bool ALastFPSHero::ShouldUseWeaponStrafeRotationMode() const
-{
-    return HasEquippedWeapon() && !bIsSprinting && !bWantsToSprint && !ShouldUseControllerYawRotationMode();
-}
-
-bool ALastFPSHero::ShouldFaceCameraForwardFromMoveInput(const FVector2D& MovementVector) const
-{
-    return ShouldUseWeaponStrafeRotationMode() && MovementVector.SizeSquared() > KINDA_SMALL_NUMBER;
-}
-
-FRotator ALastFPSHero::FaceCameraYaw(float DeltaTime)
-{
-    if (!Controller)
-    {
-        return GetActorRotation();
-    }
-
-    const FRotator TargetRotation(0.f, Controller->GetControlRotation().Yaw, 0.f);
-    if (DeltaTime <= KINDA_SMALL_NUMBER)
-    {
-        SetActorRotation(TargetRotation);
-        return TargetRotation;
-    }
-
-    const UCharacterMovementComponent* Movement = GetCharacterMovement();
-    const float RotationSpeed = Movement ? Movement->RotationRate.Yaw : 500.f;
-    const FRotator NewRotation = FMath::RInterpConstantTo(
-        GetActorRotation(),
-        TargetRotation,
-        DeltaTime,
-        RotationSpeed);
-
-    SetActorRotation(NewRotation);
-    return NewRotation;
+    return !ShouldUseControllerYawRotationMode();
 }
 
 bool ALastFPSHero::HasEquippedWeapon() const
@@ -301,11 +284,6 @@ void ALastFPSHero::Move(const FInputActionValue& Value)
     {
         EffectiveMovementVector.X = 0.f;
         EffectiveMovementVector.Y = FMath::Max(EffectiveMovementVector.Y, 0.f);
-    }
-
-    if (ShouldFaceCameraForwardFromMoveInput(EffectiveMovementVector))
-    {
-        FaceCameraYaw(GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.f);
     }
 
     LocomotionDirectionBaseRotation = GetActorRotation();

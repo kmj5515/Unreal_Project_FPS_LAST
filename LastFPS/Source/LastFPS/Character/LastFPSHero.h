@@ -86,9 +86,6 @@ protected:
     void ApplyRotationModeSettings();
     bool ShouldUseControllerYawRotationMode() const;
     bool ShouldOrientRotationToMovement() const;
-    bool ShouldUseWeaponStrafeRotationMode() const;
-    bool ShouldFaceCameraForwardFromMoveInput(const FVector2D& MovementVector) const;
-    FRotator FaceCameraYaw(float DeltaTime);
     bool HasEquippedWeapon() const;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera")

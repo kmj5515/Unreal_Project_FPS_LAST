@@ -5,6 +5,8 @@
 
 #include <initializer_list>
 
+#include "Utility/LastFPSEnumTypes.h"
+
 #if WITH_EDITOR
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -28,7 +30,12 @@ enum class ELocomotionSequenceSlot : uint8
 	JumpStartLoop,
 	JumpApex,
 	JumpFallLoop,
-	JumpFallLand
+	JumpFallLand,
+	JumpAdditiveRecovery,
+	Pivot,
+	TurnInPlace90,
+	TurnInPlace180,
+	Max,
 };
 
 struct FParsedSequenceName
@@ -164,9 +171,26 @@ static bool HasSprintMarker(const FString& Name, const TArray<FString>& Tokens)
 	return HasToken(Tokens, TEXT("SPRINT")) || HasAnyText(Name, {TEXT("SPRINT")});
 }
 
+static bool HasTurnInPlaceMarker(const FString& Name, const TArray<FString>& Tokens)
+{
+	return HasAnyToken(Tokens, {TEXT("TURN"), TEXT("ROTATE")})
+		|| HasAnyText(Name, {TEXT("TURNINPLACE"), TEXT("TURN_IN_PLACE"), TEXT("TURN"), TEXT("ROTATE")});
+}
+
+static bool HasRecoveryMarker(const FString& Name, const TArray<FString>& Tokens)
+{
+	return HasAnyToken(Tokens, {TEXT("RECOVERY"), TEXT("RECOVER")})
+		|| HasAnyText(Name, {TEXT("RECOVERY"), TEXT("RECOVER")});
+}
+
+static bool HasTurn180Marker(const FString& Name, const TArray<FString>& Tokens)
+{
+	return HasToken(Tokens, TEXT("180")) || HasAnyText(Name, {TEXT("180")});
+}
+
 static EMMCardinalDirection ParseDirection(const FString& Name, const TArray<FString>& Tokens)
 {
-	if (HasAnyToken(Tokens, {TEXT("RIGHT"), TEXT("R"), TEXT("RT")}) || HasAnyText(Name, {TEXT("RIGHT"), TEXT("_R_"), TEXT("_RT_")}) || Name.EndsWith(TEXT("_R")) || Name.EndsWith(TEXT("_RT")))
+	if (HasAnyToken(Tokens, {TEXT("RIGHT"), TEXT("R"), TEXT("RT"), TEXT("CW")}) || HasAnyText(Name, {TEXT("RIGHT"), TEXT("_R_"), TEXT("_RT_"), TEXT("_CW_")}) || Name.EndsWith(TEXT("_R")) || Name.EndsWith(TEXT("_RT")) || Name.EndsWith(TEXT("_CW")))
 	{
 		return EMMCardinalDirection::Right;
 	}
@@ -176,7 +200,7 @@ static EMMCardinalDirection ParseDirection(const FString& Name, const TArray<FSt
 		return EMMCardinalDirection::Back;
 	}
 
-	if (HasAnyToken(Tokens, {TEXT("LEFT"), TEXT("L"), TEXT("LT")}) || HasAnyText(Name, {TEXT("LEFT"), TEXT("_L_"), TEXT("_LT_")}) || Name.EndsWith(TEXT("_L")) || Name.EndsWith(TEXT("_LT")))
+	if (HasAnyToken(Tokens, {TEXT("LEFT"), TEXT("L"), TEXT("LT"), TEXT("CCW")}) || HasAnyText(Name, {TEXT("LEFT"), TEXT("_L_"), TEXT("_LT_"), TEXT("_CCW_")}) || Name.EndsWith(TEXT("_L")) || Name.EndsWith(TEXT("_LT")) || Name.EndsWith(TEXT("_CCW")))
 	{
 		return EMMCardinalDirection::Left;
 	}
@@ -199,13 +223,19 @@ static FParsedSequenceName ParseSequenceName(const FString& AssetName)
 	const bool bHasLoop = HasLoopMarker(Name, Tokens);
 	Parsed.bHasPivotMarker = HasPivotMarker(Name, Tokens);
 	Parsed.bHasLoopMarker = HasExplicitLoopMarker(Name, Tokens);
+	const bool bHasTurnInPlace = HasTurnInPlaceMarker(Name, Tokens);
 	const bool bHasJump = HasToken(Tokens, TEXT("JUMP")) || HasAnyText(Name, {TEXT("JUMP")});
+	const bool bHasRecovery = HasRecoveryMarker(Name, Tokens);
 	const bool bHasFall = HasToken(Tokens, TEXT("FALL")) || HasAnyText(Name, {TEXT("FALL")});
 	const bool bHasLand = HasAnyToken(Tokens, {TEXT("LAND"), TEXT("LANDING")}) || HasAnyText(Name, {TEXT("LAND")});
 
 	if (HasToken(Tokens, TEXT("IDLE")) || HasAnyText(Name, {TEXT("IDLE")}))
 	{
 		Parsed.Slot = ELocomotionSequenceSlot::Idle;
+	}
+	else if (bHasJump && bHasRecovery)
+	{
+		Parsed.Slot = ELocomotionSequenceSlot::JumpAdditiveRecovery;
 	}
 	else if (bHasJump && bHasStart && bHasLoop)
 	{
@@ -214,6 +244,10 @@ static FParsedSequenceName ParseSequenceName(const FString& AssetName)
 	else if (bHasJump && bHasStart)
 	{
 		Parsed.Slot = ELocomotionSequenceSlot::JumpStart;
+	}
+	else if (bHasJump && HasStopMarker(Name, Tokens))
+	{
+		Parsed.Slot = ELocomotionSequenceSlot::JumpFallLand;
 	}
 	else if (HasToken(Tokens, TEXT("APEX")) || HasAnyText(Name, {TEXT("APEX")}))
 	{
@@ -226,6 +260,24 @@ static FParsedSequenceName ParseSequenceName(const FString& AssetName)
 	else if (bHasFall)
 	{
 		Parsed.Slot = ELocomotionSequenceSlot::JumpFallLoop;
+	}
+	else if (bHasJump && bHasLoop)
+	{
+		Parsed.Slot = ELocomotionSequenceSlot::JumpStartLoop;
+	}
+	else if (bHasJump)
+	{
+		Parsed.Slot = ELocomotionSequenceSlot::JumpStart;
+	}
+	else if (bHasTurnInPlace)
+	{
+		Parsed.Slot = HasTurn180Marker(Name, Tokens)
+			? ELocomotionSequenceSlot::TurnInPlace180
+			: ELocomotionSequenceSlot::TurnInPlace90;
+	}
+	else if (Parsed.bHasPivotMarker)
+	{
+		Parsed.Slot = ELocomotionSequenceSlot::Pivot;
 	}
 	else if (HasWalkMarker(Name, Tokens))
 	{
@@ -276,7 +328,10 @@ static int32 GetCandidateIndex(const FParsedSequenceName& Parsed)
 		|| Parsed.Slot == ELocomotionSequenceSlot::WalkStop
 		|| Parsed.Slot == ELocomotionSequenceSlot::JogStart
 		|| Parsed.Slot == ELocomotionSequenceSlot::JogLoop
-		|| Parsed.Slot == ELocomotionSequenceSlot::JogStop;
+		|| Parsed.Slot == ELocomotionSequenceSlot::JogStop
+		|| Parsed.Slot == ELocomotionSequenceSlot::Pivot
+		|| Parsed.Slot == ELocomotionSequenceSlot::TurnInPlace90
+		|| Parsed.Slot == ELocomotionSequenceSlot::TurnInPlace180;
 
 	return SlotIndex * 4 + (bDirectionalSlot ? GetDirectionIndex(Parsed.Direction) : 0);
 }
@@ -324,6 +379,13 @@ static TObjectPtr<UAnimSequenceBase>& SelectDirectionalSequence(
 	}
 }
 
+static TObjectPtr<UAnimSequenceBase>& SelectLeftRightSequence(
+	FLastFPSLeftRightSequenceSet& SequenceSet,
+	EMMCardinalDirection Direction)
+{
+	return Direction == EMMCardinalDirection::Left ? SequenceSet.Left : SequenceSet.Right;
+}
+
 static bool AssignSequence(
 	TObjectPtr<UAnimSequenceBase>& Target,
 	UAnimSequenceBase* Sequence,
@@ -344,39 +406,47 @@ static bool AssignSequence(
 }
 
 static bool AssignParsedSequence(
-	FLastFPSHeroLinkedLocomotionSequences& LocomotionSequences,
+	ULastFPSLocomotionAnimationSet& AnimationSet,
 	const FParsedSequenceName& Parsed,
 	UAnimSequenceBase* Sequence,
 	bool bOverwriteExisting)
 {
 	switch (Parsed.Slot)
 	{
-	case ELocomotionSequenceSlot::Idle:
-		return AssignSequence(LocomotionSequences.Idle, Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::WalkStart:
-		return AssignSequence(SelectDirectionalSequence(LocomotionSequences.WalkStart, Parsed.Direction), Sequence, bOverwriteExisting);
+		return AssignSequence(SelectDirectionalSequence(AnimationSet.WalkStart, Parsed.Direction), Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::WalkLoop:
-		return AssignSequence(SelectDirectionalSequence(LocomotionSequences.WalkLoop, Parsed.Direction), Sequence, bOverwriteExisting);
+		return AssignSequence(SelectDirectionalSequence(AnimationSet.WalkLoop, Parsed.Direction), Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::WalkStop:
-		return AssignSequence(SelectDirectionalSequence(LocomotionSequences.WalkStop, Parsed.Direction), Sequence, bOverwriteExisting);
+		return AssignSequence(SelectDirectionalSequence(AnimationSet.WalkStop, Parsed.Direction), Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::JogStart:
-		return AssignSequence(SelectDirectionalSequence(LocomotionSequences.JogStart, Parsed.Direction), Sequence, bOverwriteExisting);
+		return AssignSequence(SelectDirectionalSequence(AnimationSet.JogStart, Parsed.Direction), Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::JogLoop:
-		return AssignSequence(SelectDirectionalSequence(LocomotionSequences.JogLoop, Parsed.Direction), Sequence, bOverwriteExisting);
+		return AssignSequence(SelectDirectionalSequence(AnimationSet.JogLoop, Parsed.Direction), Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::JogStop:
-		return AssignSequence(SelectDirectionalSequence(LocomotionSequences.JogStop, Parsed.Direction), Sequence, bOverwriteExisting);
+		return AssignSequence(SelectDirectionalSequence(AnimationSet.JogStop, Parsed.Direction), Sequence, bOverwriteExisting);
+	case ELocomotionSequenceSlot::Pivot:
+		return AssignSequence(SelectDirectionalSequence(AnimationSet.Pivot, Parsed.Direction), Sequence, bOverwriteExisting);
+	case ELocomotionSequenceSlot::TurnInPlace90:
+		return AssignSequence(SelectLeftRightSequence(AnimationSet.TurnInPlace.Turn90, Parsed.Direction), Sequence, bOverwriteExisting);
+	case ELocomotionSequenceSlot::TurnInPlace180:
+		return AssignSequence(SelectLeftRightSequence(AnimationSet.TurnInPlace.Turn180, Parsed.Direction), Sequence, bOverwriteExisting);
+	case ELocomotionSequenceSlot::Idle:
+		return AssignSequence(AnimationSet.Idle, Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::SprintLoop:
-		return AssignSequence(LocomotionSequences.SprintLoop, Sequence, bOverwriteExisting);
+		return AssignSequence(AnimationSet.SprintLoop, Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::JumpStart:
-		return AssignSequence(LocomotionSequences.JumpStart, Sequence, bOverwriteExisting);
+		return AssignSequence(AnimationSet.JumpStart, Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::JumpStartLoop:
-		return AssignSequence(LocomotionSequences.JumpStartLoop, Sequence, bOverwriteExisting);
+		return AssignSequence(AnimationSet.JumpStartLoop, Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::JumpApex:
-		return AssignSequence(LocomotionSequences.JumpApex, Sequence, bOverwriteExisting);
+		return AssignSequence(AnimationSet.JumpApex, Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::JumpFallLoop:
-		return AssignSequence(LocomotionSequences.JumpFallLoop, Sequence, bOverwriteExisting);
+		return AssignSequence(AnimationSet.JumpFallLoop, Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::JumpFallLand:
-		return AssignSequence(LocomotionSequences.JumpFallLand, Sequence, bOverwriteExisting);
+		return AssignSequence(AnimationSet.JumpFallLand, Sequence, bOverwriteExisting);
+	case ELocomotionSequenceSlot::JumpAdditiveRecovery:
+		return AssignSequence(AnimationSet.JumpAdditiveRecovery, Sequence, bOverwriteExisting);
 	case ELocomotionSequenceSlot::None:
 	default:
 		return false;
@@ -439,7 +509,7 @@ int32 ULastFPSLocomotionAnimationSetTools::AutoFillLocomotionAnimationSetWithFil
 	AnimationSet->Modify();
 	if (bClearBeforeFill)
 	{
-		AnimationSet->LocomotionSequences = FLastFPSHeroLinkedLocomotionSequences();
+		AnimationSet->ClearSequences();
 	}
 
 	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
@@ -460,7 +530,7 @@ int32 ULastFPSLocomotionAnimationSetTools::AutoFillLocomotionAnimationSetWithFil
 
 	int32 AssignedCount = 0;
 	TArray<LastFPSLocomotionAnimationSetTools::FSequenceAssignmentCandidate> Candidates;
-	Candidates.SetNum(static_cast<int32>(LastFPSLocomotionAnimationSetTools::ELocomotionSequenceSlot::JumpFallLand) * 4 + 4);
+	Candidates.SetNum(static_cast<int32>(LastFPSLocomotionAnimationSetTools::ELocomotionSequenceSlot::Max) * 4);
 
 	for (const FAssetData& AssetData : AssetDataList)
 	{
@@ -514,7 +584,7 @@ int32 ULastFPSLocomotionAnimationSetTools::AutoFillLocomotionAnimationSetWithFil
 		}
 
 		if (LastFPSLocomotionAnimationSetTools::AssignParsedSequence(
-			AnimationSet->LocomotionSequences,
+			*AnimationSet,
 			Candidate.Parsed,
 			Candidate.Sequence,
 			bOverwriteExisting))
@@ -523,6 +593,7 @@ int32 ULastFPSLocomotionAnimationSetTools::AutoFillLocomotionAnimationSetWithFil
 		}
 	}
 
+	AnimationSet->SyncLocomotionSequencesFromSeparatedSequences();
 	AnimationSet->MarkPackageDirty();
 	UE_LOG(
 		LogTemp,
