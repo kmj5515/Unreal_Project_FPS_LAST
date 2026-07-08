@@ -5,6 +5,7 @@
 #include "LastFPSEconomySubsystem.generated.h"
 
 class UDataTable;
+enum class ELastFPSItemRarity : uint8;
 
 /** 잔액 변동 시 브로드캐스트 (상점 잔액 표시 / 구매 버튼 활성화 갱신용) */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLastFPSCreditsChanged, int32, NewCredits);
@@ -59,6 +60,9 @@ public:
 
 	/** RowId 의 표시 이름 (DT_ItemData.ItemName). 정의가 없으면 RowId 문자열로 폴백. */
 	FText GetItemDisplayName(FName ItemRowId) const;
+
+	/** RowId 의 등급을 조회. 정의가 있으면 OutRarity 채우고 true, 없으면 false(OutRarity 미변경). */
+	bool TryGetItemRarity(FName ItemRowId, ELastFPSItemRarity& OutRarity) const;
 
 	/** DT_ItemData 가 설정·로드 가능한지. 검증 로직이 "미설정"과 "행 없음"을 구분하는 데 사용. */
 	bool IsItemTableConfigured() const;

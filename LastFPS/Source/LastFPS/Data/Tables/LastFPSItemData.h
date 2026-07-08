@@ -25,6 +25,19 @@ enum class ELastFPSItemRarity : uint8
 	Legendary	UMETA(DisplayName="전설"),
 };
 
+/** 등급별 표시 색 — 인벤토리/상점 UI와 드랍 픽업 발광색이 공유하는 단일 출처. */
+inline FLinearColor LastFPSGetRarityColor(ELastFPSItemRarity Rarity)
+{
+	switch (Rarity)
+	{
+	case ELastFPSItemRarity::Rare:      return FLinearColor(0.1f, 0.4f, 1.f,   1.f); // 파랑
+	case ELastFPSItemRarity::Epic:      return FLinearColor(0.6f, 0.1f, 1.f,   1.f); // 보라
+	case ELastFPSItemRarity::Legendary: return FLinearColor(1.f,  0.5f, 0.05f, 1.f); // 주황
+	case ELastFPSItemRarity::Common:
+	default:                            return FLinearColor(0.5f, 0.5f, 0.5f,  1.f); // 회색
+	}
+}
+
 /**
  * 무기 아이템의 상세 프리뷰(F1) 스펙 시트 값. **표시 전용**이며 현재 전투 로직에는 연동되지 않는다
  * (관통/사거리감소/정확도 등 전투 시스템 미구현). DT_ItemData 의 무기 행에서 저작하고 프리뷰 패널이 그룹별로 읽는다.

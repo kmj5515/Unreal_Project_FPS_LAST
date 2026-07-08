@@ -148,6 +148,10 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
         AttackerPS->Auth_AddDamageDealt(ActualDamage, DamageWorldLocation, TargetChar, bCriticalHit);
     }
 
+    // HP가 0에 도달하면 사망 훅 1회 호출 (PlayerState 유무와 무관 — 드랍/미션 등 구독자에게 브로드캐스트)
+    if (TargetChar && NewHealth <= KINDA_SMALL_NUMBER && ActualDamage > 0.f)
+        TargetChar->HandleDeath();
+
     if (!VictimPS)
         return;
 

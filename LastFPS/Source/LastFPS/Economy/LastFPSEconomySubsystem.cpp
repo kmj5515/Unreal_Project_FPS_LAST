@@ -73,6 +73,20 @@ FText ULastFPSEconomySubsystem::GetItemDisplayName(FName ItemRowId) const
 	return FText::FromName(ItemRowId); // 정의 없음/이름 비어있음 → RowId 폴백
 }
 
+bool ULastFPSEconomySubsystem::TryGetItemRarity(FName ItemRowId, ELastFPSItemRarity& OutRarity) const
+{
+	if (const UDataTable* Table = GetItemTable())
+	{
+		static const FString Context(TEXT("ULastFPSEconomySubsystem::TryGetItemRarity"));
+		if (const FLastFPSItemData* Row = Table->FindRow<FLastFPSItemData>(ItemRowId, Context, /*bWarnIfRowMissing=*/false))
+		{
+			OutRarity = Row->Rarity;
+			return true;
+		}
+	}
+	return false;
+}
+
 void ULastFPSEconomySubsystem::AddCredits(int32 Amount)
 {
 	if (Amount <= 0)

@@ -1,9 +1,17 @@
 #include "Economy/LastFPSItemPickupActor.h"
 
 #include "Character/LastFPSHero.h"
+#include "Data/Tables/LastFPSItemData.h"
+#include "Economy/LastFPSEconomySubsystem.h"
 #include "Game/LastFPSPlayerState.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/GameInstance.h"
+#include "GameFramework/RotatingMovementComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Net/UnrealNetwork.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPickup, Log, All);
 
 ALastFPSItemPickupActor::ALastFPSItemPickupActor()
 {
@@ -20,11 +28,83 @@ ALastFPSItemPickupActor::ALastFPSItemPickupActor()
     PickupMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PickupMesh"));
     PickupMesh->SetCollisionProfileName(TEXT("NoCollision"));
     PickupMesh->SetupAttachment(RootComponent);
+
+    // 메시만 로컬 회전 — 트리거 스피어(루트)는 고정 유지. 로컬 틱이라 복제 불필요. (RotationRate 는 BeginPlay 에서 적용)
+    RotatingMovement = CreateDefaultSubobject<URotatingMovementComponent>(TEXT("RotatingMovement"));
+    RotatingMovement->SetUpdatedComponent(PickupMesh);
+}
+
+void ALastFPSItemPickupActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(ALastFPSItemPickupActor, ItemRowId);
+}
+
+void ALastFPSItemPickupActor::OnRep_ItemRowId()
+{
+    ApplyRarityVisual();
+}
+
+void ALastFPSItemPickupActor::ApplyRarityVisual()
+{
+    if (!PickupMesh || ItemRowId.IsNone())
+    {
+        return;
+    }
+
+    ELastFPSItemRarity Rarity = ELastFPSItemRarity::Common;
+    bool bFoundRarity = false;
+    if (const UGameInstance* GI = GetGameInstance())
+    {
+        if (const ULastFPSEconomySubsystem* Economy = GI->GetSubsystem<ULastFPSEconomySubsystem>())
+        {
+            bFoundRarity = Economy->TryGetItemRarity(ItemRowId, Rarity); // 실패 시 Common 유지
+        }
+    }
+
+    FLinearColor Color = LastFPSGetRarityColor(Rarity) * EmissiveIntensity;
+    Color.A = 1.f;
+
+    // 어느 슬롯에 발광 머티리얼이 있는지 모르므로 전 슬롯의 MID 에 파라미터를 세팅(없는 슬롯은 무시됨).
+    const int32 NumMaterials = PickupMesh->GetNumMaterials();
+    bool bParamFoundAnySlot = false;
+    for (int32 SlotIndex = 0; SlotIndex < NumMaterials; ++SlotIndex)
+    {
+        if (UMaterialInstanceDynamic* MID = PickupMesh->CreateAndSetMaterialInstanceDynamic(SlotIndex))
+        {
+            FLinearColor ExistingValue;
+            if (MID->GetVectorParameterValue(FMaterialParameterInfo(EmissiveParameterName), ExistingValue))
+            {
+                bParamFoundAnySlot = true;
+            }
+            MID->SetVectorParameterValue(EmissiveParameterName, Color);
+        }
+    }
+
+    // [진단] 원인 확정용 임시 로그 — 문제 해결 후 제거.
+    UE_LOG(LogLastFPSPickup, Warning,
+        TEXT("[Pickup] RowId=%s 등급조회=%s Rarity=%d Color=%s 머티리얼슬롯=%d 파라미터'%s'존재=%s"),
+        *ItemRowId.ToString(),
+        bFoundRarity ? TEXT("성공") : TEXT("실패(→Common)"),
+        (int32)Rarity,
+        *Color.ToString(),
+        NumMaterials,
+        *EmissiveParameterName.ToString(),
+        bParamFoundAnySlot ? TEXT("YES") : TEXT("NO(이름불일치?)"));
 }
 
 void ALastFPSItemPickupActor::BeginPlay()
 {
     Super::BeginPlay();
+
+    // 서버/스탠드얼론: 스폰 시 RowId 가 이미 세팅됨. 순수 클라: OnRep_ItemRowId 가 도착 시 재적용.
+    ApplyRarityVisual();
+
+    // 에디터에서 조정한 RotationRate 반영 (생성자 이후 값이 세팅되므로 여기서 적용).
+    if (RotatingMovement)
+    {
+        RotatingMovement->RotationRate = RotationRate;
+    }
 
     if (!HasAuthority())
     {
