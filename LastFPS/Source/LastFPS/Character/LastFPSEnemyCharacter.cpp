@@ -84,6 +84,8 @@ void ALastFPSEnemyCharacter::HandleOwnDeath(ALastFPSCharacterBase* /*DeadChar*/)
         {
             Pickup->ItemRowId = SpawnRowIds[i];
             Pickup->Count = 1;
+            // 착지 지점(링)에서 적 중심으로의 오프셋 = 발사 시작점. 중심에서 튀어나와 포물선으로 링에 안착.
+            Pickup->LaunchStartOffset = Center - SpawnTransform.GetLocation();
             Pickup->FinishSpawning(SpawnTransform);
         }
     }

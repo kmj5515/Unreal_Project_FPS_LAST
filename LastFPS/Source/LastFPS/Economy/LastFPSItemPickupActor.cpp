@@ -16,7 +16,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPickup, Log, All);
 ALastFPSItemPickupActor::ALastFPSItemPickupActor()
 {
     bReplicates = true;
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = false; // 발사 연출 중에만 켠다.
 
     OverlapSphere = CreateDefaultSubobject<USphereComponent>(TEXT("OverlapSphere"));
     OverlapSphere->SetSphereRadius(PickupRadius);
@@ -38,6 +39,7 @@ void ALastFPSItemPickupActor::GetLifetimeReplicatedProps(TArray<FLifetimePropert
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ALastFPSItemPickupActor, ItemRowId);
+    DOREPLIFETIME(ALastFPSItemPickupActor, LaunchStartOffset);
 }
 
 void ALastFPSItemPickupActor::OnRep_ItemRowId()
@@ -106,14 +108,89 @@ void ALastFPSItemPickupActor::BeginPlay()
         RotatingMovement->RotationRate = RotationRate;
     }
 
+    // 발사 연출 준비(전 인스턴스). 오프셋이 있으면 날아가는 동안 픽업 불가.
+    TryStartLaunch();
+
     if (!HasAuthority())
     {
         return;
     }
 
+    // 연출이 없으면 즉시 착지 처리. 연출 중이면 서버 Tick 이 착지 시 HandleLanded 호출.
+    if (!bLaunching)
+    {
+        HandleLanded();
+    }
+}
+
+void ALastFPSItemPickupActor::TryStartLaunch()
+{
+    if (bLaunchResolved)
+    {
+        return;
+    }
+
+    if (LaunchStartOffset.IsNearlyZero() || LaunchDuration <= 0.f || !PickupMesh)
+    {
+        bLaunchResolved = true; // 연출 없음 — 착지 상태는 BeginPlay(서버)에서 결정.
+        return;
+    }
+
+    bLaunchResolved = true;
+    bLaunching = true;
+    LaunchElapsed = 0.f;
+    MeshRestRelativeLocation = PickupMesh->GetRelativeLocation(); // 변위 전 원래 위치 캐시.
+    PickupMesh->SetRelativeLocation(MeshRestRelativeLocation + LaunchStartOffset);
+    SetActorTickEnabled(true);
+}
+
+void ALastFPSItemPickupActor::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+
+    if (!bLaunching)
+    {
+        return;
+    }
+
+    LaunchElapsed += DeltaSeconds;
+    const float Alpha = (LaunchDuration > 0.f) ? FMath::Clamp(LaunchElapsed / LaunchDuration, 0.f, 1.f) : 1.f;
+
+    // 수평/기저 위치는 시작 오프셋→0 으로 보간, 수직은 4h·a(1-a) 포물선(양 끝 0, 중앙 정점 h).
+    const FVector Base = FMath::Lerp(LaunchStartOffset, FVector::ZeroVector, Alpha);
+    const float ArcZ = 4.f * LaunchArcHeight * Alpha * (1.f - Alpha);
+    if (PickupMesh)
+    {
+        PickupMesh->SetRelativeLocation(MeshRestRelativeLocation + Base + FVector(0.f, 0.f, ArcZ));
+    }
+
+    if (Alpha >= 1.f)
+    {
+        bLaunching = false;
+        if (PickupMesh)
+        {
+            PickupMesh->SetRelativeLocation(MeshRestRelativeLocation);
+        }
+        SetActorTickEnabled(false);
+
+        if (HasAuthority())
+        {
+            HandleLanded();
+        }
+    }
+}
+
+void ALastFPSItemPickupActor::HandleLanded()
+{
+    if (bLanded)
+    {
+        return;
+    }
+    bLanded = true;
+
     OverlapSphere->SetSphereRadius(PickupRadius);
 
-    // 스폰 순간 이미 겹쳐 있던 Hero 도 즉시 처리.
+    // 착지 순간 이미 겹쳐 있던 Hero 즉시 처리.
     TArray<AActor*> Overlapping;
     OverlapSphere->GetOverlappingActors(Overlapping, ALastFPSHero::StaticClass());
     for (AActor* Actor : Overlapping)
@@ -124,6 +201,12 @@ void ALastFPSItemPickupActor::BeginPlay()
             break;
         }
     }
+}
+
+void ALastFPSItemPickupActor::OnRep_LaunchOffset()
+{
+    // 순수 클라: 오프셋이 늦게 도착하면 여기서 연출 시작(메시 기준 위치는 BeginPlay 에서 이미 캐시).
+    TryStartLaunch();
 }
 
 void ALastFPSItemPickupActor::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
@@ -140,6 +223,12 @@ void ALastFPSItemPickupActor::OnOverlapBegin(UPrimitiveComponent* OverlappedComp
 
 void ALastFPSItemPickupActor::TryGrant(AActor* OtherActor)
 {
+    // 아직 날아가는 중(착지 전)이면 줍지 못한다.
+    if (!bLanded)
+    {
+        return;
+    }
+
     ALastFPSHero* Hero = Cast<ALastFPSHero>(OtherActor);
     if (!Hero)
     {

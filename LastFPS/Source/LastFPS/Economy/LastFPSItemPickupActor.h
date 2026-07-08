@@ -27,7 +27,12 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pickup", meta=(ExposeOnSpawn="true"))
     int32 Count = 1;
 
+    // 착지 지점(=액터 위치) 기준, 발사 연출을 시작할 상대 오프셋(적 중심 방향). 0이면 연출 없이 즉시 착지.
+    UPROPERTY(ReplicatedUsing=OnRep_LaunchOffset)
+    FVector LaunchStartOffset = FVector::ZeroVector;
+
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void Tick(float DeltaSeconds) override;
 
 protected:
     virtual void BeginPlay() override;
@@ -57,6 +62,14 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Pickup|Rarity", meta=(ClampMin="0.0"))
     float EmissiveIntensity = 1.f;
 
+    // 발사 연출 지속 시간(초). 0 이하면 연출 생략.
+    UPROPERTY(EditDefaultsOnly, Category="Pickup|Launch", meta=(ClampMin="0.0"))
+    float LaunchDuration = 0.6f;
+
+    // 포물선 정점 높이(cm).
+    UPROPERTY(EditDefaultsOnly, Category="Pickup|Launch", meta=(ClampMin="0.0"))
+    float LaunchArcHeight = 150.f;
+
 private:
     UFUNCTION()
     void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
@@ -70,4 +83,19 @@ private:
 
     UFUNCTION()
     void OnRep_ItemRowId();
+
+    // 발사 연출 시작(전 인스턴스 로컬). 중복 호출/오프셋 0 이면 무시.
+    void TryStartLaunch();
+
+    // 착지 처리(서버). 픽업 가능 상태로 전환하고 즉시 겹친 Hero 처리.
+    void HandleLanded();
+
+    UFUNCTION()
+    void OnRep_LaunchOffset();
+
+    FVector MeshRestRelativeLocation = FVector::ZeroVector;
+    float LaunchElapsed = 0.f;
+    bool bLaunching = false;
+    bool bLaunchResolved = false; // 연출 시작을 이미 처리했는지(중복 방지).
+    bool bLanded = false;         // 착지 완료(서버 기준) — 이전엔 못 줍는다.
 };
