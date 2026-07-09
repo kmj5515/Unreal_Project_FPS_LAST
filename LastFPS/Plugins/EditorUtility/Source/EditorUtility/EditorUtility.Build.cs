@@ -20,6 +20,7 @@ public class EditorUtility : ModuleRules
 				ModuleDirectory,
 				Path.Combine(ModuleDirectory, "CharacterDatatAssetTool"),
 				Path.Combine(ModuleDirectory, "Core"),
+				Path.Combine(ModuleDirectory, "EditorPlay"),
 				Path.Combine(ModuleDirectory, "LevelSelection"),
 				Path.Combine(ModuleDirectory, "RuntimeStats"),
 				Path.Combine(ModuleDirectory, "Settings")
@@ -57,6 +58,7 @@ public class EditorUtility : ModuleRules
 				"ToolMenus",
 				"DesktopPlatform",
 				"EngineSettings",
+				"LevelEditor",
 				"AssetTools",
 				"ContentBrowser",
 				"PropertyEditor"

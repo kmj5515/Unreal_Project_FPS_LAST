@@ -4,6 +4,7 @@
 #include "Components/SizeBox.h"
 #include "Containers/Ticker.h"
 #include "Editor.h"
+#include "EditorPlay/LastFPSStartMapPlayToolbar.h"
 #include "EditorUtilitySubsystem.h"
 #include "EditorUtilityWidget.h"
 #include "EditorUtilityWidgetBlueprint.h"
@@ -109,6 +110,9 @@ void FEditorUtilityModule::UnregisterTabSpawner()
 void FEditorUtilityModule::RegisterMenus()
 {
 	FToolMenuOwnerScoped OwnerScoped(this);
+
+	FLastFPSStartMapPlayToolbar::Register();
+
 	UToolMenu* MainMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu");
 	if (MainMenu)
 	{

@@ -7,6 +7,7 @@
 
 class UDataTable;
 class UEditorUtilityWidgetBlueprint;
+class UWorld;
 
 UCLASS(Config=Editor, DefaultConfig, meta=(DisplayName="LastFPS Editor Tools"))
 class EDITORUTILITY_API UEUW_Settings : public UDeveloperSettings
@@ -18,6 +19,9 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category="Level Selection Tool", meta=(AllowedClasses="/Script/Blutility.EditorUtilityWidgetBlueprint"))
 	TSoftObjectPtr<UEditorUtilityWidgetBlueprint> LevelSelectionTool;
+
+	UPROPERTY(Config, EditAnywhere, Category="Play Tools")
+	TSoftObjectPtr<UWorld> ForcedPlayStartMap;
 
 	UPROPERTY(Config, EditAnywhere, Category="Character Data Asset Tool")
 	TSoftObjectPtr<UDataTable> CharacterMasterTable;
