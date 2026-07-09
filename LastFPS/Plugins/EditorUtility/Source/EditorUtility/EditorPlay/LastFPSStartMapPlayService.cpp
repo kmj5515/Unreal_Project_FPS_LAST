@@ -7,7 +7,7 @@
 #include "Misc/PackageName.h"
 #include "Modules/ModuleManager.h"
 #include "PlayInEditorDataTypes.h"
-#include "Settings/EUW_Settings.h"
+#include "Settings/MW_Settings.h"
 #include "UnrealEdGlobals.h"
 #include "Editor/UnrealEdEngine.h"
 
@@ -61,7 +61,7 @@ void FLastFPSStartMapPlayService::PlayConfiguredStartMap()
 
 FString FLastFPSStartMapPlayService::GetConfiguredStartMapPackageName()
 {
-	const UEUW_Settings* Settings = UEUW_Settings::Get();
+	const UMW_Settings* Settings = UMW_Settings::Get();
 	if (!Settings)
 	{
 		return FString();

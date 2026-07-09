@@ -114,12 +114,4 @@ FName ALastFPSEnemyCharacter::PickWeightedDropRowId(float TotalWeight) const
 void ALastFPSEnemyCharacter::PossessedBy(AController* NewController)
 {
     Super::PossessedBy(NewController);
-
-    if (!HasAuthority() || !AttributeSet)
-    {
-        return;
-    }
-
-    AttributeSet->SetMaxHealth(MaxHealth);
-    AttributeSet->SetHealth(MaxHealth);
 }

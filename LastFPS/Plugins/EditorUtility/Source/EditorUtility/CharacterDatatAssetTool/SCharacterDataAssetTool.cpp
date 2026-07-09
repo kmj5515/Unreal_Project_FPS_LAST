@@ -10,7 +10,7 @@
 #include "Data/Characters/LastFPSCharacterStatData.h"
 #include "Data/Characters/LastFPSCharacterVisualData.h"
 #include "ContentBrowserModule.h"
-#include "Settings/EUW_Settings.h"
+#include "Settings/MW_Settings.h"
 #include "Editor.h"
 #include "Engine/DataTable.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
@@ -204,7 +204,7 @@ void SCharacterDataAssetTool::LoadSettings()
 		return;
 	}
 
-	if (const UEUW_Settings* Settings = UEUW_Settings::Get())
+	if (const UMW_Settings* Settings = UMW_Settings::Get())
 	{
 		MasterTableObjectPath = Settings->CharacterMasterTable.ToSoftObjectPath().ToString();
 		DefinitionOutputRoot = Settings->CharacterDefinitionOutputRoot.IsEmpty()
@@ -240,7 +240,7 @@ void SCharacterDataAssetTool::LoadSettings()
 
 void SCharacterDataAssetTool::SaveSettings() const
 {
-	if (UEUW_Settings* Settings = GetMutableDefault<UEUW_Settings>())
+	if (UMW_Settings* Settings = GetMutableDefault<UMW_Settings>())
 	{
 		Settings->CharacterMasterTable = TSoftObjectPtr<UDataTable>(FSoftObjectPath(MasterTableObjectPath));
 		Settings->CharacterDefinitionOutputRoot = DefinitionOutputRoot;

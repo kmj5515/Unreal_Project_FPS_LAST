@@ -64,6 +64,11 @@ const ULastFPSCharacterDefinition* ALastFPSCharacterBase::GetCharacterDefinition
     return ResolveCharacterDefinition();
 }
 
+void ALastFPSCharacterBase::SetCharacterDefinitionForSpawn(ULastFPSCharacterDefinition* InDefinition)
+{
+    CharacterDefinition = InDefinition;
+}
+
 const ULastFPSCharacterDefinition* ALastFPSCharacterBase::ResolveCharacterDefinition() const
 {
     if (CharacterDefinition)

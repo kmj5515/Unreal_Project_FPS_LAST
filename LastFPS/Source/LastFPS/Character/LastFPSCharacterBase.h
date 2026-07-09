@@ -61,6 +61,8 @@ public:
     UFUNCTION(BlueprintPure, Category="LastFPS|Character")
     const ULastFPSCharacterDefinition* GetCharacterDefinition() const;
 
+    void SetCharacterDefinitionForSpawn(ULastFPSCharacterDefinition* InDefinition);
+
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayHitSound();
 

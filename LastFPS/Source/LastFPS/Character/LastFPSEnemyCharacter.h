@@ -31,10 +31,7 @@ public:
 protected:
     virtual void BeginPlay() override;
     virtual void PossessedBy(AController* NewController) override;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Stats")
-    float MaxHealth = 10000.f;
-
+    
     // 사망 시 드랍할 픽업 (비우면 드랍 없음).
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Drop")
     TSubclassOf<ALastFPSItemPickupActor> DropPickupClass;

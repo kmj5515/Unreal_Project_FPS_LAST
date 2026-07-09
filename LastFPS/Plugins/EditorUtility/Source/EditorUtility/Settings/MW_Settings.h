@@ -3,19 +3,25 @@
 #include "CoreMinimal.h"
 #include "Animation/LastFPSLocomotionAnimationSet.h"
 #include "Engine/DeveloperSettings.h"
-#include "EUW_Settings.generated.h"
+#include "MW_Settings.generated.h"
 
 class UDataTable;
 class UEditorUtilityWidgetBlueprint;
 class UWorld;
 
-UCLASS(Config=Editor, DefaultConfig, meta=(DisplayName="LastFPS Editor Tools"))
-class EDITORUTILITY_API UEUW_Settings : public UDeveloperSettings
+UCLASS(Config=LastFPS, DefaultConfig, meta=(DisplayName="LastFPS Editor Tools"))
+class EDITORUTILITY_API UMW_Settings : public UDeveloperSettings
 {
 	GENERATED_BODY()
 
 public:
-	UEUW_Settings();
+	UMW_Settings();
+
+#if WITH_EDITOR
+	virtual FText GetSectionText() const override;
+	virtual FText GetSectionDescription() const override;
+	virtual bool SupportsAutoRegistration() const override { return false; }
+#endif
 
 	UPROPERTY(Config, EditAnywhere, Category="Level Selection Tool", meta=(AllowedClasses="/Script/Blutility.EditorUtilityWidgetBlueprint"))
 	TSoftObjectPtr<UEditorUtilityWidgetBlueprint> LevelSelectionTool;
@@ -47,5 +53,5 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Character Data Asset Tool")
 	FString LocomotionAnimationPrefixFilter = TEXT("MF_");
 
-	static const UEUW_Settings* Get() { return GetDefault<UEUW_Settings>(); }
+	static const UMW_Settings* Get() { return GetDefault<UMW_Settings>(); }
 };
