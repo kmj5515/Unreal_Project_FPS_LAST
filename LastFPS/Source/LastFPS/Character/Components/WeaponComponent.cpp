@@ -83,24 +83,10 @@ void UWeaponComponent::PlayFireEffects() const
         return;
     }
 
-    USkeletalMeshComponent* CurrentWeaponMesh = CurrentWeapon->GetWeaponMesh();
     CurrentWeapon->PlayFireAnimation();
 
-    if (FireSound)
-    {
-        UGameplayStatics::SpawnSoundAttached(FireSound, CurrentWeaponMesh, MuzzleSocketName);
-    }
-
-    if (MuzzleFlashEffect)
-    {
-        UGameplayStatics::SpawnEmitterAttached(
-            MuzzleFlashEffect,
-            CurrentWeaponMesh,
-            MuzzleSocketName,
-            FVector::ZeroVector,
-            FRotator::ZeroRotator,
-            EAttachLocation::SnapToTarget);
-    }
+    // 사운드/머즐 플래시는 WeaponDefinition을 통해서만 재생 (WeaponActor가 Definition에서 직접 조회)
+    CurrentWeapon->PlayFireEffects(MuzzleSocketName);
 }
 
 void UWeaponComponent::SetWeaponHiddenForAbility(bool bHidden)
@@ -266,8 +252,6 @@ void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
     ReloadLeftHandIKTargetName = NewDefinition->ReloadLeftHandIKTargetName;
     FireRate = NewDefinition->FireRate;
     DamageRange = NewDefinition->DamageRange;
-    FireSound = NewDefinition->FireSound;
-    MuzzleFlashEffect = NewDefinition->MuzzleFlashEffect;
 }
 
 void UWeaponComponent::OnRep_CurrentWeapon()
@@ -431,7 +415,7 @@ ALastFPSWeaponActor* UWeaponComponent::SpawnWeaponActor(USkeletalMesh* NewMesh, 
         return nullptr;
     }
 
-    NewWeapon->InitializeWeapon(NewMesh, MuzzleFlashEffect, FireSound, Definition);
+    NewWeapon->InitializeWeapon(NewMesh, Definition);
 
     AttachWeaponToOwner(NewWeapon);
 

@@ -107,12 +107,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Animation")
     TSubclassOf<UAnimInstance> UnarmedAnimLayerClass;
 
-    // ── 발사 이펙트 ───────────────────────────────────────────────
-    UPROPERTY(EditDefaultsOnly, Category="Weapon|Effects")
-    TObjectPtr<USoundBase> FireSound;
-
-    UPROPERTY(EditDefaultsOnly, Category="Weapon|Effects")
-    TObjectPtr<UParticleSystem> MuzzleFlashEffect;
+    // 발사 사운드/머즐 플래시는 WeaponComponent가 아니라 WeaponDefinition에서만 관리한다.
 
     UFUNCTION(BlueprintCallable, Category="Weapon|Debug")
     void TestEquipWeapon();

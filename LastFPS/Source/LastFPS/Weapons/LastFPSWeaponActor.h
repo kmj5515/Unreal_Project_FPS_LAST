@@ -25,7 +25,7 @@ public:
     virtual void PostInitializeComponents() override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-    void InitializeWeapon(USkeletalMesh* InMesh, UParticleSystem* InMuzzleFlash, USoundBase* InFireSound, ULastFPSWeaponDefinition* InDefinition = nullptr);
+    void InitializeWeapon(USkeletalMesh* InMesh, ULastFPSWeaponDefinition* InDefinition = nullptr);
 
     FTransform GetMuzzleTransform(FName MuzzleSocketName) const;
     bool GetSocketTransformInBoneSpace(FName SocketName, USkeletalMeshComponent* CharacterMesh, FName RelativeToBoneName, FTransform& OutTransform) const;
@@ -68,12 +68,6 @@ private:
 
     UPROPERTY(ReplicatedUsing=OnRep_WeaponHidden)
     bool bWeaponHidden = false;
-
-    UPROPERTY(Transient)
-    TObjectPtr<UParticleSystem> MuzzleFlashEffect;
-
-    UPROPERTY(Transient)
-    TObjectPtr<USoundBase> FireSound;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Animation", meta=(AllowPrivateAccess="true"))
     TObjectPtr<UAnimationAsset> FireAnimation;
