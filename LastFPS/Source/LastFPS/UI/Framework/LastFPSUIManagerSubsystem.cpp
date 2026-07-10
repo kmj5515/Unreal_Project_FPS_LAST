@@ -47,7 +47,7 @@ const ULastFPSScreenRegistry* ULastFPSUIManagerSubsystem::GetRegistry()
 	if (!CachedRegistry)
 	{
 		UE_LOG(LogLastFPSUI, Error,
-			TEXT("ScreenRegistry 미지정 — Project Settings > Game > LastFPS UI 에서 설정 필요"));
+			TEXT("ScreenRegistry 미지정 - Project Settings > MWTool > UI 에서 설정 필요"));
 	}
 	return CachedRegistry;
 }

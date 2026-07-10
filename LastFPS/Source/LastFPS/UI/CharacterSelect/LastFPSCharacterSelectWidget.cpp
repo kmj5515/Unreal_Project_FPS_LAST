@@ -5,8 +5,8 @@
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
+#include "Data/Definitions/LastFPSHeroDefinition.h"
 #include "Data/Definitions/LastFPSCharacterRoster.h"
-
 #include "Components/TextBlock.h"
 
 void ULastFPSCharacterSelectWidget::NativeConstruct()
@@ -71,17 +71,20 @@ void ULastFPSCharacterSelectWidget::OnSelectionChanged_Implementation(int32 NewI
 	const ULastFPSCharacterRoster* Roster = GetCharacterRoster();
 	const ULastFPSCharacterDefinition* Def = Roster ? Roster->GetDefinition(NewIndex) : nullptr;
 
+	// Role/Description 은 히어로 전용 데이터이므로 Hero 로 캐스팅해서 읽는다.
+	const ULastFPSHeroDefinition* HeroDef = Cast<ULastFPSHeroDefinition>(Def);
+
 	if (TB_CharName)
 	{
 		TB_CharName->SetText(Def ? Def->DisplayName : FText::GetEmpty());
 	}
 	if (TB_CharRole)
 	{
-		TB_CharRole->SetText(Def ? Def->Role : FText::GetEmpty());
+		TB_CharRole->SetText(HeroDef ? HeroDef->Role : FText::GetEmpty());
 	}
 	if (TB_CharDesc)
 	{
-		TB_CharDesc->SetText(Def ? Def->Description : FText::GetEmpty());
+		TB_CharDesc->SetText(HeroDef ? HeroDef->Description : FText::GetEmpty());
 	}
 }
 

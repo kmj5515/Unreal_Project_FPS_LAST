@@ -57,4 +57,5 @@ private:
 
 	/** GameInstance의 캐릭터 로스터(단일 소스). 없으면 nullptr. */
 	const ULastFPSCharacterRoster* GetCharacterRoster() const;
+
 };

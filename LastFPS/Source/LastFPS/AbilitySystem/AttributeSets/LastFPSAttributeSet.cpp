@@ -31,6 +31,11 @@ ALastFPSPlayerState* ResolveInstigatorPlayerState(const FGameplayEffectModCallba
 
     return nullptr;
 }
+
+ALastFPSCharacterBase* ResolvePlayerStateCharacter(const ALastFPSPlayerState* PlayerState)
+{
+    return PlayerState ? Cast<ALastFPSCharacterBase>(PlayerState->GetPawn()) : nullptr;
+}
 }
 
 ULastFPSAttributeSet::ULastFPSAttributeSet()
@@ -136,6 +141,19 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
         LastFPSGameplayTags::SetByCaller_CriticalHit,
         false,
         0.f) > 0.5f;
+
+    if (TargetChar && ActualDamage > 0.f)
+    {
+        TargetChar->MarkCombatEngaged();
+    }
+
+    if (ALastFPSCharacterBase* AttackerChar = ResolvePlayerStateCharacter(AttackerPS))
+    {
+        if (AttackerChar != TargetChar && ActualDamage > 0.f)
+        {
+            AttackerChar->MarkCombatEngaged();
+        }
+    }
 
     if (TargetChar && AttackerPS && AttackerPS != VictimPS && ActualDamage > 0.f)
         TargetChar->RecordAttacker(AttackerPS);

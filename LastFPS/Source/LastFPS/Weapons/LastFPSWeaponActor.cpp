@@ -6,6 +6,8 @@
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "Particles/ParticleSystem.h"
+#include "Sound/SoundBase.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
 
 ALastFPSWeaponActor::ALastFPSWeaponActor()
@@ -81,14 +83,11 @@ void ALastFPSWeaponActor::Tick(float DeltaSeconds)
     DrawDebugLine(World, SocketLocation, SocketLocation + SocketRotation.GetUpVector() * DebugAxisLength, FColor::Blue, false, 0.f, 0, 2.f);
 }
 
-void ALastFPSWeaponActor::InitializeWeapon(USkeletalMesh* InMesh, UParticleSystem* InMuzzleFlash, USoundBase* InFireSound, ULastFPSWeaponDefinition* InDefinition)
+void ALastFPSWeaponActor::InitializeWeapon(USkeletalMesh* InMesh, ULastFPSWeaponDefinition* InDefinition)
 {
     WeaponDefinition = InDefinition ? InDefinition : DefaultWeaponDefinition.Get();
     WeaponMeshAsset = InMesh ? InMesh : GetDefaultWeaponMesh();
     OnRep_WeaponMeshAsset();
-
-    MuzzleFlashEffect = InMuzzleFlash;
-    FireSound = InFireSound;
 }
 
 USkeletalMesh* ALastFPSWeaponActor::GetDefaultWeaponMesh() const
@@ -172,17 +171,17 @@ bool ALastFPSWeaponActor::GetSocketTransformInBoneSpace(FName SocketName, USkele
 
 void ALastFPSWeaponActor::PlayFireEffects(FName MuzzleSocketName) const
 {
-    if (!WeaponMesh)
+    if (!WeaponMesh || !WeaponDefinition)
     {
         return;
     }
 
-    if (FireSound)
+    if (USoundBase* FireSound = WeaponDefinition->FireSound)
     {
         UGameplayStatics::SpawnSoundAttached(FireSound, WeaponMesh, MuzzleSocketName);
     }
 
-    if (MuzzleFlashEffect)
+    if (UParticleSystem* MuzzleFlashEffect = WeaponDefinition->MuzzleFlashEffect)
     {
         UGameplayStatics::SpawnEmitterAttached(
             MuzzleFlashEffect,

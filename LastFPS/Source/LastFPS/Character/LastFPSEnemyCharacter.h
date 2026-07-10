@@ -2,9 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Character/LastFPSCharacterBase.h"
+#include "Perception/AIPerceptionTypes.h"
 #include "LastFPSEnemyCharacter.generated.h"
 
 class ALastFPSItemPickupActor;
+class ULastFPSAIProfile;
 
 /** 가중치 기반 드랍 항목 1종. Weight 가 클수록 자주 뽑힌다. */
 USTRUCT(BlueprintType)
@@ -28,13 +30,21 @@ class LASTFPS_API ALastFPSEnemyCharacter : public ALastFPSCharacterBase
 public:
     ALastFPSEnemyCharacter();
 
+    /**
+     * 이 적의 AI 행동 프로파일. 해석된 CharacterDefinition 이 ULastFPSEnemyDefinition 일 때
+     * 그 AIProfile 을 반환한다. 없으면 nullptr.
+     * 컨트롤러/BT 노드가 감지·공격 파라미터를 읽는 단일 진입점.
+     */
+    UFUNCTION(BlueprintPure, Category="Enemy|AI")
+    const ULastFPSAIProfile* GetAIProfile() const;
+
 protected:
     virtual void BeginPlay() override;
     virtual void PossessedBy(AController* NewController) override;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Stats")
-    float MaxHealth = 10000.f;
-
+    
+    UPROPERTY(EditAnywhere, Category="Enemy|AI")
+    TObjectPtr<UAIPerceptionComponent> AIPerceptionComponent;
+    
     // 사망 시 드랍할 픽업 (비우면 드랍 없음).
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Drop")
     TSubclassOf<ALastFPSItemPickupActor> DropPickupClass;

@@ -7,8 +7,8 @@
 #include "Components/Image.h"
 #include "UI/Framework/LastFPSButtonBase.h"
 #include "Engine/SkeletalMesh.h"
-#include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 
 void ULastFPSWeaponPreviewWidget::Setup(ULastFPSWeaponDefinition* InWeaponDef, const FLastFPSItemData& InItem, FName InRowId, ALastFPSWeaponPreviewRig* InRig)
 {
@@ -45,6 +45,16 @@ void ULastFPSWeaponPreviewWidget::HandleCloseClicked()
 
 void ULastFPSWeaponPreviewWidget::NativeDestruct()
 {
+	// 프리뷰를 닫으면 원래 뷰타깃(폰 카메라 등)으로 복구한다.
+	if (APlayerController* PC = GetOwningPlayer())
+	{
+		if (AActor* Prev = PrevViewTarget.Get())
+		{
+			PC->SetViewTargetWithBlend(Prev, 0.2f);
+		}
+	}
+	PrevViewTarget = nullptr;
+
 	// 리그는 인벤토리가 소유·재사용 → 여기서 파괴하지 않는다.
 	Rig = nullptr;
 
@@ -53,7 +63,7 @@ void ULastFPSWeaponPreviewWidget::NativeDestruct()
 
 void ULastFPSWeaponPreviewWidget::BindPreviewRig()
 {
-	if (!Rig || !WeaponDef || !Image_Preview)
+	if (!Rig || !WeaponDef)
 	{
 		return;
 	}
@@ -64,9 +74,16 @@ void ULastFPSWeaponPreviewWidget::BindPreviewRig()
 		return;
 	}
 
-	if (UTextureRenderTarget2D* RT = Rig->InitPreview(Mesh))
+	Rig->InitPreview(Mesh);
+
+	// 플레이어 뷰를 리그 카메라로 전환(SceneCapture 대신). 닫을 때 복구할 이전 뷰타깃을 캐시.
+	if (APlayerController* PC = GetOwningPlayer())
 	{
-		Image_Preview->SetBrushResourceObject(RT);
+		if (!PrevViewTarget.IsValid())
+		{
+			PrevViewTarget = PC->GetViewTarget();
+		}
+		PC->SetViewTargetWithBlend(Rig, 0.2f);
 	}
 }
 

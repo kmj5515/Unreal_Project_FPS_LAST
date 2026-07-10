@@ -18,8 +18,10 @@ public class EditorUtility : ModuleRules
 		PrivateIncludePaths.AddRange(
 			new string[] {
 				ModuleDirectory,
+				Path.Combine(ModuleDirectory, "BattleLevelTool"),
 				Path.Combine(ModuleDirectory, "CharacterDatatAssetTool"),
 				Path.Combine(ModuleDirectory, "Core"),
+				Path.Combine(ModuleDirectory, "EditorPlay"),
 				Path.Combine(ModuleDirectory, "LevelSelection"),
 				Path.Combine(ModuleDirectory, "RuntimeStats"),
 				Path.Combine(ModuleDirectory, "Settings")
@@ -53,13 +55,16 @@ public class EditorUtility : ModuleRules
 				"Slate",
 				"SlateCore",
 				"UnrealEd",
+				"Settings",
 				"UMGEditor",
 				"ToolMenus",
 				"DesktopPlatform",
 				"EngineSettings",
+				"LevelEditor",
 				"AssetTools",
 				"ContentBrowser",
-				"PropertyEditor"
+				"PropertyEditor",
+				"Projects"
 			}
 			);
 		

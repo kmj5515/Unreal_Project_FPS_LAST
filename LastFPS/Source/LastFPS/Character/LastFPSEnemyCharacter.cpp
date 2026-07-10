@@ -1,12 +1,44 @@
 #include "Character/LastFPSEnemyCharacter.h"
-
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
+#include "Character/AI/LastFPSEnemyAIController.h"
+#include "Character/LastFPSAIProfile.h"
+#include "Components/CapsuleComponent.h"
+#include "Data/Definitions/LastFPSEnemyDefinition.h"
 #include "Economy/LastFPSItemPickupActor.h"
 #include "Engine/World.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Perception/AIPerceptionComponent.h"
 
 ALastFPSEnemyCharacter::ALastFPSEnemyCharacter()
 {
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+    // 기본 두뇌를 전투 컨트롤러로. BP 에서 개별 오버라이드 가능.
+    AIControllerClass = ALastFPSEnemyAIController::StaticClass();
+
+    AIPerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>("AIPerceptionComp");
+
+    // AI 는 컨트롤러가 SetFocus 로 준 방향(desired rotation)으로 몸을 돌린다.
+    // 플레이어(Hero)와 달리 컨트롤러 Yaw 를 직접 쓰지 않고 이동 컴포넌트가 부드럽게 회전시킨다.
+    bUseControllerRotationPitch = false;
+    bUseControllerRotationRoll  = false;
+    bUseControllerRotationYaw   = false;
+    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+    {
+        Movement->bUseControllerDesiredRotation = true;
+        Movement->bOrientRotationToMovement     = false;
+        Movement->RotationRate = FRotator(0.f, 360.f, 0.f);
+    }
+
+    GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Camera,ECR_Ignore);
+}
+
+const ULastFPSAIProfile* ALastFPSEnemyCharacter::GetAIProfile() const
+{
+    if (const ULastFPSEnemyDefinition* EnemyDef = Cast<ULastFPSEnemyDefinition>(ResolveCharacterDefinition()))
+    {
+        return EnemyDef->AIProfile;
+    }
+    return nullptr;
 }
 
 void ALastFPSEnemyCharacter::BeginPlay()
@@ -114,12 +146,4 @@ FName ALastFPSEnemyCharacter::PickWeightedDropRowId(float TotalWeight) const
 void ALastFPSEnemyCharacter::PossessedBy(AController* NewController)
 {
     Super::PossessedBy(NewController);
-
-    if (!HasAuthority() || !AttributeSet)
-    {
-        return;
-    }
-
-    AttributeSet->SetMaxHealth(MaxHealth);
-    AttributeSet->SetHealth(MaxHealth);
 }

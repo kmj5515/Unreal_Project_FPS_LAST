@@ -154,12 +154,12 @@ bool ULastFPSInventoryWidget::TryOpenWeaponPreview()
 		return false;
 	}
 
-	// Modal 레이어에 프리뷰 오버레이 push (인벤토리는 아래 Menu 레이어에 그대로 남음).
+	// Menu 레이어(스크린 스택)에 프리뷰 push. 같은 스택이라 CommonUI 가 아래 인벤토리를 자동 Collapsed 한다.
 	const FLastFPSItemData ItemCopy = *Row;
 	const FName RowId = HoveredItemRowId;
 	ALastFPSWeaponPreviewRig* Rig = EnsurePreviewRig();
 	Layout->PushWidgetToLayerStack<ULastFPSWeaponPreviewWidget>(
-		LastFPSUITags::Layer_Modal(),
+		LastFPSUITags::Layer_Menu(),
 		PreviewWidgetClass,
 		[Def, ItemCopy, RowId, Rig](ULastFPSWeaponPreviewWidget& Widget)
 		{

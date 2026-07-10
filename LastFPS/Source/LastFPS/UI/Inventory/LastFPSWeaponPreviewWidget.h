@@ -38,7 +38,7 @@ protected:
 	/** 보관된 무기 정의/아이템으로 왼쪽 스탯 패널 채우기. */
 	void PopulateStats();
 
-	/** 주입된 리그에 무기 메시 세팅 + RenderTarget 을 Image_Preview 에 연결. */
+	/** 주입된 리그에 무기 메시 세팅 + 플레이어 뷰타깃을 리그 카메라로 전환. */
 	void BindPreviewRig();
 
 	/** 드래그 픽셀당 회전 각도(도). */
@@ -55,7 +55,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> TB_StatLabels;
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> TB_StatValues;
 
-	/** 오른쪽 3D 프리뷰 표시용 (P3: SceneCapture RenderTarget 을 연결). */
+	/** (선택) 프리뷰 영역 테두리/배경용 이미지. 뷰타깃 카메라 방식에선 렌더타깃을 연결하지 않는다. */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) TObjectPtr<UImage> Image_Preview;
 
 	/** 닫기 버튼 (선택, 공용 버튼) — 클릭 시 이 오버레이를 닫는다. ESC 와 동일 동작. */
@@ -75,6 +75,9 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ALastFPSWeaponPreviewRig> Rig;
+
+	/** 프리뷰 진입 전 뷰타깃(닫을 때 복구용). */
+	TWeakObjectPtr<AActor> PrevViewTarget;
 
 	bool bDragging = false;
 };

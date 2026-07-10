@@ -39,7 +39,16 @@ ALastFPSHero::ALastFPSHero()
     FollowCamera->bUsePawnControlRotation = false;
     FollowCamera->FieldOfView             = DefaultFOV;
 
-    ApplyRotationModeSettings();
+    bUseControllerRotationPitch = false;
+    bUseControllerRotationRoll = false;
+    bUseControllerRotationYaw = false;
+
+    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+    {
+        Movement->bOrientRotationToMovement = true;
+        Movement->bUseControllerDesiredRotation = false;
+        Movement->RotationRate = FRotator(0.f, 500.f, 0.f);
+    }
 
     GetCharacterMovement()->MaxWalkSpeed              = 600.f;
     GetCharacterMovement()->MaxWalkSpeedCrouched      = 200.f;
@@ -54,7 +63,7 @@ ALastFPSHero::ALastFPSHero()
         CharacterMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
     }
 
-    WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
+    WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComp"));
 
     TargetArmLength    = DefaultArmLength;
     TargetSocketOffset = DefaultSocketOffset;
@@ -65,6 +74,7 @@ void ALastFPSHero::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ALastFPSHero, CombatState);
+    DOREPLIFETIME(ALastFPSHero, JumpStartSequence);
     DOREPLIFETIME(ALastFPSHero, bIsSprinting);
 }
 
@@ -73,9 +83,30 @@ void ALastFPSHero::GiveDefaultAbilities()
     Super::GiveDefaultAbilities();
 }
 
+void ALastFPSHero::OnCombatEngagedChanged()
+{
+    Super::OnCombatEngagedChanged();
+    ApplyRotationModeSettings();
+}
+
 void ALastFPSHero::BeginPlay()
 {
     Super::BeginPlay();
+
+    bUseControllerRotationPitch = false;
+    bUseControllerRotationRoll = false;
+    bUseControllerRotationYaw = false;
+
+    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+    {
+        Movement->bOrientRotationToMovement = true;
+        Movement->bUseControllerDesiredRotation = false;
+    }
+
+    if (WeaponComponent)
+    {
+        WeaponComponent->OnWeaponEquippedChanged.AddUniqueDynamic(this, &ALastFPSHero::HandleWeaponEquippedChanged);
+    }
 
     ApplyRotationModeSettings();
 
@@ -88,6 +119,16 @@ void ALastFPSHero::BeginPlay()
                 Subsystem->AddMappingContext(DefaultMappingContext, 0);
         }
     }
+}
+
+void ALastFPSHero::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (WeaponComponent)
+    {
+        WeaponComponent->OnWeaponEquippedChanged.RemoveDynamic(this, &ALastFPSHero::HandleWeaponEquippedChanged);
+    }
+
+    Super::EndPlay(EndPlayReason);
 }
 
 void ALastFPSHero::SetGameplayInputEnabled(bool bEnabled)
@@ -150,7 +191,7 @@ void ALastFPSHero::ApplyRotationModeSettings()
 
     if (UCharacterMovementComponent* Movement = GetCharacterMovement())
     {
-        Movement->bOrientRotationToMovement = !bUseControllerYawRotation;
+        Movement->bOrientRotationToMovement = ShouldOrientRotationToMovement();
         Movement->bUseControllerDesiredRotation = false;
         Movement->RotationRate = FRotator(0.f, 500.f, 0.f);
     }
@@ -158,7 +199,17 @@ void ALastFPSHero::ApplyRotationModeSettings()
 
 bool ALastFPSHero::ShouldUseControllerYawRotationMode() const
 {
-    return bUseControllerYawRotationInFreeMovement || bIsADS || CombatState == EMMCombatState::Attacking;
+    return HasEquippedWeapon() || CombatState == EMMCombatState::Attacking;
+}
+
+bool ALastFPSHero::ShouldOrientRotationToMovement() const
+{
+    return !ShouldUseControllerYawRotationMode();
+}
+
+bool ALastFPSHero::HasEquippedWeapon() const
+{
+    return WeaponComponent && WeaponComponent->HasWeapon();
 }
 
 void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -197,7 +248,8 @@ void ALastFPSHero::HandleAbilityInput(const FInputActionValue& value, FGameplayT
     {
         if (InputID == LastFPSGameplayTags::Input_Sprint)
         {
-            SetWantsToSprint(false);
+            SetWantsToWalk(false);
+            return;
         }
 
         if (!ShouldSkipAbilityCancelOnRelease(InputID) && !ShouldBlockAbilityInputRelease(InputID))
@@ -211,6 +263,7 @@ void ALastFPSHero::Move(const FInputActionValue& Value)
 {
     const FVector2D MovementVector = Value.Get<FVector2D>();
     CachedMoveInput = MovementVector;
+    bHasMoveInputAction = true;
 
     if ((bIsSprinting || bWantsToSprint) && !HasForwardSprintInput())
     {
@@ -233,6 +286,8 @@ void ALastFPSHero::Move(const FInputActionValue& Value)
         EffectiveMovementVector.Y = FMath::Max(EffectiveMovementVector.Y, 0.f);
     }
 
+    LocomotionDirectionBaseRotation = GetActorRotation();
+
     AddMovementInput(ForwardDir, EffectiveMovementVector.Y);
     AddMovementInput(RightDir,   EffectiveMovementVector.X);
 }
@@ -240,12 +295,15 @@ void ALastFPSHero::Move(const FInputActionValue& Value)
 void ALastFPSHero::ClearMoveInput(const FInputActionValue& Value)
 {
     CachedMoveInput = FVector2D::ZeroVector;
+    bHasMoveInputAction = false;
 
     if (bIsSprinting || bWantsToSprint)
     {
         SetWantsToSprint(false);
         CancelAbilityByTag(LastFPSGameplayTags::Input_Sprint);
     }
+
+    SetWantsToWalk(false);
 }
 
 void ALastFPSHero::Look(const FInputActionValue& Value)
@@ -393,18 +451,8 @@ void ALastFPSHero::InputPressed(FGameplayTag InputID)
 
     if (InputID == LastFPSGameplayTags::Input_Sprint)
     {
-        if (!HasForwardSprintInput())
-        {
-            SetWantsToSprint(false);
-            return;
-        }
-
-        if (bIsADS)
-        {
-            SetADS(false);
-        }
-
-        SetWantsToSprint(true);
+        SetWantsToWalk(true);
+        return;
     }
 
     if (ShouldCancelFireBeforeAbilityInput(InputID))
@@ -423,7 +471,8 @@ void ALastFPSHero::InputReleased(FGameplayTag InputID)
 {
     if (InputID == LastFPSGameplayTags::Input_Sprint)
     {
-        SetWantsToSprint(false);
+        SetWantsToWalk(false);
+        return;
     }
 
     CancelAbilityByTag(InputID);
@@ -440,6 +489,11 @@ void ALastFPSHero::SetADS(bool bEnabled)
     {
         SetWantsToSprint(false);
         CancelAbilityByTag(LastFPSGameplayTags::Input_Sprint);
+    }
+
+    if (bEnabled && bWantsToWalk)
+    {
+        SetWantsToWalk(false);
     }
 
     bIsADS = bEnabled;
@@ -493,7 +547,18 @@ bool ALastFPSHero::CanStartSprint() const
 
 void ALastFPSHero::SetSprinting(bool bEnabled)
 {
+    if (bIsSprinting == bEnabled)
+    {
+        if (!bEnabled)
+        {
+            SetWantsToSprint(false);
+        }
+        return;
+    }
+
     bIsSprinting = bEnabled;
+    ApplyRotationModeSettings();
+
     if (!bEnabled)
     {
         SetWantsToSprint(false);
@@ -502,7 +567,51 @@ void ALastFPSHero::SetSprinting(bool bEnabled)
 
 void ALastFPSHero::SetWantsToSprint(bool bEnabled)
 {
+    if (bWantsToSprint == bEnabled)
+    {
+        return;
+    }
+
     bWantsToSprint = bEnabled;
+    ApplyRotationModeSettings();
+}
+
+void ALastFPSHero::SetWantsToWalk(bool bEnabled)
+{
+    if (bWantsToWalk == bEnabled)
+    {
+        return;
+    }
+
+    UCharacterMovementComponent* Movement = GetCharacterMovement();
+    if (bEnabled)
+    {
+        if (Movement)
+        {
+            PreWalkMaxWalkSpeed = Movement->MaxWalkSpeed;
+            Movement->MaxWalkSpeed = WalkMaxWalkSpeed;
+        }
+    }
+    else
+    {
+        RestoreWalkSpeed();
+    }
+
+    bWantsToWalk = bEnabled;
+    ApplyRotationModeSettings();
+}
+
+void ALastFPSHero::RestoreWalkSpeed()
+{
+    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+    {
+        if (PreWalkMaxWalkSpeed > 0.f)
+        {
+            Movement->MaxWalkSpeed = PreWalkMaxWalkSpeed;
+        }
+    }
+
+    PreWalkMaxWalkSpeed = 0.f;
 }
 
 void ALastFPSHero::SetCombatState(EMMCombatState NewState)
@@ -516,7 +625,17 @@ void ALastFPSHero::SetCombatState(EMMCombatState NewState)
     ApplyRotationModeSettings();
 }
 
+void ALastFPSHero::NotifyJumpStarted()
+{
+    ++JumpStartSequence;
+}
+
 void ALastFPSHero::OnRep_CombatState()
+{
+    ApplyRotationModeSettings();
+}
+
+void ALastFPSHero::HandleWeaponEquippedChanged(bool /*bEquipped*/)
 {
     ApplyRotationModeSettings();
 }

@@ -30,6 +30,8 @@ class LASTFPS_API ALastFPSCharacterBase : public ACharacter, public IAbilitySyst
 public:
     ALastFPSCharacterBase();
 
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
     // IAbilitySystemInterface — PlayerState의 ASC를 반환
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
@@ -50,8 +52,16 @@ public:
 
     virtual bool GetIsADS() const { return false; }
 
+    UFUNCTION(BlueprintPure, Category="LastFPS|Combat")
+    bool IsInCombat() const { return bIsInCombat; }
+
+    UFUNCTION(BlueprintCallable, Category="LastFPS|Combat")
+    void MarkCombatEngaged();
+
     UFUNCTION(BlueprintPure, Category="LastFPS|Character")
     const ULastFPSCharacterDefinition* GetCharacterDefinition() const;
+
+    void SetCharacterDefinitionForSpawn(ULastFPSCharacterDefinition* InDefinition);
 
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayHitSound();
@@ -114,6 +124,8 @@ protected:
     void UpdateStatusOverlayMixInterpolation();
     const ULastFPSCharacterDefinition* ResolveCharacterDefinition() const;
     void ApplyCharacterVisuals(const ULastFPSCharacterDefinition* Definition);
+    void ClearCombatEngaged();
+    virtual void OnCombatEngagedChanged();
 
     // Character-owned GAS used when there is no PlayerState ASC.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="GAS")
@@ -160,12 +172,22 @@ protected:
     UPROPERTY()
     TObjectPtr<UMaterialInterface> ActiveStatusOverlaySourceMaterial;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Combat", meta=(ClampMin="0.0"))
+    float CombatEngagedDuration = 3.f;
+
+    UPROPERTY(ReplicatedUsing=OnRep_IsInCombat, BlueprintReadOnly, Category="LastFPS|Combat")
+    bool bIsInCombat = false;
+
     FTimerHandle StatusOverlayMixInterpolationTimerHandle;
+    FTimerHandle CombatEngagedTimerHandle;
     FName ActiveStatusOverlayMixParameterName = NAME_None;
     float ActiveStatusOverlayMixValue = 0.f;
     float TargetStatusOverlayMixValue = 0.f;
     float ActiveStatusOverlayMixInterpSpeed = 0.f;
 
 private:
+    UFUNCTION()
+    void OnRep_IsInCombat();
+
     TMap<TWeakObjectPtr<APlayerState>, float> RecentAttackers;
 };

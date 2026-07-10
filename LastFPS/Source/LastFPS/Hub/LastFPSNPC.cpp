@@ -127,7 +127,7 @@ void ALastFPSNPC::ApplyDataFromTable()
 	if (!NPCTable)
 	{
 		UE_LOG(LogLastFPSNPC, Warning,
-			TEXT("'%s': NPCDataTable 미설정. Project Settings → Game → LastFPS NPC 에서 지정하세요."),
+			TEXT("'%s': NPCDataTable 미설정. Project Settings > MWTool > NPC 에서 지정하세요."),
 			*GetName());
 		return;
 	}

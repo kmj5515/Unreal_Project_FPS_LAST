@@ -46,6 +46,7 @@ void UWeaponComponent::BeginPlay()
         }
         else
         {
+            ApplyAnimLayerClass(UnarmedAnimLayerClass);
             OnWeaponEquippedChanged.Broadcast(false);
         }
     }
@@ -82,24 +83,10 @@ void UWeaponComponent::PlayFireEffects() const
         return;
     }
 
-    USkeletalMeshComponent* CurrentWeaponMesh = CurrentWeapon->GetWeaponMesh();
     CurrentWeapon->PlayFireAnimation();
 
-    if (FireSound)
-    {
-        UGameplayStatics::SpawnSoundAttached(FireSound, CurrentWeaponMesh, MuzzleSocketName);
-    }
-
-    if (MuzzleFlashEffect)
-    {
-        UGameplayStatics::SpawnEmitterAttached(
-            MuzzleFlashEffect,
-            CurrentWeaponMesh,
-            MuzzleSocketName,
-            FVector::ZeroVector,
-            FRotator::ZeroRotator,
-            EAttachLocation::SnapToTarget);
-    }
+    // 사운드/머즐 플래시는 WeaponDefinition을 통해서만 재생 (WeaponActor가 Definition에서 직접 조회)
+    CurrentWeapon->PlayFireEffects(MuzzleSocketName);
 }
 
 void UWeaponComponent::SetWeaponHiddenForAbility(bool bHidden)
@@ -200,6 +187,33 @@ void UWeaponComponent::EquipWeaponDefinition(ULastFPSWeaponDefinition* NewDefini
     ApplyWeaponDefinition(NewDefinition);
 }
 
+void UWeaponComponent::UnequipWeapon()
+{
+    if (!GetOwner())
+    {
+        return;
+    }
+
+    if (!GetOwner()->HasAuthority())
+    {
+        Server_UnequipWeapon();
+        return;
+    }
+
+    WeaponDefinition = nullptr;
+    WeaponSkeletalMesh = nullptr;
+    WeaponType = EMMWeaponType::Unarmed;
+    WeaponAnimLayerClass = nullptr;
+    DestroyCurrentWeapon();
+    ApplyAnimLayerClass(UnarmedAnimLayerClass);
+    OnWeaponEquippedChanged.Broadcast(false);
+}
+
+void UWeaponComponent::Server_UnequipWeapon_Implementation()
+{
+    UnequipWeapon();
+}
+
 void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefinition)
 {
     WeaponDefinition = NewDefinition;
@@ -209,12 +223,14 @@ void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefini
 
     if (!WeaponSkeletalMesh)
     {
+        ApplyAnimLayerClass(UnarmedAnimLayerClass);
         OnWeaponEquippedChanged.Broadcast(false);
         return;
     }
 
     CurrentWeapon = SpawnWeaponActor(WeaponSkeletalMesh, WeaponActorClass, NewDefinition);
     ApplyWeaponVisibilityOverride();
+    ApplyAnimLayerClass(ResolveCurrentAnimLayerClass());
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
 }
 
@@ -236,8 +252,6 @@ void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
     ReloadLeftHandIKTargetName = NewDefinition->ReloadLeftHandIKTargetName;
     FireRate = NewDefinition->FireRate;
     DamageRange = NewDefinition->DamageRange;
-    FireSound = NewDefinition->FireSound;
-    MuzzleFlashEffect = NewDefinition->MuzzleFlashEffect;
 }
 
 void UWeaponComponent::OnRep_CurrentWeapon()
@@ -248,12 +262,14 @@ void UWeaponComponent::OnRep_CurrentWeapon()
         ApplyWeaponVisibilityOverride();
     }
 
+    ApplyAnimLayerClass(ResolveCurrentAnimLayerClass());
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
 }
 
 void UWeaponComponent::OnRep_WeaponType()
 {
     // WeaponType 변경 시 애니메이션이 새 분기를 잡도록 재브로드캐스트
+    ApplyAnimLayerClass(ResolveCurrentAnimLayerClass());
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
 }
 
@@ -265,6 +281,8 @@ void UWeaponComponent::OnRep_WeaponDefinition()
     {
         AttachWeaponToOwner(CurrentWeapon);
     }
+
+    ApplyAnimLayerClass(ResolveCurrentAnimLayerClass());
 }
 
 void UWeaponComponent::AttachWeaponToOwner(ALastFPSWeaponActor* WeaponActor)
@@ -314,13 +332,37 @@ void UWeaponComponent::ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType,
 
     if (!NewMesh)
     {
+        ApplyAnimLayerClass(UnarmedAnimLayerClass);
         OnWeaponEquippedChanged.Broadcast(false);
         return;
     }
 
     CurrentWeapon = SpawnWeaponActor(NewMesh, NewWeaponActorClass);
     ApplyWeaponVisibilityOverride();
+    ApplyAnimLayerClass(ResolveCurrentAnimLayerClass());
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
+}
+
+void UWeaponComponent::ApplyAnimLayerClass(TSubclassOf<UAnimInstance> AnimLayerClass) const
+{
+    ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+    USkeletalMeshComponent* OwnerMesh = OwnerCharacter ? OwnerCharacter->GetMesh() : nullptr;
+    if (!OwnerMesh || !AnimLayerClass)
+    {
+        return;
+    }
+
+    OwnerMesh->LinkAnimClassLayers(AnimLayerClass);
+}
+
+TSubclassOf<UAnimInstance> UWeaponComponent::ResolveCurrentAnimLayerClass() const
+{
+    if (CurrentWeapon && WeaponAnimLayerClass)
+    {
+        return WeaponAnimLayerClass;
+    }
+
+    return UnarmedAnimLayerClass;
 }
 
 void UWeaponComponent::ApplyWeaponVisibilityOverride()
@@ -373,7 +415,7 @@ ALastFPSWeaponActor* UWeaponComponent::SpawnWeaponActor(USkeletalMesh* NewMesh, 
         return nullptr;
     }
 
-    NewWeapon->InitializeWeapon(NewMesh, MuzzleFlashEffect, FireSound, Definition);
+    NewWeapon->InitializeWeapon(NewMesh, Definition);
 
     AttachWeaponToOwner(NewWeapon);
 
