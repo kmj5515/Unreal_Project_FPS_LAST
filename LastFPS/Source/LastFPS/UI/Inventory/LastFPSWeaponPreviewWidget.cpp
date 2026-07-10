@@ -50,7 +50,7 @@ void ULastFPSWeaponPreviewWidget::NativeDestruct()
 	{
 		if (AActor* Prev = PrevViewTarget.Get())
 		{
-			PC->SetViewTargetWithBlend(Prev, 0.2f);
+			PC->SetViewTarget(Prev);
 		}
 	}
 	PrevViewTarget = nullptr;
@@ -83,7 +83,7 @@ void ULastFPSWeaponPreviewWidget::BindPreviewRig()
 		{
 			PrevViewTarget = PC->GetViewTarget();
 		}
-		PC->SetViewTargetWithBlend(Rig, 0.2f);
+		PC->SetViewTarget(Rig);
 	}
 }
 
