@@ -2,11 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Data/Tables/LastFPSItemData.h"
 #include "LastFPSItemPickupActor.generated.h"
 
 class USphereComponent;
 class UStaticMeshComponent;
 class URotatingMovementComponent;
+class UNiagaraComponent;
 
 /**
  * 월드에 떨어지는 아이템 드랍. Hero 가 밟으면 그 플레이어 PlayerState 로 지급을 위임하고 파괴된다.
@@ -47,6 +49,9 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Pickup")
     TObjectPtr<URotatingMovementComponent> RotatingMovement;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Pickup")
+    TObjectPtr<UNiagaraComponent> SpawnVFX;
+
     UPROPERTY(EditDefaultsOnly, Category="Pickup")
     float PickupRadius = 100.f;
 
@@ -61,6 +66,9 @@ protected:
     // 발광 밝기 배율 (블룸 발광을 위한 HDR 부스트). 등급 색 RGB 에 곱해진다.
     UPROPERTY(EditDefaultsOnly, Category="Pickup|Rarity", meta=(ClampMin="0.0"))
     float EmissiveIntensity = 1.f;
+
+    UPROPERTY(EditDefaultsOnly, Category="Pickup")
+    FName SpawnFXColorParameterName = TEXT("Color");
 
     // 발사 연출 지속 시간(초). 0 이하면 연출 생략.
     UPROPERTY(EditDefaultsOnly, Category="Pickup|Launch", meta=(ClampMin="0.0"))
@@ -90,8 +98,14 @@ private:
     // 착지 처리(서버). 픽업 가능 상태로 전환하고 즉시 겹친 Hero 처리.
     void HandleLanded();
 
+    void PlaySpawnFX();
+
     UFUNCTION()
     void OnRep_LaunchOffset();
+
+    ELastFPSItemRarity CachedRarity = ELastFPSItemRarity::Common;
+    FLinearColor CachedRarityColor = FLinearColor::White;
+    bool bSpawnFXPlayed = false;
 
     FVector MeshRestRelativeLocation = FVector::ZeroVector;
     float LaunchElapsed = 0.f;

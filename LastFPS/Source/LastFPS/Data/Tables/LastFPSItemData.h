@@ -31,8 +31,8 @@ inline FLinearColor LastFPSGetRarityColor(ELastFPSItemRarity Rarity)
 	switch (Rarity)
 	{
 	case ELastFPSItemRarity::Rare:      return FLinearColor(0.1f, 0.4f, 1.f,   1.f); // 파랑
-	case ELastFPSItemRarity::Epic:      return FLinearColor(0.6f, 0.1f, 1.f,   1.f); // 보라
-	case ELastFPSItemRarity::Legendary: return FLinearColor(1.f,  0.5f, 0.05f, 1.f); // 주황
+	case ELastFPSItemRarity::Epic:      return FLinearColor(1.f,  0.5f, 0.05f, 1.f); // 주황
+	case ELastFPSItemRarity::Legendary: return FLinearColor(1.f,  0.85f, 0.1f, 1.f); // 노랑
 	case ELastFPSItemRarity::Common:
 	default:                            return FLinearColor(0.5f, 0.5f, 0.5f,  1.f); // 회색
 	}

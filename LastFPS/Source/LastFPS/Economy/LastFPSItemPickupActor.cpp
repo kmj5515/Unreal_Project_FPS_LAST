@@ -8,7 +8,10 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/GameInstance.h"
 #include "GameFramework/RotatingMovementComponent.h"
+#include "Economy/LastFPSRaritySettings.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 #include "Net/UnrealNetwork.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPickup, Log, All);
@@ -33,6 +36,10 @@ ALastFPSItemPickupActor::ALastFPSItemPickupActor()
     // 메시만 로컬 회전 — 트리거 스피어(루트)는 고정 유지. 로컬 틱이라 복제 불필요. (RotationRate 는 BeginPlay 에서 적용)
     RotatingMovement = CreateDefaultSubobject<URotatingMovementComponent>(TEXT("RotatingMovement"));
     RotatingMovement->SetUpdatedComponent(PickupMesh);
+
+    SpawnVFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("SpawnVFX"));
+    SpawnVFX->SetupAttachment(PickupMesh);
+    SpawnVFX->bAutoActivate = false;
 }
 
 void ALastFPSItemPickupActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -64,7 +71,10 @@ void ALastFPSItemPickupActor::ApplyRarityVisual()
         }
     }
 
-    FLinearColor Color = LastFPSGetRarityColor(Rarity) * EmissiveIntensity;
+    CachedRarity = Rarity;
+    CachedRarityColor = LastFPSGetRarityColor(Rarity);
+
+    FLinearColor Color = CachedRarityColor * EmissiveIntensity;
     Color.A = 1.f;
 
     // 어느 슬롯에 발광 머티리얼이 있는지 모르므로 전 슬롯의 MID 에 파라미터를 세팅(없는 슬롯은 무시됨).
@@ -93,6 +103,8 @@ void ALastFPSItemPickupActor::ApplyRarityVisual()
         NumMaterials,
         *EmissiveParameterName.ToString(),
         bParamFoundAnySlot ? TEXT("YES") : TEXT("NO(이름불일치?)"));
+
+    PlaySpawnFX();
 }
 
 void ALastFPSItemPickupActor::BeginPlay()
@@ -201,6 +213,31 @@ void ALastFPSItemPickupActor::HandleLanded()
             break;
         }
     }
+}
+
+void ALastFPSItemPickupActor::PlaySpawnFX()
+{
+    if (bSpawnFXPlayed || !SpawnVFX || GetNetMode() == NM_DedicatedServer)
+    {
+        return;
+    }
+
+    const ULastFPSRaritySettings* Settings = ULastFPSRaritySettings::Get();
+    const FLastFPSRarityVisuals* Visuals = Settings ? Settings->Visuals.Find(CachedRarity) : nullptr;
+    UNiagaraSystem* FX = Visuals ? Visuals->SpawnFX.LoadSynchronous() : nullptr;
+    if (!FX)
+    {
+        return;
+    }
+
+    bSpawnFXPlayed = true;
+
+    SpawnVFX->SetAsset(FX);
+    if (!SpawnFXColorParameterName.IsNone())
+    {
+        SpawnVFX->SetVariableLinearColor(SpawnFXColorParameterName, CachedRarityColor);
+    }
+    SpawnVFX->Activate(true);
 }
 
 void ALastFPSItemPickupActor::OnRep_LaunchOffset()
