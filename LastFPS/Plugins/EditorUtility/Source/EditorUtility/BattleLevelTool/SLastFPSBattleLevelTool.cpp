@@ -1,5 +1,6 @@
 #include "BattleLevelTool/SLastFPSBattleLevelTool.h"
 
+#include "LastFPSEditorWidgets.h"
 #include "AssetRegistry/AssetData.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
 #include "Engine/World.h"
@@ -12,6 +13,7 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/SBoxPanel.h"
+#include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
 #define LOCTEXT_NAMESPACE "SLastFPSBattleLevelTool"
@@ -22,81 +24,84 @@ void SLastFPSBattleLevelTool::Construct(const FArguments& InArgs)
 
 	ChildSlot
 	[
-		SNew(SBorder)
-		.Padding(12.f)
-		[
+		LastFPSEditorWidgets::MakeToolPanel(
+			LOCTEXT("BattleToolPanelTitle", "배틀 레벨 도구"),
+			LOCTEXT("BattleToolPanelSubtitle", "시나리오"),
 			SNew(SVerticalBox)
+
 			+ SVerticalBox::Slot()
 			.AutoHeight()
+			.Padding(0.f, 0.f, 0.f, 8.f)
 			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("Title", "Battle Level Tool"))
-				.Font(FCoreStyle::GetDefaultFontStyle(FName(TEXT("Bold")), 14))
+				LastFPSEditorWidgets::MakeFormRow(
+					LOCTEXT("CurrentLevelRowLabel", "현재 레벨"),
+					SNew(SHorizontalBox)
+
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.Padding(0.f, 0.f, 6.f, 0.f)
+					[
+						SNew(SButton)
+						.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+						.Text(LOCTEXT("Refresh", "새로고침"))
+						.OnClicked(this, &SLastFPSBattleLevelTool::RefreshClicked)
+					]
+
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.Padding(0.f, 0.f, 6.f, 0.f)
+					[
+						SNew(SButton)
+						.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+						.Text(LOCTEXT("ValidateCurrent", "현재 레벨 검증"))
+						.OnClicked(this, &SLastFPSBattleLevelTool::ValidateCurrentClicked)
+					]
+
+					+ SHorizontalBox::Slot()
+					.FillWidth(1.f)
+					.VAlign(VAlign_Center)
+					[
+						SNew(STextBlock)
+						.Text(this, &SLastFPSBattleLevelTool::GetCurrentLevelText)
+						.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
+					])
 			]
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 8.f, 0.f, 8.f)
-			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(0.f, 0.f, 6.f, 0.f)
-				[
-					SNew(SButton)
-					.Text(LOCTEXT("Refresh", "Refresh"))
-					.OnClicked(this, &SLastFPSBattleLevelTool::RefreshClicked)
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(0.f, 0.f, 6.f, 0.f)
-				[
-					SNew(SButton)
-					.Text(LOCTEXT("ValidateCurrent", "Validate Current"))
-					.OnClicked(this, &SLastFPSBattleLevelTool::ValidateCurrentClicked)
-				]
-				+ SHorizontalBox::Slot()
-				.FillWidth(1.f)
-				.VAlign(VAlign_Center)
-				[
-					SNew(STextBlock)
-					.Text(this, &SLastFPSBattleLevelTool::GetCurrentLevelText)
-				]
-			]
+
 			+ SVerticalBox::Slot()
 			.AutoHeight()
 			.Padding(0.f, 0.f, 0.f, 8.f)
 			[
 				BuildScenarioEditor()
 			]
+
 			+ SVerticalBox::Slot()
 			.FillHeight(0.52f)
 			[
-				SNew(SBorder)
-				.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
-				.Padding(8.f)
-				[
-					SAssignNew(LevelListBox, SScrollBox)
-				]
+				LastFPSEditorWidgets::MakeSection(
+					LOCTEXT("BattleLevelsSection", "배틀 레벨"),
+					LastFPSEditorWidgets::GetToolAccentColor(),
+					SAssignNew(LevelListBox, SScrollBox))
 			]
+
 			+ SVerticalBox::Slot()
 			.FillHeight(0.28f)
 			.Padding(0.f, 8.f, 0.f, 0.f)
 			[
-				SNew(SBorder)
-				.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
-				.Padding(8.f)
-				[
-					SAssignNew(ValidationBox, SScrollBox)
-				]
+				LastFPSEditorWidgets::MakeSection(
+					LOCTEXT("ValidationSection", "검증"),
+					LastFPSEditorWidgets::GetToolAccentColor(),
+					SAssignNew(ValidationBox, SScrollBox),
+					false)
 			]
+
 			+ SVerticalBox::Slot()
 			.AutoHeight()
 			.Padding(0.f, 8.f, 0.f, 0.f)
 			[
 				SAssignNew(StatusText, STextBlock)
-				.Text(LOCTEXT("Ready", "Ready."))
-			]
-		]
+				.Text(LOCTEXT("Ready", "준비됨."))
+				.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
+			])
 	];
 
 	RefreshLevelList();
@@ -123,7 +128,8 @@ void SLastFPSBattleLevelTool::RefreshLevelList()
 		LevelListBox->AddSlot()
 		[
 			SNew(STextBlock)
-			.Text(LOCTEXT("NoLevels", "No battle levels found. Check MWTool > Battle Levels settings."))
+			.Text(LOCTEXT("NoLevels", "배틀 레벨을 찾을 수 없습니다. MWTool > Battle Levels 설정을 확인하세요."))
+			.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
 		];
 		return;
 	}
@@ -152,7 +158,8 @@ void SLastFPSBattleLevelTool::RefreshMonsterDraftList()
 		MonsterDraftBox->AddSlot()
 		[
 			SNew(STextBlock)
-			.Text(LOCTEXT("NoDraftMonsters", "No monsters added."))
+			.Text(LOCTEXT("NoDraftMonsters", "추가된 몬스터가 없습니다."))
+			.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
 		];
 		return;
 	}
@@ -165,13 +172,14 @@ void SLastFPSBattleLevelTool::RefreshMonsterDraftList()
 		[
 			SNew(STextBlock)
 			.Text(FText::Format(
-				LOCTEXT("DraftMonsterRow", "{0}. {1} x{2} / SpawnTag: {3} / Scale: {4}"),
+				LOCTEXT("DraftMonsterRow", "{0}. {1} x{2} / 스폰 태그: {3} / 스케일: {4}"),
 				FText::AsNumber(MonsterIndex + 1),
 				FText::FromString(Monster.MonsterDefinition.ToSoftObjectPath().GetAssetName()),
 				FText::AsNumber(Monster.Count),
 				FText::FromName(Monster.SpawnTag),
 				FText::AsNumber(Monster.LevelScale)
 			))
+			.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
 		];
 	}
 }
@@ -190,7 +198,8 @@ void SLastFPSBattleLevelTool::RefreshValidationMessages()
 		ValidationBox->AddSlot()
 		[
 			SNew(STextBlock)
-			.Text(LOCTEXT("NoValidation", "Press Validate Current to inspect the current battle level."))
+			.Text(LOCTEXT("NoValidation", "현재 레벨 검증을 눌러 배틀 레벨을 확인하세요."))
+			.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
 		];
 		return;
 	}
@@ -209,7 +218,7 @@ FReply SLastFPSBattleLevelTool::RefreshClicked()
 {
 	RefreshBattleLevels();
 	RefreshLevelList();
-	SetStatus(FText::Format(LOCTEXT("RefreshedStatus", "Loaded {0} battle levels."), FText::AsNumber(BattleLevels.Num())));
+	SetStatus(FText::Format(LOCTEXT("RefreshedStatus", "배틀 레벨 {0}개를 불러왔습니다."), FText::AsNumber(BattleLevels.Num())));
 	return FReply::Handled();
 }
 
@@ -217,7 +226,7 @@ FReply SLastFPSBattleLevelTool::ValidateCurrentClicked()
 {
 	FLastFPSBattleLevelService::ValidateCurrentBattleLevel(ValidationMessages);
 	RefreshValidationMessages();
-	SetStatus(LOCTEXT("ValidatedStatus", "Current level validation finished."));
+	SetStatus(LOCTEXT("ValidatedStatus", "현재 레벨 검증이 완료되었습니다."));
 	return FReply::Handled();
 }
 
@@ -226,7 +235,7 @@ FReply SLastFPSBattleLevelTool::AddMonsterClicked()
 	const FSoftObjectPath MonsterPath(PendingMonsterObjectPath);
 	if (!MonsterPath.IsValid())
 	{
-		SetStatus(LOCTEXT("MonsterMissingStatus", "Select a monster definition first."));
+		SetStatus(LOCTEXT("MonsterMissingStatus", "먼저 몬스터 정의를 선택하세요."));
 		return FReply::Handled();
 	}
 
@@ -238,7 +247,7 @@ FReply SLastFPSBattleLevelTool::AddMonsterClicked()
 
 	DraftMonsters.Add(MonsterEntry);
 	RefreshMonsterDraftList();
-	SetStatus(LOCTEXT("MonsterAddedStatus", "Monster entry added."));
+	SetStatus(LOCTEXT("MonsterAddedStatus", "몬스터 항목을 추가했습니다."));
 	return FReply::Handled();
 }
 
@@ -246,7 +255,7 @@ FReply SLastFPSBattleLevelTool::ClearMonstersClicked()
 {
 	DraftMonsters.Reset();
 	RefreshMonsterDraftList();
-	SetStatus(LOCTEXT("MonstersClearedStatus", "Monster entries cleared."));
+	SetStatus(LOCTEXT("MonstersClearedStatus", "몬스터 항목을 비웠습니다."));
 	return FReply::Handled();
 }
 
@@ -263,7 +272,7 @@ FReply SLastFPSBattleLevelTool::CreateScenarioClicked()
 		ErrorMessage))
 	{
 		SelectedScenarioObjectPath = SavedObjectPath;
-		SetStatus(FText::Format(LOCTEXT("ScenarioCreatedStatus", "Created scenario: {0}"), FText::FromString(SavedObjectPath)));
+		SetStatus(FText::Format(LOCTEXT("ScenarioCreatedStatus", "시나리오를 생성했습니다: {0}"), FText::FromString(SavedObjectPath)));
 		return FReply::Handled();
 	}
 
@@ -285,7 +294,7 @@ FReply SLastFPSBattleLevelTool::SaveScenarioClicked()
 		ErrorMessage))
 	{
 		SelectedScenarioObjectPath = SavedObjectPath;
-		SetStatus(FText::Format(LOCTEXT("ScenarioUpdatedStatus", "Updated scenario: {0}"), FText::FromString(SavedObjectPath)));
+		SetStatus(FText::Format(LOCTEXT("ScenarioUpdatedStatus", "시나리오를 저장했습니다: {0}"), FText::FromString(SavedObjectPath)));
 		return FReply::Handled();
 	}
 
@@ -302,7 +311,7 @@ FReply SLastFPSBattleLevelTool::PlayScenarioClicked()
 		DraftMonsters,
 		ErrorMessage))
 	{
-		SetStatus(LOCTEXT("ScenarioPlayQueuedStatus", "Queued PIE with current scenario draft."));
+		SetStatus(LOCTEXT("ScenarioPlayQueuedStatus", "현재 시나리오 초안으로 PIE 실행을 예약했습니다."));
 		return FReply::Handled();
 	}
 
@@ -322,7 +331,7 @@ FReply SLastFPSBattleLevelTool::LoadSelectedScenarioClicked()
 		ErrorMessage))
 	{
 		RefreshMonsterDraftList();
-		SetStatus(LOCTEXT("ScenarioLoadedStatus", "Loaded selected scenario into draft."));
+		SetStatus(LOCTEXT("ScenarioLoadedStatus", "선택한 시나리오를 초안에 불러왔습니다."));
 		return FReply::Handled();
 	}
 
@@ -337,7 +346,7 @@ FReply SLastFPSBattleLevelTool::PlaySelectedScenarioClicked()
 		FSoftObjectPath(SelectedScenarioObjectPath),
 		ErrorMessage))
 	{
-		SetStatus(LOCTEXT("SelectedScenarioPlayQueuedStatus", "Queued PIE with selected scenario."));
+		SetStatus(LOCTEXT("SelectedScenarioPlayQueuedStatus", "선택한 시나리오로 PIE 실행을 예약했습니다."));
 		return FReply::Handled();
 	}
 
@@ -349,7 +358,7 @@ FReply SLastFPSBattleLevelTool::OpenLevelClicked(FLastFPSBattleLevelInfo BattleL
 {
 	if (FLastFPSBattleLevelService::OpenBattleLevel(BattleLevel))
 	{
-		SetStatus(FText::Format(LOCTEXT("OpenedStatus", "Opened {0}."), FText::FromString(BattleLevel.DisplayName)));
+		SetStatus(FText::Format(LOCTEXT("OpenedStatus", "{0} 레벨을 열었습니다."), FText::FromString(BattleLevel.DisplayName)));
 	}
 
 	return FReply::Handled();
@@ -359,7 +368,7 @@ FReply SLastFPSBattleLevelTool::PlayLevelClicked(FLastFPSBattleLevelInfo BattleL
 {
 	if (FLastFPSBattleLevelService::PlayBattleLevel(BattleLevel))
 	{
-		SetStatus(FText::Format(LOCTEXT("PlayStatus", "Started PIE with {0}."), FText::FromString(BattleLevel.DisplayName)));
+		SetStatus(FText::Format(LOCTEXT("PlayStatus", "{0} 레벨로 PIE를 시작했습니다."), FText::FromString(BattleLevel.DisplayName)));
 	}
 
 	return FReply::Handled();
@@ -368,22 +377,22 @@ FReply SLastFPSBattleLevelTool::PlayLevelClicked(FLastFPSBattleLevelInfo BattleL
 FReply SLastFPSBattleLevelTool::UseLevelForScenarioClicked(FLastFPSBattleLevelInfo BattleLevel)
 {
 	BattleMapObjectPath = BattleLevel.AssetPath.ToString();
-	SetStatus(FText::Format(LOCTEXT("ScenarioMapSelectedStatus", "Scenario map set to {0}."), FText::FromString(BattleLevel.DisplayName)));
+	SetStatus(FText::Format(LOCTEXT("ScenarioMapSelectedStatus", "시나리오 맵을 {0}(으)로 설정했습니다."), FText::FromString(BattleLevel.DisplayName)));
 	return FReply::Handled();
 }
 
 TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildScenarioEditor()
 {
-	return SNew(SBorder)
-		.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
-		.Padding(8.f)
-		[
-			SNew(SVerticalBox)
+	return LastFPSEditorWidgets::MakeSection(
+		LOCTEXT("ScenarioEditorSectionTitle", "배틀 시나리오"),
+		LastFPSEditorWidgets::GetToolAccentColor(),
+		SNew(SVerticalBox)
 			+ SVerticalBox::Slot()
 			.AutoHeight()
 			[
 				SNew(STextBlock)
-				.Text(LOCTEXT("ScenarioEditorTitle", "Scenario Draft"))
+				.Text(LOCTEXT("ScenarioEditorInnerTitle", "배틀 시나리오 초안"))
+				.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
 				.Font(FCoreStyle::GetDefaultFontStyle(FName(TEXT("Bold")), 11))
 			]
 			+ SVerticalBox::Slot()
@@ -391,6 +400,13 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildScenarioEditor()
 			.Padding(0.f, 6.f, 0.f, 0.f)
 			[
 				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				[
+					SNew(STextBlock)
+					.Text(LOCTEXT("SelectedScenarioLabel", "선택한 시나리오"))
+					.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
+				]
 				+ SHorizontalBox::Slot()
 				.FillWidth(1.f)
 				.Padding(0.f, 0.f, 6.f, 0.f)
@@ -405,14 +421,17 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildScenarioEditor()
 				.Padding(0.f, 0.f, 6.f, 0.f)
 				[
 					SNew(SButton)
-					.Text(LOCTEXT("LoadSelectedScenario", "Load Selected"))
+					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+					.Text(LOCTEXT("LoadSelectedScenario", "선택 항목 불러오기"))
 					.OnClicked(this, &SLastFPSBattleLevelTool::LoadSelectedScenarioClicked)
+
 				]
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				[
 					SNew(SButton)
-					.Text(LOCTEXT("PlaySelectedScenario", "Play Selected"))
+					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+					.Text(LOCTEXT("PlaySelectedScenario", "선택 항목 실행"))
 					.OnClicked(this, &SLastFPSBattleLevelTool::PlaySelectedScenarioClicked)
 				]
 			]
@@ -422,10 +441,19 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildScenarioEditor()
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				[
+					SNew(STextBlock)
+					.Text(LOCTEXT("DraftScenarioLabel", "시나리오 초안"))
+					.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
+				]
+
+				+ SHorizontalBox::Slot()
 				.FillWidth(0.25f)
 				.Padding(0.f, 0.f, 6.f, 0.f)
 				[
 					SNew(SEditableTextBox)
+					.Style(&LastFPSEditorWidgets::GetToolEditableTextBoxStyle())
 					.Text(this, &SLastFPSBattleLevelTool::GetScenarioNameText)
 					.OnTextCommitted(this, &SLastFPSBattleLevelTool::SetScenarioName)
 				]
@@ -452,7 +480,8 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildScenarioEditor()
 				.Padding(0.f, 0.f, 6.f, 0.f)
 				[
 					SNew(SButton)
-					.Text(LOCTEXT("CreateScenario", "Create Scenario"))
+					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+					.Text(LOCTEXT("CreateScenario", "시나리오 생성"))
 					.OnClicked(this, &SLastFPSBattleLevelTool::CreateScenarioClicked)
 				]
 				+ SHorizontalBox::Slot()
@@ -460,14 +489,16 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildScenarioEditor()
 				.Padding(0.f, 0.f, 6.f, 0.f)
 				[
 					SNew(SButton)
-					.Text(LOCTEXT("SaveScenario", "Save Selected"))
+					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+					.Text(LOCTEXT("SaveScenario", "선택 항목 저장"))
 					.OnClicked(this, &SLastFPSBattleLevelTool::SaveScenarioClicked)
 				]
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				[
 					SNew(SButton)
-					.Text(LOCTEXT("PlayScenario", "Play Scenario"))
+					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+					.Text(LOCTEXT("PlayScenario", "시나리오 실행"))
 					.OnClicked(this, &SLastFPSBattleLevelTool::PlayScenarioClicked)
 				]
 			]
@@ -500,6 +531,7 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildScenarioEditor()
 				.Padding(0.f, 0.f, 6.f, 0.f)
 				[
 					SNew(SEditableTextBox)
+					.Style(&LastFPSEditorWidgets::GetToolEditableTextBoxStyle())
 					.Text(this, &SLastFPSBattleLevelTool::GetPendingMonsterSpawnTagText)
 					.OnTextCommitted(this, &SLastFPSBattleLevelTool::SetPendingMonsterSpawnTag)
 				]
@@ -518,14 +550,16 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildScenarioEditor()
 				.Padding(0.f, 0.f, 4.f, 0.f)
 				[
 					SNew(SButton)
-					.Text(LOCTEXT("AddMonster", "Add Monster"))
+					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+					.Text(LOCTEXT("AddMonster", "몬스터 추가"))
 					.OnClicked(this, &SLastFPSBattleLevelTool::AddMonsterClicked)
 				]
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				[
 					SNew(SButton)
-					.Text(LOCTEXT("ClearMonsters", "Clear"))
+					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+					.Text(LOCTEXT("ClearMonsters", "비우기"))
 					.OnClicked(this, &SLastFPSBattleLevelTool::ClearMonstersClicked)
 				]
 			]
@@ -533,17 +567,18 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildScenarioEditor()
 			.AutoHeight()
 			.Padding(0.f, 6.f, 0.f, 0.f)
 			[
-				SAssignNew(MonsterDraftBox, SScrollBox)
+				SNew(SBox)
+				.MaxDesiredHeight(100.f)
+				[
+					SAssignNew(MonsterDraftBox, SScrollBox)
+				]
 			]
-		];
+		);
 }
 
 TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildLevelRow(const FLastFPSBattleLevelInfo& BattleLevel)
 {
-	return SNew(SBorder)
-		.BorderImage(FAppStyle::GetBrush("ToolPanel.DarkGroupBorder"))
-		.Padding(6.f)
-		[
+	return LastFPSEditorWidgets::MakeRowBox(
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot()
 			.FillWidth(1.f)
@@ -555,6 +590,7 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildLevelRow(const FLastFPSBattleL
 				[
 					SNew(STextBlock)
 					.Text(FText::FromString(BattleLevel.DisplayName))
+					.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
 					.Font(FCoreStyle::GetDefaultFontStyle(FName(TEXT("Bold")), 10))
 				]
 				+ SVerticalBox::Slot()
@@ -562,7 +598,7 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildLevelRow(const FLastFPSBattleL
 				[
 					SNew(STextBlock)
 					.Text(FText::FromString(BattleLevel.PackageName))
-					.ColorAndOpacity(FSlateColor(FLinearColor(0.65f, 0.65f, 0.65f)))
+					.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
 				]
 			]
 			+ SHorizontalBox::Slot()
@@ -571,7 +607,8 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildLevelRow(const FLastFPSBattleL
 			.VAlign(VAlign_Center)
 			[
 				SNew(SButton)
-				.Text(LOCTEXT("OpenLevel", "Open"))
+				.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+				.Text(LOCTEXT("OpenLevel", "열기"))
 				.OnClicked(this, &SLastFPSBattleLevelTool::OpenLevelClicked, BattleLevel)
 			]
 			+ SHorizontalBox::Slot()
@@ -580,7 +617,8 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildLevelRow(const FLastFPSBattleL
 			.VAlign(VAlign_Center)
 			[
 				SNew(SButton)
-				.Text(LOCTEXT("PlayLevel", "Play"))
+				.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+				.Text(LOCTEXT("PlayLevel", "실행"))
 				.OnClicked(this, &SLastFPSBattleLevelTool::PlayLevelClicked, BattleLevel)
 			]
 			+ SHorizontalBox::Slot()
@@ -589,17 +627,20 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildLevelRow(const FLastFPSBattleL
 			.VAlign(VAlign_Center)
 			[
 				SNew(SButton)
-				.Text(LOCTEXT("UseLevelForScenario", "Use"))
+				.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+				.Text(LOCTEXT("UseLevelForScenario", "사용"))
 				.OnClicked(this, &SLastFPSBattleLevelTool::UseLevelForScenarioClicked, BattleLevel)
 			]
-		];
+		);
 }
 
 TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildValidationRow(const FLastFPSBattleLevelValidationMessage& Message) const
 {
-	return SNew(STextBlock)
-		.Text(Message.Message)
-		.ColorAndOpacity(GetSeverityColor(Message.Severity));
+	return LastFPSEditorWidgets::MakeRowBox(
+			SNew(STextBlock)
+			.Text(Message.Message)
+			.ColorAndOpacity(GetSeverityColor(Message.Severity))
+		);
 }
 
 FSlateColor SLastFPSBattleLevelTool::GetSeverityColor(ELastFPSBattleLevelValidationSeverity Severity) const
@@ -619,8 +660,8 @@ FText SLastFPSBattleLevelTool::GetCurrentLevelText() const
 {
 	const FString CurrentPackageName = FLastFPSBattleLevelService::GetCurrentLevelPackageName();
 	return CurrentPackageName.IsEmpty()
-		? LOCTEXT("NoCurrentLevelText", "Current: None")
-		: FText::Format(LOCTEXT("CurrentLevelText", "Current: {0}"), FText::FromString(CurrentPackageName));
+		? LOCTEXT("NoCurrentLevelText", "현재: 없음")
+		: FText::Format(LOCTEXT("CurrentLevelText", "현재: {0}"), FText::FromString(CurrentPackageName));
 }
 
 FText SLastFPSBattleLevelTool::GetScenarioNameText() const

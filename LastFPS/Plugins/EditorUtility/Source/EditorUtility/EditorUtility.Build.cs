@@ -63,7 +63,8 @@ public class EditorUtility : ModuleRules
 				"LevelEditor",
 				"AssetTools",
 				"ContentBrowser",
-				"PropertyEditor"
+				"PropertyEditor",
+				"Projects"
 			}
 			);
 		

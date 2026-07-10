@@ -223,25 +223,25 @@ namespace
 		OutScenarioId = MakeScenarioAssetName(ScenarioName);
 		if (OutScenarioId.IsEmpty())
 		{
-			OutErrorMessage = LOCTEXT("ScenarioNameMissing", "Scenario name is required.");
+			OutErrorMessage = LOCTEXT("ScenarioNameMissing", "시나리오 이름이 필요합니다.");
 			return false;
 		}
 
 		if (!BattleMapPath.IsValid())
 		{
-			OutErrorMessage = LOCTEXT("ScenarioMapMissing", "Battle map is required.");
+			OutErrorMessage = LOCTEXT("ScenarioMapMissing", "배틀 맵이 필요합니다.");
 			return false;
 		}
 
 		if (!PlayerCharacterPath.IsValid())
 		{
-			OutErrorMessage = LOCTEXT("ScenarioPlayerMissing", "Player character is required.");
+			OutErrorMessage = LOCTEXT("ScenarioPlayerMissing", "플레이어 캐릭터가 필요합니다.");
 			return false;
 		}
 
 		if (Monsters.IsEmpty())
 		{
-			OutErrorMessage = LOCTEXT("ScenarioMonsterMissing", "At least one monster entry is required.");
+			OutErrorMessage = LOCTEXT("ScenarioMonsterMissing", "몬스터 항목이 하나 이상 필요합니다.");
 			return false;
 		}
 
@@ -266,7 +266,7 @@ namespace
 		UPackage* Package = Scenario.GetOutermost();
 		if (!Package)
 		{
-			OutErrorMessage = LOCTEXT("ScenarioPackageMissing", "Scenario package is not available.");
+			OutErrorMessage = LOCTEXT("ScenarioPackageMissing", "시나리오 패키지를 사용할 수 없습니다.");
 			return false;
 		}
 
@@ -283,7 +283,7 @@ namespace
 
 		if (!UPackage::SavePackage(Package, &Scenario, *PackageFileName, SaveArgs))
 		{
-			OutErrorMessage = LOCTEXT("ScenarioSaveFailed", "Failed to save scenario asset.");
+			OutErrorMessage = LOCTEXT("ScenarioSaveFailed", "시나리오 에셋 저장에 실패했습니다.");
 			return false;
 		}
 
@@ -336,7 +336,7 @@ bool FLastFPSBattleLevelService::OpenBattleLevel(const FLastFPSBattleLevelInfo& 
 {
 	if (!IsPackageUsable(BattleLevel.PackageName))
 	{
-		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("InvalidOpenMap", "Battle level package is invalid or missing."));
+		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("InvalidOpenMap", "배틀 레벨 패키지가 유효하지 않거나 없습니다."));
 		return false;
 	}
 
@@ -348,19 +348,19 @@ bool FLastFPSBattleLevelService::PlayBattleLevel(const FLastFPSBattleLevelInfo& 
 {
 	if (!GUnrealEd)
 	{
-		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("EditorMissing", "Unreal Editor is not ready."));
+		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("EditorMissing", "언리얼 에디터가 준비되지 않았습니다."));
 		return false;
 	}
 
 	if (GUnrealEd->IsPlaySessionInProgress())
 	{
-		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("PlayInProgress", "A Play session is already running or queued."));
+		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("PlayInProgress", "이미 실행 중이거나 대기 중인 플레이 세션이 있습니다."));
 		return false;
 	}
 
 	if (!IsPackageUsable(BattleLevel.PackageName))
 	{
-		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("InvalidPlayMap", "Battle level package is invalid or missing."));
+		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("InvalidPlayMap", "배틀 레벨 패키지가 유효하지 않거나 없습니다."));
 		return false;
 	}
 
@@ -389,38 +389,38 @@ bool FLastFPSBattleLevelService::PlayScenario(
 {
 	if (!GUnrealEd)
 	{
-		OutErrorMessage = LOCTEXT("ScenarioEditorMissing", "Unreal Editor is not ready.");
+		OutErrorMessage = LOCTEXT("ScenarioEditorMissing", "언리얼 에디터가 준비되지 않았습니다.");
 		return false;
 	}
 
 	if (GUnrealEd->IsPlaySessionInProgress())
 	{
-		OutErrorMessage = LOCTEXT("ScenarioPlayInProgress", "A Play session is already running or queued.");
+		OutErrorMessage = LOCTEXT("ScenarioPlayInProgress", "이미 실행 중이거나 대기 중인 플레이 세션이 있습니다.");
 		return false;
 	}
 
 	if (!BattleMapPath.IsValid())
 	{
-		OutErrorMessage = LOCTEXT("ScenarioPlayMapMissing", "Battle map is required.");
+		OutErrorMessage = LOCTEXT("ScenarioPlayMapMissing", "배틀 맵이 필요합니다.");
 		return false;
 	}
 
 	if (!PlayerCharacterPath.IsValid())
 	{
-		OutErrorMessage = LOCTEXT("ScenarioPlayPlayerMissing", "Player character is required.");
+		OutErrorMessage = LOCTEXT("ScenarioPlayPlayerMissing", "플레이어 캐릭터가 필요합니다.");
 		return false;
 	}
 
 	if (Monsters.IsEmpty())
 	{
-		OutErrorMessage = LOCTEXT("ScenarioPlayMonsterMissing", "At least one monster entry is required.");
+		OutErrorMessage = LOCTEXT("ScenarioPlayMonsterMissing", "몬스터 항목이 하나 이상 필요합니다.");
 		return false;
 	}
 
 	const FString MapPackageName = BattleMapPath.GetLongPackageName();
 	if (!IsPackageUsable(MapPackageName))
 	{
-		OutErrorMessage = LOCTEXT("ScenarioPlayMapInvalid", "Battle map package is invalid or missing.");
+		OutErrorMessage = LOCTEXT("ScenarioPlayMapInvalid", "배틀 맵 패키지가 유효하지 않거나 없습니다.");
 		return false;
 	}
 
@@ -489,14 +489,14 @@ bool FLastFPSBattleLevelService::LoadScenarioAsset(
 
 	if (!ScenarioPath.IsValid())
 	{
-		OutErrorMessage = LOCTEXT("ScenarioAssetMissing", "Scenario asset is required.");
+		OutErrorMessage = LOCTEXT("ScenarioAssetMissing", "시나리오 에셋이 필요합니다.");
 		return false;
 	}
 
 	const ULastFPSBattleScenarioDefinition* Scenario = Cast<ULastFPSBattleScenarioDefinition>(ScenarioPath.TryLoad());
 	if (!Scenario)
 	{
-		OutErrorMessage = LOCTEXT("ScenarioAssetLoadFailed", "Failed to load selected scenario asset.");
+		OutErrorMessage = LOCTEXT("ScenarioAssetLoadFailed", "선택한 시나리오 에셋을 불러오지 못했습니다.");
 		return false;
 	}
 
@@ -531,7 +531,7 @@ bool FLastFPSBattleLevelService::CreateScenarioAsset(
 	UPackage* Package = CreatePackage(*PackageName);
 	if (!Package)
 	{
-		OutErrorMessage = LOCTEXT("ScenarioPackageFailed", "Failed to create scenario package.");
+		OutErrorMessage = LOCTEXT("ScenarioPackageFailed", "시나리오 패키지 생성에 실패했습니다.");
 		return false;
 	}
 
@@ -544,7 +544,7 @@ bool FLastFPSBattleLevelService::CreateScenarioAsset(
 
 	if (!Scenario)
 	{
-		OutErrorMessage = LOCTEXT("ScenarioAssetFailed", "Failed to create scenario asset.");
+		OutErrorMessage = LOCTEXT("ScenarioAssetFailed", "시나리오 에셋 생성에 실패했습니다.");
 		return false;
 	}
 
@@ -574,7 +574,7 @@ bool FLastFPSBattleLevelService::SaveScenarioAsset(
 
 	if (!ScenarioPath.IsValid())
 	{
-		OutErrorMessage = LOCTEXT("ScenarioAssetMissingForSave", "Select a scenario asset before saving.");
+		OutErrorMessage = LOCTEXT("ScenarioAssetMissingForSave", "저장하기 전에 시나리오 에셋을 선택하세요.");
 		return false;
 	}
 
@@ -587,7 +587,7 @@ bool FLastFPSBattleLevelService::SaveScenarioAsset(
 	ULastFPSBattleScenarioDefinition* Scenario = Cast<ULastFPSBattleScenarioDefinition>(ScenarioPath.TryLoad());
 	if (!Scenario)
 	{
-		OutErrorMessage = LOCTEXT("ScenarioAssetSaveLoadFailed", "Failed to load selected scenario asset.");
+		OutErrorMessage = LOCTEXT("ScenarioAssetSaveLoadFailed", "선택한 시나리오 에셋을 불러오지 못했습니다.");
 		return false;
 	}
 
@@ -610,21 +610,21 @@ void FLastFPSBattleLevelService::ValidateCurrentBattleLevel(TArray<FLastFPSBattl
 	UWorld* EditorWorld = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
 	if (!EditorWorld)
 	{
-		AddMessage(OutMessages, ELastFPSBattleLevelValidationSeverity::Error, LOCTEXT("NoEditorWorld", "Editor world is not available."));
+		AddMessage(OutMessages, ELastFPSBattleLevelValidationSeverity::Error, LOCTEXT("NoEditorWorld", "에디터 월드를 사용할 수 없습니다."));
 		return;
 	}
 
 	const FString CurrentPackageName = GetCurrentLevelPackageName();
 	if (CurrentPackageName.IsEmpty())
 	{
-		AddMessage(OutMessages, ELastFPSBattleLevelValidationSeverity::Error, LOCTEXT("NoCurrentLevel", "Current level package could not be resolved."));
+		AddMessage(OutMessages, ELastFPSBattleLevelValidationSeverity::Error, LOCTEXT("NoCurrentLevel", "현재 레벨 패키지를 확인할 수 없습니다."));
 		return;
 	}
 
 	if (!IsBattleLevelPackage(CurrentPackageName))
 	{
 		AddMessage(OutMessages, ELastFPSBattleLevelValidationSeverity::Warning, FText::Format(
-			LOCTEXT("OutsideBattleRoot", "Current level is outside the configured battle level root: {0}"),
+			LOCTEXT("OutsideBattleRoot", "현재 레벨이 설정된 배틀 레벨 루트 밖에 있습니다: {0}"),
 			FText::FromString(GetBattleLevelRootPath())
 		));
 	}
@@ -632,7 +632,7 @@ void FLastFPSBattleLevelService::ValidateCurrentBattleLevel(TArray<FLastFPSBattl
 	const ULastFPSBattleLevelSettings* Settings = ULastFPSBattleLevelSettings::Get();
 	if (!Settings)
 	{
-		AddMessage(OutMessages, ELastFPSBattleLevelValidationSeverity::Error, LOCTEXT("MissingSettings", "Battle level settings are not available."));
+		AddMessage(OutMessages, ELastFPSBattleLevelValidationSeverity::Error, LOCTEXT("MissingSettings", "배틀 레벨 설정을 사용할 수 없습니다."));
 		return;
 	}
 
@@ -647,7 +647,7 @@ void FLastFPSBattleLevelService::ValidateCurrentBattleLevel(TArray<FLastFPSBattl
 
 		if (!bHasPlayerStart)
 		{
-			AddMessage(OutMessages, ELastFPSBattleLevelValidationSeverity::Error, LOCTEXT("MissingPlayerStart", "PlayerStart actor is missing."));
+			AddMessage(OutMessages, ELastFPSBattleLevelValidationSeverity::Error, LOCTEXT("MissingPlayerStart", "PlayerStart 액터가 없습니다."));
 		}
 	}
 
@@ -661,7 +661,7 @@ void FLastFPSBattleLevelService::ValidateCurrentBattleLevel(TArray<FLastFPSBattl
 		if (!HasActorWithTag(*EditorWorld, RequiredTag))
 		{
 			AddMessage(OutMessages, ELastFPSBattleLevelValidationSeverity::Warning, FText::Format(
-				LOCTEXT("MissingRequiredTag", "No actor with required tag: {0}"),
+				LOCTEXT("MissingRequiredTag", "필수 태그를 가진 액터가 없습니다: {0}"),
 				FText::FromName(RequiredTag)
 			));
 		}
@@ -669,7 +669,7 @@ void FLastFPSBattleLevelService::ValidateCurrentBattleLevel(TArray<FLastFPSBattl
 
 	if (OutMessages.IsEmpty())
 	{
-		AddMessage(OutMessages, ELastFPSBattleLevelValidationSeverity::Info, LOCTEXT("ValidationPassed", "Battle level validation passed."));
+		AddMessage(OutMessages, ELastFPSBattleLevelValidationSeverity::Info, LOCTEXT("ValidationPassed", "배틀 레벨 검증을 통과했습니다."));
 	}
 }
 

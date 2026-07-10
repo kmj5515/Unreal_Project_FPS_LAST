@@ -82,12 +82,10 @@ bool ALastFPSGameModeBase::ApplyCharacterDefinitionToAbilitySystem(
         return false;
     }
 
-    if (CharacterDefinition->StatData && CharacterDefinition->StatData->ApplyToAbilitySystem(ASC))
-    {
-        return true;
-    }
+    // Hero/Enemy 서브클래스의 virtual 이 각자 전용 스타트업 처리를 덧붙인다.
+    CharacterDefinition->GiveToAbilitySystem(ASC);
 
-    return false;
+    return CharacterDefinition->StatData != nullptr;
 }
 
 int32 ALastFPSGameModeBase::GetTotalConnectedPlayers() const

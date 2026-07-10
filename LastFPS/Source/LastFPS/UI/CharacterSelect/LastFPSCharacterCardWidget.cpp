@@ -1,8 +1,9 @@
 #include "UI/CharacterSelect/LastFPSCharacterCardWidget.h"
 
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
-#include "Components/TextBlock.h"
+#include "Data/Definitions/LastFPSHeroDefinition.h"
 #include "Components/Border.h"
+#include "Components/TextBlock.h"
 #include "Input/Events.h"
 
 void ULastFPSCharacterCardWidget::NativeOnInitialized()
@@ -17,14 +18,18 @@ void ULastFPSCharacterCardWidget::NativeOnInitialized()
 
 void ULastFPSCharacterCardWidget::SetupCard_Implementation(const ULastFPSCharacterDefinition* Def)
 {
+	// Role/Description 은 히어로 전용 데이터이므로 Hero 로 캐스팅해서 읽는다.
+	const ULastFPSHeroDefinition* HeroDef = Cast<ULastFPSHeroDefinition>(Def);
+
 	if (TB_CardName)
 	{
 		TB_CardName->SetText(Def ? Def->DisplayName : FText::GetEmpty());
 	}
 	if (TB_CardRole)
 	{
-		TB_CardRole->SetText(Def ? Def->Role : FText::GetEmpty());
+		TB_CardRole->SetText(HeroDef ? HeroDef->Role : FText::GetEmpty());
 	}
+
 }
 
 void ULastFPSCharacterCardWidget::SetSelected_Implementation(bool bSelected)

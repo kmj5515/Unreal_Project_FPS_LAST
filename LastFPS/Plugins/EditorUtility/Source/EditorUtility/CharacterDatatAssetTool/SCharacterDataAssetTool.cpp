@@ -1,6 +1,8 @@
 #include "SCharacterDataAssetTool.h"
 
+#include "LastFPSEditorWidgets.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "Brushes/SlateImageBrush.h"
 #include "Character/LastFPSAbilitySet.h"
 #include "Character/LastFPSAIProfile.h"
 #include "Animation/LastFPSLocomotionAnimationSet.h"
@@ -14,8 +16,12 @@
 #include "Editor.h"
 #include "Engine/DataTable.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
+#include "Data/Definitions/LastFPSHeroDefinition.h"
+#include "Data/Definitions/LastFPSEnemyDefinition.h"
 #include "IContentBrowserSingleton.h"
+#include "Interfaces/IPluginManager.h"
 #include "Misc/PackageName.h"
+#include "Misc/Paths.h"
 #include "PropertyCustomizationHelpers.h"
 #include "UObject/Package.h"
 #include "Framework/Application/SlateApplication.h"
@@ -26,175 +32,264 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/SWindow.h"
 #include "Widgets/SBoxPanel.h"
+#include "Widgets/Colors/SColorBlock.h"
+#include "Widgets/Images/SImage.h"
+#include "Widgets/Layout/SExpandableArea.h"
 #include "Widgets/Text/STextBlock.h"
+#include "Styling/AppStyle.h"
 
 #define LOCTEXT_NAMESPACE "SCharacterDataAssetTool"
+
+namespace
+{
+	FString GetCharacterToolImagePath(const TCHAR* FileName)
+	{
+		static const FString ResourceDirectory = []()
+		{
+			if (const TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("EditorUtility")))
+			{
+				return Plugin->GetBaseDir() / TEXT("Resources/ToolPanel");
+			}
+
+			return FPaths::ProjectDir() / TEXT("Plugins/EditorUtility/Resources/ToolPanel");
+		}();
+
+		return ResourceDirectory / FileName;
+	}
+
+	const FSlateBrush* GetCharacterToolImageTestBrush()
+	{
+		static const FSlateImageBrush Brush(GetCharacterToolImagePath(TEXT("TP_AssetPreview.png")), FVector2D(832.f, 260.f));
+		return &Brush;
+	}
+
+	FText GetDefinitionTypeDisplayText(const FString& DefinitionType)
+	{
+		if (DefinitionType == TEXT("Enemy"))
+		{
+			return LOCTEXT("DefinitionTypeEnemy", "적");
+		}
+
+		return LOCTEXT("DefinitionTypeHero", "영웅");
+	}
+}
 
 void SCharacterDataAssetTool::Construct(const FArguments& InArgs)
 {
 	LoadSettings();
 	RefreshRowNames();
 
+	DefinitionTypeOptions.Reset();
+	DefinitionTypeOptions.Add(MakeShared<FString>(TEXT("Hero")));
+	DefinitionTypeOptions.Add(MakeShared<FString>(TEXT("Enemy")));
+	SelectedDefinitionType = DefinitionTypeOptions[0];
+
 	ChildSlot
 	[
-		SNew(SBorder)
-		.Padding(12.f)
+		SNew(SScrollBox)
+		+ SScrollBox::Slot().FillSize(1)
 		[
-			SNew(SVerticalBox)
+			LastFPSEditorWidgets::MakeToolPanel(
+				LOCTEXT("CharacterToolPanelTitle", "캐릭터 도구"),
+				LOCTEXT("CharacterToolPanelSubtitle", "데이터 에셋"),
+				SNew(SVerticalBox)
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 8.f)
-			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("MasterTableLabel", "Character Master DataTable"))
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 12.f)
-			[
-				SNew(SObjectPropertyEntryBox)
-				.AllowedClass(UDataTable::StaticClass())
-				.ObjectPath(this, &SCharacterDataAssetTool::GetMasterTableObjectPath)
-				.OnObjectChanged(this, &SCharacterDataAssetTool::SetMasterTable)
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 8.f)
-			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("RowNameLabel", "Name"))
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 12.f)
-			[
-				SAssignNew(RowNameComboBox, SComboBox<TSharedPtr<FName>>)
-				.OptionsSource(&RowNames)
-				.OnGenerateWidget(this, &SCharacterDataAssetTool::GenerateRowNameWidget)
-				.OnSelectionChanged_Lambda([this](TSharedPtr<FName> NewSelection, ESelectInfo::Type)
-				{
-					SelectedRowName = NewSelection;
-					SelectedRowNameString = SelectedRowName.IsValid() ? SelectedRowName->ToString() : FString();
-					SaveSettings();
-				})
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f, 0.f, 8.f)
 				[
-					SNew(STextBlock)
-					.Text(this, &SCharacterDataAssetTool::GetSelectedRowNameText)
+					SNew(SBox)
+					.HeightOverride(72.f)
+					[
+						SNew(SImage)
+						.Image(GetCharacterToolImageTestBrush())
+					]
 				]
-			]
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			[
-				DrawFolderPickerSection(
-					LOCTEXT("DefinitionOutputRootLabel", "Definition Output Root"),
-					&SCharacterDataAssetTool::DefinitionOutputRoot,
-					LOCTEXT("GenerateDefinitionButton", "Generate"),
-					&SCharacterDataAssetTool::GenerateCharacterDefinition)
-			]
+				// 섹션 1: 캐릭터 마스터 데이터 테이블
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f, 0.f, 8.f)
+				[
+					LastFPSEditorWidgets::MakeSection(
+						LOCTEXT("MasterTableLabel", "캐릭터 마스터 데이터 테이블"),
+						LastFPSEditorWidgets::GetToolAccentColor(),
+						SNew(SVerticalBox)
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			[
-				DrawFolderPickerSection(
-					LOCTEXT("StatOutputRootLabel", "Stat Output Root"),
-					&SCharacterDataAssetTool::StatOutputRoot,
-					LOCTEXT("GenerateStatButton", "Generate Stat"),
-					&SCharacterDataAssetTool::GenerateCharacterStat)
-			]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.f, 8.f, 0.f, 6.f)
+						[
+							LastFPSEditorWidgets::MakeFormRow(
+								LOCTEXT("MasterTableRowLabel", "데이터 테이블"),
+								SNew(SObjectPropertyEntryBox)
+								.AllowedClass(UDataTable::StaticClass())
+								.ObjectPath(this, &SCharacterDataAssetTool::GetMasterTableObjectPath)
+								.OnObjectChanged(this, &SCharacterDataAssetTool::SetMasterTable))
+						]
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			[
-				DrawFolderPickerSection(
-					LOCTEXT("AbilitySetOutputRootLabel", "AbilitySet Output Root"),
-					&SCharacterDataAssetTool::AbilitySetOutputRoot,
-					LOCTEXT("GenerateAbilityButton", "Generate AbilitySet"),
-					&SCharacterDataAssetTool::GenerateCharacterAbilitySet)
-			]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.f, 0.f, 0.f, 6.f)
+						[
+							LastFPSEditorWidgets::MakeFormRow(
+								LOCTEXT("RowNameLabel", "이름"),
+								SAssignNew(RowNameComboBox, SComboBox<TSharedPtr<FName>>)
+								.OptionsSource(&RowNames)
+								.OnGenerateWidget(this, &SCharacterDataAssetTool::GenerateRowNameWidget)
+								.OnSelectionChanged_Lambda([this](TSharedPtr<FName> NewSelection, ESelectInfo::Type)
+								{
+									SelectedRowName = NewSelection;
+									SelectedRowNameString = SelectedRowName.IsValid() ? SelectedRowName->ToString() : FString();
+									UpdateDefaultDefinitionTypeFromRow();
+									SaveSettings();
+								})
+								[
+									SNew(STextBlock)
+									.Text(this, &SCharacterDataAssetTool::GetSelectedRowNameText)
+								])
+						]
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 8.f, 0.f, 8.f)
-			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("LocomotionAnimationSetLabel", "Locomotion Animation Set"))
-			]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.f, 0.f, 0.f, 6.f)
+						[
+							LastFPSEditorWidgets::MakeFormRow(
+								LOCTEXT("DefinitionTypeLabel", "정의 타입"),
+								SAssignNew(DefinitionTypeComboBox, SComboBox<TSharedPtr<FString>>)
+								.OptionsSource(&DefinitionTypeOptions)
+								.OnGenerateWidget_Lambda([](TSharedPtr<FString> InItem)
+								{
+									return SNew(STextBlock)
+										.Text(InItem.IsValid() ? GetDefinitionTypeDisplayText(*InItem) : FText::GetEmpty());
+								})
+								.OnSelectionChanged_Lambda([this](TSharedPtr<FString> NewSelection, ESelectInfo::Type)
+								{
+									if (NewSelection.IsValid())
+									{
+										SelectedDefinitionType = NewSelection;
+									}
+								})
+								[
+									SNew(STextBlock)
+									.Text_Lambda([this]()
+									{
+										return GetDefinitionTypeDisplayText(
+											SelectedDefinitionType.IsValid() ? *SelectedDefinitionType : FString(TEXT("Hero")));
+									})
+								])
+						]
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 12.f)
-			[
-				SNew(SObjectPropertyEntryBox)
-				.AllowedClass(ULastFPSLocomotionAnimationSet::StaticClass())
-				.ObjectPath(this, &SCharacterDataAssetTool::GetLocomotionAnimationSetObjectPath)
-				.OnObjectChanged(this, &SCharacterDataAssetTool::SetLocomotionAnimationSet)
-			]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							DrawFolderPickerSection(
+								LOCTEXT("DefinitionOutputRootLabel", "정의 저장 경로"),
+								&SCharacterDataAssetTool::DefinitionOutputRoot,
+								LOCTEXT("GenerateDefinitionButton", "생성"),
+								&SCharacterDataAssetTool::GenerateCharacterDefinition)
+						]
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 8.f)
-			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("LocomotionAnimationNameFilterLabel", "Locomotion Animation Name Filter"))
-			]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							DrawFolderPickerSection(
+								LOCTEXT("StatOutputRootLabel", "스탯 저장 경로"),
+								&SCharacterDataAssetTool::StatOutputRoot,
+								LOCTEXT("GenerateStatButton", "스탯 생성"),
+								&SCharacterDataAssetTool::GenerateCharacterStat)
+						]
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 16.f)
-			[
-				SNew(SEditableTextBox)
-				.Text_Lambda([this]()
-				{
-					return FText::FromString(LocomotionAnimationNameFilter);
-				})
-				.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type)
-				{
-					LocomotionAnimationNameFilter = NewText.ToString();
-					SaveSettings();
-				})
-			]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							DrawFolderPickerSection(
+								LOCTEXT("AbilitySetOutputRootLabel", "어빌리티 세트 저장 경로"),
+								&SCharacterDataAssetTool::AbilitySetOutputRoot,
+								LOCTEXT("GenerateAbilityButton", "어빌리티 세트 생성"),
+								&SCharacterDataAssetTool::GenerateCharacterAbilitySet)
+						]
+					)
+				]
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 8.f)
-			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("LocomotionAnimationPrefixFilterLabel", "Locomotion Animation Prefix Filter"))
-			]
+				// 섹션 2: 로코모션 애니메이션 세트
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 4.f, 0.f, 8.f)
+				[
+					LastFPSEditorWidgets::MakeSection(
+						LOCTEXT("LocomotionAnimationSetLabel", "로코모션 애니메이션 세트"),
+						LastFPSEditorWidgets::GetToolAccentColor(),
+						SNew(SVerticalBox)
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 16.f)
-			[
-				SNew(SEditableTextBox)
-				.Text_Lambda([this]()
-				{
-					return FText::FromString(LocomotionAnimationPrefixFilter);
-				})
-				.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type)
-				{
-					LocomotionAnimationPrefixFilter = NewText.ToString();
-					SaveSettings();
-				})
-			]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.f, 8.f, 0.f, 6.f)
+						[
+							LastFPSEditorWidgets::MakeFormRow(
+								LOCTEXT("LocomotionAnimationSetRowLabel", "애니메이션 세트"),
+								SNew(SObjectPropertyEntryBox)
+								.AllowedClass(ULastFPSLocomotionAnimationSet::StaticClass())
+								.ObjectPath(this, &SCharacterDataAssetTool::GetLocomotionAnimationSetObjectPath)
+								.OnObjectChanged(this, &SCharacterDataAssetTool::SetLocomotionAnimationSet))
+						]
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			[
-				DrawFolderPickerSection(
-					LOCTEXT("LocomotionAnimationSourceRootLabel", "Locomotion Animation Source Root"),
-					&SCharacterDataAssetTool::LocomotionAnimationSourceRoot,
-					LOCTEXT("AutoFillLocomotionAnimationSetButton", "Auto Fill Locomotion Set"),
-					&SCharacterDataAssetTool::AutoFillLocomotionAnimationSet,
-					false)
-			]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.f, 0.f, 0.f, 6.f)
+						[
+							LastFPSEditorWidgets::MakeFormRow(
+								LOCTEXT("LocomotionAnimationNameFilterLabel", "이름 필터"),
+								SNew(SEditableTextBox)
+								.Style(&LastFPSEditorWidgets::GetToolEditableTextBoxStyle())
+								.Text_Lambda([this]()
+								{
+									return FText::FromString(LocomotionAnimationNameFilter);
+								})
+								.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type)
+								{
+									LocomotionAnimationNameFilter = NewText.ToString();
+									SaveSettings();
+								}))
+						]
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.f, 0.f, 0.f, 6.f)
+						[
+							LastFPSEditorWidgets::MakeFormRow(
+								LOCTEXT("LocomotionAnimationPrefixFilterLabel", "접두사 필터"),
+								SNew(SEditableTextBox)
+								.Style(&LastFPSEditorWidgets::GetToolEditableTextBoxStyle())
+								.Text_Lambda([this]()
+								{
+									return FText::FromString(LocomotionAnimationPrefixFilter);
+								})
+								.OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type)
+								{
+									LocomotionAnimationPrefixFilter = NewText.ToString();
+									SaveSettings();
+								}))
+						]
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							DrawFolderPickerSection(
+								LOCTEXT("LocomotionAnimationSourceRootLabel", "로코모션 애니메이션 소스 경로"),
+								&SCharacterDataAssetTool::LocomotionAnimationSourceRoot,
+								LOCTEXT("AutoFillLocomotionAnimationSetButton", "로코모션 세트 자동 채우기"),
+								&SCharacterDataAssetTool::AutoFillLocomotionAnimationSet,
+								false)
+						]
+					)
+				]
+			)
 		]
 	];
+
+	// 처음 열릴 때도 현재 선택된 행의 캐릭터 타입에 맞춰 기본 타입을 잡아준다.
+	UpdateDefaultDefinitionTypeFromRow();
 }
 
 void SCharacterDataAssetTool::LoadSettings()
@@ -234,7 +329,8 @@ void SCharacterDataAssetTool::LoadSettings()
 	if (!LocomotionAnimationSet.IsValid() && !LocomotionAnimationSetObjectPath.IsEmpty())
 	{
 		LocomotionAnimationSet = Cast<ULastFPSLocomotionAnimationSet>(
-			StaticLoadObject(ULastFPSLocomotionAnimationSet::StaticClass(), nullptr, *LocomotionAnimationSetObjectPath));
+			StaticLoadObject(ULastFPSLocomotionAnimationSet::StaticClass(), nullptr,
+			                 *LocomotionAnimationSetObjectPath));
 	}
 }
 
@@ -328,10 +424,10 @@ FText SCharacterDataAssetTool::GetSelectedRowNameText() const
 {
 	return SelectedRowName.IsValid()
 		       ? FText::FromName(*SelectedRowName)
-		       : LOCTEXT("NoRowSelected", "Select a row");
+		       : LOCTEXT("NoRowSelected", "행을 선택하세요");
 }
 
-FReply SCharacterDataAssetTool::OpenFolderPicker(FString SCharacterDataAssetTool::*OutputRootMember)
+FReply SCharacterDataAssetTool::OpenFolderPicker(FString SCharacterDataAssetTool::* OutputRootMember)
 {
 	FPathPickerConfig PathPickerConfig;
 	PathPickerConfig.DefaultPath = (this->*OutputRootMember);
@@ -349,7 +445,7 @@ FReply SCharacterDataAssetTool::OpenFolderPicker(FString SCharacterDataAssetTool
 		FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
 
 	TSharedRef<SWindow> PickerWindow = SNew(SWindow)
-		.Title(LOCTEXT("OutputRootPickerTitle", "Choose Character Asset Folder"))
+		.Title(LOCTEXT("OutputRootPickerTitle", "캐릭터 에셋 폴더 선택"))
 		.ClientSize(FVector2D(420.f, 520.f))
 		.SupportsMaximize(false)
 		.SupportsMinimize(false);
@@ -371,7 +467,8 @@ FReply SCharacterDataAssetTool::OpenFolderPicker(FString SCharacterDataAssetTool
 		.HAlign(HAlign_Right)
 		[
 			SNew(SButton)
-			.Text(LOCTEXT("UseFolderButton", "Use Selected Folder"))
+			.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+			.Text(LOCTEXT("UseFolderButton", "선택한 폴더 사용"))
 			.OnClicked_Lambda([WeakPickerWindow]()
 			{
 				if (TSharedPtr<SWindow> PickerWindowPtr = WeakPickerWindow.Pin())
@@ -430,9 +527,10 @@ FReply SCharacterDataAssetTool::GenerateCharacterDefinition()
 		else
 		{
 			UPackage* Package = CreatePackage(*PackageName);
+			// 콤보에서 고른 타입으로 서브클래스 인스턴스를 생성한다.
 			Definition = NewObject<ULastFPSCharacterDefinition>(
 				Package,
-				ULastFPSCharacterDefinition::StaticClass(),
+				ResolveDefinitionClass(),
 				*AssetName,
 				RF_Public | RF_Standalone | RF_Transactional);
 
@@ -460,64 +558,54 @@ bool SCharacterDataAssetTool::CanGenerate() const
 
 TSharedRef<SWidget> SCharacterDataAssetTool::DrawFolderPickerSection(
 	const FText& LabelText,
-	FString SCharacterDataAssetTool::*OutputRootMember,
+	FString SCharacterDataAssetTool::* OutputRootMember,
 	const FText& GenerateButtonText,
 	FReply (SCharacterDataAssetTool::*OnGenerateClicked)(),
 	bool bRequiresCharacterRow)
 {
-	return SNew(SVerticalBox)
+	return LastFPSEditorWidgets::MakeFormRow(
+		LabelText,
+		SNew(SHorizontalBox)
 
-		+ SVerticalBox::Slot()
-		.AutoHeight()
-		.Padding(0.f, 0.f, 0.f, 8.f)
+		+ SHorizontalBox::Slot()
+		.FillWidth(1.f)
 		[
-			SNew(STextBlock)
-			.Text(LabelText)
+			SNew(SEditableTextBox)
+			.Style(&LastFPSEditorWidgets::GetToolEditableTextBoxStyle())
+			.IsReadOnly(true)
+			.Text_Lambda([this, OutputRootMember]()
+			{
+				return FText::FromString((this->*OutputRootMember));
+			})
 		]
 
-		+ SVerticalBox::Slot()
-		.AutoHeight()
-		.Padding(0.f, 0.f, 0.f, 16.f)
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		.Padding(8.f, 0.f, 0.f, 0.f)
 		[
-			SNew(SHorizontalBox)
+			SNew(SButton)
+			.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+			.Text(LOCTEXT("PickFolderButton", "폴더 선택"))
+			.OnClicked_Lambda([this, OutputRootMember]()
+			{
+				return OpenFolderPicker(OutputRootMember);
+			})
+		]
 
-			+ SHorizontalBox::Slot()
-			.FillWidth(1.f)
-			[
-				SNew(SEditableTextBox)
-				.IsReadOnly(true)
-				.Text_Lambda([this, OutputRootMember]()
-				{
-					return FText::FromString((this->*OutputRootMember));
-				})
-			]
-
-			+ SHorizontalBox::Slot()
-			.AutoWidth()
-			.Padding(8.f, 0.f, 0.f, 0.f)
-			[
-				SNew(SButton)
-				.Text(LOCTEXT("PickFolderButton", "Choose Folder"))
-				.OnClicked_Lambda([this, OutputRootMember]()
-				{
-					return OpenFolderPicker(OutputRootMember);
-				})
-			]
-
-			+ SHorizontalBox::Slot()
-			.AutoWidth()
-			.Padding(4.f, 0.f)
-			[
-				SNew(SButton)
-				.ContentPadding(FMargin(12.f, 4.f))
-				.Text(GenerateButtonText)
-				.IsEnabled_Lambda([this, OutputRootMember, bRequiresCharacterRow]()
-				{
-					return (!bRequiresCharacterRow || CanGenerate()) && !(this->*OutputRootMember).IsEmpty();
-				})
-				.OnClicked(this, OnGenerateClicked)
-			]
-		];
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		.Padding(4.f, 0.f)
+		[
+			SNew(SButton)
+			.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+			.ContentPadding(FMargin(12.f, 4.f))
+			.Text(GenerateButtonText)
+			.IsEnabled_Lambda([this, OutputRootMember, bRequiresCharacterRow]()
+			{
+				return (!bRequiresCharacterRow || CanGenerate()) && !(this->*OutputRootMember).IsEmpty();
+			})
+			.OnClicked(this, OnGenerateClicked)
+		]);
 }
 
 FReply SCharacterDataAssetTool::GenerateCharacterStat()
@@ -650,7 +738,8 @@ FReply SCharacterDataAssetTool::AutoFillLocomotionAnimationSet()
 	if (!AnimationSet && !LocomotionAnimationSetObjectPath.IsEmpty())
 	{
 		AnimationSet = Cast<ULastFPSLocomotionAnimationSet>(
-			StaticLoadObject(ULastFPSLocomotionAnimationSet::StaticClass(), nullptr, *LocomotionAnimationSetObjectPath));
+			StaticLoadObject(ULastFPSLocomotionAnimationSet::StaticClass(), nullptr,
+			                 *LocomotionAnimationSetObjectPath));
 		LocomotionAnimationSet = AnimationSet;
 	}
 
@@ -693,15 +782,66 @@ void SCharacterDataAssetTool::ApplyRowToDefinition(
 	Definition->CharacterId = Row.CharacterId.IsNone() ? RowName : Row.CharacterId;
 	Definition->CharacterType = Row.CharacterType;
 	Definition->DisplayName = FText::FromString(Row.DisplayName);
-	Definition->Role = FText::FromString(Row.Role);
-	Definition->Description = FText::FromString(Row.Description);
 	Definition->Icon = Cast<UTexture2D>(Row.Icon.LoadSynchronous());
 	Definition->PawnClass = Row.PawnClass.LoadSynchronous();
 	Definition->StatData = Row.StatData.LoadSynchronous();
 	Definition->VisualData = Row.VisualData.LoadSynchronous();
 	Definition->AcceleratorData = Row.AcceleratorData.LoadSynchronous();
 	Definition->AbilitySet = Row.AbilitySet.LoadSynchronous();
-	Definition->AIProfile = Row.AIProfile.LoadSynchronous();
+
+	// 서브클래스 전용 필드는 실제 타입에 맞춰 채운다.
+	if (ULastFPSHeroDefinition* HeroDefinition = Cast<ULastFPSHeroDefinition>(Definition))
+	{
+		HeroDefinition->Role = FText::FromString(Row.Role);
+		HeroDefinition->Description = FText::FromString(Row.Description);
+	}
+	else if (ULastFPSEnemyDefinition* EnemyDefinition = Cast<ULastFPSEnemyDefinition>(Definition))
+	{
+		EnemyDefinition->AIProfile = Row.AIProfile.LoadSynchronous();
+	}
+}
+
+UClass* SCharacterDataAssetTool::ResolveDefinitionClass() const
+{
+	if (SelectedDefinitionType.IsValid() && *SelectedDefinitionType == TEXT("Enemy"))
+	{
+		return ULastFPSEnemyDefinition::StaticClass();
+	}
+	return ULastFPSHeroDefinition::StaticClass();
+}
+
+void SCharacterDataAssetTool::UpdateDefaultDefinitionTypeFromRow()
+{
+	UDataTable* Table = MasterTable.Get();
+	if (!Table || !SelectedRowName.IsValid())
+	{
+		return;
+	}
+
+	static const FString Context(TEXT("CharacterDataAssetTool"));
+	const FLastFPSCharacterMasterData* Row =
+		Table->FindRow<FLastFPSCharacterMasterData>(*SelectedRowName, Context, true);
+	if (!Row)
+	{
+		return;
+	}
+
+	const FString DesiredType =
+		(Row->CharacterType == ELastFPSCharacterType::Enemy) ? TEXT("Enemy") : TEXT("Hero");
+
+	for (const TSharedPtr<FString>& Option : DefinitionTypeOptions)
+	{
+		if (Option.IsValid() && *Option == DesiredType)
+		{
+			SelectedDefinitionType = Option;
+			break;
+		}
+	}
+
+	if (DefinitionTypeComboBox.IsValid())
+	{
+		DefinitionTypeComboBox->SetSelectedItem(SelectedDefinitionType);
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

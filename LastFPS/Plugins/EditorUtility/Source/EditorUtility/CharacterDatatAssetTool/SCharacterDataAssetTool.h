@@ -27,6 +27,11 @@ private:
 	void RefreshRowNames();
 	TSharedRef<SWidget> GenerateRowNameWidget(TSharedPtr<FName> RowName) const;
 
+	/** 콤보에서 고른 라벨(Hero/Enemy)을 실제 생성할 Definition 서브클래스로 변환. */
+	UClass* ResolveDefinitionClass() const;
+	/** 선택된 행의 CharacterType에 맞춰 생성 타입 콤보의 기본값을 잡아준다. */
+	void UpdateDefaultDefinitionTypeFromRow();
+
 	FText GetSelectedRowNameText() const;
 	FReply OpenFolderPicker(FString SCharacterDataAssetTool::*OutputRootMember);
 
@@ -54,6 +59,11 @@ private:
 	TArray<TSharedPtr<FName>> RowNames;
 	TSharedPtr<FName> SelectedRowName;
 	TSharedPtr<SComboBox<TSharedPtr<FName>>> RowNameComboBox;
+
+	// 생성할 Definition 타입 선택(Hero/Enemy)
+	TArray<TSharedPtr<FString>> DefinitionTypeOptions;
+	TSharedPtr<FString> SelectedDefinitionType;
+	TSharedPtr<SComboBox<TSharedPtr<FString>>> DefinitionTypeComboBox;
 	FString DefinitionOutputRoot = TEXT("/Game/Data/Characters");
 	FString StatOutputRoot = TEXT("/Game/Data/Characters");
 	FString AbilitySetOutputRoot = TEXT("/Game/Data/Characters");
