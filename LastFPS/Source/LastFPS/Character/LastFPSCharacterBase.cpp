@@ -59,6 +59,11 @@ float ALastFPSCharacterBase::GetMaxHealth() const
     return AttributeSet ? AttributeSet->GetMaxHealth() : 0.f;
 }
 
+float ALastFPSCharacterBase::GetAttackRange() const
+{
+    return AttributeSet ? AttributeSet->GetAttackRange() : 0.f;
+}
+
 const ULastFPSCharacterDefinition* ALastFPSCharacterBase::GetCharacterDefinition() const
 {
     return ResolveCharacterDefinition();

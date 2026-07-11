@@ -58,6 +58,11 @@ public:
     FGameplayAttributeData Defense;
     ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, Defense)
 
+    // 공격 사거리(cm). 근접/원거리 캐릭터를 GE·스탯 데이터로 구분한다. AI 추격/공격 판정이 이 값을 사용.
+    UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_AttackRange, Category="Attributes|Combat")
+    FGameplayAttributeData AttackRange;
+    ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, AttackRange)
+
     UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_PhysicalDamageMultiplier, Category="Attributes|Damage")
     FGameplayAttributeData PhysicalDamageMultiplier;
     ATTRIBUTE_ACCESSORS(ULastFPSAttributeSet, PhysicalDamageMultiplier)
@@ -96,6 +101,7 @@ protected:
     UFUNCTION() void OnRep_CriticalChance(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_CriticalDamagePercent(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_Defense(const FGameplayAttributeData& Old);
+    UFUNCTION() void OnRep_AttackRange(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_PhysicalDamageMultiplier(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_FireDamageMultiplier(const FGameplayAttributeData& Old);
     UFUNCTION() void OnRep_IceDamageMultiplier(const FGameplayAttributeData& Old);

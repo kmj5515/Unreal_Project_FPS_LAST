@@ -41,6 +41,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin=0))
 	float AttackRange = 200.f;
 
+	/**
+	 * 카이팅: 타깃이 이 거리보다 가까워지면 뒤로/옆으로 빠져 거리를 유지한다(cm).
+	 * 0 이하면 카이팅 안 함(제자리 사격). 보통 AttackRange 보다 작게(예: AttackRange*0.5) 둔다.
+	 * 원거리 적 전용 — 근접 적은 0.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin=0))
+	float KeepDistance = 0.f;
+
 	/** 공격 후 다음 판단까지의 최소 간격(초). BT 공격 태스크의 페이싱에 사용. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin=0))
 	float ReactionDelay = 0.f;

@@ -43,8 +43,13 @@ bool UBTTask_ChaseTarget::GetTargetDistance(UBehaviorTreeComponent& OwnerComp, f
 		return false;
 	}
 
-	const ULastFPSAIProfile* Profile = Enemy->GetAIProfile();
-	OutAttackRange = Profile ? Profile->AttackRange : 200.f;
+	// 공격 사거리는 AttributeSet 에서(원거리/근접 구분). 미설정(0)이면 프로파일로 폴백.
+	OutAttackRange = Enemy->GetAttackRange();
+	if (OutAttackRange <= 0.f)
+	{
+		const ULastFPSAIProfile* Profile = Enemy->GetAIProfile();
+		OutAttackRange = Profile ? Profile->AttackRange : 200.f;
+	}
 	OutDistance = FVector::Dist(Enemy->GetActorLocation(), OutTarget->GetActorLocation());
 	return true;
 }
@@ -60,16 +65,19 @@ EBTNodeResult::Type UBTTask_ChaseTarget::ExecuteTask(UBehaviorTreeComponent& Own
 		return EBTNodeResult::Failed;
 	}
 
-	// 이미 사거리 안이면 추격 불필요.
-	if (Distance <= AttackRange)
+	AICon->SetFocus(Target);
+
+	const bool bHasLoS = AICon->LineOfSightTo(Target);
+
+	// 사거리 안 + 시야 확보 시에만 멈춘다. 시야가 막혔으면 더 접근해 시야를 확보한다.
+	if (Distance <= AttackRange && bHasLoS)
 	{
-		AICon->SetFocus(Target);
 		return EBTNodeResult::Succeeded;
 	}
 
-	// 타깃을 바라보며, 사거리 살짝 안쪽까지 이동(경계에서 진동 방지).
-	AICon->SetFocus(Target);
-	AICon->MoveToActor(Target, AttackRange * 0.9f, /*bStopOnOverlap*/ true, /*bUsePathfinding*/ true);
+	// 시야가 있으면 사거리 살짝 안쪽까지, 없으면 더 바짝 붙어 장애물을 우회한다.
+	const float Acceptance = bHasLoS ? AttackRange * 0.9f : 60.f;
+	AICon->MoveToActor(Target, Acceptance, /*bStopOnOverlap*/ true, /*bUsePathfinding*/ true);
 	return EBTNodeResult::InProgress;
 }
 
@@ -93,17 +101,21 @@ void UBTTask_ChaseTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 
 	AICon->SetFocus(Target);
 
-	if (Distance <= AttackRange)
+	const bool bHasLoS = AICon->LineOfSightTo(Target);
+
+	if (Distance <= AttackRange && bHasLoS)
 	{
-		// 사거리 진입 → 공격 분기로 넘김.
+		// 사거리 진입 + 시야 확보 → 공격 분기로 넘김.
 		AICon->StopMovement();
 		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 		return;
 	}
 
 	// 정지 상태로 남아 있으면(경로 종료/실패) 다시 이동 지시. 움직이는 타깃을 계속 따라간다.
+	// 시야가 막혔으면 사거리 안이어도 더 접근해 시야를 확보한다.
 	if (AICon->GetMoveStatus() == EPathFollowingStatus::Idle)
 	{
-		AICon->MoveToActor(Target, AttackRange * 0.9f, true, true);
+		const float Acceptance = bHasLoS ? AttackRange * 0.9f : 60.f;
+		AICon->MoveToActor(Target, Acceptance, true, true);
 	}
 }

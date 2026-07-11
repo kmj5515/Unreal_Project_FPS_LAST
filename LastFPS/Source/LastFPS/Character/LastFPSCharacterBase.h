@@ -43,6 +43,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="LastFPS|Attributes")
     float GetMaxHealth() const;
 
+    /** AttributeSet 의 공격 사거리(cm). AI 추격/공격 판정이 사용. 0 이면 미설정. */
+    UFUNCTION(BlueprintCallable, Category="LastFPS|Attributes")
+    float GetAttackRange() const;
+
     /** 킬피드 등 UI 표시명. 비어 있으면 PlayerState 이름 사용 */
     UFUNCTION(BlueprintPure, Category="LastFPS|Display")
     FString GetKillFeedDisplayName() const;

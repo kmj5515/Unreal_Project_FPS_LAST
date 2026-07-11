@@ -48,6 +48,7 @@ ULastFPSAttributeSet::ULastFPSAttributeSet()
     InitCriticalChance(0.f);
     InitCriticalDamagePercent(150.f);
     InitDefense(0.f);
+    InitAttackRange(200.f);
     InitPhysicalDamageMultiplier(1.f);
     InitFireDamageMultiplier(1.f);
     InitIceDamageMultiplier(1.f);
@@ -69,6 +70,7 @@ void ULastFPSAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, CriticalChance,   COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, CriticalDamagePercent, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, Defense,          COND_None, REPNOTIFY_Always);
+    DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, AttackRange,      COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, PhysicalDamageMultiplier, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, FireDamageMultiplier, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(ULastFPSAttributeSet, IceDamageMultiplier, COND_None, REPNOTIFY_Always);
@@ -96,6 +98,8 @@ void ULastFPSAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
         || Attribute == GetPoisonDamageMultiplierAttribute())
         NewValue = FMath::Max(0.f, NewValue);
     else if (Attribute == GetMoveSpeedAttribute())
+        NewValue = FMath::Max(0.f, NewValue);
+    else if (Attribute == GetAttackRangeAttribute())
         NewValue = FMath::Max(0.f, NewValue);
 }
 
@@ -233,6 +237,7 @@ void ULastFPSAttributeSet::OnRep_AttackDamage(const FGameplayAttributeData& Old)
 void ULastFPSAttributeSet::OnRep_CriticalChance(const FGameplayAttributeData& Old)   { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, CriticalChance, Old); }
 void ULastFPSAttributeSet::OnRep_CriticalDamagePercent(const FGameplayAttributeData& Old) { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, CriticalDamagePercent, Old); }
 void ULastFPSAttributeSet::OnRep_Defense(const FGameplayAttributeData& Old)          { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, Defense, Old); }
+void ULastFPSAttributeSet::OnRep_AttackRange(const FGameplayAttributeData& Old)      { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, AttackRange, Old); }
 void ULastFPSAttributeSet::OnRep_PhysicalDamageMultiplier(const FGameplayAttributeData& Old) { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, PhysicalDamageMultiplier, Old); }
 void ULastFPSAttributeSet::OnRep_FireDamageMultiplier(const FGameplayAttributeData& Old) { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, FireDamageMultiplier, Old); }
 void ULastFPSAttributeSet::OnRep_IceDamageMultiplier(const FGameplayAttributeData& Old) { GAMEPLAYATTRIBUTE_REPNOTIFY(ULastFPSAttributeSet, IceDamageMultiplier, Old); }

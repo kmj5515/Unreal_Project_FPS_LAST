@@ -44,11 +44,16 @@ EBTNodeResult::Type UBTTask_EnemyAttack::ExecuteTask(UBehaviorTreeComponent& Own
 		return EBTNodeResult::Failed;
 	}
 
-	// 타깃을 바라본다(발사/스윙 방향 정렬).
-	if (AActor* Target = Cast<AActor>(BB->GetValueAsObject(TargetActorKey.SelectedKeyName)))
+	AActor* Target = Cast<AActor>(BB->GetValueAsObject(TargetActorKey.SelectedKeyName));
+
+	// 시야가 막혀 있으면(벽 너머 등) 발사하지 않는다. 실패로 빠져 추격이 재배치하게 한다.
+	if (!Target || !AICon->LineOfSightTo(Target))
 	{
-		AICon->SetFocus(Target);
+		return EBTNodeResult::Failed;
 	}
+
+	// 타깃을 바라본다(발사/스윙 방향 정렬).
+	AICon->SetFocus(Target);
 
 	// AttackAbilityTag 로 어빌리티 발동. 쿨다운이면 활성화 실패할 수 있으나,
 	// 그 경우에도 ReactionDelay 만큼 사거리에서 대기했다가 재시도하도록 InProgress 로 진행한다.

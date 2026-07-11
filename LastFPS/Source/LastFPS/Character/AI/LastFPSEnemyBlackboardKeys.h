@@ -6,9 +6,12 @@
  * 적 전투 BT 가 사용하는 Blackboard 키 이름 모음.
  * 컨트롤러·서비스·태스크가 같은 문자열을 공유해 오타로 인한 미연결을 막는다.
  * 에디터에서 Blackboard 에셋(BB_Enemy)을 만들 때 아래와 같은 타입/이름으로 키를 추가할 것:
- *   - TargetActor    : Object (Base Class = Actor)
- *   - bInAttackRange : Bool
- *   - TargetLocation : Vector   (원거리/이동 예측용, 선택)
+ *   - TargetActor      : Object (Base Class = Actor)
+ *   - bInAttackRange   : Bool
+ *   - bHasLineOfSight  : Bool
+ *   - bTargetTooClose  : Bool
+ *   - TargetLocation   : Vector   (원거리/이동 예측용, 선택)
+ *   - KiteLocation     : Vector   (EQS 카이팅 목적지)
  */
 namespace LastFPSEnemyBBKeys
 {
@@ -18,6 +21,15 @@ namespace LastFPSEnemyBBKeys
 	/** 타깃이 AttackRange 안에 있는지. 추격 vs 공격 분기용. */
 	inline const FName bInAttackRange(TEXT("bInAttackRange"));
 
+	/** 타깃이 시야(직선 트레이스)에 보이는지. 원거리 공격을 벽 너머로 쏘지 않게 게이팅. */
+	inline const FName bHasLineOfSight(TEXT("bHasLineOfSight"));
+
+	/** 타깃이 KeepDistance 보다 가까운지. 참이면 카이팅(뒤로 빠지기) 분기. */
+	inline const FName bTargetTooClose(TEXT("bTargetTooClose"));
+
 	/** 타깃의 마지막 알려진 위치. MoveTo 예비/원거리 조준에 사용(선택). */
 	inline const FName TargetLocation(TEXT("TargetLocation"));
+
+	/** EQS 가 고른 카이팅 목적지. RunEQS → 이 키에 기록 → MoveTo 가 사용. */
+	inline const FName KiteLocation(TEXT("KiteLocation"));
 }

@@ -5,6 +5,8 @@
 #include "Utility/LastFPSEnumTypes.h"
 #include "LastFPSBaseAnimInstance.generated.h"
 
+class ULastFPSLocomotionAnimationSet;
+
 UCLASS(Abstract, Blueprintable)
 class LASTFPS_API ULastFPSBaseAnimInstance : public UAnimInstance
 {
@@ -21,7 +23,14 @@ public:
 		EMMCardinalDirection CurrentDirection,
 		float DeadZone);
 
+	/** 로코모션 애니메이션 세트(단일 소스). CharacterAnimInstance·링크드 레이어 등이 공유 참조한다. */
+	UFUNCTION(BlueprintPure, Category="MM|Locomotion", meta=(BlueprintThreadSafe))
+	ULastFPSLocomotionAnimationSet* GetLocomotionSet() const { return LocomotionSet; }
+
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|Locomotion")
+	TObjectPtr<ULastFPSLocomotionAnimationSet> LocomotionSet;
+
 	UFUNCTION(BlueprintPure, Category="MM|Locomotion")
 	EMMCardinalDirection DirectionToCardinalDirection(float InDirection) const;
 

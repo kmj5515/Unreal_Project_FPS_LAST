@@ -53,4 +53,5 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Skill3, "Ability.Skill3", "Skill 3 abilit
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Ultimate, "Ability.Ultimate", "Ultimate ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_ProbePassive, "Ability.Passive.Probe", "프로브 패시브 어빌리티")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Trigger_SpawnProbe, "Ability.Trigger.SpawnProbe", "프로브 생성 트리거 어빌리티")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Enemy_Shoot, "Ability.Enemy.Shoot", "적 AI 원거리 발사 공격")
 }

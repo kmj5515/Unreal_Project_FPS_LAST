@@ -32,6 +32,8 @@ void UBTService_UpdateCombatTarget::TickNode(UBehaviorTreeComponent& OwnerComp, 
 	{
 		BB->ClearValue(LastFPSEnemyBBKeys::TargetActor);
 		BB->SetValueAsBool(LastFPSEnemyBBKeys::bInAttackRange, false);
+		BB->SetValueAsBool(LastFPSEnemyBBKeys::bHasLineOfSight, false);
+		BB->SetValueAsBool(LastFPSEnemyBBKeys::bTargetTooClose, false);
 	};
 
 	AActor* TargetActor = Cast<AActor>(BB->GetValueAsObject(LastFPSEnemyBBKeys::TargetActor));
@@ -50,7 +52,12 @@ void UBTService_UpdateCombatTarget::TickNode(UBehaviorTreeComponent& OwnerComp, 
 	}
 
 	const ULastFPSAIProfile* Profile = Enemy->GetAIProfile();
-	const float AttackRange = Profile ? Profile->AttackRange : 200.f;
+	// 공격 사거리는 AttributeSet(GE·스탯으로 세팅)에서. 미설정(0)이면 프로파일로 폴백.
+	float AttackRange = Enemy->GetAttackRange();
+	if (AttackRange <= 0.f)
+	{
+		AttackRange = Profile ? Profile->AttackRange : 200.f;
+	}
 	const float LoseRange = Profile
 		? ((Profile->LoseSightRange > Profile->DetectionRange) ? Profile->LoseSightRange : Profile->DetectionRange)
 		: 1600.f;
@@ -64,7 +71,13 @@ void UBTService_UpdateCombatTarget::TickNode(UBehaviorTreeComponent& OwnerComp, 
 		return;
 	}
 
-	// 유효 타깃: 마지막 위치와 사거리 진입 여부 갱신.
+	// 유효 타깃: 마지막 위치·사거리·시야 갱신.
 	BB->SetValueAsVector(LastFPSEnemyBBKeys::TargetLocation, TargetActor->GetActorLocation());
 	BB->SetValueAsBool(LastFPSEnemyBBKeys::bInAttackRange, Distance <= AttackRange);
+	// 시야는 컨트롤러의 LineOfSightTo(폰 시점 기준 트레이스)로 판정.
+	BB->SetValueAsBool(LastFPSEnemyBBKeys::bHasLineOfSight, AICon->LineOfSightTo(TargetActor));
+
+	// 카이팅: KeepDistance(>0)보다 가까우면 뒤로 빠질 신호.
+	const float KeepDistance = Profile ? Profile->KeepDistance : 0.f;
+	BB->SetValueAsBool(LastFPSEnemyBBKeys::bTargetTooClose, KeepDistance > 0.f && Distance < KeepDistance);
 }

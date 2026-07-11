@@ -17,8 +17,7 @@ public:
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|LinkedLayer|Locomotion")
-	TObjectPtr<ULastFPSLocomotionAnimationSet> LocomotionSet;
+	// LocomotionSet 은 공통 부모 ULastFPSBaseAnimInstance 로 이동(단일 소스). 여기서 상속받아 그대로 사용.
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|LinkedLayer|Debug")
 	bool bDebugSequenceSelection = true;

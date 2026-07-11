@@ -57,4 +57,7 @@ namespace LastFPSGameplayTags
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Ultimate);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_ProbePassive);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Trigger_SpawnProbe);
+
+	// 적 AI 공격 어빌리티
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Shoot);
 }

@@ -30,6 +30,7 @@ ALastFPSEnemyCharacter::ALastFPSEnemyCharacter()
     }
 
     GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Camera,ECR_Ignore);
+    GetMesh()->SetCollisionResponseToChannel(ECC_Camera,ECR_Ignore);
 }
 
 const ULastFPSAIProfile* ALastFPSEnemyCharacter::GetAIProfile() const
