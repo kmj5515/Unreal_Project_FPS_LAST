@@ -1,9 +1,79 @@
-# Project Instructions
+# AGENTS.md
 
-- Do not run Unreal Engine builds or compilation commands automatically.
-- Only run a build when the user explicitly requests it in the current conversation.
-- When proposing, generating, or modifying code, treat SOLID principles as mandatory project rules, not optional style preferences.
-- Before creating feature-specific classes, functions, or data structures, check whether the responsibility can be expressed as a reusable common structure.
-- Prefer small responsibilities, composition, interfaces, data-driven configuration, and reusable abstractions over hard-coded feature combinations or skill-specific implementations.
-- If a feature-specific implementation is still chosen, clearly justify why a shared abstraction would be worse for this codebase.
-- Write code comments only in Korean.
+이 문서는 에이전트가 이 저장소에서 코드를 분석·제안·수정할 때 반드시 따라야 하는 프로젝트 지침이다.
+
+## 프로젝트 환경
+
+- 이 프로젝트는 Unreal Engine 5.7 이상을 기준으로 한다.
+- Unreal Engine의 빌드 및 컴파일 명령은 자동으로 실행하지 않는다.
+- 현재 대화에서 사용자가 명시적으로 요청한 경우에만 빌드한다.
+- 기존 사용자 변경 사항과 작업 중인 파일을 임의로 되돌리거나 덮어쓰지 않는다.
+
+## 필수 설계 원칙
+
+- SOLID 원칙을 선택적인 권장 사항이 아닌 필수 규칙으로 적용한다.
+- 낮은 결합도와 높은 응집도를 유지한다. 클래스와 모듈은 밀접하게 연관된 하나의 책임을 소유하고, 협력 객체의 구체 구현은 가능한 한 알지 않아야 한다.
+- 구체 클래스에 직접 의존하기보다 인터페이스, 추상화, 델리게이트, 이벤트 또는 안정적인 데이터 계약에 의존한다.
+- 상속보다 컴포지션을 우선하며, Actor 또는 Component가 지나치게 많은 책임을 갖지 않도록 분리한다.
+- 기능 전용 클래스·함수·자료구조를 만들기 전에 공통으로 재사용할 수 있는 책임인지 먼저 확인한다.
+- 작고 명확한 책임, 재사용 가능한 추상화와 공통 구조를 우선한다.
+- 범용 구조보다 기능 전용 구현을 선택했다면, 공통 추상화가 이 코드베이스에 더 부적합한 이유를 설명한다.
+
+## 데이터 기반 설계
+
+- 게임플레이 설정에는 데이터 기반 설계를 의무적으로 적용한다.
+- 무기, 스킬, 캐릭터 또는 게임 모드에 따라 달라질 수 있는 수치, 행동 조합 및 밸런스 값은 하드코딩하지 않는다.
+- 변경 가능한 설정은 용도에 맞게 설정 구조체, Data Asset, Data Table, Curve 또는 Gameplay Tag로 표현한다.
+- 불변 설정 데이터와 변경 가능한 런타임 상태를 명확히 분리한다.
+- 공유 설정 에셋에 일시적인 런타임 상태를 저장하지 않는다.
+- 범용 시스템은 안정적인 데이터 계약만 소비해야 하며, 구체적인 무기·스킬·캐릭터·게임 모드를 모두 열거하는 switch, 캐스팅 또는 문자열 비교를 포함하지 않아야 한다.
+- 확장 가능한 범주와 조건에는 원시 문자열보다 Gameplay Tag 또는 타입이 지정된 식별자를 우선한다.
+- 새로운 콘텐츠 변형은 범용 시스템을 수정하기보다 데이터 추가와 행동 조합으로 확장한다.
+- 코드 수정이 불가피하다면 데이터만으로 표현할 수 없는 새로운 행동이 무엇인지 설명한다.
+
+## Unreal Engine 코드 규칙
+
+- UObject 참조에는 소유권과 수명에 맞는 `TObjectPtr`, `TWeakObjectPtr` 또는 `TSoftObjectPtr`를 사용한다.
+- 에셋을 항상 메모리에 유지할 필요가 없다면 강한 참조보다 소프트 참조를 우선한다.
+- 매 프레임 실행할 명확한 이유가 없는 Actor와 Component는 Tick을 비활성화한다.
+- Tick에서 반복 탐색, 에셋 로딩, 동적 캐스팅, 컨테이너 복사 또는 문자열 생성을 피한다.
+- 생성자에서는 기본값과 서브오브젝트를 구성하고, 월드가 필요한 초기화는 적절한 생명주기 함수에서 수행한다.
+- `UFUNCTION`과 `UPROPERTY`는 리플렉션, 직렬화, 복제 또는 에디터·Blueprint 노출이 실제로 필요할 때만 사용한다.
+- Blueprint에 노출하는 공개 API는 최소화한다.
+- 네트워크 게임플레이 상태는 서버 권한을 기준으로 변경하고, RPC의 호출 주체와 입력값을 검증한다.
+- 복제 데이터는 필요한 상태만 포함하며 변경 빈도와 대역폭을 고려한다.
+
+## C++ 및 API 규칙
+
+- 공개 API를 최소화하고 구현 세부 사항은 `private` 또는 `protected`로 숨긴다.
+- 함수와 클래스 이름은 책임, 동작 및 결과를 분명하게 표현한다.
+- 조회 함수는 상태를 변경하지 않으며 가능한 경우 `const`를 적용한다.
+- 여러 Boolean 인자로 행동을 제어하지 말고 옵션 구조체나 의미가 분명한 별도 함수를 사용한다.
+- 소유권이 불명확한 원시 포인터를 피하고 외부 참조는 사용 전에 유효성을 확인한다.
+- 헤더에서는 전방 선언을 활용하고 불필요한 include 및 모듈 의존성을 줄인다.
+- 순환 의존성을 만들지 않는다.
+- 매직 넘버, 중복 코드 및 기능별 하드코딩을 허용하지 않는다.
+- 델리게이트 등록과 해제의 수명 주기를 명확하게 관리한다.
+
+## 오류 처리와 로그
+
+- 실패를 조용히 무시하지 않는다.
+- 복구 가능한 오류와 프로그래밍 오류를 구분하여 로그, `ensure`, `check`를 사용한다.
+- 로그에는 관련 객체, 수행하려던 동작 및 실패 원인을 포함한다.
+- 정상적인 프레임 흐름에서 반복적으로 경고 로그를 출력하지 않는다.
+- 임시 디버그 코드와 화면 메시지를 최종 구현에 남기지 않는다.
+
+## 주석과 문서화
+
+- 코드 주석은 한국어로만 작성한다.
+- 코드가 무엇을 하는지 그대로 반복하지 말고 설계 이유, 제약 조건 및 예외를 설명한다.
+- 임시 해결책에는 제거 조건이나 필요한 후속 작업을 명시한다.
+
+## 변경 및 검증 절차
+
+- 코드를 수정하기 전에 관련 구현, 호출부, 데이터 흐름 및 기존 공통 구조를 먼저 확인한다.
+- 요청 범위 밖의 리팩터링이나 파일 변경은 하지 않는다.
+- 변경 후 정상 경로, 실패 경로 및 경계 조건을 검토한다.
+- 네트워크 기능은 서버, 소유 클라이언트 및 비소유 클라이언트 관점에서 검토한다.
+- 헤더 의존성, UObject 수명, 에디터 노출, 직렬화 및 복제에 미치는 영향을 확인한다.
+- 빌드를 실행하지 않은 경우 검증 결과에 그 사실을 명확히 밝힌다.
