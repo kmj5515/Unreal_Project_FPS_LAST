@@ -2,8 +2,11 @@
 
 #include "AbilitySystemComponent.h"
 #include "Character/LastFPSCharacterBase.h"
+#include "Data/Tables/LastFPSSkillBalanceData.h"
+#include "Engine/GameInstance.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "Skills/LastFPSSkillDataSubsystem.h"
 #include "Utility/LastFPSTags.h"
 
 UGA_ProbePassive::UGA_ProbePassive()
@@ -188,6 +191,12 @@ bool UGA_ProbePassive::SpawnProbeEmitter(ALastFPSCharacterBase* SourceCharacter)
 		return false;
 	}
 
+	float ProbeBaseDamage = 0.f;
+	if (!ResolveProbeBaseDamage(SourceCharacter, ProbeBaseDamage))
+	{
+		return false;
+	}
+
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = SourceCharacter;
 	SpawnParams.Instigator = SourceCharacter;
@@ -204,8 +213,39 @@ bool UGA_ProbePassive::SpawnProbeEmitter(ALastFPSCharacterBase* SourceCharacter)
 		return false;
 	}
 
-	ProbeEmitter->InitializeEmitter(SourceCharacter, SlotIndex, ProbeEmitterConfig);
+	ProbeEmitter->InitializeEmitter(
+		SourceCharacter,
+		SlotIndex,
+		ProbeEmitterConfig,
+		ProbeBaseDamage);
 	return true;
+}
+
+bool UGA_ProbePassive::ResolveProbeBaseDamage(
+	const ALastFPSCharacterBase* SourceCharacter,
+	float& OutBaseDamage) const
+{
+	OutBaseDamage = 0.f;
+	if (!SourceCharacter || ProbeBalanceId.IsNone())
+	{
+		return false;
+	}
+
+	const UGameInstance* GameInstance = SourceCharacter->GetGameInstance();
+	const ULastFPSSkillDataSubsystem* SkillDataSubsystem =
+		GameInstance ? GameInstance->GetSubsystem<ULastFPSSkillDataSubsystem>() : nullptr;
+	const FLastFPSSkillBalanceData* BalanceData =
+		SkillDataSubsystem ? SkillDataSubsystem->FindBalance(ProbeBalanceId) : nullptr;
+	if (!ensureMsgf(
+		BalanceData && BalanceData->Damage > 0.f,
+		TEXT("프로브 밸런스 행 '%s'을 찾지 못했거나 Damage가 0 이하입니다."),
+		*ProbeBalanceId.ToString()))
+	{
+		return false;
+	}
+
+	OutBaseDamage = BalanceData->Damage + GetEquippedWeaponBaseDamage();
+	return OutBaseDamage > 0.f;
 }
 
 int32 UGA_ProbePassive::FindAvailableSlotIndex(

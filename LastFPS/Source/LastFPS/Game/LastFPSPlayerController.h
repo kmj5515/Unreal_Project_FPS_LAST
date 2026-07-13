@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "CommonPlayerController.h"
+#include "GenericTeamAgentInterface.h"
 #include "GameplayTagContainer.h"
 #include "Hub/ILastFPSInteractable.h"
 #include "Hub/LastFPSNPCTypes.h"
@@ -32,11 +33,16 @@ DECLARE_DYNAMIC_DELEGATE_OneParam(FLastFPSQuantityResultDelegate, int32, Quantit
  * 책임: ① UI 진입점(façade) ② 캐릭터 선택 동기화 ③ NPC 상호작용 ④ 모달/공지
  */
 UCLASS()
-class LASTFPS_API ALastFPSPlayerController : public ACommonPlayerController
+class LASTFPS_API ALastFPSPlayerController : public ACommonPlayerController, public IGenericTeamAgentInterface
 {
     GENERATED_BODY()
 
 public:
+    ALastFPSPlayerController();
+
+    virtual void SetGenericTeamId(const FGenericTeamId& NewTeamId) override;
+    virtual FGenericTeamId GetGenericTeamId() const override;
+
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -227,6 +233,8 @@ protected:
     FTimerHandle MenuLayerSyncBindRetryTimerHandle;
     bool bHUDWidgetPushed = false;
     bool bMenuLayerSyncBound = false;
+
+    FGenericTeamId TeamId;
 
     /** GameMode에서 읽어와 캐시한 진입/ESC 화면 태그 */
     FGameplayTag InitialScreenTag;

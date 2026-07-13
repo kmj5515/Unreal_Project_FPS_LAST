@@ -8,6 +8,7 @@
 #include "AbilitySystem/Effects/GE_StatusSlow.h"
 #include "AbilitySystem/Effects/GE_UltimateCooldown.h"
 #include "Character/LastFPSHero.h"
+#include "Data/Tables/LastFPSSkillBalanceData.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
 #include "Utility/LastFPSTags.h"
@@ -205,6 +206,35 @@ FLastFPSAreaEffectConfig UGA_ViolaFrostStorm::BuildAreaConfig() const
 	{
 		Config.DamageEffect = ULastFPSGE_DamageInstant::StaticClass();
 	}
+	if (const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData())
+	{
+		if (BalanceData->Radius > 0.f)
+		{
+			Config.Radius = BalanceData->Radius;
+			Config.VisualRadius = BalanceData->Radius;
+		}
+		if (BalanceData->Duration > 0.f)
+		{
+			Config.Duration = BalanceData->Duration;
+		}
+		Config.DamageInterval = FMath::Max(
+			BalanceData->GetParameter(
+				LastFPSGameplayTags::Skill_Parameter_DamageInterval,
+				Config.DamageInterval),
+			0.f);
+		Config.ConeAngleDegrees = FMath::Clamp(
+			BalanceData->GetParameter(
+				LastFPSGameplayTags::Skill_Parameter_ConeAngle,
+				Config.ConeAngleDegrees),
+			0.f,
+			360.f);
+		if (BalanceData->Damage > 0.f)
+		{
+			Config.DamageRange = LastFPSDamage::MakeDamageRange(
+				BalanceData->Damage + GetEquippedWeaponBaseDamage(),
+				AreaConfig.DamageRange.DamageElement);
+		}
+	}
 
 	Config.bDrawDebug = ShouldDrawDebug();
 	Config.DebugDrawTime = GetDebugDrawTime();
@@ -242,13 +272,14 @@ void UGA_ViolaFrostStorm::SpawnFrostStorm(ALastFPSHero* Hero)
 	}
 
 	bFrostStormSpawned = true;
-	AreaActor->InitializeAreaEffect(Hero, SourceASC, BuildAreaConfig());
+	const FLastFPSAreaEffectConfig EffectiveAreaConfig = BuildAreaConfig();
+	AreaActor->InitializeAreaEffect(Hero, SourceASC, EffectiveAreaConfig);
 	AreaActor->FinishSpawning(SpawnTransform);
 
 	DrawDebugLine(
 		GetCurrentActorInfo(),
 		SpawnTransform.GetLocation(),
-		SpawnTransform.GetLocation() + SpawnTransform.GetUnitAxis(EAxis::X) * AreaConfig.Radius);
+		SpawnTransform.GetLocation() + SpawnTransform.GetUnitAxis(EAxis::X) * EffectiveAreaConfig.Radius);
 }
 
 void UGA_ViolaFrostStorm::SpawnFrostStormFromCurrentAvatar()

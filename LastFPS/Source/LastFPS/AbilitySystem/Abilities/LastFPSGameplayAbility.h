@@ -5,6 +5,7 @@
 #include "LastFPSGameplayAbility.generated.h"
 
 class UWorld;
+struct FLastFPSSkillBalanceData;
 
 UCLASS(Abstract)
 class LASTFPS_API ULastFPSGameplayAbility : public UGameplayAbility
@@ -15,6 +16,10 @@ public:
 	ULastFPSGameplayAbility();
 
 protected:
+	/** 현재 Ability의 입력 태그에 연결된 캐릭터 스킬 밸런스 행을 반환한다. */
+	const FLastFPSSkillBalanceData* GetSkillBalanceData() const;
+	float GetEquippedWeaponBaseDamage() const;
+
 	virtual void DrawDebug(
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayEventData* TriggerEventData) const;

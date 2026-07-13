@@ -65,6 +65,11 @@ private:
 	FVector GetAuraSourceLocation() const;
 	FVector GetAuraOrigin() const;
 	float GetAuraVisualRadius() const;
+	float GetEffectiveAuraDuration() const;
+	float GetEffectiveAuraRadius() const;
+	float GetEffectiveAuraAreaDuration() const;
+	float GetEffectiveDamageInterval() const;
+	FLastFPSDamageRange GetEffectiveDamageRange() const;
 
 	UFUNCTION()
 	void OnAuraEffectEvent(FGameplayEventData Payload);

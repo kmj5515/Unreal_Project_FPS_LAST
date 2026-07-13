@@ -10,9 +10,43 @@ class ALastFPSProjectile;
 class ALastFPSWeaponActor;
 class UAnimationAsset;
 class UAnimInstance;
+class UCameraShakeBase;
 class UParticleSystem;
 class USkeletalMesh;
 class USoundBase;
+
+USTRUCT(BlueprintType)
+struct LASTFPS_API FLastFPSWeaponAimRecoilSettings
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil")
+    bool bEnabled = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.0", Units="deg"))
+    float Strength = 0.75f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.0"))
+    float HorizontalRatio = 0.25f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.0", ClampMax="1.0"))
+    float RandomnessRatio = 0.15f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.0"))
+    float ADSMultiplier = 0.65f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.01"))
+    float InterpolationSpeed = 20.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.0", Units="s"))
+    float RecoveryDelay = 0.08f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.0", ClampMax="1.0"))
+    float RecoveryRatio = 0.4f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.01"))
+    float RecoveryInterpolationSpeed = 10.f;
+};
 
 UCLASS(BlueprintType)
 class LASTFPS_API ULastFPSWeaponDefinition : public UPrimaryDataAsset
@@ -73,5 +107,15 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Effects")
     TObjectPtr<UParticleSystem> MuzzleFlashEffect;
+
+	/** 로컬 소유자가 발사할 때 재생할 무기 전용 카메라 셰이크입니다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Effects|Camera Shake")
+	TSubclassOf<UCameraShakeBase> FireCameraShakeClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Effects|Camera Shake", meta=(ClampMin="0.0"))
+	float FireCameraShakeScale = 1.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Recoil")
+    FLastFPSWeaponAimRecoilSettings AimRecoil;
 
 };

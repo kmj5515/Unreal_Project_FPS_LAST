@@ -18,6 +18,55 @@
 
 #define LOCTEXT_NAMESPACE "SLastFPSBattleLevelTool"
 
+namespace
+{
+	// 입력 필드 위에 작은 캡션을 얹어 무엇을 입력하는지 명확히 한다.
+	// 폼 컨트롤이 한 줄에 몰려 있을 때 각 항목의 의미를 잃지 않도록 하기 위한 용도.
+	TSharedRef<SWidget> MakeLabeledField(const FText& Label, const TSharedRef<SWidget>& Field)
+	{
+		return SNew(SVerticalBox)
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f, 0.f, 2.f)
+			[
+				SNew(STextBlock)
+				.Text(Label)
+				.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
+				.Font(FCoreStyle::GetDefaultFontStyle(FName(TEXT("Regular")), 8))
+			]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			[
+				Field
+			];
+	}
+
+	// 워크플로우 단계 헤딩. 번호 배지와 제목으로 순서를 드러낸다.
+	TSharedRef<SWidget> MakeStepHeading(const FText& Number, const FText& Title)
+	{
+		return SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.VAlign(VAlign_Center)
+			.Padding(0.f, 0.f, 6.f, 0.f)
+			[
+				SNew(STextBlock)
+				.Text(Number)
+				.ColorAndOpacity(FSlateColor(LastFPSEditorWidgets::GetToolAccentColor()))
+				.Font(FCoreStyle::GetDefaultFontStyle(FName(TEXT("Bold")), 11))
+			]
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.VAlign(VAlign_Center)
+			[
+				SNew(STextBlock)
+				.Text(Title)
+				.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
+				.Font(FCoreStyle::GetDefaultFontStyle(FName(TEXT("Bold")), 11))
+			];
+	}
+}
+
 void SLastFPSBattleLevelTool::Construct(const FArguments& InArgs)
 {
 	RefreshBattleLevels();
@@ -168,18 +217,60 @@ void SLastFPSBattleLevelTool::RefreshMonsterDraftList()
 	{
 		const FLastFPSBattleScenarioMonsterEntry& Monster = DraftMonsters[MonsterIndex];
 		MonsterDraftBox->AddSlot()
-		.Padding(0.f, 0.f, 0.f, 3.f)
+		.Padding(0.f, 0.f, 0.f, 4.f)
 		[
-			SNew(STextBlock)
-			.Text(FText::Format(
-				LOCTEXT("DraftMonsterRow", "{0}. {1} x{2} / 스폰 태그: {3} / 스케일: {4}"),
-				FText::AsNumber(MonsterIndex + 1),
-				FText::FromString(Monster.MonsterDefinition.ToSoftObjectPath().GetAssetName()),
-				FText::AsNumber(Monster.Count),
-				FText::FromName(Monster.SpawnTag),
-				FText::AsNumber(Monster.LevelScale)
-			))
-			.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
+			LastFPSEditorWidgets::MakeRowBox(
+				SNew(SHorizontalBox)
+
+				// 순번
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				.Padding(0.f, 0.f, 8.f, 0.f)
+				[
+					SNew(STextBlock)
+					.Text(FText::AsNumber(MonsterIndex + 1))
+					.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
+				]
+
+				// 캐릭터 이름과 수량
+				+ SHorizontalBox::Slot()
+				.FillWidth(1.f)
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text(FText::Format(
+						LOCTEXT("DraftMonsterName", "{0}  x{1}"),
+						FText::FromString(Monster.MonsterDefinition.ToSoftObjectPath().GetAssetName()),
+						FText::AsNumber(Monster.Count)))
+					.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
+					.Font(FCoreStyle::GetDefaultFontStyle(FName(TEXT("Bold")), 10))
+				]
+
+				// 스폰 태그와 스케일 메타
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				.Padding(0.f, 0.f, 8.f, 0.f)
+				[
+					SNew(STextBlock)
+					.Text(FText::Format(
+						LOCTEXT("DraftMonsterMeta", "{0} · 스케일 {1}"),
+						FText::FromName(Monster.SpawnTag),
+						FText::AsNumber(Monster.LevelScale)))
+					.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
+				]
+
+				// 행별 삭제
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				[
+					SNew(SButton)
+					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+					.Text(LOCTEXT("RemoveMonster", "삭제"))
+					.OnClicked(this, &SLastFPSBattleLevelTool::RemoveMonsterClicked, MonsterIndex)
+				])
 		];
 	}
 }
@@ -248,6 +339,19 @@ FReply SLastFPSBattleLevelTool::AddMonsterClicked()
 	DraftMonsters.Add(MonsterEntry);
 	RefreshMonsterDraftList();
 	SetStatus(LOCTEXT("MonsterAddedStatus", "몬스터 항목을 추가했습니다."));
+	return FReply::Handled();
+}
+
+FReply SLastFPSBattleLevelTool::RemoveMonsterClicked(int32 MonsterIndex)
+{
+	if (!DraftMonsters.IsValidIndex(MonsterIndex))
+	{
+		return FReply::Handled();
+	}
+
+	DraftMonsters.RemoveAt(MonsterIndex);
+	RefreshMonsterDraftList();
+	SetStatus(LOCTEXT("MonsterRemovedStatus", "몬스터 항목을 삭제했습니다."));
 	return FReply::Handled();
 }
 
@@ -387,193 +491,231 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildScenarioEditor()
 		LOCTEXT("ScenarioEditorSectionTitle", "배틀 시나리오"),
 		LastFPSEditorWidgets::GetToolAccentColor(),
 		SNew(SVerticalBox)
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("ScenarioEditorInnerTitle", "배틀 시나리오 초안"))
-				.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
-				.Font(FCoreStyle::GetDefaultFontStyle(FName(TEXT("Bold")), 11))
-			]
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 6.f, 0.f, 0.f)
-			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				[
-					SNew(STextBlock)
-					.Text(LOCTEXT("SelectedScenarioLabel", "선택한 시나리오"))
-					.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
-				]
-				+ SHorizontalBox::Slot()
-				.FillWidth(1.f)
-				.Padding(0.f, 0.f, 6.f, 0.f)
-				[
-					SNew(SObjectPropertyEntryBox)
-					.AllowedClass(ULastFPSBattleScenarioDefinition::StaticClass())
-					.ObjectPath(this, &SLastFPSBattleLevelTool::GetSelectedScenarioObjectPath)
-					.OnObjectChanged(this, &SLastFPSBattleLevelTool::SetSelectedScenarioObject)
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(0.f, 0.f, 6.f, 0.f)
-				[
-					SNew(SButton)
-					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
-					.Text(LOCTEXT("LoadSelectedScenario", "선택 항목 불러오기"))
-					.OnClicked(this, &SLastFPSBattleLevelTool::LoadSelectedScenarioClicked)
 
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				[
-					SNew(SButton)
-					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
-					.Text(LOCTEXT("PlaySelectedScenario", "선택 항목 실행"))
-					.OnClicked(this, &SLastFPSBattleLevelTool::PlaySelectedScenarioClicked)
-				]
-			]
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 6.f, 0.f, 0.f)
+		// 1단계: 저장된 시나리오를 초안으로 불러오거나 바로 실행한다.
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			MakeStepHeading(
+				LOCTEXT("StepLoadNumber", "1"),
+				LOCTEXT("StepLoadTitle", "저장된 시나리오 불러오기"))
+		]
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0.f, 6.f, 0.f, 0.f)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.FillWidth(1.f)
+			.VAlign(VAlign_Center)
+			.Padding(0.f, 0.f, 6.f, 0.f)
 			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				[
-					SNew(STextBlock)
-					.Text(LOCTEXT("DraftScenarioLabel", "시나리오 초안"))
-					.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
-				]
+				SNew(SObjectPropertyEntryBox)
+				.AllowedClass(ULastFPSBattleScenarioDefinition::StaticClass())
+				.ObjectPath(this, &SLastFPSBattleLevelTool::GetSelectedScenarioObjectPath)
+				.OnObjectChanged(this, &SLastFPSBattleLevelTool::SetSelectedScenarioObject)
+			]
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.Padding(0.f, 0.f, 6.f, 0.f)
+			[
+				SNew(SButton)
+				.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+				.Text(LOCTEXT("LoadSelectedScenario", "불러오기"))
+				.OnClicked(this, &SLastFPSBattleLevelTool::LoadSelectedScenarioClicked)
+			]
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			[
+				SNew(SButton)
+				.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+				.Text(LOCTEXT("PlaySelectedScenario", "실행"))
+				.OnClicked(this, &SLastFPSBattleLevelTool::PlaySelectedScenarioClicked)
+			]
+		]
 
-				+ SHorizontalBox::Slot()
-				.FillWidth(0.25f)
-				.Padding(0.f, 0.f, 6.f, 0.f)
-				[
+		// 2단계: 초안의 메타데이터와 몬스터 구성을 편집한다.
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0.f, 12.f, 0.f, 0.f)
+		[
+			MakeStepHeading(
+				LOCTEXT("StepEditNumber", "2"),
+				LOCTEXT("StepEditTitle", "시나리오 초안 편집"))
+		]
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0.f, 6.f, 0.f, 0.f)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.FillWidth(0.34f)
+			.Padding(0.f, 0.f, 6.f, 0.f)
+			[
+				MakeLabeledField(
+					LOCTEXT("ScenarioNameFieldLabel", "시나리오 이름"),
 					SNew(SEditableTextBox)
 					.Style(&LastFPSEditorWidgets::GetToolEditableTextBoxStyle())
 					.Text(this, &SLastFPSBattleLevelTool::GetScenarioNameText)
-					.OnTextCommitted(this, &SLastFPSBattleLevelTool::SetScenarioName)
-				]
-				+ SHorizontalBox::Slot()
-				.FillWidth(0.25f)
-				.Padding(0.f, 0.f, 6.f, 0.f)
-				[
+					.OnTextCommitted(this, &SLastFPSBattleLevelTool::SetScenarioName))
+			]
+			+ SHorizontalBox::Slot()
+			.FillWidth(0.33f)
+			.Padding(0.f, 0.f, 6.f, 0.f)
+			[
+				MakeLabeledField(
+					LOCTEXT("ScenarioMapFieldLabel", "대상 맵"),
 					SNew(SObjectPropertyEntryBox)
 					.AllowedClass(UWorld::StaticClass())
 					.ObjectPath(this, &SLastFPSBattleLevelTool::GetBattleMapObjectPath)
-					.OnObjectChanged(this, &SLastFPSBattleLevelTool::SetBattleMapObject)
-				]
-				+ SHorizontalBox::Slot()
-				.FillWidth(0.25f)
-				.Padding(0.f, 0.f, 6.f, 0.f)
-				[
+					.OnObjectChanged(this, &SLastFPSBattleLevelTool::SetBattleMapObject))
+			]
+			+ SHorizontalBox::Slot()
+			.FillWidth(0.33f)
+			[
+				MakeLabeledField(
+					LOCTEXT("ScenarioPlayerFieldLabel", "플레이어 캐릭터"),
 					SNew(SObjectPropertyEntryBox)
 					.AllowedClass(ULastFPSCharacterDefinition::StaticClass())
 					.ObjectPath(this, &SLastFPSBattleLevelTool::GetPlayerCharacterObjectPath)
-					.OnObjectChanged(this, &SLastFPSBattleLevelTool::SetPlayerCharacterObject)
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(0.f, 0.f, 6.f, 0.f)
-				[
-					SNew(SButton)
-					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
-					.Text(LOCTEXT("CreateScenario", "시나리오 생성"))
-					.OnClicked(this, &SLastFPSBattleLevelTool::CreateScenarioClicked)
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(0.f, 0.f, 6.f, 0.f)
-				[
-					SNew(SButton)
-					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
-					.Text(LOCTEXT("SaveScenario", "선택 항목 저장"))
-					.OnClicked(this, &SLastFPSBattleLevelTool::SaveScenarioClicked)
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				[
-					SNew(SButton)
-					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
-					.Text(LOCTEXT("PlayScenario", "시나리오 실행"))
-					.OnClicked(this, &SLastFPSBattleLevelTool::PlayScenarioClicked)
-				]
+					.OnObjectChanged(this, &SLastFPSBattleLevelTool::SetPlayerCharacterObject))
 			]
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 6.f, 0.f, 0.f)
-			[
+		]
+
+		// 몬스터 추가 폼: 각 필드가 무엇인지 라벨로 구분한다.
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0.f, 8.f, 0.f, 0.f)
+		[
+			LastFPSEditorWidgets::MakeRowBox(
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
 				.FillWidth(0.34f)
 				.Padding(0.f, 0.f, 6.f, 0.f)
 				[
-					SNew(SObjectPropertyEntryBox)
-					.AllowedClass(ULastFPSCharacterDefinition::StaticClass())
-					.ObjectPath(this, &SLastFPSBattleLevelTool::GetPendingMonsterObjectPath)
-					.OnObjectChanged(this, &SLastFPSBattleLevelTool::SetPendingMonsterObject)
+					MakeLabeledField(
+						LOCTEXT("MonsterCharacterFieldLabel", "캐릭터"),
+						SNew(SObjectPropertyEntryBox)
+						.AllowedClass(ULastFPSCharacterDefinition::StaticClass())
+						.ObjectPath(this, &SLastFPSBattleLevelTool::GetPendingMonsterObjectPath)
+						.OnObjectChanged(this, &SLastFPSBattleLevelTool::SetPendingMonsterObject))
+				]
+				+ SHorizontalBox::Slot()
+				.FillWidth(0.14f)
+				.Padding(0.f, 0.f, 6.f, 0.f)
+				[
+					MakeLabeledField(
+						LOCTEXT("MonsterCountFieldLabel", "수량"),
+						SNew(SSpinBox<int32>)
+						.MinValue(1)
+						.MaxValue(999)
+						.Value_Lambda([this]() { return PendingMonsterCount; })
+						.OnValueChanged_Lambda([this](int32 NewValue) { PendingMonsterCount = FMath::Max(NewValue, 1); }))
+				]
+				+ SHorizontalBox::Slot()
+				.FillWidth(0.26f)
+				.Padding(0.f, 0.f, 6.f, 0.f)
+				[
+					MakeLabeledField(
+						LOCTEXT("MonsterSpawnTagFieldLabel", "스폰 태그"),
+						SNew(SEditableTextBox)
+						.Style(&LastFPSEditorWidgets::GetToolEditableTextBoxStyle())
+						.Text(this, &SLastFPSBattleLevelTool::GetPendingMonsterSpawnTagText)
+						.OnTextCommitted(this, &SLastFPSBattleLevelTool::SetPendingMonsterSpawnTag))
+				]
+				+ SHorizontalBox::Slot()
+				.FillWidth(0.14f)
+				.Padding(0.f, 0.f, 6.f, 0.f)
+				[
+					MakeLabeledField(
+						LOCTEXT("MonsterScaleFieldLabel", "스케일"),
+						SNew(SSpinBox<float>)
+						.MinValue(0.01f)
+						.MaxValue(100.f)
+						.Value_Lambda([this]() { return PendingMonsterLevelScale; })
+						.OnValueChanged_Lambda([this](float NewValue) { PendingMonsterLevelScale = FMath::Max(NewValue, 0.01f); }))
 				]
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
-				.Padding(0.f, 0.f, 6.f, 0.f)
-				[
-					SNew(SSpinBox<int32>)
-					.MinValue(1)
-					.MaxValue(999)
-					.Value_Lambda([this]() { return PendingMonsterCount; })
-					.OnValueChanged_Lambda([this](int32 NewValue) { PendingMonsterCount = FMath::Max(NewValue, 1); })
-				]
-				+ SHorizontalBox::Slot()
-				.FillWidth(0.22f)
-				.Padding(0.f, 0.f, 6.f, 0.f)
-				[
-					SNew(SEditableTextBox)
-					.Style(&LastFPSEditorWidgets::GetToolEditableTextBoxStyle())
-					.Text(this, &SLastFPSBattleLevelTool::GetPendingMonsterSpawnTagText)
-					.OnTextCommitted(this, &SLastFPSBattleLevelTool::SetPendingMonsterSpawnTag)
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(0.f, 0.f, 6.f, 0.f)
-				[
-					SNew(SSpinBox<float>)
-					.MinValue(0.01f)
-					.MaxValue(100.f)
-					.Value_Lambda([this]() { return PendingMonsterLevelScale; })
-					.OnValueChanged_Lambda([this](float NewValue) { PendingMonsterLevelScale = FMath::Max(NewValue, 0.01f); })
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				.Padding(0.f, 0.f, 4.f, 0.f)
+				.VAlign(VAlign_Bottom)
 				[
 					SNew(SButton)
 					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
-					.Text(LOCTEXT("AddMonster", "몬스터 추가"))
+					.Text(LOCTEXT("AddMonster", "추가"))
 					.OnClicked(this, &SLastFPSBattleLevelTool::AddMonsterClicked)
-				]
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				[
-					SNew(SButton)
-					.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
-					.Text(LOCTEXT("ClearMonsters", "비우기"))
-					.OnClicked(this, &SLastFPSBattleLevelTool::ClearMonstersClicked)
-				]
-			]
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 6.f, 0.f, 0.f)
+				])
+		]
+
+		// 스폰 목록 헤더: 현재 개수와 전체 비우기 액션.
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0.f, 8.f, 0.f, 4.f)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.FillWidth(1.f)
+			.VAlign(VAlign_Center)
 			[
-				SNew(SBox)
-				.MaxDesiredHeight(100.f)
-				[
-					SAssignNew(MonsterDraftBox, SScrollBox)
-				]
+				SNew(STextBlock)
+				.Text(this, &SLastFPSBattleLevelTool::GetDraftMonsterCountText)
+				.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
 			]
-		);
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			[
+				SNew(SButton)
+				.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+				.Text(LOCTEXT("ClearMonsters", "비우기"))
+				.OnClicked(this, &SLastFPSBattleLevelTool::ClearMonstersClicked)
+			]
+		]
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		[
+			SNew(SBox)
+			.MaxDesiredHeight(110.f)
+			[
+				SAssignNew(MonsterDraftBox, SScrollBox)
+			]
+		]
+
+		// 초안 저장/실행 액션. 실행은 강조 버튼으로 위계를 둔다.
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0.f, 10.f, 0.f, 0.f)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.FillWidth(1.f)
+			.Padding(0.f, 0.f, 6.f, 0.f)
+			[
+				SNew(SButton)
+				.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+				.HAlign(HAlign_Center)
+				.Text(LOCTEXT("CreateScenario", "시나리오 생성"))
+				.OnClicked(this, &SLastFPSBattleLevelTool::CreateScenarioClicked)
+			]
+			+ SHorizontalBox::Slot()
+			.FillWidth(1.f)
+			.Padding(0.f, 0.f, 6.f, 0.f)
+			[
+				SNew(SButton)
+				.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+				.HAlign(HAlign_Center)
+				.Text(LOCTEXT("SaveScenario", "저장"))
+				.OnClicked(this, &SLastFPSBattleLevelTool::SaveScenarioClicked)
+			]
+			+ SHorizontalBox::Slot()
+			.FillWidth(1.f)
+			[
+				SNew(SButton)
+				.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+				.HAlign(HAlign_Center)
+				.Text(LOCTEXT("PlayScenario", "초안으로 실행"))
+				.OnClicked(this, &SLastFPSBattleLevelTool::PlayScenarioClicked)
+			]
+		]
+	);
 }
 
 TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildLevelRow(const FLastFPSBattleLevelInfo& BattleLevel)
@@ -662,6 +804,11 @@ FText SLastFPSBattleLevelTool::GetCurrentLevelText() const
 	return CurrentPackageName.IsEmpty()
 		? LOCTEXT("NoCurrentLevelText", "현재: 없음")
 		: FText::Format(LOCTEXT("CurrentLevelText", "현재: {0}"), FText::FromString(CurrentPackageName));
+}
+
+FText SLastFPSBattleLevelTool::GetDraftMonsterCountText() const
+{
+	return FText::Format(LOCTEXT("DraftMonsterCount", "스폰 목록 · {0}"), FText::AsNumber(DraftMonsters.Num()));
 }
 
 FText SLastFPSBattleLevelTool::GetScenarioNameText() const

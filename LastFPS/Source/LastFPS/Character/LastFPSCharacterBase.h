@@ -109,8 +109,9 @@ protected:
     virtual void GiveDefaultAbilities();
     void ApplyDefaultEffects();
     void OnHealthChanged(const FOnAttributeChangeData& Data);
-    void UpdateAliveCollisionState(bool bAlive);
-    void OnMoveSpeedChanged(const FOnAttributeChangeData& Data);
+    virtual void UpdateAliveCollisionState(bool bAlive);
+    virtual void OnMoveSpeedChanged(const FOnAttributeChangeData& Data);
+    virtual float ResolveMaxWalkSpeed(float AttributeMoveSpeed) const;
     void BindStatusOverlayMaterials(UAbilitySystemComponent* ASC);
     void UnbindStatusOverlayMaterials(UAbilitySystemComponent* ASC);
     void OnStatusOverlayTagChanged(FGameplayTag StatusTag, int32 NewCount);

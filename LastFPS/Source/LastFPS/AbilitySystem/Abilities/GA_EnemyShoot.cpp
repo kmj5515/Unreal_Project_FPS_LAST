@@ -3,11 +3,10 @@
 #include "AbilitySystemComponent.h"
 #include "AIController.h"
 #include "Character/LastFPSCharacterBase.h"
-#include "Components/SkeletalMeshComponent.h"
 #include "Data/Projectiles/LastFPSAbilityProjectileData.h"
 #include "Engine/World.h"
-#include "GameFramework/ProjectileMovementComponent.h"
 #include "Projectiles/LastFPSProjectile.h"
+#include "Projectiles/LastFPSProjectileLaunchUtility.h"
 #include "Utility/LastFPSTags.h"
 
 UGA_EnemyShoot::UGA_EnemyShoot()
@@ -67,55 +66,19 @@ void UGA_EnemyShoot::SpawnProjectileAtTarget(ALastFPSCharacterBase* Self) const
 		Target = AICon->GetFocusActor();
 	}
 
-	// 스폰 위치: 소켓이 있으면 소켓, 없으면 액터 + 총구 높이.
-	FVector SpawnLocation = Self->GetActorLocation() + FVector(0.f, 0.f, MuzzleHeight);
-	if (const USkeletalMeshComponent* Mesh = Self->GetMesh())
-	{
-		if (!ProjectileData->SpawnSocketName.IsNone() && Mesh->DoesSocketExist(ProjectileData->SpawnSocketName))
-		{
-			SpawnLocation = Mesh->GetSocketLocation(ProjectileData->SpawnSocketName);
-		}
-	}
-
-	// 조준: 타깃 몸통을 향해. 타깃이 없으면 액터 전방.
-	FVector AimDirection = Self->GetActorForwardVector();
+	FVector AimTarget = Self->GetActorLocation()
+		+ Self->GetActorForwardVector() * ProjectileData->AimTraceRange;
 	if (Target)
 	{
-		const FVector AimPoint = Target->GetActorLocation() + FVector(0.f, 0.f, TargetAimHeight);
-		const FVector ToTarget = (AimPoint - SpawnLocation).GetSafeNormal();
-		if (!ToTarget.IsNearlyZero())
-		{
-			AimDirection = ToTarget;
-		}
+		AimTarget = Target->GetActorLocation() + FVector(0.f, 0.f, TargetAimHeight);
 	}
 
-	const FRotator SpawnRotation = AimDirection.Rotation();
-	SpawnLocation += SpawnRotation.RotateVector(ProjectileData->SpawnLocationOffset);
-
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = Self;
-	SpawnParams.Instigator = Cast<APawn>(Self);
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	ALastFPSProjectile* Projectile = World->SpawnActor<ALastFPSProjectile>(
-		ProjectileData->ProjectileClass,
-		SpawnLocation,
-		SpawnRotation,
-		SpawnParams);
-
-	if (!Projectile)
-	{
-		return;
-	}
-
-	Projectile->InitializeGameplayProjectile(
-		Self,
-		ProjectileData->ImpactRules,
-		ProjectileData->EffectsOnHit,
-		ProjectileData->VisualData);
-
-	if (Projectile->ProjectileMovement)
-	{
-		Projectile->ProjectileMovement->Velocity = AimDirection * ProjectileData->ProjectileSpeed;
-	}
+	FLastFPSProjectileLaunchRequest LaunchRequest;
+	LaunchRequest.SourceActor = Self;
+	LaunchRequest.ProjectileData = ProjectileData;
+	LaunchRequest.AimTarget = AimTarget;
+	LaunchRequest.FallbackAimDirection = Self->GetActorForwardVector();
+	LaunchRequest.FallbackMuzzleHeight = MuzzleHeight;
+	LaunchRequest.bUseEquippedWeapon = true;
+	LastFPSProjectileLaunch::SpawnProjectile(LaunchRequest);
 }

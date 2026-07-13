@@ -4,6 +4,7 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "GameplayEffect.h"
+#include "Utility/LastFPSCombatAffiliation.h"
 
 UAbilitySystemComponent* ULastFPSProjectileImpactRule::GetAbilitySystemComponent(AActor* Actor)
 {
@@ -43,7 +44,8 @@ void ULastFPSProjectileImpactRule::ApplyGameplayEffectsToTarget(
 	const TArray<TSubclassOf<UGameplayEffect>>& Effects,
 	const FLastFPSDamageRange& DamageRange)
 {
-	if (!Context.SourceASC || !TargetActor)
+	if (!Context.SourceASC || !TargetActor
+		|| LastFPSCombatAffiliation::AreFriendlyActors(Context.SourceActor.Get(), TargetActor))
 	{
 		return;
 	}
@@ -68,7 +70,10 @@ void ULastFPSProjectileImpactRule::ApplyGameplayEffectsToTarget(
 		FGameplayEffectSpecHandle Spec = Context.SourceASC->MakeOutgoingSpec(EffectClass, 1.f, EffectContext);
 		if (Spec.IsValid())
 		{
-			LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), DamageRange);
+			const FLastFPSDamageRange EffectiveDamageRange = Context.BaseDamageOverride > 0.f
+				? LastFPSDamage::MakeDamageRange(Context.BaseDamageOverride, DamageRange.DamageElement)
+				: DamageRange;
+			LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), EffectiveDamageRange);
 			TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 		}
 	}

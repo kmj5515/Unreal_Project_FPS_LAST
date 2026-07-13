@@ -1,6 +1,8 @@
 #include "AbilitySystem/Effects/GE_MoveSpeedBuff.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
+#include "GameplayEffectComponents/TargetTagsGameplayEffectComponent.h"
 #include "GameplayEffectTypes.h"
+#include "Utility/LastFPSTags.h"
 
 ULastFPSGE_MoveSpeedBuff::ULastFPSGE_MoveSpeedBuff()
 {
@@ -17,4 +19,11 @@ ULastFPSGE_MoveSpeedBuff::ULastFPSGE_MoveSpeedBuff()
     Mod.ModifierOp        = EGameplayModOp::Additive;
     Mod.ModifierMagnitude = FScalableFloat(250.f);
     Modifiers.Add(Mod);
+
+	FInheritedTagContainer GrantedTags;
+	GrantedTags.AddTag(LastFPSGameplayTags::Status_Movement_SpeedBoost);
+	UTargetTagsGameplayEffectComponent* TargetTagsComponent =
+		CreateDefaultSubobject<UTargetTagsGameplayEffectComponent>(TEXT("TargetTagsGameplayEffectComponent"));
+	GEComponents.Add(TargetTagsComponent);
+	TargetTagsComponent->SetAndApplyTargetTagChanges(GrantedTags);
 }

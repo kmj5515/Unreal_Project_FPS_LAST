@@ -1,0 +1,4 @@
+---,Damage,FireInterval,AimTraceRange,DamageElement,Parameters
+Rifle,"1100.000000","0.100000","10000.000000","Physical","()"
+Sniper,"15.000000","5.000000","10000.000000","Physical","()"
+Bazooka,"15.000000","5.000000","10000.000000","Physical","()"

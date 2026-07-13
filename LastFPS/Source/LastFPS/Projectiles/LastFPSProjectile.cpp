@@ -11,18 +11,14 @@
 #include "NiagaraFunctionLibrary.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Data/Projectiles/LastFPSProjectileVisualData.h"
-#include "Character/LastFPSEnemyCharacter.h"
+#include "Utility/LastFPSCombatAffiliation.h"
 
 namespace
 {
-	// 임시 팩션 규칙: AI 적끼리는 아군으로 간주해 서로 데미지를 주지 않는다.
-	// 플레이어끼리는 개인전(FFA)이라 아군이 아니며, 적↔플레이어는 항상 적대.
-	// TODO: 팀전 등 확장 시 GenericTeamId 기반 팀 시스템으로 교체.
+	// 투사체 충돌과 효과 적용이 동일한 팀 판정 계약을 사용하도록 진입점을 통일한다.
 	bool AreFriendlyActors(const AActor* Source, const AActor* Target)
 	{
-		return Source && Target
-			&& Source->IsA(ALastFPSEnemyCharacter::StaticClass())
-			&& Target->IsA(ALastFPSEnemyCharacter::StaticClass());
+		return LastFPSCombatAffiliation::AreFriendlyActors(Source, Target);
 	}
 }
 
@@ -65,12 +61,14 @@ void ALastFPSProjectile::InitializeGameplayProjectile(
     AActor* InSourceActor,
     const TArray<TObjectPtr<ULastFPSProjectileImpactRule>>& InImpactRules,
     const TArray<TSubclassOf<UGameplayEffect>>& InLegacyEffectsOnHit,
-    ULastFPSProjectileVisualData* InVisualData)
+    ULastFPSProjectileVisualData* InVisualData,
+    const float InBaseDamageOverride)
 {
     SourceActor = InSourceActor;
     ImpactRules = InImpactRules;
     LegacyEffectsOnHit = InLegacyEffectsOnHit;
     VisualData = InVisualData;
+    BaseDamageOverride = FMath::Max(InBaseDamageOverride, 0.f);
     ApplyVisualData();
     EnableGameplayCollision();
 }
@@ -110,7 +108,7 @@ void ALastFPSProjectile::OnProjectileOverlap(
         return;
     }
 
-    // 아군(AI 적끼리)은 데미지 없이 통과 — 히트 처리/파괴하지 않고 계속 비행한다.
+    // 아군은 데미지 없이 통과하며 히트 처리나 투사체 파괴를 수행하지 않는다.
     if (AreFriendlyActors(SourceActor, OtherActor))
     {
         return;
@@ -126,6 +124,12 @@ void ALastFPSProjectile::OnProjectileStop(const FHitResult& ImpactResult)
 {
     if (HasAuthority() && !bHasAppliedHit)
     {
+        if (AreFriendlyActors(SourceActor, ImpactResult.GetActor()))
+        {
+            Destroy();
+            return;
+        }
+
         ExecuteImpactRules(ImpactResult.GetActor(), ImpactResult);
         bHasAppliedHit = true;
         PlayImpactFeedback(ImpactResult);
@@ -148,6 +152,7 @@ void ALastFPSProjectile::ExecuteImpactRules(AActor* HitActor, const FHitResult& 
     Context.HitActor = HitActor;
     Context.SourceASC = SourceASC;
     Context.HitResult = ImpactResult;
+    Context.BaseDamageOverride = BaseDamageOverride;
 
     bool bExecutedRule = false;
     for (const TObjectPtr<ULastFPSProjectileImpactRule>& ImpactRule : ImpactRules)
@@ -174,7 +179,8 @@ void ALastFPSProjectile::ExecuteImpactRules(AActor* HitActor, const FHitResult& 
 
 void ALastFPSProjectile::ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass)
 {
-    if (!SourceActor || !TargetActor || !EffectClass)
+    if (!SourceActor || !TargetActor || !EffectClass
+        || AreFriendlyActors(SourceActor, TargetActor))
     {
         return;
     }
@@ -200,7 +206,10 @@ void ALastFPSProjectile::ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UG
     FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(EffectClass, 1.f, Context);
     if (Spec.IsValid())
     {
-        LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), LegacyDamageRange);
+        const FLastFPSDamageRange EffectiveDamageRange = BaseDamageOverride > 0.f
+            ? LastFPSDamage::MakeDamageRange(BaseDamageOverride, LegacyDamageRange.DamageElement)
+            : LegacyDamageRange;
+        LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), EffectiveDamageRange);
         TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
     }
 }

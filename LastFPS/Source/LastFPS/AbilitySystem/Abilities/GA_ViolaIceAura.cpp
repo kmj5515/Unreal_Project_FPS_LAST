@@ -7,6 +7,7 @@
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Character/LastFPSHero.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Data/Tables/LastFPSSkillBalanceData.h"
 #include "Engine/World.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
@@ -152,23 +153,25 @@ void UGA_ViolaIceAura::StartAuraLoop()
 
 	SpawnAuraAreaEffect();
 
-	if (DamageInterval > 0.f && ShouldSpawnAuraAreaEffect())
+	const float EffectiveDamageInterval = GetEffectiveDamageInterval();
+	if (EffectiveDamageInterval > 0.f && ShouldSpawnAuraAreaEffect())
 	{
 		World->GetTimerManager().SetTimer(
 			AuraTargetEffectTimerHandle,
 			this,
 			&UGA_ViolaIceAura::SpawnAuraAreaEffect,
-			DamageInterval,
+			EffectiveDamageInterval,
 			true);
 	}
 
-	if (AuraDuration > 0.f)
+	const float EffectiveAuraDuration = GetEffectiveAuraDuration();
+	if (EffectiveAuraDuration > 0.f)
 	{
 		World->GetTimerManager().SetTimer(
 			AuraDurationTimerHandle,
 			this,
 			&UGA_ViolaIceAura::FinishAura,
-			AuraDuration,
+			EffectiveAuraDuration,
 			false);
 	}
 	else
@@ -213,20 +216,20 @@ void UGA_ViolaIceAura::SpawnAuraAreaEffect()
 
 bool UGA_ViolaIceAura::ShouldSpawnAuraAreaEffect() const
 {
-	return AuraAreaDuration > 0.f
-		&& AuraRadius > 0.f
+	return GetEffectiveAuraAreaDuration() > 0.f
+		&& GetEffectiveAuraRadius() > 0.f
 		&& (AuraDamageEffect || !AuraTargetEffects.IsEmpty() || AuraPulseNiagaraSystem);
 }
 
 FLastFPSAreaEffectConfig UGA_ViolaIceAura::BuildAuraAreaConfig() const
 {
 	FLastFPSAreaEffectConfig AreaConfig;
-	AreaConfig.Radius = AuraRadius;
-	AreaConfig.Duration = AuraAreaDuration;
-	AreaConfig.DamageInterval = DamageInterval;
+	AreaConfig.Radius = GetEffectiveAuraRadius();
+	AreaConfig.Duration = GetEffectiveAuraAreaDuration();
+	AreaConfig.DamageInterval = GetEffectiveDamageInterval();
 	AreaConfig.DamageEffect = AuraDamageEffect;
 	AreaConfig.DamageCooldownEffect = AuraDamageCooldownEffect;
-	AreaConfig.DamageRange = DamageRange;
+	AreaConfig.DamageRange = GetEffectiveDamageRange();
 	AreaConfig.TargetEffects = AuraTargetEffects;
 	AreaConfig.RequiredTargetTags = RequiredTargetTags;
 	AreaConfig.BlockedTargetTags = BlockedTargetTags;
@@ -235,7 +238,7 @@ FLastFPSAreaEffectConfig UGA_ViolaIceAura::BuildAuraAreaConfig() const
 	AreaConfig.VisualRadiusNiagaraParameterName = AuraVisualRadiusNiagaraParameterName;
 	AreaConfig.DurationNiagaraParameterName = AuraDurationNiagaraParameterName;
 	AreaConfig.bDrawDebug = ShouldDrawDebug();
-	AreaConfig.DebugDrawTime = AuraAreaDuration;
+	AreaConfig.DebugDrawTime = AreaConfig.Duration;
 	AreaConfig.DebugColor = DebugColor;
 	return AreaConfig;
 }
@@ -414,7 +417,47 @@ FVector UGA_ViolaIceAura::GetAuraOrigin() const
 
 float UGA_ViolaIceAura::GetAuraVisualRadius() const
 {
-	return AuraVisualRadius > 0.f ? AuraVisualRadius : AuraRadius * 2.f;
+	return AuraVisualRadius > 0.f ? AuraVisualRadius : GetEffectiveAuraRadius() * 2.f;
+}
+
+float UGA_ViolaIceAura::GetEffectiveAuraDuration() const
+{
+	const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
+	return BalanceData && BalanceData->Duration > 0.f ? BalanceData->Duration : AuraDuration;
+}
+
+float UGA_ViolaIceAura::GetEffectiveAuraRadius() const
+{
+	const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
+	return BalanceData && BalanceData->Radius > 0.f ? BalanceData->Radius : AuraRadius;
+}
+
+float UGA_ViolaIceAura::GetEffectiveAuraAreaDuration() const
+{
+	const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
+	const float Value = BalanceData
+		? BalanceData->GetParameter(LastFPSGameplayTags::Skill_Parameter_AreaDuration, AuraAreaDuration)
+		: AuraAreaDuration;
+	return FMath::Max(Value, 0.f);
+}
+
+float UGA_ViolaIceAura::GetEffectiveDamageInterval() const
+{
+	const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
+	const float Value = BalanceData
+		? BalanceData->GetParameter(LastFPSGameplayTags::Skill_Parameter_DamageInterval, DamageInterval)
+		: DamageInterval;
+	return FMath::Max(Value, 0.f);
+}
+
+FLastFPSDamageRange UGA_ViolaIceAura::GetEffectiveDamageRange() const
+{
+	const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
+	return BalanceData && BalanceData->Damage > 0.f
+		? LastFPSDamage::MakeDamageRange(
+			BalanceData->Damage + GetEquippedWeaponBaseDamage(),
+			DamageRange.DamageElement)
+		: DamageRange;
 }
 
 void UGA_ViolaIceAura::OnAuraEffectEvent(FGameplayEventData)

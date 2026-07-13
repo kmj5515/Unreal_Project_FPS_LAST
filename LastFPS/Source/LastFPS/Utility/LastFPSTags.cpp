@@ -9,6 +9,8 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_AuraDamageCooldown, "Status.AuraDamageCool
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Freeze, "Status.Freeze", "빙결 상태")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_FreezeStack, "Status.FreezeStack", "빙결 누적 상태")
 
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Movement_SpeedBoost, "Status.Movement.SpeedBoost", "이동속도 증가 효과가 활성화된 상태")
+
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_Dash, "Cooldown.Skill.Dash", "Dash cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill1, "Cooldown.Skill1", "Skill 1 cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill2, "Cooldown.Skill2", "Skill 2 cooldown")
@@ -17,6 +19,10 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Ultimate, "Cooldown.Ultimate", "Ultimate
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(SetByCaller_Damage, "SetByCaller.Damage", "SetByCaller damage magnitude")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(SetByCaller_CriticalHit, "SetByCaller.CriticalHit", "SetByCaller critical hit flag")
+
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Parameter_AreaDuration, "Skill.Parameter.AreaDuration", "개별 피해 영역의 유지 시간")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Parameter_DamageInterval, "Skill.Parameter.DamageInterval", "반복 피해 적용 간격")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Parameter_ConeAngle, "Skill.Parameter.ConeAngle", "부채꼴 스킬의 전체 각도")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_AbilityCommit, "Event.Montage.Ability.Commit", "Commit an ability from an ability montage")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_AbilityEnd, "Event.Montage.Ability.End", "End an ability from an ability montage")

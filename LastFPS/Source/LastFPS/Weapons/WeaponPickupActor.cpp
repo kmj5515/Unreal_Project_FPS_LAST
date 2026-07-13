@@ -1,7 +1,7 @@
 #include "Weapons/WeaponPickupActor.h"
 #include "Weapons/LastFPSWeaponActor.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
-#include "Character/LastFPSHero.h"
+#include "Character/Interfaces/LastFPSWeaponUser.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -52,7 +52,7 @@ void AWeaponPickupActor::BeginPlay()
     PickupMesh->SetSkeletalMesh(ResolveWeaponMesh());
 
     TArray<AActor*> OverlappingActors;
-    OverlapSphere->GetOverlappingActors(OverlappingActors, ALastFPSHero::StaticClass());
+    OverlapSphere->GetOverlappingActors(OverlappingActors);
 
     for (AActor* OverlappingActor : OverlappingActors)
     {
@@ -78,10 +78,10 @@ void AWeaponPickupActor::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AAc
 
 void AWeaponPickupActor::TryEquipToActor(AActor* OtherActor)
 {
-    ALastFPSHero* Hero = Cast<ALastFPSHero>(OtherActor);
-    if (!Hero) return;
+    ILastFPSWeaponUser* WeaponUser = Cast<ILastFPSWeaponUser>(OtherActor);
+    if (!WeaponUser) return;
 
-    UWeaponComponent* WeaponComp = Hero->GetWeaponComponent();
+    UWeaponComponent* WeaponComp = WeaponUser->GetWeaponComponent();
     if (!WeaponComp) return;
 
     if (WeaponDefinition)

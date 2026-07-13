@@ -2,6 +2,16 @@
 
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
+#include "Character/Interfaces/LastFPSWeaponUser.h"
+
+namespace
+{
+	UWeaponComponent* ResolveWeaponComponent(const ACharacter* Character)
+	{
+		const ILastFPSWeaponUser* WeaponUser = Cast<ILastFPSWeaponUser>(Character);
+		return WeaponUser ? WeaponUser->GetWeaponComponent() : nullptr;
+	}
+}
 
 void ULastFPSAnimInstance::ResetAnimState()
 {
@@ -24,23 +34,17 @@ void ULastFPSAnimInstance::ResetAnimState()
 
 void ULastFPSAnimInstance::OnOwnerCharacterChanged(ACharacter* PreviousCharacter, ACharacter* NewCharacter)
 {
-	if (ALastFPSHero* PreviousHero = Cast<ALastFPSHero>(PreviousCharacter))
+	if (UWeaponComponent* PreviousWeapon = ResolveWeaponComponent(PreviousCharacter))
 	{
-		if (UWeaponComponent* PreviousWeapon = PreviousHero->GetWeaponComponent())
-		{
-			PreviousWeapon->OnWeaponEquippedChanged.RemoveDynamic(this, &ULastFPSAnimInstance::OnWeaponEquipped);
-		}
+		PreviousWeapon->OnWeaponEquippedChanged.RemoveDynamic(this, &ULastFPSAnimInstance::OnWeaponEquipped);
 	}
 
 	WeaponType = EMMWeaponType::Unarmed;
 
-	if (ALastFPSHero* NewHero = Cast<ALastFPSHero>(NewCharacter))
+	if (UWeaponComponent* Weapon = ResolveWeaponComponent(NewCharacter))
 	{
-		if (UWeaponComponent* Weapon = NewHero->GetWeaponComponent())
-		{
-			WeaponType = Weapon->GetWeaponType();
-			Weapon->OnWeaponEquippedChanged.AddUniqueDynamic(this, &ULastFPSAnimInstance::OnWeaponEquipped);
-		}
+		WeaponType = Weapon->GetWeaponType();
+		Weapon->OnWeaponEquippedChanged.AddUniqueDynamic(this, &ULastFPSAnimInstance::OnWeaponEquipped);
 	}
 }
 
@@ -134,38 +138,34 @@ void ULastFPSAnimInstance::UpdateHandIK()
 	LeftHandIKAlpha = 0.f;
 	LeftHandIKTransform = FTransform::Identity;
 
-	ALastFPSHero* Hero = Cast<ALastFPSHero>(OwnerCharacter);
-	if (!Hero || !Hero->GetMesh())
-	{
-		return;
-	}
-
-	UWeaponComponent* Weapon = Hero->GetWeaponComponent();
-	if (!Weapon || !Weapon->HasWeapon())
-	{
-		return;
-	}
-
 	if (CombatState == EMMCombatState::Casting)
+	{
+		return;
+	}
+	if (CombatState != EMMCombatState::Reloading || !bUseReloadLeftHandIKTarget)
+	{
+		LeftHandIKTransform = WeaponLeftHandIKTransform;
+		LeftHandIKAlpha = WeaponLeftHandIKAlpha;
+		return;
+	}
+
+	if (!OwnerCharacter || !OwnerCharacter->GetMesh())
+	{
+		return;
+	}
+
+	UWeaponComponent* Weapon = ResolveWeaponComponent(OwnerCharacter);
+	if (!Weapon || !Weapon->HasWeapon() || Weapon->ReloadLeftHandIKTargetName.IsNone())
 	{
 		return;
 	}
 
 	FTransform IKTransform;
-	const bool bUseReloadTarget = bUseReloadLeftHandIKTarget
-		&& CombatState == EMMCombatState::Reloading
-		&& !Weapon->ReloadLeftHandIKTargetName.IsNone();
-
-	const bool bHasIKTransform = bUseReloadTarget
-		                             ? Weapon->GetLeftHandIKTransformForTarget(
-			                             Weapon->ReloadLeftHandIKTargetName,
-			                             Hero->GetMesh(),
-			                             RightHandBoneName,
-			                             IKTransform)
-		                             : Weapon->GetLeftHandIKTransform(
-			                             Hero->GetMesh(),
-			                             RightHandBoneName,
-			                             IKTransform);
+	const bool bHasIKTransform = Weapon->GetLeftHandIKTransformForTarget(
+		Weapon->ReloadLeftHandIKTargetName,
+		OwnerCharacter->GetMesh(),
+		RightHandBoneName,
+		IKTransform);
 
 	if (bHasIKTransform)
 	{
@@ -176,13 +176,10 @@ void ULastFPSAnimInstance::UpdateHandIK()
 
 void ULastFPSAnimInstance::OnWeaponEquipped(bool)
 {
-	if (const ALastFPSHero* Hero = Cast<ALastFPSHero>(OwnerCharacter))
+	if (const UWeaponComponent* Weapon = ResolveWeaponComponent(OwnerCharacter))
 	{
-		if (const UWeaponComponent* Weapon = Hero->GetWeaponComponent())
-		{
-			WeaponType = Weapon->GetWeaponType();
-			return;
-		}
+		WeaponType = Weapon->GetWeaponType();
+		return;
 	}
 
 	WeaponType = EMMWeaponType::Unarmed;

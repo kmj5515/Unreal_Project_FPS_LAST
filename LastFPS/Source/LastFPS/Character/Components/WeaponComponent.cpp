@@ -4,19 +4,25 @@
 #include "Character/LastFPSCharacterBase.h"
 #include "Weapons/LastFPSWeaponActor.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
+#include "Data/Tables/LastFPSWeaponBalanceData.h"
 #include "Weapons/WeaponPickupActor.h"
+#include "Weapons/LastFPSWeaponDataSubsystem.h"
 #include "Projectiles/LastFPSProjectile.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "DrawDebugHelpers.h"
+#include "Engine/GameInstance.h"
+#include "Camera/PlayerCameraManager.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 
 UWeaponComponent::UWeaponComponent()
 {
     SetIsReplicatedByDefault(true);
-    PrimaryComponentTick.bCanEverTick = false;
+    PrimaryComponentTick.bCanEverTick = true;
+    PrimaryComponentTick.bStartWithTickEnabled = false;
 }
 
 void UWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -66,14 +72,88 @@ FTransform UWeaponComponent::GetMuzzleTransform() const
         return GetOwner() ? GetOwner()->GetActorTransform() : FTransform::Identity;
     }
 
-    const FTransform MuzzleTransform = CurrentWeapon->GetMuzzleTransform(MuzzleSocketName);
-    UE_LOG(LogTemp, Warning, TEXT("MuzzleDebug WeaponActor=%s MuzzleSocket=%s MuzzleLoc=%s MuzzleRot=%s"),
-        *CurrentWeapon->GetName(),
-        *MuzzleSocketName.ToString(),
-        *MuzzleTransform.GetLocation().ToString(),
-        *MuzzleTransform.Rotator().ToString());
+    return CurrentWeapon->GetMuzzleTransform(MuzzleSocketName);
+}
 
-    return MuzzleTransform;
+void UWeaponComponent::TickComponent(
+    float DeltaTime,
+    ELevelTick TickType,
+    FActorComponentTickFunction* ThisTickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+    const bool bHasPendingKick = !FMath::IsNearlyZero(PendingAimRecoilPitch, KINDA_SMALL_NUMBER)
+        || !FMath::IsNearlyZero(PendingAimRecoilYaw, KINDA_SMALL_NUMBER);
+    const bool bHasRecoverableRecoil = !FMath::IsNearlyZero(RecoverableAimRecoilPitch, KINDA_SMALL_NUMBER)
+        || !FMath::IsNearlyZero(RecoverableAimRecoilYaw, KINDA_SMALL_NUMBER);
+    if (!bHasPendingKick && !bHasRecoverableRecoil)
+    {
+        ResetPendingAimRecoil();
+        return;
+    }
+
+    ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+    APlayerController* PlayerController = OwnerCharacter && OwnerCharacter->IsLocallyControlled()
+        ? Cast<APlayerController>(OwnerCharacter->GetController())
+        : nullptr;
+    if (!PlayerController || !WeaponDefinition)
+    {
+        ResetPendingAimRecoil();
+        return;
+    }
+
+    const FLastFPSWeaponAimRecoilSettings& Recoil = WeaponDefinition->AimRecoil;
+    FRotator RecoilRotation = PlayerController->GetControlRotation();
+    bool bRotationChanged = false;
+
+    if (bHasPendingKick)
+    {
+        const float KickSpeed = FMath::Max(Recoil.InterpolationSpeed, 0.01f);
+        const float KickAlpha = FMath::Clamp(DeltaTime * KickSpeed, 0.f, 1.f);
+        const float PitchKickDelta = PendingAimRecoilPitch * KickAlpha;
+        const float YawKickDelta = PendingAimRecoilYaw * KickAlpha;
+
+        RecoilRotation.Pitch = FRotator::NormalizeAxis(RecoilRotation.Pitch + PitchKickDelta);
+        RecoilRotation.Yaw = FRotator::NormalizeAxis(RecoilRotation.Yaw + YawKickDelta);
+        PendingAimRecoilPitch -= PitchKickDelta;
+        PendingAimRecoilYaw -= YawKickDelta;
+        const float RecoveryRatio = FMath::Clamp(Recoil.RecoveryRatio, 0.f, 1.f);
+        RecoverableAimRecoilPitch += PitchKickDelta * RecoveryRatio;
+        RecoverableAimRecoilYaw += YawKickDelta * RecoveryRatio;
+        bRotationChanged = true;
+    }
+
+    TimeSinceLastAimRecoil += DeltaTime;
+    if (TimeSinceLastAimRecoil >= FMath::Max(Recoil.RecoveryDelay, 0.f))
+    {
+        const float RecoverySpeed = FMath::Max(Recoil.RecoveryInterpolationSpeed, 0.01f);
+        const float RecoveryAlpha = FMath::Clamp(DeltaTime * RecoverySpeed, 0.f, 1.f);
+        const float PitchRecoveryDelta = RecoverableAimRecoilPitch * RecoveryAlpha;
+        const float YawRecoveryDelta = RecoverableAimRecoilYaw * RecoveryAlpha;
+
+        RecoilRotation.Pitch = FRotator::NormalizeAxis(RecoilRotation.Pitch - PitchRecoveryDelta);
+        RecoilRotation.Yaw = FRotator::NormalizeAxis(RecoilRotation.Yaw - YawRecoveryDelta);
+        RecoverableAimRecoilPitch -= PitchRecoveryDelta;
+        RecoverableAimRecoilYaw -= YawRecoveryDelta;
+        bRotationChanged = bRotationChanged
+            || !FMath::IsNearlyZero(PitchRecoveryDelta)
+            || !FMath::IsNearlyZero(YawRecoveryDelta);
+    }
+
+    if (bRotationChanged)
+    {
+        PlayerController->SetControlRotation(RecoilRotation);
+    }
+}
+
+float UWeaponComponent::GetWeaponBaseDamage() const
+{
+    if (!HasWeapon())
+    {
+        return 0.f;
+    }
+
+    return FMath::Max((DamageRange.MinDamage + DamageRange.MaxDamage) * 0.5f, 0.f);
 }
 
 void UWeaponComponent::PlayFireEffects() const
@@ -87,6 +167,96 @@ void UWeaponComponent::PlayFireEffects() const
 
     // 사운드/머즐 플래시는 WeaponDefinition을 통해서만 재생 (WeaponActor가 Definition에서 직접 조회)
     CurrentWeapon->PlayFireEffects(MuzzleSocketName);
+}
+
+void UWeaponComponent::PlayFireCameraShake() const
+{
+	ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+	if (!OwnerCharacter
+		|| !OwnerCharacter->IsLocallyControlled()
+		|| !WeaponDefinition
+		|| !WeaponDefinition->FireCameraShakeClass
+		|| WeaponDefinition->FireCameraShakeScale <= 0.f)
+	{
+		return;
+	}
+
+	APlayerController* PlayerController = Cast<APlayerController>(OwnerCharacter->GetController());
+	if (!PlayerController || !PlayerController->PlayerCameraManager)
+	{
+		return;
+	}
+
+	PlayerController->PlayerCameraManager->StartCameraShake(
+		WeaponDefinition->FireCameraShakeClass,
+		WeaponDefinition->FireCameraShakeScale,
+		ECameraShakePlaySpace::CameraLocal);
+}
+
+void UWeaponComponent::ApplyFireAimRecoil(bool bIsAiming)
+{
+    ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+    if (!OwnerCharacter
+        || !OwnerCharacter->IsLocallyControlled()
+        || !WeaponDefinition
+        || !WeaponDefinition->AimRecoil.bEnabled)
+    {
+        return;
+    }
+
+    APlayerController* PlayerController = Cast<APlayerController>(OwnerCharacter->GetController());
+    if (!PlayerController)
+    {
+        return;
+    }
+
+    const FLastFPSWeaponAimRecoilSettings& Recoil = WeaponDefinition->AimRecoil;
+    const float Strength = FMath::Max(Recoil.Strength, 0.f);
+    if (Strength <= 0.f)
+    {
+        return;
+    }
+
+    const float Randomness = FMath::Clamp(Recoil.RandomnessRatio, 0.f, 1.f);
+    const float AimMultiplier = bIsAiming ? FMath::Max(Recoil.ADSMultiplier, 0.f) : 1.f;
+    const float VerticalRecoil = Strength
+        * FMath::FRandRange(1.f - Randomness, 1.f + Randomness)
+        * AimMultiplier;
+    const float HorizontalRecoil = Strength
+        * FMath::Max(Recoil.HorizontalRatio, 0.f)
+        * FMath::FRandRange(-1.f, 1.f)
+        * AimMultiplier;
+
+    PendingAimRecoilPitch += VerticalRecoil;
+    PendingAimRecoilYaw += HorizontalRecoil;
+    TimeSinceLastAimRecoil = 0.f;
+    SetComponentTickEnabled(true);
+}
+
+void UWeaponComponent::ResetPendingAimRecoil()
+{
+    ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+    APlayerController* PlayerController = OwnerCharacter && OwnerCharacter->IsLocallyControlled()
+        ? Cast<APlayerController>(OwnerCharacter->GetController())
+        : nullptr;
+    if (PlayerController
+        && (!FMath::IsNearlyZero(RecoverableAimRecoilPitch)
+            || !FMath::IsNearlyZero(RecoverableAimRecoilYaw)))
+    {
+        FRotator RestoredRotation = PlayerController->GetControlRotation();
+        RestoredRotation.Pitch = FRotator::NormalizeAxis(
+            RestoredRotation.Pitch - RecoverableAimRecoilPitch);
+        RestoredRotation.Yaw = FRotator::NormalizeAxis(
+            RestoredRotation.Yaw - RecoverableAimRecoilYaw);
+        PlayerController->SetControlRotation(RestoredRotation);
+    }
+
+    PendingAimRecoilPitch = 0.f;
+    PendingAimRecoilYaw = 0.f;
+    RecoverableAimRecoilPitch = 0.f;
+    RecoverableAimRecoilYaw = 0.f;
+    TimeSinceLastAimRecoil = 0.f;
+    SetComponentTickEnabled(false);
 }
 
 void UWeaponComponent::SetWeaponHiddenForAbility(bool bHidden)
@@ -194,6 +364,8 @@ void UWeaponComponent::UnequipWeapon()
         return;
     }
 
+    ResetPendingAimRecoil();
+
     if (!GetOwner()->HasAuthority())
     {
         Server_UnequipWeapon();
@@ -216,6 +388,7 @@ void UWeaponComponent::Server_UnequipWeapon_Implementation()
 
 void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefinition)
 {
+    ResetPendingAimRecoil();
     WeaponDefinition = NewDefinition;
     ApplyWeaponDefinitionValues(NewDefinition);
 
@@ -252,6 +425,23 @@ void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
     ReloadLeftHandIKTargetName = NewDefinition->ReloadLeftHandIKTargetName;
     FireRate = NewDefinition->FireRate;
     DamageRange = NewDefinition->DamageRange;
+
+    const UGameInstance* GameInstance = GetOwner() ? GetOwner()->GetGameInstance() : nullptr;
+    const ULastFPSWeaponDataSubsystem* WeaponDataSubsystem =
+        GameInstance ? GameInstance->GetSubsystem<ULastFPSWeaponDataSubsystem>() : nullptr;
+    const FLastFPSWeaponBalanceData* BalanceData =
+        WeaponDataSubsystem ? WeaponDataSubsystem->FindBalance(NewDefinition->WeaponId) : nullptr;
+    if (!BalanceData)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("무기 '%s'의 WeaponBalance 행을 찾지 못해 WeaponDefinition 수치를 사용합니다."),
+            *NewDefinition->WeaponId.ToString());
+        return;
+    }
+
+    FireRate = FMath::Max(BalanceData->FireInterval, 0.01f);
+    AimTraceRange = FMath::Max(BalanceData->AimTraceRange, 0.f);
+    DamageRange = LastFPSDamage::MakeDamageRange(BalanceData->Damage, BalanceData->DamageElement);
 }
 
 void UWeaponComponent::OnRep_CurrentWeapon()
@@ -275,6 +465,7 @@ void UWeaponComponent::OnRep_WeaponType()
 
 void UWeaponComponent::OnRep_WeaponDefinition()
 {
+    ResetPendingAimRecoil();
     ApplyWeaponDefinitionValues(WeaponDefinition);
 
     if (CurrentWeapon)
@@ -466,7 +657,7 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
         ? ClientMuzzleLocation
         : GetMuzzleTransform().GetLocation();
 
-    const FVector TraceEnd = ClientCameraLocation + AimDirection * 10000.f;
+    const FVector TraceEnd = ClientCameraLocation + AimDirection * AimTraceRange;
 
     FHitResult HitResult;
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WeaponTrace), false, Character);

@@ -2,9 +2,49 @@
 
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
+#include "Character/LastFPSCharacterBase.h"
+#include "Character/Components/WeaponComponent.h"
+#include "Character/Interfaces/LastFPSWeaponUser.h"
+#include "Data/Definitions/LastFPSCharacterDefinition.h"
+#include "Data/Tables/LastFPSCharacterSkillData.h"
+#include "Data/Tables/LastFPSSkillBalanceData.h"
+#include "Engine/GameInstance.h"
+#include "Skills/LastFPSSkillDataSubsystem.h"
 
 ULastFPSGameplayAbility::ULastFPSGameplayAbility()
 {
+}
+
+const FLastFPSSkillBalanceData* ULastFPSGameplayAbility::GetSkillBalanceData() const
+{
+	const ALastFPSCharacterBase* Character = Cast<ALastFPSCharacterBase>(GetAvatarActorFromActorInfo());
+	const ULastFPSCharacterDefinition* CharacterDefinition = Character ? Character->GetCharacterDefinition() : nullptr;
+	const UGameInstance* GameInstance = Character ? Character->GetGameInstance() : nullptr;
+	const ULastFPSSkillDataSubsystem* SkillDataSubsystem =
+		GameInstance ? GameInstance->GetSubsystem<ULastFPSSkillDataSubsystem>() : nullptr;
+	if (!CharacterDefinition || !SkillDataSubsystem)
+	{
+		return nullptr;
+	}
+
+	const FGameplayTagContainer& CurrentAbilityTags = GetAssetTags();
+	const FLastFPSCharacterSkillData* SkillData = SkillDataSubsystem->FindSkillByAbilityTags(
+		CharacterDefinition->CharacterId,
+		CurrentAbilityTags);
+	if (!SkillData)
+	{
+		return nullptr;
+	}
+
+	return SkillDataSubsystem->FindBalance(SkillData->SkillId);
+}
+
+float ULastFPSGameplayAbility::GetEquippedWeaponBaseDamage() const
+{
+	const AActor* AvatarActor = GetAvatarActorFromActorInfo();
+	const ILastFPSWeaponUser* WeaponUser = Cast<ILastFPSWeaponUser>(AvatarActor);
+	const UWeaponComponent* WeaponComponent = WeaponUser ? WeaponUser->GetWeaponComponent() : nullptr;
+	return WeaponComponent ? WeaponComponent->GetWeaponBaseDamage() : 0.f;
 }
 
 void ULastFPSGameplayAbility::DrawDebug(

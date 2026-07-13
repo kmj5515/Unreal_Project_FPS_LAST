@@ -61,11 +61,13 @@ void ALastFPSOrbitingProjectileEmitter::EndPlay(const EEndPlayReason::Type EndPl
 void ALastFPSOrbitingProjectileEmitter::InitializeEmitter(
 	ALastFPSCharacterBase* InSourceCharacter,
 	const int32 InSlotIndex,
-	const FLastFPSOrbitingProjectileEmitterConfig& InConfig)
+	const FLastFPSOrbitingProjectileEmitterConfig& InConfig,
+	const float InBaseDamageOverride)
 {
 	SourceCharacter = InSourceCharacter;
 	SlotIndex = FMath::Max(0, InSlotIndex);
 	Config = InConfig;
+	BaseDamageOverride = FMath::Max(InBaseDamageOverride, 0.f);
 
 	SetOwner(InSourceCharacter);
 	SetInstigator(InSourceCharacter);
@@ -227,7 +229,8 @@ void ALastFPSOrbitingProjectileEmitter::FireProjectile()
 		SourceCharacter,
 		Config.ProjectileData->ImpactRules,
 		Config.ProjectileData->EffectsOnHit,
-		Config.ProjectileData->VisualData);
+		Config.ProjectileData->VisualData,
+		BaseDamageOverride);
 
 	if (Projectile->ProjectileMovement)
 	{

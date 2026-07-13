@@ -5,9 +5,27 @@
 #include "GameplayEffect.h"
 #include "Utility/LastFPSTags.h"
 
+namespace
+{
+	constexpr float DamageVarianceRatio = 0.2f;
+}
+
 float FLastFPSDamageRange::Roll() const
 {
 	return LastFPSDamage::RollDamage(*this);
+}
+
+FLastFPSDamageRange LastFPSDamage::MakeDamageRange(
+	const float BaseDamage,
+	const ELastFPSDamageElement DamageElement)
+{
+	const float SafeBaseDamage = FMath::Max(BaseDamage, 0.f);
+
+	FLastFPSDamageRange DamageRange;
+	DamageRange.MinDamage = SafeBaseDamage * (1.f - DamageVarianceRatio);
+	DamageRange.MaxDamage = SafeBaseDamage * (1.f + DamageVarianceRatio);
+	DamageRange.DamageElement = DamageElement;
+	return DamageRange;
 }
 
 float LastFPSDamage::RollDamage(const FLastFPSDamageRange& DamageRange)

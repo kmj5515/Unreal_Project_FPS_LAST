@@ -32,6 +32,21 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPlayerController, Log, All);
 
+ALastFPSPlayerController::ALastFPSPlayerController()
+    : TeamId(FGenericTeamId::NoTeam)
+{
+}
+
+void ALastFPSPlayerController::SetGenericTeamId(const FGenericTeamId& NewTeamId)
+{
+    TeamId = NewTeamId;
+}
+
+FGenericTeamId ALastFPSPlayerController::GetGenericTeamId() const
+{
+    return TeamId;
+}
+
 template<typename TWidget>
 TWidget* ALastFPSPlayerController::PushWidgetToModalLayer(TSubclassOf<TWidget> WidgetClass)
 {

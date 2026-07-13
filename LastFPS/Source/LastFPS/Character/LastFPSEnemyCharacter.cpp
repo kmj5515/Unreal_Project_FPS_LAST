@@ -3,11 +3,16 @@
 #include "Character/AI/LastFPSEnemyAIController.h"
 #include "Character/LastFPSAIProfile.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Character/Components/WeaponComponent.h"
 #include "Data/Definitions/LastFPSEnemyDefinition.h"
+#include "Data/Definitions/LastFPSWeaponDefinition.h"
 #include "Economy/LastFPSItemPickupActor.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Perception/AIPerceptionComponent.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogLastFPSEnemyCharacter, Log, All);
 
 ALastFPSEnemyCharacter::ALastFPSEnemyCharacter()
 {
@@ -16,6 +21,7 @@ ALastFPSEnemyCharacter::ALastFPSEnemyCharacter()
     AIControllerClass = ALastFPSEnemyAIController::StaticClass();
 
     AIPerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>("AIPerceptionComp");
+    WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComp"));
 
     // AI 는 컨트롤러가 SetFocus 로 준 방향(desired rotation)으로 몸을 돌린다.
     // 플레이어(Hero)와 달리 컨트롤러 Yaw 를 직접 쓰지 않고 이동 컴포넌트가 부드럽게 회전시킨다.
@@ -49,11 +55,20 @@ void ALastFPSEnemyCharacter::BeginPlay()
     if (HasAuthority())
     {
         OnDeath.AddUObject(this, &ALastFPSEnemyCharacter::HandleOwnDeath);
+
+        const ULastFPSEnemyDefinition* EnemyDefinition =
+            Cast<ULastFPSEnemyDefinition>(ResolveCharacterDefinition());
+        if (WeaponComponent && EnemyDefinition && EnemyDefinition->InitialWeaponDefinition)
+        {
+            WeaponComponent->EquipWeaponDefinition(EnemyDefinition->InitialWeaponDefinition);
+        }
     }
 }
 
 void ALastFPSEnemyCharacter::HandleOwnDeath(ALastFPSCharacterBase* /*DeadChar*/)
 {
+    SetLifeSpan(DeathRemovalDelay);
+
     UWorld* World = GetWorld();
     if (!DropPickupClass || !World)
     {
@@ -122,6 +137,45 @@ void ALastFPSEnemyCharacter::HandleOwnDeath(ALastFPSCharacterBase* /*DeadChar*/)
             Pickup->FinishSpawning(SpawnTransform);
         }
     }
+}
+
+void ALastFPSEnemyCharacter::UpdateAliveCollisionState(bool bAlive)
+{
+    // 서버에서 무기 액터를 먼저 제거해 랙돌 전환 후 무기가 시체에 남지 않게 한다.
+    if (!bAlive && HasAuthority() && WeaponComponent && WeaponComponent->HasWeapon())
+    {
+        WeaponComponent->UnequipWeapon();
+    }
+
+    Super::UpdateAliveCollisionState(bAlive);
+
+    if (!bAlive)
+    {
+        StartDeathRagdoll();
+    }
+}
+
+void ALastFPSEnemyCharacter::StartDeathRagdoll()
+{
+    if (bDeathRagdollStarted)
+    {
+        return;
+    }
+
+    USkeletalMeshComponent* MeshComp = GetMesh();
+    if (!MeshComp || !MeshComp->GetPhysicsAsset())
+    {
+        UE_LOG(LogLastFPSEnemyCharacter, Warning,
+            TEXT("적 랙돌 전환 실패: Enemy=%s, 원인=유효한 PhysicsAsset이 없습니다."),
+            *GetNameSafe(this));
+        return;
+    }
+
+    bDeathRagdollStarted = true;
+    MeshComp->SetCollisionProfileName(TEXT("Ragdoll"));
+    MeshComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    MeshComp->SetAllBodiesSimulatePhysics(true);
+    MeshComp->WakeAllRigidBodies();
 }
 
 FName ALastFPSEnemyCharacter::PickWeightedDropRowId(float TotalWeight) const

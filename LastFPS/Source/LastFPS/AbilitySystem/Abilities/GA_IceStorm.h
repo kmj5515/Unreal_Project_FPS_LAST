@@ -152,6 +152,8 @@ private:
 	bool CacheAimTarget();
 	FVector GetCameraAimDirection(const ALastFPSHero* Hero) const;
 	FVector GetAimTarget(const ALastFPSHero* Hero, const FVector& CameraAimDirection) const;
+	float GetEffectiveAimTraceRange() const;
+	FLastFPSAreaEffectConfig BuildAreaConfig() const;
 	FTransform BuildTargetGroundTransform(const ALastFPSHero* Hero, const FVector& TargetLocation) const;
 	void StartTargetingIndicator();
 	void UpdateTargetingIndicator();

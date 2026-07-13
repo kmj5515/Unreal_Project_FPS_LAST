@@ -65,7 +65,8 @@ public:
 	void InitializeEmitter(
 		ALastFPSCharacterBase* InSourceCharacter,
 		int32 InSlotIndex,
-		const FLastFPSOrbitingProjectileEmitterConfig& InConfig);
+		const FLastFPSOrbitingProjectileEmitterConfig& InConfig,
+		float InBaseDamageOverride);
 
 	AActor* GetSourceActor() const;
 	int32 GetSlotIndex() const;
@@ -104,6 +105,8 @@ private:
 
 	UPROPERTY()
 	int32 FireCount = 0;
+
+	float BaseDamageOverride = 0.f;
 
 	FTimerHandle FireTimerHandle;
 };

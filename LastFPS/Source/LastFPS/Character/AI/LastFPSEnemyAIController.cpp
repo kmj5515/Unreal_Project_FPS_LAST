@@ -9,16 +9,19 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "Utility/LastFPSTeamTypes.h"
 
 ALastFPSEnemyAIController::ALastFPSEnemyAIController()
 {
+	SetGenericTeamId(FGenericTeamId(static_cast<uint8>(ELastFPSTeam::Enemy)));
+
 	EnemyPerception = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("EnemyPerception"));
 	SightConfig     = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
 
-	// 팀 시스템이 없으므로 모든 소속을 감지 후보로 두고, 실제 필터는 콜백에서 Hero 타입으로 한다.
+	// 팀 태도가 적대적인 대상만 감지 후보로 받는다.
 	SightConfig->DetectionByAffiliation.bDetectEnemies    = true;
 	SightConfig->DetectionByAffiliation.bDetectNeutrals   = true;
-	SightConfig->DetectionByAffiliation.bDetectFriendlies = true;
+	SightConfig->DetectionByAffiliation.bDetectFriendlies = false;
 	SightConfig->PeripheralVisionAngleDegrees = 70.f;
 	SightConfig->SetMaxAge(5.f);
 

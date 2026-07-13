@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Character/LastFPSCharacterBase.h"
+#include "Character/Interfaces/LastFPSWeaponUser.h"
 #include "Utility/LastFPSEnumTypes.h"
 #include "LastFPSHero.generated.h"
 
@@ -11,11 +12,10 @@ class UInputMappingContext;
 class ULastFPSInputConfig;
 class UWeaponComponent;
 class UAnimMontage;
-class UCameraShakeBase;
 struct FInputActionValue;
 
 UCLASS()
-class LASTFPS_API ALastFPSHero : public ALastFPSCharacterBase
+class LASTFPS_API ALastFPSHero : public ALastFPSCharacterBase, public ILastFPSWeaponUser
 {
     GENERATED_BODY()
 
@@ -23,6 +23,8 @@ public:
     ALastFPSHero();
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void PossessedBy(AController* NewController) override;
+    virtual void OnRep_PlayerState() override;
 
     UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayWeaponFireEffects();
@@ -31,11 +33,11 @@ public:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
     FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-    FORCEINLINE UWeaponComponent* GetWeaponComponent() const { return WeaponComponent; }
+    virtual UWeaponComponent* GetWeaponComponent() const override { return WeaponComponent; }
     virtual bool GetIsADS() const override { return bIsADS; }
     FORCEINLINE bool GetIsSprinting() const { return bIsSprinting; }
     FORCEINLINE bool GetWantsToSprint() const { return bWantsToSprint; }
-    FORCEINLINE bool GetWantsToWalk() const { return bWantsToWalk; }
+    FORCEINLINE bool GetWantsToWalk() const { return bWantsToWalk || CombatState == EMMCombatState::Attacking; }
     FORCEINLINE EMMCombatState GetCombatState() const { return CombatState; }
     FORCEINLINE FVector2D GetCachedMoveInput() const { return CachedMoveInput; }
     FORCEINLINE FRotator GetLocomotionDirectionBaseRotation() const
@@ -68,6 +70,8 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void GiveDefaultAbilities() override;
     virtual void OnCombatEngagedChanged() override;
+	virtual void OnMoveSpeedChanged(const FOnAttributeChangeData& Data) override;
+	virtual float ResolveMaxWalkSpeed(float AttributeMoveSpeed) const override;
 
     void Move(const FInputActionValue& Value);
     void ClearMoveInput(const FInputActionValue& Value);
@@ -121,6 +125,24 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Camera")
     float CameraLagSpeed = 15.f;
 
+	/** 이 태그를 가진 효과가 하나 이상 활성화되면 카메라를 뒤로 이동합니다. */
+	UPROPERTY(EditDefaultsOnly, Category="Camera|Speed Boost")
+	FGameplayTag SpeedBoostCameraTag;
+
+	UPROPERTY(EditDefaultsOnly, Category="Camera|Speed Boost", meta=(ClampMin="0.0", Units="cm"))
+	float SpeedBoostArmLengthOffset = 120.f;
+
+	/** 이 속도 이하에서는 카메라 거리 보너스를 적용하지 않습니다. */
+	UPROPERTY(EditDefaultsOnly, Category="Camera|Speed Boost", meta=(ClampMin="0.0", Units="cm/s"))
+	float SpeedBoostCameraStartSpeed = 600.f;
+
+	/** 이 속도 이상에서 SpeedBoostArmLengthOffset 전체를 적용합니다. */
+	UPROPERTY(EditDefaultsOnly, Category="Camera|Speed Boost", meta=(ClampMin="0.0", Units="cm/s"))
+	float SpeedBoostCameraFullSpeed = 1000.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Camera|Speed Boost", meta=(ClampMin="0.0"))
+	float SpeedBoostCameraInterpSpeed = 3.f;
+
     UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint")
     float SprintForwardInputThreshold = 0.5f;
 
@@ -138,8 +160,6 @@ protected:
 
 private:
     bool bIsADS = false;
-    float PreADSWalkSpeed = 0.f;
-    float PreWalkMaxWalkSpeed = 0.f;
     FVector2D CachedMoveInput = FVector2D::ZeroVector;
     FRotator LocomotionDirectionBaseRotation = FRotator::ZeroRotator;
     bool bHasMoveInputAction = false;
@@ -162,17 +182,27 @@ private:
     float TargetArmLength;
     FVector TargetSocketOffset;
     float TargetFOV;
+	bool bSpeedBoostCameraActive = false;
+	bool bSpeedBoostCameraTransition = false;
+	float CurrentSpeedBoostArmLengthOffset = 0.f;
+	FDelegateHandle SpeedBoostCameraTagDelegateHandle;
+	TWeakObjectPtr<UAbilitySystemComponent> SpeedBoostCameraASC;
 
     UFUNCTION()
     void OnRep_CombatState();
 
     UFUNCTION()
     void HandleWeaponEquippedChanged(bool bEquipped);
+	void BindSpeedBoostCameraTag();
+	void UnbindSpeedBoostCameraTag();
+	void HandleSpeedBoostCameraTagChanged(FGameplayTag Tag, int32 NewCount);
+	void UpdateSpeedBoostCameraOffset(float EffectiveMoveSpeed);
+	void RefreshCameraTargets();
 
     void HandleAbilityInput(const FInputActionValue& value, FGameplayTag InputID);
     bool ShouldCancelFireBeforeAbilityInput(FGameplayTag InputID) const;
     bool ShouldSkipAbilityCancelOnRelease(FGameplayTag InputID) const;
-    void RestoreWalkSpeed();
+	void RefreshMaxWalkSpeed();
 
     void TickLocalMatchIntro();
 

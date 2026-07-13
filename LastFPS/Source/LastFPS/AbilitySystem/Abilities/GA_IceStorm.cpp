@@ -7,6 +7,7 @@
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Data/Tables/LastFPSSkillBalanceData.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
 #include "NiagaraComponent.h"
@@ -339,7 +340,7 @@ FVector UGA_IceStorm::GetAimTarget(const ALastFPSHero* Hero, const FVector& Came
 	const FVector TraceDirection = CameraAimDirection.IsNearlyZero()
 		? ViewRotation.Vector().GetSafeNormal()
 		: CameraAimDirection.GetSafeNormal();
-	const FVector TraceEnd = ViewLocation + TraceDirection * AimTraceRange;
+	const FVector TraceEnd = ViewLocation + TraceDirection * GetEffectiveAimTraceRange();
 
 	UWorld* World = GetWorld();
 	if (!World)
@@ -369,6 +370,47 @@ FVector UGA_IceStorm::GetAimTarget(const ALastFPSHero* Hero, const FVector& Came
 		QueryParams);
 
 	return bHit ? HitResult.ImpactPoint : TraceEnd;
+}
+
+float UGA_IceStorm::GetEffectiveAimTraceRange() const
+{
+	const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
+	return BalanceData && BalanceData->Range > 0.f ? BalanceData->Range : AimTraceRange;
+}
+
+FLastFPSAreaEffectConfig UGA_IceStorm::BuildAreaConfig() const
+{
+	FLastFPSAreaEffectConfig Config = AreaConfig;
+	const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
+	if (!BalanceData)
+	{
+		return Config;
+	}
+
+	if (BalanceData->Radius > 0.f)
+	{
+		const float VisualRadiusRatio = AreaConfig.Radius > 0.f && AreaConfig.VisualRadius > 0.f
+			? AreaConfig.VisualRadius / AreaConfig.Radius
+			: 2.f;
+		Config.Radius = BalanceData->Radius;
+		Config.VisualRadius = BalanceData->Radius * VisualRadiusRatio;
+	}
+	if (BalanceData->Duration > 0.f)
+	{
+		Config.Duration = BalanceData->Duration;
+	}
+	Config.DamageInterval = FMath::Max(
+		BalanceData->GetParameter(
+			LastFPSGameplayTags::Skill_Parameter_DamageInterval,
+			Config.DamageInterval),
+		0.f);
+	if (BalanceData->Damage > 0.f)
+	{
+		Config.DamageRange = LastFPSDamage::MakeDamageRange(
+			BalanceData->Damage + GetEquippedWeaponBaseDamage(),
+			AreaConfig.DamageRange.DamageElement);
+	}
+	return Config;
 }
 
 FTransform UGA_IceStorm::BuildTargetGroundTransform(const ALastFPSHero* Hero, const FVector& TargetLocation) const
@@ -511,14 +553,17 @@ void UGA_IceStorm::ApplyTargetingIndicatorParameters(const FTransform& Indicator
 		return;
 	}
 
+	const FLastFPSAreaEffectConfig EffectiveAreaConfig = BuildAreaConfig();
 	if (!TargetingIndicatorRadiusNiagaraParameterName.IsNone())
 	{
-		TargetingIndicatorNiagaraComponent->SetVariableFloat(TargetingIndicatorRadiusNiagaraParameterName, AreaConfig.Radius);
+		TargetingIndicatorNiagaraComponent->SetVariableFloat(TargetingIndicatorRadiusNiagaraParameterName, EffectiveAreaConfig.Radius);
 	}
 
 	if (!TargetingIndicatorVisualRadiusNiagaraParameterName.IsNone())
 	{
-		const float VisualRadius = AreaConfig.VisualRadius > 0.f ? AreaConfig.VisualRadius : AreaConfig.Radius * 2.f;
+		const float VisualRadius = EffectiveAreaConfig.VisualRadius > 0.f
+			? EffectiveAreaConfig.VisualRadius
+			: EffectiveAreaConfig.Radius * 2.f;
 		TargetingIndicatorNiagaraComponent->SetVariableFloat(TargetingIndicatorVisualRadiusNiagaraParameterName, VisualRadius);
 	}
 
@@ -562,7 +607,7 @@ void UGA_IceStorm::SpawnAreaEffect()
 	}
 
 	bAreaSpawned = true;
-	AreaActor->InitializeAreaEffect(Hero, SourceASC, AreaConfig);
+	AreaActor->InitializeAreaEffect(Hero, SourceASC, BuildAreaConfig());
 	AreaActor->FinishSpawning(SpawnTransform);
 }
 

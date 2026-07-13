@@ -1,0 +1,6 @@
+---,Damage,Cooldown,Cost,Range,Radius,Duration,Parameters
+Viola_IceProjectile,"15.000000","4.000000","0.000000","0.000000","0.000000","0.000000","()"
+Viola_IceAura,"1000.000000","8.000000","0.000000","0.000000","250.000000","10.000000","(((TagName=""Skill.Parameter.AreaDuration""),10.000000),((TagName=""Skill.Parameter.DamageInterval""),0.100000))"
+Viola_IceStorm,"15.000000","10.000000","0.000000","1500.000000","500.000000","10.000000","(((TagName=""Skill.Parameter.DamageInterval""),0.200000))"
+Viola_FrostStorm,"65.000000","10.000000","0.000000","0.000000","1200.000000","0.350000","(((TagName=""Skill.Parameter.DamageInterval""),1.000000),((TagName=""Skill.Parameter.ConeAngle""),70.000000))"
+Viola_ProbePassive,"10.000000","0.000000","0.000000","0.000000","0.000000","0.000000","()"

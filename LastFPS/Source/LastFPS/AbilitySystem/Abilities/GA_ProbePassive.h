@@ -37,6 +37,10 @@ public:
 		bool bWasCancelled) override;
 
 protected:
+	/** 액티브 스킬 슬롯과 독립적으로 프로브 밸런스 행을 조회하기 위한 식별자입니다. */
+	UPROPERTY(EditDefaultsOnly, Category="Probe|Balance")
+	FName ProbeBalanceId = TEXT("Viola_ProbePassive");
+
 	UPROPERTY(EditDefaultsOnly, Category="Probe", meta=(ClampMin="1"))
 	int32 MaxProbeCount = 3;
 
@@ -58,6 +62,7 @@ private:
 	bool ShouldSkipDuplicateActivation(const UGameplayAbility* ActivatedAbility) const;
 	void MarkHandledActivation(UGameplayAbility* ActivatedAbility);
 	bool SpawnProbeEmitter(ALastFPSCharacterBase* SourceCharacter) const;
+	bool ResolveProbeBaseDamage(const ALastFPSCharacterBase* SourceCharacter, float& OutBaseDamage) const;
 	int32 FindAvailableSlotIndex(UWorld* World, const ALastFPSCharacterBase* SourceCharacter, int32& OutExistingProbeCount) const;
 
 	FDelegateHandle AbilityActivatedDelegateHandle;

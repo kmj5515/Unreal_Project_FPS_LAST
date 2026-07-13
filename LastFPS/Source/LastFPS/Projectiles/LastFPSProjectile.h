@@ -28,7 +28,8 @@ public:
         AActor* InSourceActor,
         const TArray<TObjectPtr<ULastFPSProjectileImpactRule>>& InImpactRules,
         const TArray<TSubclassOf<UGameplayEffect>>& InLegacyEffectsOnHit,
-        ULastFPSProjectileVisualData* InVisualData);
+        ULastFPSProjectileVisualData* InVisualData,
+        float InBaseDamageOverride = 0.f);
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Projectile")
     TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
@@ -81,6 +82,8 @@ private:
 
     UPROPERTY()
     TObjectPtr<ULastFPSProjectileVisualData> VisualData;
+
+    float BaseDamageOverride = 0.f;
 
     bool bHasAppliedHit = false;
 };

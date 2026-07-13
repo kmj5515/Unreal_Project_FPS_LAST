@@ -153,6 +153,8 @@ void UGA_BasicShoot::Fire()
         ShouldDrawDebug(),
         GetDebugDrawTime());
 
+    Weapon->ApplyFireAimRecoil(Hero->GetIsADS());
+
     if (!Weapon->CanFire())
     {
         EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
@@ -164,6 +166,7 @@ void UGA_BasicShoot::LocalFire(UWeaponComponent* Weapon)
     if (Weapon)
     {
         Weapon->PlayFireEffects();
+		Weapon->PlayFireCameraShake();
     }
 
     ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());

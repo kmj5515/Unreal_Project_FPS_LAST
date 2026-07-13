@@ -2,11 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Character/LastFPSCharacterBase.h"
+#include "Character/Interfaces/LastFPSWeaponUser.h"
 #include "Perception/AIPerceptionTypes.h"
 #include "LastFPSEnemyCharacter.generated.h"
 
 class ALastFPSItemPickupActor;
 class ULastFPSAIProfile;
+class UWeaponComponent;
 
 /** 가중치 기반 드랍 항목 1종. Weight 가 클수록 자주 뽑힌다. */
 USTRUCT(BlueprintType)
@@ -23,12 +25,14 @@ struct FLastFPSEnemyDropEntry
 };
 
 UCLASS()
-class LASTFPS_API ALastFPSEnemyCharacter : public ALastFPSCharacterBase
+class LASTFPS_API ALastFPSEnemyCharacter : public ALastFPSCharacterBase, public ILastFPSWeaponUser
 {
     GENERATED_BODY()
 
 public:
     ALastFPSEnemyCharacter();
+
+    virtual UWeaponComponent* GetWeaponComponent() const override { return WeaponComponent; }
 
     /**
      * 이 적의 AI 행동 프로파일. 해석된 CharacterDefinition 이 ULastFPSEnemyDefinition 일 때
@@ -41,9 +45,13 @@ public:
 protected:
     virtual void BeginPlay() override;
     virtual void PossessedBy(AController* NewController) override;
+    virtual void UpdateAliveCollisionState(bool bAlive) override;
     
     UPROPERTY(EditAnywhere, Category="Enemy|AI")
     TObjectPtr<UAIPerceptionComponent> AIPerceptionComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Enemy|Weapon")
+    TObjectPtr<UWeaponComponent> WeaponComponent;
     
     // 사망 시 드랍할 픽업 (비우면 드랍 없음).
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Drop")
@@ -65,9 +73,16 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Drop")
     float DropSpreadRadius = 150.f;
 
+    /** 사망 후 랙돌이 월드에 남아 있는 시간이다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Enemy|Death", meta=(ClampMin="0.1", Units="s"))
+    float DeathRemovalDelay = 5.f;
+
 private:
     void HandleOwnDeath(ALastFPSCharacterBase* DeadChar);
+    void StartDeathRagdoll();
 
     // DropTable 에서 가중치로 RowId 1개 추첨. TotalWeight 는 유효 항목 가중치 합. 실패 시 NAME_None.
     FName PickWeightedDropRowId(float TotalWeight) const;
+
+    bool bDeathRagdollStarted = false;
 };

@@ -11,4 +11,10 @@ class LASTFPS_API ULastFPSActiveGameplayAbility : public ULastFPSGameplayAbility
 
 public:
 	ULastFPSActiveGameplayAbility();
+
+protected:
+	virtual void ApplyCooldown(
+		FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		FGameplayAbilityActivationInfo ActivationInfo) const override;
 };

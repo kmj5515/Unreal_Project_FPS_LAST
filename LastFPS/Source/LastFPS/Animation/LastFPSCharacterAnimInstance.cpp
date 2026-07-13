@@ -1,6 +1,8 @@
 #include "Animation/LastFPSCharacterAnimInstance.h"
 
 #include "Character/LastFPSCharacterBase.h"
+#include "Character/Components/WeaponComponent.h"
+#include "Character/Interfaces/LastFPSWeaponUser.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
@@ -34,6 +36,7 @@ void ULastFPSCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	UpdateGroundDistance();
 	UpdateCombatState();
+	UpdateWeaponHandIK();
 	UpdateGameThreadCharacterState(DeltaSeconds);
 	CacheThreadSafeInputs();
 }
@@ -105,6 +108,8 @@ void ULastFPSCharacterAnimInstance::ResetAnimState()
 	AimYaw = 0.f;
 	bIsDead = false;
 	bHasThreadSafeInputs = false;
+	WeaponLeftHandIKTransform = FTransform::Identity;
+	WeaponLeftHandIKAlpha = 0.f;
 	bCachedIsSprinting = false;
 	bCachedWantsToSprint = false;
 	bCachedWantsToWalk = false;
@@ -150,6 +155,34 @@ void ULastFPSCharacterAnimInstance::UpdateGameThreadCharacterState(float)
 
 void ULastFPSCharacterAnimInstance::UpdateThreadSafeCharacterState(float)
 {
+}
+
+void ULastFPSCharacterAnimInstance::UpdateWeaponHandIK()
+{
+	WeaponLeftHandIKTransform = FTransform::Identity;
+	WeaponLeftHandIKAlpha = 0.f;
+
+	if (!OwnerCharacter || !OwnerCharacter->GetMesh())
+	{
+		return;
+	}
+
+	const ILastFPSWeaponUser* WeaponUser = Cast<ILastFPSWeaponUser>(OwnerCharacter);
+	UWeaponComponent* Weapon = WeaponUser ? WeaponUser->GetWeaponComponent() : nullptr;
+	if (!Weapon || !Weapon->HasWeapon())
+	{
+		return;
+	}
+
+	FTransform IKTransform;
+	if (Weapon->GetLeftHandIKTransform(
+		OwnerCharacter->GetMesh(),
+		WeaponIKRightHandBoneName,
+		IKTransform))
+	{
+		WeaponLeftHandIKTransform = IKTransform;
+		WeaponLeftHandIKAlpha = 1.f;
+	}
 }
 
 bool ULastFPSCharacterAnimInstance::RefreshOwnerReferences()

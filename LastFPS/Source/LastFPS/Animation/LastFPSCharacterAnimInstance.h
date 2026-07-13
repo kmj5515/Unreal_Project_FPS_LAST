@@ -101,6 +101,16 @@ public:
 	bool HasMovementComponent() const { return bCachedHasMovementComponent; }
 
 protected:
+	/** Hero와 Enemy가 공통으로 사용하는 무기 기준 왼손 IK 변환이다. */
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK", meta=(DisplayName="Weapon Left Hand IK Transform"))
+	FTransform WeaponLeftHandIKTransform = FTransform::Identity;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK", meta=(DisplayName="Weapon Left Hand IK Alpha"))
+	float WeaponLeftHandIKAlpha = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|IK")
+	FName WeaponIKRightHandBoneName = TEXT("hand_r");
+
 	UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
 	EMMLocomotionState LocomotionState = EMMLocomotionState::Idle;
 
@@ -268,6 +278,7 @@ protected:
 	virtual void CacheMovementModeFlags();
 	virtual void UpdateGameThreadCharacterState(float DeltaSeconds);
 	virtual void UpdateThreadSafeCharacterState(float DeltaSeconds);
+	void UpdateWeaponHandIK();
 	virtual void UpdateCombatState();
 	void SetCachedDirectionBaseRotation(const FRotator& InRotation);
 

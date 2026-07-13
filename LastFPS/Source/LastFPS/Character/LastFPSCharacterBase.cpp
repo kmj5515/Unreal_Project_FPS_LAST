@@ -467,7 +467,12 @@ void ALastFPSCharacterBase::UpdateAliveCollisionState(bool bAlive)
 
 void ALastFPSCharacterBase::OnMoveSpeedChanged(const FOnAttributeChangeData& Data)
 {
-    GetCharacterMovement()->MaxWalkSpeed = Data.NewValue;
+    GetCharacterMovement()->MaxWalkSpeed = ResolveMaxWalkSpeed(Data.NewValue);
+}
+
+float ALastFPSCharacterBase::ResolveMaxWalkSpeed(const float AttributeMoveSpeed) const
+{
+	return FMath::Max(AttributeMoveSpeed, 0.f);
 }
 
 void ALastFPSCharacterBase::BindStatusOverlayMaterials(UAbilitySystemComponent* ASC)
@@ -778,7 +783,7 @@ void ALastFPSCharacterBase::GiveDefaultAbilities()
 
     for (const TSubclassOf<UGameplayAbility>& AbilityClass : *AbilitiesToGrant)
     {
-        if (AbilityClass)
+        if (AbilityClass && !ASC->FindAbilitySpecFromClass(AbilityClass))
             ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1));
     }
 }

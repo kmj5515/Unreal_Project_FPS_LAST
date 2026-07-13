@@ -6,12 +6,13 @@
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Animation/AnimInstance.h"
 #include "Character/LastFPSHero.h"
+#include "Data/Tables/LastFPSSkillBalanceData.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
-#include "GameFramework/ProjectileMovementComponent.h"
-#include "Projectiles/LastFPSProjectileAimUtility.h"
-#include "Utility/LastFPSTags.h"
 #include "Projectiles/LastFPSProjectile.h"
+#include "Projectiles/LastFPSProjectileAimUtility.h"
+#include "Projectiles/LastFPSProjectileLaunchUtility.h"
+#include "Utility/LastFPSTags.h"
 
 UGA_Projectile::UGA_Projectile()
 {
@@ -126,53 +127,25 @@ void UGA_Projectile::SpawnProjectile()
     bProjectileSpawned = true;
 
     const FVector CameraAimDirection = LastFPSProjectileAim::GetAimDirection(Hero);
-    FRotator SpawnRotation = CameraAimDirection.Rotation();
-    FVector SpawnLocation = Hero->GetActorLocation() + FVector(0.f, 0.f, 60.f);
-
-    if (USkeletalMeshComponent* Mesh = Hero->GetMesh())
-    {
-        if (!ProjectileData->SpawnSocketName.IsNone() && Mesh->DoesSocketExist(ProjectileData->SpawnSocketName))
-        {
-            SpawnLocation = Mesh->GetSocketLocation(ProjectileData->SpawnSocketName);
-        }
-    }
-    SpawnLocation += SpawnRotation.RotateVector(ProjectileData->SpawnLocationOffset);
-
+    const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
+    const float AimTraceRange = BalanceData && BalanceData->Range > 0.f
+        ? BalanceData->Range
+        : ProjectileData->AimTraceRange;
     const FVector AimTarget = LastFPSProjectileAim::GetAimTarget(
         World,
         Hero,
         CameraAimDirection,
-        ProjectileData->AimTraceRange);
-    FVector AimDirection = (AimTarget - SpawnLocation).GetSafeNormal();
-    if (AimDirection.IsNearlyZero())
-    {
-        AimDirection = CameraAimDirection;
-    }
-    SpawnRotation = AimDirection.Rotation();
+        AimTraceRange);
 
-    FActorSpawnParameters SpawnParams;
-    SpawnParams.Owner = Hero;
-    SpawnParams.Instigator = Hero;
-    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-    ALastFPSProjectile* Projectile = World->SpawnActor<ALastFPSProjectile>(
-        ProjectileData->ProjectileClass,
-        SpawnLocation,
-        SpawnRotation,
-        SpawnParams);
-
-    if (Projectile)
-    {
-        Projectile->InitializeGameplayProjectile(
-            Hero,
-            ProjectileData->ImpactRules,
-            ProjectileData->EffectsOnHit,
-            ProjectileData->VisualData);
-        if (Projectile->ProjectileMovement)
-        {
-            Projectile->ProjectileMovement->Velocity = AimDirection * ProjectileData->ProjectileSpeed;
-        }
-    }
+    FLastFPSProjectileLaunchRequest LaunchRequest;
+    LaunchRequest.SourceActor = Hero;
+    LaunchRequest.ProjectileData = ProjectileData;
+    LaunchRequest.AimTarget = AimTarget;
+    LaunchRequest.FallbackAimDirection = CameraAimDirection;
+    LaunchRequest.BaseDamageOverride = BalanceData && BalanceData->Damage > 0.f
+        ? BalanceData->Damage + GetEquippedWeaponBaseDamage()
+        : 0.f;
+    LastFPSProjectileLaunch::SpawnProjectile(LaunchRequest);
 }
 
 void UGA_Projectile::OnProjectileSpawnEvent(FGameplayEventData Payload)

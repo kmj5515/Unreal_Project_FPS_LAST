@@ -27,6 +27,9 @@ struct LASTFPS_API FLastFPSProjectileImpactContext
 	UPROPERTY()
 	FHitResult HitResult;
 
+	/** 0이면 각 ImpactRule의 기존 범위를 사용한다. */
+	float BaseDamageOverride = 0.f;
+
 	FVector GetImpactLocation() const
 	{
 		if (HitResult.bBlockingHit || !HitResult.ImpactPoint.IsNearlyZero())

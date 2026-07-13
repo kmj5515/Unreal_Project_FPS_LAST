@@ -31,7 +31,10 @@ public:
 
     FTransform GetMuzzleTransform() const;
     bool CanFire() const;
+    float GetWeaponBaseDamage() const;
     void PlayFireEffects() const;
+	void PlayFireCameraShake() const;
+    void ApplyFireAimRecoil(bool bIsAiming);
     void SetWeaponHiddenForAbility(bool bHidden);
 
     UFUNCTION(BlueprintCallable, Category="Weapon|Animation")
@@ -96,6 +99,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
     float FireRate = 0.1f;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon", meta=(ClampMin="0.0", Units="cm"))
+    float AimTraceRange = 10000.f;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Damage")
     FLastFPSDamageRange DamageRange;
 
@@ -127,6 +133,7 @@ public:
     
 protected:
     virtual void BeginPlay() override;
+    virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
     UPROPERTY(ReplicatedUsing=OnRep_CurrentWeapon)
@@ -153,6 +160,12 @@ private:
     void DestroyCurrentWeapon();
     void HandleFireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
     bool ValidateClientMuzzleLocation(const FVector& ClientMuzzleLocation) const;
+    void ResetPendingAimRecoil();
 
     int32 WeaponHiddenOverrideCount = 0;
+    float PendingAimRecoilPitch = 0.f;
+    float PendingAimRecoilYaw = 0.f;
+    float RecoverableAimRecoilPitch = 0.f;
+    float RecoverableAimRecoilYaw = 0.f;
+    float TimeSinceLastAimRecoil = 0.f;
 };

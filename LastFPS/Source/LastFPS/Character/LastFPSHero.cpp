@@ -4,7 +4,6 @@
 #include "Utility/LastFPSTags.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
-#include "Camera/CameraShakeBase.h"
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
@@ -15,6 +14,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "AbilitySystem/Abilities/LastFPSConfirmableAbility.h"
 #include "AbilitySystem/Abilities/GA_BasicShoot.h"
 #include "AbilitySystem/Abilities/GA_Ultimate.h"
@@ -68,6 +68,7 @@ ALastFPSHero::ALastFPSHero()
     TargetArmLength    = DefaultArmLength;
     TargetSocketOffset = DefaultSocketOffset;
     TargetFOV          = DefaultFOV;
+	SpeedBoostCameraTag = LastFPSGameplayTags::Status_Movement_SpeedBoost;
 }
 
 void ALastFPSHero::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -76,6 +77,20 @@ void ALastFPSHero::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
     DOREPLIFETIME(ALastFPSHero, CombatState);
     DOREPLIFETIME(ALastFPSHero, JumpStartSequence);
     DOREPLIFETIME(ALastFPSHero, bIsSprinting);
+}
+
+void ALastFPSHero::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	RefreshMaxWalkSpeed();
+	BindSpeedBoostCameraTag();
+}
+
+void ALastFPSHero::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+	RefreshMaxWalkSpeed();
+	BindSpeedBoostCameraTag();
 }
 
 void ALastFPSHero::GiveDefaultAbilities()
@@ -87,6 +102,28 @@ void ALastFPSHero::OnCombatEngagedChanged()
 {
     Super::OnCombatEngagedChanged();
     ApplyRotationModeSettings();
+}
+
+void ALastFPSHero::OnMoveSpeedChanged(const FOnAttributeChangeData& Data)
+{
+	Super::OnMoveSpeedChanged(Data);
+	const UCharacterMovementComponent* Movement = GetCharacterMovement();
+	UpdateSpeedBoostCameraOffset(Movement ? Movement->MaxWalkSpeed : Data.NewValue);
+}
+
+float ALastFPSHero::ResolveMaxWalkSpeed(const float AttributeMoveSpeed) const
+{
+	if (GetWantsToWalk())
+	{
+		return FMath::Max(WalkMaxWalkSpeed, 0.f);
+	}
+
+	if (bIsADS)
+	{
+		return FMath::Max(ADSWalkSpeed, 0.f);
+	}
+
+	return Super::ResolveMaxWalkSpeed(AttributeMoveSpeed);
 }
 
 void ALastFPSHero::BeginPlay()
@@ -109,6 +146,7 @@ void ALastFPSHero::BeginPlay()
     }
 
     ApplyRotationModeSettings();
+	BindSpeedBoostCameraTag();
 
     if (APlayerController* PC = Cast<APlayerController>(GetController()))
     {
@@ -123,6 +161,8 @@ void ALastFPSHero::BeginPlay()
 
 void ALastFPSHero::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	UnbindSpeedBoostCameraTag();
+
     if (WeaponComponent)
     {
         WeaponComponent->OnWeaponEquippedChanged.RemoveDynamic(this, &ALastFPSHero::HandleWeaponEquippedChanged);
@@ -176,9 +216,100 @@ void ALastFPSHero::Tick(float DeltaTime)
 
 void ALastFPSHero::TickCameraInterp(float DeltaTime)
 {
-    CameraBoom->TargetArmLength = FMath::FInterpTo(CameraBoom->TargetArmLength, TargetArmLength, DeltaTime, ADSInterpSpeed);
+	const float ArmInterpSpeed = !bIsADS && bSpeedBoostCameraTransition
+		? SpeedBoostCameraInterpSpeed
+		: ADSInterpSpeed;
+    CameraBoom->TargetArmLength = FMath::FInterpTo(CameraBoom->TargetArmLength, TargetArmLength, DeltaTime, ArmInterpSpeed);
     CameraBoom->SocketOffset = FMath::VInterpTo(CameraBoom->SocketOffset, TargetSocketOffset, DeltaTime, ADSInterpSpeed);
     FollowCamera->FieldOfView = FMath::FInterpTo(FollowCamera->FieldOfView, TargetFOV, DeltaTime, ADSInterpSpeed);
+
+	if (bSpeedBoostCameraTransition
+		&& FMath::IsNearlyEqual(CameraBoom->TargetArmLength, TargetArmLength, 0.5f))
+	{
+		bSpeedBoostCameraTransition = false;
+	}
+}
+
+void ALastFPSHero::BindSpeedBoostCameraTag()
+{
+	if (!IsLocallyControlled() || !SpeedBoostCameraTag.IsValid())
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!ASC || (SpeedBoostCameraASC.Get() == ASC && SpeedBoostCameraTagDelegateHandle.IsValid()))
+	{
+		return;
+	}
+
+	UnbindSpeedBoostCameraTag();
+	SpeedBoostCameraASC = ASC;
+	SpeedBoostCameraTagDelegateHandle = ASC->RegisterGameplayTagEvent(
+		SpeedBoostCameraTag,
+		EGameplayTagEventType::AnyCountChange).AddUObject(
+			this,
+			&ALastFPSHero::HandleSpeedBoostCameraTagChanged);
+
+	HandleSpeedBoostCameraTagChanged(SpeedBoostCameraTag, ASC->GetTagCount(SpeedBoostCameraTag));
+}
+
+void ALastFPSHero::UnbindSpeedBoostCameraTag()
+{
+	if (SpeedBoostCameraTagDelegateHandle.IsValid())
+	{
+		if (UAbilitySystemComponent* ASC = SpeedBoostCameraASC.Get())
+		{
+			ASC->RegisterGameplayTagEvent(
+				SpeedBoostCameraTag,
+				EGameplayTagEventType::AnyCountChange).Remove(SpeedBoostCameraTagDelegateHandle);
+		}
+		SpeedBoostCameraTagDelegateHandle.Reset();
+	}
+
+	SpeedBoostCameraASC.Reset();
+}
+
+void ALastFPSHero::HandleSpeedBoostCameraTagChanged(const FGameplayTag Tag, const int32 NewCount)
+{
+	if (Tag != SpeedBoostCameraTag)
+	{
+		return;
+	}
+
+	bSpeedBoostCameraActive = NewCount > 0;
+	const UCharacterMovementComponent* Movement = GetCharacterMovement();
+	UpdateSpeedBoostCameraOffset(Movement ? Movement->MaxWalkSpeed : 0.f);
+}
+
+void ALastFPSHero::UpdateSpeedBoostCameraOffset(const float EffectiveMoveSpeed)
+{
+	float NewOffset = 0.f;
+	if (bSpeedBoostCameraActive)
+	{
+		const float SpeedRange = SpeedBoostCameraFullSpeed - SpeedBoostCameraStartSpeed;
+		const float SpeedAlpha = SpeedRange > KINDA_SMALL_NUMBER
+			? FMath::Clamp((EffectiveMoveSpeed - SpeedBoostCameraStartSpeed) / SpeedRange, 0.f, 1.f)
+			: (EffectiveMoveSpeed > SpeedBoostCameraStartSpeed ? 1.f : 0.f);
+		NewOffset = FMath::Max(SpeedBoostArmLengthOffset, 0.f) * SpeedAlpha;
+	}
+
+	if (!FMath::IsNearlyEqual(CurrentSpeedBoostArmLengthOffset, NewOffset))
+	{
+		CurrentSpeedBoostArmLengthOffset = NewOffset;
+		bSpeedBoostCameraTransition = true;
+	}
+
+	RefreshCameraTargets();
+}
+
+void ALastFPSHero::RefreshCameraTargets()
+{
+	TargetArmLength = bIsADS
+		? ADSArmLength
+		: DefaultArmLength + CurrentSpeedBoostArmLengthOffset;
+	TargetSocketOffset = bIsADS ? ADSSocketOffset : DefaultSocketOffset;
+	TargetFOV = bIsADS ? ADSFOV : DefaultFOV;
 }
 
 void ALastFPSHero::ApplyRotationModeSettings()
@@ -497,9 +628,7 @@ void ALastFPSHero::SetADS(bool bEnabled)
     }
 
     bIsADS = bEnabled;
-    TargetArmLength    = bIsADS ? ADSArmLength : DefaultArmLength;
-    TargetSocketOffset = bIsADS ? ADSSocketOffset : DefaultSocketOffset;
-    TargetFOV          = bIsADS ? ADSFOV : DefaultFOV;
+	RefreshCameraTargets();
     ApplyRotationModeSettings();
 
     if (CameraBoom)
@@ -508,18 +637,7 @@ void ALastFPSHero::SetADS(bool bEnabled)
         CameraBoom->CameraLagSpeed = bIsADS ? 60.f : CameraLagSpeed;
     }
 
-    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
-    {
-        if (bIsADS)
-        {
-            PreADSWalkSpeed = Movement->MaxWalkSpeed;
-            Movement->MaxWalkSpeed = ADSWalkSpeed;
-        }
-        else
-        {
-            Movement->MaxWalkSpeed = PreADSWalkSpeed > 0.f ? PreADSWalkSpeed : 600.f;
-        }
-    }
+	RefreshMaxWalkSpeed();
 }
 
 bool ALastFPSHero::ShouldCancelFireBeforeAbilityInput(FGameplayTag InputID) const
@@ -583,35 +701,24 @@ void ALastFPSHero::SetWantsToWalk(bool bEnabled)
         return;
     }
 
-    UCharacterMovementComponent* Movement = GetCharacterMovement();
-    if (bEnabled)
-    {
-        if (Movement)
-        {
-            PreWalkMaxWalkSpeed = Movement->MaxWalkSpeed;
-            Movement->MaxWalkSpeed = WalkMaxWalkSpeed;
-        }
-    }
-    else
-    {
-        RestoreWalkSpeed();
-    }
-
     bWantsToWalk = bEnabled;
+	RefreshMaxWalkSpeed();
     ApplyRotationModeSettings();
 }
 
-void ALastFPSHero::RestoreWalkSpeed()
+void ALastFPSHero::RefreshMaxWalkSpeed()
 {
-    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
-    {
-        if (PreWalkMaxWalkSpeed > 0.f)
-        {
-            Movement->MaxWalkSpeed = PreWalkMaxWalkSpeed;
-        }
-    }
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	const UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!Movement || !ASC)
+	{
+		return;
+	}
 
-    PreWalkMaxWalkSpeed = 0.f;
+	const float AttributeMoveSpeed = ASC->GetNumericAttribute(
+		ULastFPSAttributeSet::GetMoveSpeedAttribute());
+	Movement->MaxWalkSpeed = ResolveMaxWalkSpeed(AttributeMoveSpeed);
+	UpdateSpeedBoostCameraOffset(Movement->MaxWalkSpeed);
 }
 
 void ALastFPSHero::SetCombatState(EMMCombatState NewState)
@@ -622,6 +729,7 @@ void ALastFPSHero::SetCombatState(EMMCombatState NewState)
     }
 
     CombatState = NewState;
+	RefreshMaxWalkSpeed();
     ApplyRotationModeSettings();
 }
 
@@ -632,6 +740,7 @@ void ALastFPSHero::NotifyJumpStarted()
 
 void ALastFPSHero::OnRep_CombatState()
 {
+	RefreshMaxWalkSpeed();
     ApplyRotationModeSettings();
 }
 

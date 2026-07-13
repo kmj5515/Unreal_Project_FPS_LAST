@@ -41,6 +41,10 @@ struct LASTFPS_API FLastFPSDamageResult
 
 namespace LastFPSDamage
 {
+	/** 기준 데미지에 공통 ±20% 편차 공식을 적용해 범위를 만든다. */
+	LASTFPS_API FLastFPSDamageRange MakeDamageRange(
+		float BaseDamage,
+		ELastFPSDamageElement DamageElement);
 	LASTFPS_API float RollDamage(const FLastFPSDamageRange& DamageRange);
 	LASTFPS_API FLastFPSDamageResult CalculateDamage(
 		const FGameplayEffectSpec& Spec,

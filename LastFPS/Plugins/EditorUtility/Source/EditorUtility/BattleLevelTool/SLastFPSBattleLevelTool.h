@@ -24,6 +24,7 @@ private:
 	FReply RefreshClicked();
 	FReply ValidateCurrentClicked();
 	FReply AddMonsterClicked();
+	FReply RemoveMonsterClicked(int32 MonsterIndex);
 	FReply ClearMonstersClicked();
 	FReply CreateScenarioClicked();
 	FReply SaveScenarioClicked();
@@ -38,6 +39,7 @@ private:
 	TSharedRef<SWidget> BuildValidationRow(const FLastFPSBattleLevelValidationMessage& Message) const;
 	FSlateColor GetSeverityColor(ELastFPSBattleLevelValidationSeverity Severity) const;
 	FText GetCurrentLevelText() const;
+	FText GetDraftMonsterCountText() const;
 	FText GetScenarioNameText() const;
 	FText GetPendingMonsterSpawnTagText() const;
 	FString GetSelectedScenarioObjectPath() const;

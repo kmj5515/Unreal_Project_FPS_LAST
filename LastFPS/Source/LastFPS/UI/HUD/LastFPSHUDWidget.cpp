@@ -3,14 +3,16 @@
 #include "UI/HUD/LastFPSSkillCooldownSlotWidget.h"
 #include "UI/HUD/LastFPSHUDStyle.h"
 #include "AbilitySystemComponent.h"
-#include "AbilitySystem/Effects/GE_Skill1Cooldown.h"
-#include "AbilitySystem/Effects/GE_Skill2Cooldown.h"
-#include "AbilitySystem/Effects/GE_UltimateCooldown.h"
+#include "Data/Definitions/LastFPSCharacterDefinition.h"
+#include "Data/Tables/LastFPSCharacterSkillData.h"
+#include "Engine/GameInstance.h"
 #include "Styling/SlateBrush.h"
-#include "Utility/LastFPSTags.h"
 #include "UI/Framework/LastFPSUITags.h"
+#include "Utility/LastFPSTags.h"
 #include "GameFramework/PlayerController.h"
+#include "Engine/Texture2D.h"
 #include "PrimaryGameLayout.h"
+#include "Skills/LastFPSSkillDataSubsystem.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
 
 void FLastFPSSmoothedGaugeDisplay::Initialize(float Current, float InMax)
@@ -183,26 +185,74 @@ bool ULastFPSHUDWidget::TryInitSkillSlots()
         return true;
     }
 
-    if (!WBP_SkillCooldownSlot_Q || !WBP_SkillCooldownSlot_E || !WBP_SkillCooldownSlot_F || !CachedASC.IsValid())
+    if (!WBP_SkillCooldownSlot_Q || !WBP_SkillCooldownSlot_E
+        || !WBP_SkillCooldownSlot_Z || !WBP_SkillCooldownSlot_F || !CachedASC.IsValid())
     {
         return false;
     }
 
-    WBP_SkillCooldownSlot_Q->ConfigureCooldownSlot(
-        LastFPSGameplayTags::Cooldown_Skill1, ULastFPSGE_Skill1Cooldown::StaticClass());
-    WBP_SkillCooldownSlot_Q->SetKeyLabel(FText::FromString(TEXT("Q")));
+    const APlayerController* PC = GetOwningPlayer();
+    const ALastFPSCharacterBase* Character = PC ? Cast<ALastFPSCharacterBase>(PC->GetPawn()) : nullptr;
+    const ULastFPSCharacterDefinition* Definition = Character ? Character->GetCharacterDefinition() : nullptr;
+    const UGameInstance* GameInstance = Character ? Character->GetGameInstance() : nullptr;
+    const ULastFPSSkillDataSubsystem* SkillDataSubsystem =
+        GameInstance ? GameInstance->GetSubsystem<ULastFPSSkillDataSubsystem>() : nullptr;
+    if (!Definition || !SkillDataSubsystem)
+    {
+        return false;
+    }
 
-    WBP_SkillCooldownSlot_E->ConfigureCooldownSlot(
-        LastFPSGameplayTags::Cooldown_Skill2, ULastFPSGE_Skill2Cooldown::StaticClass());
-    WBP_SkillCooldownSlot_E->SetKeyLabel(FText::FromString(TEXT("E")));
-    
-    WBP_SkillCooldownSlot_Z->ConfigureCooldownSlot(
-        LastFPSGameplayTags::Cooldown_Skill3, ULastFPSGE_Skill2Cooldown::StaticClass());
-    WBP_SkillCooldownSlot_Z->SetKeyLabel(FText::FromString(TEXT("Z")));
-    
-    WBP_SkillCooldownSlot_F->ConfigureCooldownSlot(
-        LastFPSGameplayTags::Cooldown_Ultimate, ULastFPSGE_UltimateCooldown::StaticClass());
-    WBP_SkillCooldownSlot_F->SetKeyLabel(FText::FromString(TEXT("F")));
+    const FLastFPSCharacterSkillData* Skill1 = SkillDataSubsystem->FindSkill(
+        Definition->CharacterId, ELastFPSCharacterSkillSlot::Skill1);
+    const FLastFPSCharacterSkillData* Skill2 = SkillDataSubsystem->FindSkill(
+        Definition->CharacterId, ELastFPSCharacterSkillSlot::Skill2);
+    const FLastFPSCharacterSkillData* Skill3 = SkillDataSubsystem->FindSkill(
+        Definition->CharacterId, ELastFPSCharacterSkillSlot::Skill3);
+    const FLastFPSCharacterSkillData* Ultimate = SkillDataSubsystem->FindSkill(
+        Definition->CharacterId, ELastFPSCharacterSkillSlot::Ultimate);
+    const bool bHasDefinitionLoadout = Skill1 && Skill2 && Skill3 && Ultimate;
+    if (!bHasDefinitionLoadout)
+    {
+        WBP_SkillCooldownSlot_Q->ConfigureCooldownSlot(LastFPSGameplayTags::Cooldown_Skill1, nullptr);
+        WBP_SkillCooldownSlot_Q->SetKeyLabel(FText::FromString(TEXT("Q")));
+        WBP_SkillCooldownSlot_E->ConfigureCooldownSlot(LastFPSGameplayTags::Cooldown_Skill2, nullptr);
+        WBP_SkillCooldownSlot_E->SetKeyLabel(FText::FromString(TEXT("E")));
+        WBP_SkillCooldownSlot_Z->ConfigureCooldownSlot(LastFPSGameplayTags::Cooldown_Skill3, nullptr);
+        WBP_SkillCooldownSlot_Z->SetKeyLabel(FText::FromString(TEXT("Z")));
+        WBP_SkillCooldownSlot_F->ConfigureCooldownSlot(LastFPSGameplayTags::Cooldown_Ultimate, nullptr);
+        WBP_SkillCooldownSlot_F->SetKeyLabel(FText::FromString(TEXT("F")));
+        TickSkillSlots();
+        bSkillSlotsInitialized = true;
+        return true;
+    }
+
+    const auto ConfigureSlot = [](
+        ULastFPSSkillCooldownSlotWidget* Widget,
+        const FLastFPSCharacterSkillData* SkillData,
+        const ELastFPSCharacterSkillSlot ExpectedSlot)
+    {
+        if (!Widget || !SkillData || SkillData->Slot != ExpectedSlot
+            || !SkillData->CooldownTag.IsValid())
+        {
+            return false;
+        }
+
+        Widget->ConfigureCooldownSlot(SkillData->CooldownTag, nullptr);
+        Widget->SetConfiguredKeyLabel(SkillData->KeyLabel);
+        if (UTexture2D* Icon = SkillData->Icon.LoadSynchronous())
+        {
+            Widget->SetSkillIconTexture(Icon);
+        }
+        return true;
+    };
+
+    if (!ConfigureSlot(WBP_SkillCooldownSlot_Q, Skill1, ELastFPSCharacterSkillSlot::Skill1)
+        || !ConfigureSlot(WBP_SkillCooldownSlot_E, Skill2, ELastFPSCharacterSkillSlot::Skill2)
+        || !ConfigureSlot(WBP_SkillCooldownSlot_Z, Skill3, ELastFPSCharacterSkillSlot::Skill3)
+        || !ConfigureSlot(WBP_SkillCooldownSlot_F, Ultimate, ELastFPSCharacterSkillSlot::Ultimate))
+    {
+        return false;
+    }
 
     TickSkillSlots();
     bSkillSlotsInitialized = true;
