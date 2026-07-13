@@ -9,6 +9,7 @@
 #include "Styling/CoreStyle.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/Input/SMenuAnchor.h"
 #include "Widgets/Input/SSpinBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SScrollBox.h"
@@ -38,6 +39,30 @@ namespace
 			.AutoHeight()
 			[
 				Field
+			];
+	}
+
+	// 사용 설명서 팝업의 한 항목. 소제목(굵게)과 본문(자동 줄바꿈)을 세로로 묶는다.
+	TSharedRef<SWidget> MakeHelpBlock(const FText& Heading, const FText& Body)
+	{
+		return SNew(SVerticalBox)
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f, 0.f, 3.f)
+			[
+				SNew(STextBlock)
+				.Text(Heading)
+				.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
+				.Font(FCoreStyle::GetDefaultFontStyle(FName(TEXT("Bold")), 11))
+			]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f, 0.f, 12.f)
+			[
+				SNew(STextBlock)
+				.Text(Body)
+				.AutoWrapText(true)
+				.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
 			];
 	}
 
@@ -113,6 +138,29 @@ void SLastFPSBattleLevelTool::Construct(const FArguments& InArgs)
 						SNew(STextBlock)
 						.Text(this, &SLastFPSBattleLevelTool::GetCurrentLevelText)
 						.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
+					]
+
+					// 우측 끝의 도움말(?) 버튼. 클릭 시 사용 설명서 팝업을 연다.
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					.VAlign(VAlign_Center)
+					.Padding(6.f, 0.f, 0.f, 0.f)
+					[
+						SAssignNew(HelpAnchor, SMenuAnchor)
+						.Placement(MenuPlacement_BelowRightAnchor)
+						.OnGetMenuContent(this, &SLastFPSBattleLevelTool::BuildHelpMenuContent)
+						[
+							SNew(SButton)
+							.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+							.ToolTipText(LOCTEXT("HelpButtonTooltip", "사용 설명서 열기"))
+							.OnClicked(this, &SLastFPSBattleLevelTool::ToggleHelpClicked)
+							[
+								SNew(STextBlock)
+								.Text(LOCTEXT("HelpButtonLabel", "?"))
+								.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
+								.Font(FCoreStyle::GetDefaultFontStyle(FName(TEXT("Bold")), 11))
+							]
+						]
 					])
 			]
 
@@ -319,6 +367,116 @@ FReply SLastFPSBattleLevelTool::ValidateCurrentClicked()
 	RefreshValidationMessages();
 	SetStatus(LOCTEXT("ValidatedStatus", "현재 레벨 검증이 완료되었습니다."));
 	return FReply::Handled();
+}
+
+FReply SLastFPSBattleLevelTool::ToggleHelpClicked()
+{
+	if (HelpAnchor)
+	{
+		HelpAnchor->SetIsOpen(!HelpAnchor->IsOpen());
+	}
+
+	return FReply::Handled();
+}
+
+TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildHelpMenuContent()
+{
+	const TSharedRef<SScrollBox> HelpBody = SNew(SScrollBox);
+
+	HelpBody->AddSlot()
+	.Padding(0.f, 0.f, 0.f, 4.f)
+	[
+		SNew(STextBlock)
+		.Text(LOCTEXT("HelpTitle", "배틀 레벨 도구 사용 설명서"))
+		.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
+		.Font(FCoreStyle::GetDefaultFontStyle(FName(TEXT("Bold")), 13))
+	];
+
+	HelpBody->AddSlot()
+	.Padding(0.f, 0.f, 0.f, 10.f)
+	[
+		LastFPSEditorWidgets::MakeColorLine(LastFPSEditorWidgets::GetToolAccentColor())
+	];
+
+	HelpBody->AddSlot()
+	[
+		MakeHelpBlock(
+			LOCTEXT("HelpOverviewHeading", "개요"),
+			LOCTEXT("HelpOverviewBody",
+				"배틀 레벨과 전투 시나리오를 한 곳에서 만들고 편집하고 PIE로 바로 시험하는 도구입니다. "
+				"시나리오는 대상 맵, 플레이어 캐릭터, 스폰할 몬스터 구성을 담아 BS_ 데이터 에셋으로 저장됩니다."))
+	];
+
+	HelpBody->AddSlot()
+	[
+		MakeHelpBlock(
+			LOCTEXT("HelpCurrentHeading", "현재 레벨"),
+			LOCTEXT("HelpCurrentBody",
+				"· 새로고침: 프로젝트에서 배틀 레벨 목록을 다시 수집합니다.\n"
+				"· 현재 레벨 검증: 지금 열려 있는 레벨을 검사해 스폰 지점 태그 등 실행 조건이 갖춰졌는지 아래 검증 영역에 보여줍니다."))
+	];
+
+	HelpBody->AddSlot()
+	[
+		MakeHelpBlock(
+			LOCTEXT("HelpStep1Heading", "① 저장된 시나리오 불러오기"),
+			LOCTEXT("HelpStep1Body",
+				"· 불러오기: 선택한 시나리오(BS_) 에셋의 내용을 아래 초안 편집 영역으로 채웁니다.\n"
+				"· 실행: 선택한 시나리오를 초안으로 가져오지 않고 그대로 PIE로 실행합니다."))
+	];
+
+	HelpBody->AddSlot()
+	[
+		MakeHelpBlock(
+			LOCTEXT("HelpStep2Heading", "② 시나리오 초안 편집"),
+			LOCTEXT("HelpStep2Body",
+				"· 시나리오 이름: 새로 생성할 때 사용할 에셋 이름입니다.\n"
+				"· 대상 맵 / 플레이어 캐릭터: 전투가 벌어질 레벨과 플레이할 캐릭터 정의.\n"
+				"· 몬스터 추가: 캐릭터·수량(1 이상)·스폰 태그·스케일(0.01 이상)을 정하고 추가를 누르면 목록에 들어갑니다.\n"
+				"· 스폰 태그는 레벨에 배치된 스폰 지점의 태그와 일치해야 실제로 스폰됩니다(기본 EnemySpawn).\n"
+				"· 스폰 목록: 각 행의 삭제로 개별 제거, 비우기로 전체 초기화."))
+	];
+
+	HelpBody->AddSlot()
+	[
+		MakeHelpBlock(
+			LOCTEXT("HelpActionsHeading", "저장 · 실행"),
+			LOCTEXT("HelpActionsBody",
+				"· 시나리오 생성: 현재 초안을 새 시나리오 에셋으로 만듭니다.\n"
+				"· 저장: 불러온(또는 방금 생성한) 시나리오 에셋에 현재 초안을 덮어써 갱신합니다.\n"
+				"· 초안으로 실행: 에셋으로 저장하지 않고 현재 초안 그대로 PIE를 실행합니다. 빠른 반복 테스트용입니다."))
+	];
+
+	HelpBody->AddSlot()
+	[
+		MakeHelpBlock(
+			LOCTEXT("HelpLevelsHeading", "배틀 레벨 목록"),
+			LOCTEXT("HelpLevelsBody",
+				"· 열기: 해당 레벨을 에디터에서 엽니다.\n"
+				"· 실행: 해당 레벨로 PIE를 시작합니다.\n"
+				"· 사용: 해당 레벨을 초안의 대상 맵으로 지정합니다."))
+	];
+
+	HelpBody->AddSlot()
+	[
+		MakeHelpBlock(
+			LOCTEXT("HelpValidationHeading", "검증 메시지 색"),
+			LOCTEXT("HelpValidationBody",
+				"· 초록: 정보/정상  · 노랑: 경고(실행은 되지만 확인 필요)  · 빨강: 오류(수정 필요).\n"
+				"실행 전 현재 레벨 검증으로 스폰 태그 구성을 확인하면 스폰 누락을 예방할 수 있습니다."))
+	];
+
+	return SNew(SBorder)
+		.BorderImage(FAppStyle::GetBrush("Menu.Background"))
+		.Padding(FMargin(14.f, 12.f))
+		[
+			SNew(SBox)
+			.WidthOverride(500.f)
+			.MaxDesiredHeight(560.f)
+			[
+				HelpBody
+			]
+		];
 }
 
 FReply SLastFPSBattleLevelTool::AddMonsterClicked()

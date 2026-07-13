@@ -161,11 +161,13 @@ private:
     void HandleFireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
     bool ValidateClientMuzzleLocation(const FVector& ClientMuzzleLocation) const;
     void ResetPendingAimRecoil();
+    void ResetAimRecoilSequence();
 
     int32 WeaponHiddenOverrideCount = 0;
     float PendingAimRecoilPitch = 0.f;
     float PendingAimRecoilYaw = 0.f;
     float RecoverableAimRecoilPitch = 0.f;
     float RecoverableAimRecoilYaw = 0.f;
-    float TimeSinceLastAimRecoil = 0.f;
+    double LastAimRecoilTimeSeconds = 0.0;
+    bool bHasFiredAimRecoil = false;
 };

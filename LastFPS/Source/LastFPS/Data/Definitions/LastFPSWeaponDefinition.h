@@ -27,6 +27,12 @@ struct LASTFPS_API FLastFPSWeaponAimRecoilSettings
     float Strength = 0.75f;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.0"))
+    float FirstShotStrengthMultiplier = 1.35f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.0", Units="s"))
+    float FirstShotResetInterval = 0.5f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.0"))
     float HorizontalRatio = 0.25f;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.0", ClampMax="1.0"))
@@ -37,9 +43,6 @@ struct LASTFPS_API FLastFPSWeaponAimRecoilSettings
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.01"))
     float InterpolationSpeed = 20.f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.0", Units="s"))
-    float RecoveryDelay = 0.08f;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aim Recoil", meta=(ClampMin="0.0", ClampMax="1.0"))
     float RecoveryRatio = 0.4f;

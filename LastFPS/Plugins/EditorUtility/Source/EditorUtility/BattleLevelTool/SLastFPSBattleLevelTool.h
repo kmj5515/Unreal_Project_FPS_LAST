@@ -5,6 +5,7 @@
 #include "Types/SlateEnums.h"
 #include "Widgets/SCompoundWidget.h"
 
+class SMenuAnchor;
 class SScrollBox;
 class STextBlock;
 
@@ -23,6 +24,8 @@ private:
 	void RefreshValidationMessages();
 	FReply RefreshClicked();
 	FReply ValidateCurrentClicked();
+	FReply ToggleHelpClicked();
+	TSharedRef<SWidget> BuildHelpMenuContent();
 	FReply AddMonsterClicked();
 	FReply RemoveMonsterClicked(int32 MonsterIndex);
 	FReply ClearMonstersClicked();
@@ -69,4 +72,5 @@ private:
 	TSharedPtr<SScrollBox> MonsterDraftBox;
 	TSharedPtr<SScrollBox> ValidationBox;
 	TSharedPtr<STextBlock> StatusText;
+	TSharedPtr<SMenuAnchor> HelpAnchor;
 };

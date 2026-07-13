@@ -13,10 +13,16 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
+
+namespace
+{
+    constexpr float AimRecoilCompletionToleranceDegrees = 0.01f;
+}
 
 UWeaponComponent::UWeaponComponent()
 {
@@ -110,8 +116,16 @@ void UWeaponComponent::TickComponent(
     {
         const float KickSpeed = FMath::Max(Recoil.InterpolationSpeed, 0.01f);
         const float KickAlpha = FMath::Clamp(DeltaTime * KickSpeed, 0.f, 1.f);
-        const float PitchKickDelta = PendingAimRecoilPitch * KickAlpha;
-        const float YawKickDelta = PendingAimRecoilYaw * KickAlpha;
+        float PitchKickDelta = PendingAimRecoilPitch * KickAlpha;
+        float YawKickDelta = PendingAimRecoilYaw * KickAlpha;
+        if (FMath::Abs(PendingAimRecoilPitch - PitchKickDelta) <= AimRecoilCompletionToleranceDegrees)
+        {
+            PitchKickDelta = PendingAimRecoilPitch;
+        }
+        if (FMath::Abs(PendingAimRecoilYaw - YawKickDelta) <= AimRecoilCompletionToleranceDegrees)
+        {
+            YawKickDelta = PendingAimRecoilYaw;
+        }
 
         RecoilRotation.Pitch = FRotator::NormalizeAxis(RecoilRotation.Pitch + PitchKickDelta);
         RecoilRotation.Yaw = FRotator::NormalizeAxis(RecoilRotation.Yaw + YawKickDelta);
@@ -122,9 +136,7 @@ void UWeaponComponent::TickComponent(
         RecoverableAimRecoilYaw += YawKickDelta * RecoveryRatio;
         bRotationChanged = true;
     }
-
-    TimeSinceLastAimRecoil += DeltaTime;
-    if (TimeSinceLastAimRecoil >= FMath::Max(Recoil.RecoveryDelay, 0.f))
+    else
     {
         const float RecoverySpeed = FMath::Max(Recoil.RecoveryInterpolationSpeed, 0.01f);
         const float RecoveryAlpha = FMath::Clamp(DeltaTime * RecoverySpeed, 0.f, 1.f);
@@ -135,8 +147,7 @@ void UWeaponComponent::TickComponent(
         RecoilRotation.Yaw = FRotator::NormalizeAxis(RecoilRotation.Yaw - YawRecoveryDelta);
         RecoverableAimRecoilPitch -= PitchRecoveryDelta;
         RecoverableAimRecoilYaw -= YawRecoveryDelta;
-        bRotationChanged = bRotationChanged
-            || !FMath::IsNearlyZero(PitchRecoveryDelta)
+        bRotationChanged = !FMath::IsNearlyZero(PitchRecoveryDelta)
             || !FMath::IsNearlyZero(YawRecoveryDelta);
     }
 
@@ -217,19 +228,31 @@ void UWeaponComponent::ApplyFireAimRecoil(bool bIsAiming)
         return;
     }
 
+    const UWorld* World = GetWorld();
+    const double CurrentTimeSeconds = World ? World->GetTimeSeconds() : 0.0;
+    const double TimeSinceLastShot = CurrentTimeSeconds - LastAimRecoilTimeSeconds;
+    const bool bIsFirstShot = !bHasFiredAimRecoil
+        || TimeSinceLastShot >= FMath::Max(static_cast<double>(Recoil.FirstShotResetInterval), 0.0);
+    LastAimRecoilTimeSeconds = CurrentTimeSeconds;
+    bHasFiredAimRecoil = true;
+
     const float Randomness = FMath::Clamp(Recoil.RandomnessRatio, 0.f, 1.f);
     const float AimMultiplier = bIsAiming ? FMath::Max(Recoil.ADSMultiplier, 0.f) : 1.f;
+    const float FirstShotMultiplier = bIsFirstShot
+        ? FMath::Max(Recoil.FirstShotStrengthMultiplier, 0.f)
+        : 1.f;
     const float VerticalRecoil = Strength
+        * FirstShotMultiplier
         * FMath::FRandRange(1.f - Randomness, 1.f + Randomness)
         * AimMultiplier;
     const float HorizontalRecoil = Strength
+        * FirstShotMultiplier
         * FMath::Max(Recoil.HorizontalRatio, 0.f)
         * FMath::FRandRange(-1.f, 1.f)
         * AimMultiplier;
 
     PendingAimRecoilPitch += VerticalRecoil;
     PendingAimRecoilYaw += HorizontalRecoil;
-    TimeSinceLastAimRecoil = 0.f;
     SetComponentTickEnabled(true);
 }
 
@@ -255,8 +278,13 @@ void UWeaponComponent::ResetPendingAimRecoil()
     PendingAimRecoilYaw = 0.f;
     RecoverableAimRecoilPitch = 0.f;
     RecoverableAimRecoilYaw = 0.f;
-    TimeSinceLastAimRecoil = 0.f;
     SetComponentTickEnabled(false);
+}
+
+void UWeaponComponent::ResetAimRecoilSequence()
+{
+    LastAimRecoilTimeSeconds = 0.0;
+    bHasFiredAimRecoil = false;
 }
 
 void UWeaponComponent::SetWeaponHiddenForAbility(bool bHidden)
@@ -365,6 +393,7 @@ void UWeaponComponent::UnequipWeapon()
     }
 
     ResetPendingAimRecoil();
+    ResetAimRecoilSequence();
 
     if (!GetOwner()->HasAuthority())
     {
@@ -389,6 +418,7 @@ void UWeaponComponent::Server_UnequipWeapon_Implementation()
 void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefinition)
 {
     ResetPendingAimRecoil();
+    ResetAimRecoilSequence();
     WeaponDefinition = NewDefinition;
     ApplyWeaponDefinitionValues(NewDefinition);
 
@@ -466,6 +496,7 @@ void UWeaponComponent::OnRep_WeaponType()
 void UWeaponComponent::OnRep_WeaponDefinition()
 {
     ResetPendingAimRecoil();
+    ResetAimRecoilSequence();
     ApplyWeaponDefinitionValues(WeaponDefinition);
 
     if (CurrentWeapon)
