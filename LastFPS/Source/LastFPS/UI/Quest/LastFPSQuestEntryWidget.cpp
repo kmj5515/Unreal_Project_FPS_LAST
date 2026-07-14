@@ -115,6 +115,8 @@ FText ULastFPSQuestEntryWidget::StatusToText(ELastFPSQuestStatus Status)
 		return NSLOCTEXT("LastFPS", "Quest_Status_Completed", "완료");
 	case ELastFPSQuestStatus::Claimed:
 		return NSLOCTEXT("LastFPS", "Quest_Status_Claimed", "수령완료");
+	case ELastFPSQuestStatus::Locked:
+		return NSLOCTEXT("LastFPS", "Quest_Status_Locked", "잠김");
 	case ELastFPSQuestStatus::NotStarted:
 	default:
 		return NSLOCTEXT("LastFPS", "Quest_Status_NotStarted", "미시작");
