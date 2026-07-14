@@ -35,9 +35,6 @@ public:
     UFUNCTION(BlueprintCallable, Category="Weapon|Animation")
     void PlayFireAnimation();
 
-    UFUNCTION(BlueprintCallable, Category="Weapon|Animation")
-    void PlayReloadAnimation();
-
     USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
     USkeletalMesh* GetDefaultWeaponMesh() const;
     ULastFPSWeaponDefinition* GetDefaultWeaponDefinition() const { return DefaultWeaponDefinition; }
@@ -71,9 +68,6 @@ private:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Animation", meta=(AllowPrivateAccess="true"))
     TObjectPtr<UAnimationAsset> FireAnimation;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Animation", meta=(AllowPrivateAccess="true"))
-    TObjectPtr<UAnimationAsset> ReloadAnimation;
 
     UPROPERTY(EditDefaultsOnly, Category="Weapon|Animation", meta=(ClampMin="0.01"))
     float WeaponAnimationPlayRate = 1.f;

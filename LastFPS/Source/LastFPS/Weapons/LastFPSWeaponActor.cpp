@@ -203,14 +203,3 @@ void ALastFPSWeaponActor::PlayFireAnimation()
         WeaponMesh->SetPlayRate(PlayRate);
     }
 }
-
-void ALastFPSWeaponActor::PlayReloadAnimation()
-{
-    UAnimationAsset* Animation = WeaponDefinition ? WeaponDefinition->ReloadAnimation.Get() : ReloadAnimation.Get();
-    const float PlayRate = WeaponDefinition ? WeaponDefinition->AnimationPlayRate : WeaponAnimationPlayRate;
-    if (WeaponMesh && Animation)
-    {
-        WeaponMesh->PlayAnimation(Animation, false);
-        WeaponMesh->SetPlayRate(PlayRate);
-    }
-}

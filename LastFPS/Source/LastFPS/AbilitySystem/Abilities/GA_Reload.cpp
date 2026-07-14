@@ -41,11 +41,6 @@ void UGA_Reload::ActivateAbility(
 
     Hero->SetCombatState(EMMCombatState::Reloading);
 
-    if (UWeaponComponent* Weapon = Hero->GetWeaponComponent())
-    {
-        Weapon->PlayReloadAnimation();
-    }
-
     bool bWaitingForMontageEnd = false;
     if (ReloadMontage && Hero->GetMesh())
     {
@@ -109,6 +104,11 @@ void UGA_Reload::EndAbility(
 
     if (ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo()))
     {
+        if (UWeaponComponent* Weapon = Hero->GetWeaponComponent())
+        {
+            Weapon->RestoreMagazineToWeapon();
+        }
+
         if (Hero->GetCombatState() == EMMCombatState::Reloading)
         {
             Hero->SetCombatState(EMMCombatState::Idle);

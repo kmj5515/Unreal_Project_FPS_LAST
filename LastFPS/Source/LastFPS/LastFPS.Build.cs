@@ -19,7 +19,7 @@ public class LastFPS : ModuleRules
 			"AIModule", "NavigationSystem", "Niagara"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "NetCore", "SlateCore" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "NetCore", "Slate", "SlateCore" });
 
 		// Uncomment if you are using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");

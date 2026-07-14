@@ -65,6 +65,12 @@ void UWeaponComponent::BeginPlay()
     // 클라이언트는 OnRep_CurrentWeapon에서 attach + 브로드캐스트
 }
 
+void UWeaponComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    ApplyRestoreMagazineVisual();
+    Super::EndPlay(EndPlayReason);
+}
+
 bool UWeaponComponent::CanFire() const
 {
     return CurrentWeapon != nullptr;
@@ -296,12 +302,155 @@ void UWeaponComponent::SetWeaponHiddenForAbility(bool bHidden)
     ApplyWeaponVisibilityOverride();
 }
 
-void UWeaponComponent::PlayReloadAnimation() const
+void UWeaponComponent::DetachMagazineToHand()
 {
-    if (CurrentWeapon)
+    AActor* OwnerActor = GetOwner();
+    if (!OwnerActor)
     {
-        CurrentWeapon->PlayReloadAnimation();
+        return;
     }
+
+    if (OwnerActor->HasAuthority())
+    {
+        Multicast_DetachMagazineToHand();
+        return;
+    }
+
+    // 예측 클라이언트는 서버 왕복을 기다리지 않고 동일한 시각 상태를 먼저 적용합니다.
+    ApplyDetachMagazineVisual();
+}
+
+void UWeaponComponent::RestoreMagazineToWeapon()
+{
+    AActor* OwnerActor = GetOwner();
+    if (!OwnerActor)
+    {
+        ApplyRestoreMagazineVisual();
+        return;
+    }
+
+    if (OwnerActor->HasAuthority())
+    {
+        Multicast_RestoreMagazineToWeapon();
+        return;
+    }
+
+    // 서버 Multicast가 도착해도 복구 함수가 멱등적으로 동작하므로 중복 호출은 안전합니다.
+    ApplyRestoreMagazineVisual();
+}
+
+void UWeaponComponent::Multicast_DetachMagazineToHand_Implementation()
+{
+    ApplyDetachMagazineVisual();
+}
+
+void UWeaponComponent::Multicast_RestoreMagazineToWeapon_Implementation()
+{
+    ApplyRestoreMagazineVisual();
+}
+
+void UWeaponComponent::ApplyDetachMagazineVisual()
+{
+    if (DetachedMagazineVisual
+        || !CurrentWeapon
+        || !WeaponDefinition
+        || (GetOwner() && GetOwner()->GetNetMode() == NM_DedicatedServer))
+    {
+        return;
+    }
+
+    const FLastFPSWeaponMagazineVisualSettings& Settings = WeaponDefinition->MagazineVisual;
+    USkeletalMeshComponent* WeaponMesh = CurrentWeapon->GetWeaponMesh();
+    ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+    USkeletalMeshComponent* CharacterMesh = OwnerCharacter ? OwnerCharacter->GetMesh() : nullptr;
+    UWorld* World = GetWorld();
+    if (!World || !WeaponMesh || !CharacterMesh || !Settings.DetachedMagazineActorClass)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("탄창 분리 실패: Owner=%s Weapon=%s Definition=%s에 필요한 시각 설정이 없습니다."),
+            GetOwner() ? *GetOwner()->GetName() : TEXT("None"),
+            CurrentWeapon ? *CurrentWeapon->GetName() : TEXT("None"),
+            WeaponDefinition ? *WeaponDefinition->GetName() : TEXT("None"));
+        return;
+    }
+
+    if (Settings.WeaponMagazineBoneName.IsNone()
+        || WeaponMesh->GetBoneIndex(Settings.WeaponMagazineBoneName) == INDEX_NONE)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("탄창 분리 실패: 무기 '%s'에서 탄창 본 '%s'을 찾지 못했습니다."),
+            *CurrentWeapon->GetName(),
+            *Settings.WeaponMagazineBoneName.ToString());
+        return;
+    }
+
+    if (Settings.HandSocketName.IsNone() || !CharacterMesh->DoesSocketExist(Settings.HandSocketName))
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("탄창 분리 실패: 캐릭터 메시 '%s'에서 손 소켓 '%s'을 찾지 못했습니다."),
+            *CharacterMesh->GetName(),
+            *Settings.HandSocketName.ToString());
+        return;
+    }
+
+    FActorSpawnParameters SpawnParameters;
+    SpawnParameters.Owner = OwnerCharacter;
+    SpawnParameters.Instigator = OwnerCharacter;
+    SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+    const FTransform SocketTransform = CharacterMesh->GetSocketTransform(Settings.HandSocketName, RTS_World);
+    AActor* MagazineVisual = World->SpawnActor<AActor>(
+        Settings.DetachedMagazineActorClass,
+        SocketTransform,
+        SpawnParameters);
+    if (!MagazineVisual)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("탄창 분리 실패: Definition '%s'의 탄창 BP를 생성하지 못했습니다."),
+            *WeaponDefinition->GetName());
+        return;
+    }
+
+    MagazineVisual->SetReplicates(false);
+    if (!MagazineVisual->AttachToComponent(
+        CharacterMesh,
+        FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+        Settings.HandSocketName))
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("탄창 분리 실패: 생성한 탄창 '%s'을 손 소켓 '%s'에 부착하지 못했습니다."),
+            *MagazineVisual->GetName(),
+            *Settings.HandSocketName.ToString());
+        MagazineVisual->Destroy();
+        return;
+    }
+
+    MagazineVisual->SetActorRelativeTransform(Settings.HandAttachmentOffset);
+    WeaponMesh->HideBoneByName(Settings.WeaponMagazineBoneName, EPhysBodyOp::PBO_None);
+
+    DetachedMagazineVisual = MagazineVisual;
+    MagazineSourceWeapon = CurrentWeapon;
+    HiddenMagazineBoneName = Settings.WeaponMagazineBoneName;
+}
+
+void UWeaponComponent::ApplyRestoreMagazineVisual()
+{
+    if (IsValid(DetachedMagazineVisual))
+    {
+        DetachedMagazineVisual->Destroy();
+    }
+    DetachedMagazineVisual = nullptr;
+
+    if (IsValid(MagazineSourceWeapon) && !HiddenMagazineBoneName.IsNone())
+    {
+        if (USkeletalMeshComponent* WeaponMesh = MagazineSourceWeapon->GetWeaponMesh())
+        {
+            WeaponMesh->UnHideBoneByName(HiddenMagazineBoneName);
+        }
+    }
+
+    MagazineSourceWeapon = nullptr;
+    HiddenMagazineBoneName = NAME_None;
 }
 
 void UWeaponComponent::FireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration)
@@ -476,6 +625,8 @@ void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
 
 void UWeaponComponent::OnRep_CurrentWeapon()
 {
+    ApplyRestoreMagazineVisual();
+
     if (CurrentWeapon)
     {
         AttachWeaponToOwner(CurrentWeapon);
@@ -495,6 +646,7 @@ void UWeaponComponent::OnRep_WeaponType()
 
 void UWeaponComponent::OnRep_WeaponDefinition()
 {
+    ApplyRestoreMagazineVisual();
     ResetPendingAimRecoil();
     ResetAimRecoilSequence();
     ApplyWeaponDefinitionValues(WeaponDefinition);
@@ -646,6 +798,8 @@ ALastFPSWeaponActor* UWeaponComponent::SpawnWeaponActor(USkeletalMesh* NewMesh, 
 
 void UWeaponComponent::DestroyCurrentWeapon()
 {
+    ApplyRestoreMagazineVisual();
+
     if (CurrentWeapon)
     {
         CurrentWeapon->Destroy();

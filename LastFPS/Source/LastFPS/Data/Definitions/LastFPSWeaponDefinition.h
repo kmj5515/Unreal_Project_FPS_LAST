@@ -8,6 +8,7 @@
 
 class ALastFPSProjectile;
 class ALastFPSWeaponActor;
+class AActor;
 class UAnimationAsset;
 class UAnimInstance;
 class UCameraShakeBase;
@@ -51,6 +52,28 @@ struct LASTFPS_API FLastFPSWeaponAimRecoilSettings
     float RecoveryInterpolationSpeed = 10.f;
 };
 
+USTRUCT(BlueprintType)
+struct LASTFPS_API FLastFPSWeaponMagazineVisualSettings
+{
+    GENERATED_BODY()
+
+    /** 손에 표시할 탄창 BP입니다. 즉시 사용하는 시각 요소이므로 Definition과 함께 로드합니다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Magazine")
+    TSubclassOf<AActor> DetachedMagazineActorClass;
+
+    /** 분리 시 숨길 무기 Skeletal Mesh의 탄창 본입니다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Magazine")
+    FName WeaponMagazineBoneName = TEXT("Clip_Bone");
+
+    /** 분리된 탄창을 부착할 캐릭터 메시의 손 소켓입니다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Magazine")
+    FName HandSocketName = TEXT("MagazineHandSocket");
+
+    /** 손 소켓에 스냅한 뒤 적용할 무기별 상대 변환입니다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Magazine")
+    FTransform HandAttachmentOffset = FTransform::Identity;
+};
+
 UCLASS(BlueprintType)
 class LASTFPS_API ULastFPSWeaponDefinition : public UPrimaryDataAsset
 {
@@ -81,9 +104,6 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Animation")
     TObjectPtr<UAnimationAsset> FireAnimation;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Animation")
-    TObjectPtr<UAnimationAsset> ReloadAnimation;
-
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Animation", meta=(ClampMin="0.01"))
     float AnimationPlayRate = 1.f;
 
@@ -98,6 +118,9 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Sockets")
     FName ReloadLeftHandIKTargetName = TEXT("Clip_Bone");
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Reload")
+    FLastFPSWeaponMagazineVisualSettings MagazineVisual;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Firing", meta=(ClampMin="0.01"))
     float FireRate = 0.1f;

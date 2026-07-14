@@ -8,6 +8,7 @@
 
 class ALastFPSProjectile;
 class ALastFPSWeaponActor;
+class AActor;
 class AWeaponPickupActor;
 class UAnimInstance;
 class UGameplayEffect;
@@ -37,8 +38,11 @@ public:
     void ApplyFireAimRecoil(bool bIsAiming);
     void SetWeaponHiddenForAbility(bool bHidden);
 
-    UFUNCTION(BlueprintCallable, Category="Weapon|Animation")
-    void PlayReloadAnimation() const;
+    UFUNCTION(BlueprintCallable, Category="Weapon|Reload")
+    void DetachMagazineToHand();
+
+    UFUNCTION(BlueprintCallable, Category="Weapon|Reload")
+    void RestoreMagazineToWeapon();
     void FireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
 
     UFUNCTION(BlueprintCallable, Category="Weapon|IK")
@@ -133,6 +137,7 @@ public:
     
 protected:
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
@@ -148,6 +153,12 @@ private:
     UFUNCTION()
     void OnRep_WeaponDefinition();
 
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_DetachMagazineToHand();
+
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_RestoreMagazineToWeapon();
+
     void ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass);
     void ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefinition);
     void ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinition* NewDefinition);
@@ -162,6 +173,16 @@ private:
     bool ValidateClientMuzzleLocation(const FVector& ClientMuzzleLocation) const;
     void ResetPendingAimRecoil();
     void ResetAimRecoilSequence();
+    void ApplyDetachMagazineVisual();
+    void ApplyRestoreMagazineVisual();
+
+    UPROPERTY(Transient)
+    TObjectPtr<AActor> DetachedMagazineVisual;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ALastFPSWeaponActor> MagazineSourceWeapon;
+
+    FName HiddenMagazineBoneName;
 
     int32 WeaponHiddenOverrideCount = 0;
     float PendingAimRecoilPitch = 0.f;
