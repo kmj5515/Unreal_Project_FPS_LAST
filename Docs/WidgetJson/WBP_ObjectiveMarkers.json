@@ -1,0 +1,10 @@
+{
+  "parentClass": "/Script/LastFPS.LastFPSObjectiveMarkerWidget",
+  "savePath": "/Game/UI/OutUI/HUD",
+  "assetName": "WBP_ObjectiveMarkers",
+  "overwrite": false,
+  "root": {
+    "type": "CanvasPanel",
+    "name": "Canvas_Markers"
+  }
+}

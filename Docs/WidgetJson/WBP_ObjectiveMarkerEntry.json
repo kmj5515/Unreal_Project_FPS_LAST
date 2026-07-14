@@ -1,0 +1,54 @@
+{
+  "parentClass": "/Script/LastFPS.LastFPSObjectiveMarkerEntryWidget",
+  "savePath": "/Game/UI/OutUI/HUD",
+  "assetName": "WBP_ObjectiveMarkerEntry",
+  "overwrite": false,
+  "root": {
+    "type": "VerticalBox",
+    "name": "Root",
+    "children": [
+      {
+        "type": "Overlay",
+        "name": "Overlay_Icon",
+        "halign": "Center",
+        "children": [
+          {
+            "type": "Image",
+            "name": "Icon",
+            "desiredSize": [26, 26],
+            "color": [1.0, 0.85, 0.2, 1.0],
+            "halign": "Center",
+            "valign": "Center"
+          },
+          {
+            "type": "Image",
+            "name": "Arrow",
+            "desiredSize": [40, 40],
+            "color": [1.0, 0.85, 0.2, 1.0],
+            "halign": "Center",
+            "valign": "Center"
+          }
+        ]
+      },
+      {
+        "type": "TextBlock",
+        "name": "Text_Distance",
+        "text": "0m",
+        "fontSize": 16,
+        "justify": "Center",
+        "color": [1.0, 1.0, 1.0, 1.0],
+        "halign": "Center",
+        "padding": [0, 2, 0, 0]
+      },
+      {
+        "type": "TextBlock",
+        "name": "Text_Label",
+        "text": "목표",
+        "fontSize": 12,
+        "justify": "Center",
+        "color": [0.8, 0.8, 0.8, 1.0],
+        "halign": "Center"
+      }
+    ]
+  }
+}

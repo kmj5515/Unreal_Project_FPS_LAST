@@ -15,6 +15,25 @@ class ULastFPSEconomySubsystem;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLastFPSQuestStateChanged);
 
 /**
+ * 화면 마커 대상 1건 — 진행중 퀘스트의 위치 목표(ReachLocation)를 월드 좌표로 노출.
+ * 거리(m)는 플레이어 위치에 따라 매 프레임 바뀌므로 여기 담지 않고 HUD 위젯이 계산한다.
+ */
+USTRUCT(BlueprintType)
+struct FLastFPSObjectiveWaypoint
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	FVector WorldLocation = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	FText Label;
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	FName QuestId;
+};
+
+/**
  * 퀘스트 1건의 런타임 상태 — DataTable 정적 정의와 분리해 서브시스템이 소유한다.
  * Progress/Baseline 인덱스는 해당 행 Objectives 배열 순서와 1:1.
  */
@@ -96,6 +115,10 @@ public:
 	void UnregisterLocationMarker(FGameplayTag LocationTag, USceneComponent* Marker);
 	/** 태그에 등록된 월드 위치 조회. 없거나 파괴됐으면 false. */
 	bool GetTrackedLocation(FGameplayTag LocationTag, FVector& OutLocation) const;
+
+	/** 진행중 퀘스트의 미완료 위치 목표(ReachLocation) 중 위치가 등록된 것들. HUD 마커용. */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
+	void GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint>& OutWaypoints) const;
 
 	UPROPERTY(BlueprintAssignable, Category="LastFPS|Quest")
 	FOnLastFPSQuestStateChanged OnQuestStateChanged;

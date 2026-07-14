@@ -458,6 +458,51 @@ bool ULastFPSQuestSubsystem::GetTrackedLocation(FGameplayTag LocationTag, FVecto
 	return false;
 }
 
+void ULastFPSQuestSubsystem::GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint>& OutWaypoints) const
+{
+	OutWaypoints.Reset();
+
+	for (const TPair<FName, FLastFPSQuestRuntimeState>& Pair : RuntimeStates)
+	{
+		if (Pair.Value.Status != ELastFPSQuestStatus::InProgress)
+		{
+			continue;
+		}
+		const FLastFPSQuestData* Def = FindQuest(Pair.Key);
+		if (!Def)
+		{
+			continue;
+		}
+
+		for (int32 i = 0; i < Def->Objectives.Num(); ++i)
+		{
+			const FLastFPSQuestObjective& Obj = Def->Objectives[i];
+			if (Obj.Type != ELastFPSObjectiveType::ReachLocation)
+			{
+				continue;
+			}
+			// 이미 도달한 목표는 마커를 띄우지 않는다.
+			const int32 Prog = Pair.Value.Progress.IsValidIndex(i) ? Pair.Value.Progress[i] : 0;
+			if (Prog >= Obj.RequiredCount)
+			{
+				continue;
+			}
+
+			FVector Location;
+			if (!GetTrackedLocation(Obj.TargetTag, Location))
+			{
+				continue; // 레벨에 마커가 아직 없으면 건너뜀
+			}
+
+			FLastFPSObjectiveWaypoint Waypoint;
+			Waypoint.WorldLocation = Location;
+			Waypoint.Label = Obj.Label.IsEmpty() ? Def->Title : Obj.Label;
+			Waypoint.QuestId = Pair.Key;
+			OutWaypoints.Add(Waypoint);
+		}
+	}
+}
+
 void ULastFPSQuestSubsystem::BroadcastStateChanged()
 {
 	UpdateLocationPollTimer();
