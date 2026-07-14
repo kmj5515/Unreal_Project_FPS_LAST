@@ -5,8 +5,77 @@
 
 #include "Engine/DataTable.h"
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
+#include "GameFramework/Pawn.h"
+#include "Components/SceneComponent.h"
+#include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSQuest, Log, All);
+
+// ── 목표 유형별 판정 트래커 (구현 세부 — 헤더에 노출하지 않는다) ──────────────────
+
+namespace
+{
+	/** 아이템 획득 — 수락 시점 보유량 기준선 이후의 증가분(pull형). */
+	class FAcquireItemTracker : public ILastFPSObjectiveTracker
+	{
+	public:
+		virtual int32 CaptureBaseline(const FLastFPSQuestObjective& Obj, const FLastFPSObjectiveEvalContext& Ctx) const override
+		{
+			return Ctx.Economy ? Ctx.Economy->GetItemCount(Obj.TargetId) : 0;
+		}
+		virtual bool RecomputeProgress(const FLastFPSQuestObjective& Obj, int32 Baseline, const FLastFPSObjectiveEvalContext& Ctx, int32& OutProgress) const override
+		{
+			const int32 Current = Ctx.Economy ? Ctx.Economy->GetItemCount(Obj.TargetId) : 0;
+			OutProgress = Current - Baseline; // 클램프는 호출부가 일괄 처리
+			return true;
+		}
+	};
+
+	/** 위치 도달 — 로컬 폰이 마커의 AcceptRadius(m) 이내면 완료(pull형, 이진). */
+	class FReachLocationTracker : public ILastFPSObjectiveTracker
+	{
+	public:
+		virtual bool RecomputeProgress(const FLastFPSQuestObjective& Obj, int32 Baseline, const FLastFPSObjectiveEvalContext& Ctx, int32& OutProgress) const override
+		{
+			OutProgress = 0;
+			FVector Target;
+			if (Ctx.bHasPlayerLocation && Ctx.Subsystem && Ctx.Subsystem->GetTrackedLocation(Obj.TargetTag, Target))
+			{
+				const float RadiusCm = Obj.AcceptRadius * 100.f; // m → cm
+				if (FVector::DistSquared(Ctx.PlayerLocation, Target) <= FMath::Square(RadiusCm))
+				{
+					OutProgress = Obj.RequiredCount;
+				}
+			}
+			return true;
+		}
+	};
+
+	/** 대상 처치 — 서버 사망 이벤트를 태그 계층 매칭으로 누적(push형). */
+	class FKillTargetTracker : public ILastFPSObjectiveTracker
+	{
+	public:
+		virtual bool MatchesEvent(const FLastFPSObjectiveEvent& Event, const FLastFPSQuestObjective& Obj) const override
+		{
+			return Event.Type == ELastFPSObjectiveType::KillTarget
+				&& Obj.TargetTag.IsValid()
+				&& Event.Tag.MatchesTag(Obj.TargetTag);
+		}
+	};
+
+	/** NPC 대화 — 상호작용 NPC 행 이름 일치로 누적(push형). */
+	class FTalkToNPCTracker : public ILastFPSObjectiveTracker
+	{
+	public:
+		virtual bool MatchesEvent(const FLastFPSObjectiveEvent& Event, const FLastFPSQuestObjective& Obj) const override
+		{
+			return Event.Type == ELastFPSObjectiveType::TalkToNPC
+				&& !Obj.TargetId.IsNone()
+				&& Event.Id == Obj.TargetId;
+		}
+	};
+}
 
 void ULastFPSQuestSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -15,8 +84,10 @@ void ULastFPSQuestSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 	Super::Initialize(Collection);
 
+	BuildTrackers();
 	SeedRuntimeStates();
 	ValidateReferences();
+	UpdateLocationPollTimer();
 
 	// 보유 변동 구독 — AcquireItem 진행 자동 추적. (Economy 시드는 델리게이트를 안 태우므로 위 SeedRuntimeStates 에서 기준선/초기진행을 이미 반영.)
 	if (ULastFPSEconomySubsystem* Economy = GetEconomy())
@@ -37,12 +108,51 @@ void ULastFPSQuestSubsystem::Deinitialize()
 		bInventorySubscribed = false;
 	}
 
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		GI->GetTimerManager().ClearTimer(LocationPollTimerHandle);
+	}
+
 	Super::Deinitialize();
 }
 
 ULastFPSEconomySubsystem* ULastFPSQuestSubsystem::GetEconomy() const
 {
 	return GetGameInstance() ? GetGameInstance()->GetSubsystem<ULastFPSEconomySubsystem>() : nullptr;
+}
+
+void ULastFPSQuestSubsystem::BuildTrackers()
+{
+	Trackers.Add(ELastFPSObjectiveType::AcquireItem, MakeUnique<FAcquireItemTracker>());
+	Trackers.Add(ELastFPSObjectiveType::ReachLocation, MakeUnique<FReachLocationTracker>());
+	Trackers.Add(ELastFPSObjectiveType::KillTarget, MakeUnique<FKillTargetTracker>());
+	Trackers.Add(ELastFPSObjectiveType::TalkToNPC, MakeUnique<FTalkToNPCTracker>());
+}
+
+const ILastFPSObjectiveTracker* ULastFPSQuestSubsystem::GetTracker(ELastFPSObjectiveType Type) const
+{
+	const TUniquePtr<ILastFPSObjectiveTracker>* Found = Trackers.Find(Type);
+	return Found ? Found->Get() : nullptr;
+}
+
+FLastFPSObjectiveEvalContext ULastFPSQuestSubsystem::MakeEvalContext() const
+{
+	FLastFPSObjectiveEvalContext Ctx;
+	Ctx.Economy = GetEconomy();
+	Ctx.Subsystem = this;
+
+	if (const UGameInstance* GI = GetGameInstance())
+	{
+		if (const APlayerController* PC = GI->GetFirstLocalPlayerController())
+		{
+			if (const APawn* Pawn = PC->GetPawn())
+			{
+				Ctx.PlayerLocation = Pawn->GetActorLocation();
+				Ctx.bHasPlayerLocation = true;
+			}
+		}
+	}
+	return Ctx;
 }
 
 const UDataTable* ULastFPSQuestSubsystem::GetQuestTable() const
@@ -145,15 +255,36 @@ void ULastFPSQuestSubsystem::CaptureBaseline(const FLastFPSQuestData& Def, FLast
 {
 	State.Baseline.Init(0, Def.Objectives.Num());
 
-	const ULastFPSEconomySubsystem* Economy = GetEconomy();
+	const FLastFPSObjectiveEvalContext Ctx = MakeEvalContext();
 	for (int32 i = 0; i < Def.Objectives.Num(); ++i)
 	{
 		const FLastFPSQuestObjective& Obj = Def.Objectives[i];
-		if (Obj.Type == ELastFPSObjectiveType::AcquireItem && Economy)
+		if (const ILastFPSObjectiveTracker* Tracker = GetTracker(Obj.Type))
 		{
-			State.Baseline[i] = Economy->GetItemCount(Obj.TargetId);
+			State.Baseline[i] = Tracker->CaptureBaseline(Obj, Ctx);
 		}
 	}
+}
+
+bool ULastFPSQuestSubsystem::CheckCompletion(FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def) const
+{
+	if (State.Status != ELastFPSQuestStatus::InProgress)
+	{
+		return false;
+	}
+
+	// 목표가 없거나 전부 충족 → 완료로 단조 승격.
+	for (int32 i = 0; i < Def.Objectives.Num(); ++i)
+	{
+		const int32 Prog = State.Progress.IsValidIndex(i) ? State.Progress[i] : 0;
+		if (Prog < Def.Objectives[i].RequiredCount)
+		{
+			return false;
+		}
+	}
+
+	State.Status = ELastFPSQuestStatus::Completed;
+	return true;
 }
 
 bool ULastFPSQuestSubsystem::RecomputeProgress(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def)
@@ -167,43 +298,32 @@ bool ULastFPSQuestSubsystem::RecomputeProgress(FName QuestId, FLastFPSQuestRunti
 	State.Progress.SetNum(Def.Objectives.Num());
 	State.Baseline.SetNum(Def.Objectives.Num());
 
-	const ULastFPSEconomySubsystem* Economy = GetEconomy();
+	const FLastFPSObjectiveEvalContext Ctx = MakeEvalContext();
 
 	bool bChanged = false;
-	bool bAllMet = true;
 	for (int32 i = 0; i < Def.Objectives.Num(); ++i)
 	{
 		const FLastFPSQuestObjective& Obj = Def.Objectives[i];
+		const ILastFPSObjectiveTracker* Tracker = GetTracker(Obj.Type);
+
+		// pull형만 재계산 — push형(처치/대화)은 이벤트 누적값을 유지한다.
 		int32 NewProgress = 0;
-		if (Obj.Type == ELastFPSObjectiveType::AcquireItem && Economy)
+		if (Tracker && Tracker->RecomputeProgress(Obj, State.Baseline[i], Ctx, NewProgress))
 		{
-			// 기준선(수락 시점 보유량)을 뺀 "이후 증가분". 시드 재고는 카운트되지 않는다.
-			const int32 Gained = Economy->GetItemCount(Obj.TargetId) - State.Baseline[i];
-			NewProgress = FMath::Clamp(Gained, 0, Obj.RequiredCount);
-		}
-
-		if (State.Progress[i] != NewProgress)
-		{
-			State.Progress[i] = NewProgress;
-			bChanged = true;
-		}
-		if (NewProgress < Obj.RequiredCount)
-		{
-			bAllMet = false;
+			NewProgress = FMath::Clamp(NewProgress, 0, Obj.RequiredCount);
+			if (State.Progress[i] != NewProgress)
+			{
+				State.Progress[i] = NewProgress;
+				bChanged = true;
+			}
 		}
 	}
 
-	// 목표가 없거나 전부 충족 → 완료로 단조 승격(1회).
-	if (bAllMet)
-	{
-		State.Status = ELastFPSQuestStatus::Completed;
-		bChanged = true;
-	}
-
+	bChanged |= CheckCompletion(State, Def);
 	return bChanged;
 }
 
-void ULastFPSQuestSubsystem::HandleInventoryChanged()
+bool ULastFPSQuestSubsystem::RecomputeAllActive()
 {
 	bool bAnyChanged = false;
 	for (TPair<FName, FLastFPSQuestRuntimeState>& Pair : RuntimeStates)
@@ -217,10 +337,176 @@ void ULastFPSQuestSubsystem::HandleInventoryChanged()
 			bAnyChanged |= RecomputeProgress(Pair.Key, Pair.Value, *Def);
 		}
 	}
+	return bAnyChanged;
+}
+
+void ULastFPSQuestSubsystem::HandleInventoryChanged()
+{
+	if (RecomputeAllActive())
+	{
+		BroadcastStateChanged();
+	}
+}
+
+void ULastFPSQuestSubsystem::HandleLocationPoll()
+{
+	if (RecomputeAllActive())
+	{
+		BroadcastStateChanged();
+	}
+}
+
+void ULastFPSQuestSubsystem::ApplyObjectiveEvent(const FLastFPSObjectiveEvent& Event)
+{
+	bool bAnyChanged = false;
+	for (TPair<FName, FLastFPSQuestRuntimeState>& Pair : RuntimeStates)
+	{
+		if (Pair.Value.Status != ELastFPSQuestStatus::InProgress)
+		{
+			continue;
+		}
+		if (const FLastFPSQuestData* Def = FindQuest(Pair.Key))
+		{
+			bAnyChanged |= ApplyEventToQuest(Pair.Value, *Def, Event);
+		}
+	}
 
 	if (bAnyChanged)
 	{
-		OnQuestStateChanged.Broadcast();
+		BroadcastStateChanged();
+	}
+}
+
+bool ULastFPSQuestSubsystem::ApplyEventToQuest(FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def, const FLastFPSObjectiveEvent& Event)
+{
+	State.Progress.SetNum(Def.Objectives.Num());
+
+	bool bChanged = false;
+	for (int32 i = 0; i < Def.Objectives.Num(); ++i)
+	{
+		const FLastFPSQuestObjective& Obj = Def.Objectives[i];
+		const ILastFPSObjectiveTracker* Tracker = GetTracker(Obj.Type);
+		if (Tracker && Tracker->MatchesEvent(Event, Obj))
+		{
+			const int32 NewProgress = FMath::Clamp(State.Progress[i] + Event.Count, 0, Obj.RequiredCount);
+			if (NewProgress != State.Progress[i])
+			{
+				State.Progress[i] = NewProgress;
+				bChanged = true;
+			}
+		}
+	}
+
+	bChanged |= CheckCompletion(State, Def);
+	return bChanged;
+}
+
+void ULastFPSQuestSubsystem::NotifyObjectiveKill(FGameplayTag EnemyTag)
+{
+	if (!EnemyTag.IsValid())
+	{
+		return;
+	}
+	FLastFPSObjectiveEvent Event;
+	Event.Type = ELastFPSObjectiveType::KillTarget;
+	Event.Tag = EnemyTag;
+	ApplyObjectiveEvent(Event);
+}
+
+void ULastFPSQuestSubsystem::NotifyTalkedToNPC(FName NPCRowName)
+{
+	if (NPCRowName.IsNone())
+	{
+		return;
+	}
+	FLastFPSObjectiveEvent Event;
+	Event.Type = ELastFPSObjectiveType::TalkToNPC;
+	Event.Id = NPCRowName;
+	ApplyObjectiveEvent(Event);
+}
+
+void ULastFPSQuestSubsystem::RegisterLocationMarker(FGameplayTag LocationTag, USceneComponent* Marker)
+{
+	if (!LocationTag.IsValid() || !Marker)
+	{
+		return;
+	}
+	LocationMarkers.Add(LocationTag, Marker);
+	// 마커가 활성 ReachLocation 목표보다 늦게 등장했을 수 있어 폴 타이머를 재평가.
+	UpdateLocationPollTimer();
+}
+
+void ULastFPSQuestSubsystem::UnregisterLocationMarker(FGameplayTag LocationTag, USceneComponent* Marker)
+{
+	const TWeakObjectPtr<USceneComponent>* Found = LocationMarkers.Find(LocationTag);
+	if (Found && Found->Get() == Marker)
+	{
+		LocationMarkers.Remove(LocationTag);
+	}
+}
+
+bool ULastFPSQuestSubsystem::GetTrackedLocation(FGameplayTag LocationTag, FVector& OutLocation) const
+{
+	if (const TWeakObjectPtr<USceneComponent>* Found = LocationMarkers.Find(LocationTag))
+	{
+		if (const USceneComponent* Comp = Found->Get())
+		{
+			OutLocation = Comp->GetComponentLocation();
+			return true;
+		}
+	}
+	return false;
+}
+
+void ULastFPSQuestSubsystem::BroadcastStateChanged()
+{
+	UpdateLocationPollTimer();
+	OnQuestStateChanged.Broadcast();
+}
+
+void ULastFPSQuestSubsystem::UpdateLocationPollTimer()
+{
+	UGameInstance* GI = GetGameInstance();
+	if (!GI)
+	{
+		return;
+	}
+
+	bool bNeedPoll = false;
+	for (const TPair<FName, FLastFPSQuestRuntimeState>& Pair : RuntimeStates)
+	{
+		if (Pair.Value.Status != ELastFPSQuestStatus::InProgress)
+		{
+			continue;
+		}
+		const FLastFPSQuestData* Def = FindQuest(Pair.Key);
+		if (!Def)
+		{
+			continue;
+		}
+		for (const FLastFPSQuestObjective& Obj : Def->Objectives)
+		{
+			if (Obj.Type == ELastFPSObjectiveType::ReachLocation)
+			{
+				bNeedPoll = true;
+				break;
+			}
+		}
+		if (bNeedPoll)
+		{
+			break;
+		}
+	}
+
+	FTimerManager& TM = GI->GetTimerManager();
+	const bool bActive = TM.IsTimerActive(LocationPollTimerHandle);
+	if (bNeedPoll && !bActive)
+	{
+		TM.SetTimer(LocationPollTimerHandle, this, &ULastFPSQuestSubsystem::HandleLocationPoll, LocationPollInterval, /*bLoop=*/true);
+	}
+	else if (!bNeedPoll && bActive)
+	{
+		TM.ClearTimer(LocationPollTimerHandle);
 	}
 }
 
@@ -261,7 +547,7 @@ bool ULastFPSQuestSubsystem::AcceptQuest(FName QuestId)
 	CaptureBaseline(*Def, *State);
 	RecomputeProgress(QuestId, *State, *Def); // 수락 즉시 충족되는 경우(목표 0개 등) 반영
 
-	OnQuestStateChanged.Broadcast();
+	BroadcastStateChanged();
 	return true;
 }
 
@@ -290,7 +576,7 @@ bool ULastFPSQuestSubsystem::TryClaimReward(FName QuestId)
 	}
 
 	NotifyRewardGranted(*Def);
-	OnQuestStateChanged.Broadcast();
+	BroadcastStateChanged();
 	return true;
 }
 

@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
 #include "GameplayEffectTypes.h"
+#include "GameplayTagContainer.h"
 #include "TimerManager.h"
 #include "Data/Status/LastFPSStatusOverlayConfig.h"
 #include "LastFPSCharacterBase.generated.h"
@@ -64,6 +65,10 @@ public:
 
     UFUNCTION(BlueprintPure, Category="LastFPS|Character")
     const ULastFPSCharacterDefinition* GetCharacterDefinition() const;
+
+    /** 이 캐릭터를 처치했을 때 KillTarget 퀘스트에 통지할 종류 태그. 비면 통지 안 함(플레이어 등). */
+    UFUNCTION(BlueprintPure, Category="LastFPS|Quest")
+    FGameplayTag GetQuestKillTag() const { return QuestKillTag; }
 
     void SetCharacterDefinitionForSpawn(ULastFPSCharacterDefinition* InDefinition);
 
@@ -152,6 +157,10 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
     TObjectPtr<ULastFPSCharacterDefinition> CharacterDefinition;
+
+    /** KillTarget 퀘스트용 종류 태그(예: Enemy.Type.Grunt). 적 BP 에서 설정, 플레이어는 비움. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Quest")
+    FGameplayTag QuestKillTag;
 
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Sound")
     TObjectPtr<USoundBase> HitSound;

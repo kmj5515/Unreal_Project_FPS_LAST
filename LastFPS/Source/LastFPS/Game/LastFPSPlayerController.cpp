@@ -2,6 +2,9 @@
 
 #include "Character/LastFPSHero.h"
 #include "Hub/ILastFPSInteractable.h"
+#include "Hub/LastFPSNPC.h"
+#include "Quest/LastFPSQuestSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "Data/Tables/LastFPSDialogueData.h"
 #include "UI/HUD/LastFPSHUDWidget.h"
 #include "UI/Common/LastFPSNoticeWidget.h"
@@ -559,6 +562,18 @@ void ALastFPSPlayerController::BeginNPCInteraction(
     InteractionSession.NPC = NPCActor;
     InteractionSession.NPCName = Name;
     InteractionSession.PreviousViewTarget = GetViewTarget();
+
+    // TalkToNPC 목표 진행 — 상호작용이 확정된 시점에 로컬 퀘스트에 통지.
+    if (const ALastFPSNPC* NPC = Cast<ALastFPSNPC>(NPCActor))
+    {
+        if (UGameInstance* GI = GetGameInstance())
+        {
+            if (ULastFPSQuestSubsystem* Quest = GI->GetSubsystem<ULastFPSQuestSubsystem>())
+            {
+                Quest->NotifyTalkedToNPC(NPC->NPCRowName);
+            }
+        }
+    }
 
     // 상호작용 UI 모드 진입: 이동/회전 잠금 + 커서 표시(단일 진입점).
     SetInteractionInputMode(true);

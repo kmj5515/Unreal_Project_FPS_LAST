@@ -2,10 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Engine/TimerHandle.h"
 #include "Data/Tables/LastFPSQuestData.h"
+#include "Quest/LastFPSObjectiveTracker.h"
 #include "LastFPSQuestSubsystem.generated.h"
 
 class UDataTable;
+class USceneComponent;
 class ULastFPSEconomySubsystem;
 
 /** 퀘스트 상태/진행이 바뀔 때 브로드캐스트 — 임무 화면/트래커 UI 갱신용 */
@@ -75,6 +78,25 @@ public:
 	const UDataTable* GetQuestTable() const;
 	const FLastFPSQuestData* FindQuest(FName QuestId) const;
 
+	// ── 외부 이벤트 통지 (목표 진행 push) ────────────────────────────
+
+	/** 처치 통지 — 서버 사망 브릿지가 오너 클라에서 호출. KillTarget 목표를 누적. */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
+	void NotifyObjectiveKill(FGameplayTag EnemyTag);
+
+	/** 대화 통지 — NPC 상호작용 시작 시 호출. TalkToNPC 목표를 누적. */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
+	void NotifyTalkedToNPC(FName NPCRowName);
+
+	// ── 위치 마커 등록소 (ReachLocation 위치 소스 / HUD 공용) ─────────
+
+	/** 위치 마커 등록 (ULastFPSObjectiveMarkerComponent 가 BeginPlay 에서 호출). */
+	void RegisterLocationMarker(FGameplayTag LocationTag, USceneComponent* Marker);
+	/** 위치 마커 해제 (EndPlay). 같은 컴포넌트일 때만 제거. */
+	void UnregisterLocationMarker(FGameplayTag LocationTag, USceneComponent* Marker);
+	/** 태그에 등록된 월드 위치 조회. 없거나 파괴됐으면 false. */
+	bool GetTrackedLocation(FGameplayTag LocationTag, FVector& OutLocation) const;
+
 	UPROPERTY(BlueprintAssignable, Category="LastFPS|Quest")
 	FOnLastFPSQuestStateChanged OnQuestStateChanged;
 
@@ -83,8 +105,19 @@ protected:
 	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Quest")
 	TSoftObjectPtr<UDataTable> QuestTable;
 
+	/** ReachLocation 도달 판정 폴 주기(초). 위치 목표가 활성일 때만 타이머가 돈다. */
+	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Quest", meta=(ClampMin=0.05))
+	float LocationPollInterval = 0.2f;
+
 private:
 	ULastFPSEconomySubsystem* GetEconomy() const;
+
+	/** 유형별 목표 트래커 구성 (Initialize 1회). */
+	void BuildTrackers();
+	const ILastFPSObjectiveTracker* GetTracker(ELastFPSObjectiveType Type) const;
+
+	/** pull형 트래커가 참조할 현재 외부 상태(Economy/로컬 폰 위치) 구성. */
+	FLastFPSObjectiveEvalContext MakeEvalContext() const;
 
 	/** 부팅 시 각 행의 Status(초기 시드)로 런타임 상태를 만든다. InProgress 시드는 기준선도 캡처. */
 	void SeedRuntimeStates();
@@ -99,11 +132,31 @@ private:
 	UFUNCTION()
 	void HandleInventoryChanged();
 
-	/** 한 퀘스트의 진행을 절대상태에서 재계산(기준선 차감). 완료 도달 시 Completed 로 단조 승격. 변경 시 true. */
+	/** 위치 폴 타이머 콜백 — pull형(위치 등) 재계산. */
+	void HandleLocationPoll();
+
+	/** 모든 진행중 퀘스트의 pull형 목표 재계산 + 완료 승격. 변경 시 true(브로드캐스트는 호출부). */
+	bool RecomputeAllActive();
+
+	/** 한 퀘스트의 pull형 진행을 절대상태에서 재계산. 완료 도달 시 Completed 로 단조 승격. 변경 시 true. */
 	bool RecomputeProgress(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def);
 
-	/** 목표별 기준선 캡처 (AcquireItem = 현재 보유량). */
+	/** 외부 이벤트를 진행중 퀘스트들에 적용(push형 목표 누적) + 완료 승격 + 변경 시 브로드캐스트. */
+	void ApplyObjectiveEvent(const FLastFPSObjectiveEvent& Event);
+	/** 한 퀘스트에 이벤트 적용. 변경 시 true. */
+	bool ApplyEventToQuest(FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def, const FLastFPSObjectiveEvent& Event);
+
+	/** 모든 목표 충족 시 Completed 로 단조 승격. 승격했으면 true. */
+	bool CheckCompletion(FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def) const;
+
+	/** 목표별 기준선 캡처 (트래커 위임). */
 	void CaptureBaseline(const FLastFPSQuestData& Def, FLastFPSQuestRuntimeState& State) const;
+
+	/** 상태 변경 통지 — 위치 폴 타이머 갱신 후 델리게이트 브로드캐스트. */
+	void BroadcastStateChanged();
+
+	/** 진행중 ReachLocation 목표 유무에 따라 위치 폴 타이머를 켜고/끈다. */
+	void UpdateLocationPollTimer();
 
 	/** 완료 토스트 (로컬 PC 의 ShowNotice). */
 	void NotifyRewardGranted(const FLastFPSQuestData& Def) const;
@@ -112,5 +165,13 @@ private:
 	FText BuildRewardMessage(const FLastFPSQuestData& Def) const;
 
 	TMap<FName, FLastFPSQuestRuntimeState> RuntimeStates;
+
+	/** 목표 유형 → 판정 트래커 (Initialize 에서 구성). */
+	TMap<ELastFPSObjectiveType, TUniquePtr<ILastFPSObjectiveTracker>> Trackers;
+
+	/** 위치 태그 → 마커 컴포넌트 (레벨 액터 수명이라 약참조). */
+	TMap<FGameplayTag, TWeakObjectPtr<USceneComponent>> LocationMarkers;
+
+	FTimerHandle LocationPollTimerHandle;
 	bool bInventorySubscribed = false;
 };

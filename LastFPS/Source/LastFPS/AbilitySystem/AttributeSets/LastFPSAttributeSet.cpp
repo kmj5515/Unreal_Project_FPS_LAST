@@ -186,6 +186,16 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
     if (AttackerPS && AttackerPS != VictimPS)
     {
         AttackerPS->Auth_AddKill();
+
+        // 처치 목표(KillTarget) 진행 — 피격자 종류 태그를 가해자 소유 클라 퀘스트에 통지.
+        if (TargetChar)
+        {
+            const FGameplayTag KillTag = TargetChar->GetQuestKillTag();
+            if (KillTag.IsValid())
+            {
+                AttackerPS->Auth_NotifyQuestKill(KillTag);
+            }
+        }
     }
 
     if (!TargetChar)
