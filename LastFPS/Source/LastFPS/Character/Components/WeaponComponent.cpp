@@ -16,12 +16,16 @@
 #include "Engine/World.h"
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "Utility/LastFPSCombatAffiliation.h"
 
 namespace
 {
     constexpr float AimRecoilCompletionToleranceDegrees = 0.01f;
+    constexpr float MaximumServerDebugShotDurationSeconds = 5.f;
+    constexpr float MinimumServerFireIntervalSeconds = 0.01f;
 }
 
 UWeaponComponent::UWeaponComponent()
@@ -827,7 +831,8 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
 {
     ACharacter* Character = Cast<ACharacter>(GetOwner());
     UWorld* World = GetWorld();
-    if (!World || !Character || !ProjectileClass)
+    if (!World || !Character || !Character->HasAuthority() || !ProjectileClass
+        || !TryConsumeServerFirePermission())
     {
         return;
     }
@@ -842,30 +847,38 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
         ? ClientMuzzleLocation
         : GetMuzzleTransform().GetLocation();
 
-    const FVector TraceEnd = ClientCameraLocation + AimDirection * AimTraceRange;
+    const FVector TraceStart = ResolveValidatedTraceStart(*Character, ClientCameraLocation);
+
+    const FVector TraceEnd = TraceStart + AimDirection * AimTraceRange;
 
     FHitResult HitResult;
     FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WeaponTrace), false, Character);
     QueryParams.AddIgnoredActor(Character);
+    QueryParams.AddIgnoredActor(CurrentWeapon);
 
     FCollisionObjectQueryParams ObjectParams;
     ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
     ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
     ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
     ObjectParams.AddObjectTypesToQuery(ECC_PhysicsBody);
+    // Pickup Object Channel은 조회하지 않아 획득 아이템 뒤의 실제 조준 대상을 찾는다.
 
     const bool bHit = World->LineTraceSingleByObjectType(
-        HitResult, ClientCameraLocation, TraceEnd, ObjectParams, QueryParams);
+        HitResult, TraceStart, TraceEnd, ObjectParams, QueryParams);
 
     const FVector AimTarget = bHit ? HitResult.ImpactPoint : TraceEnd;
     const FRotator ProjectileRotation = (AimTarget - MuzzleLocation).Rotation();
 
     if (bDrawDebugShot)
     {
-        DrawDebugLine(World, ClientCameraLocation, TraceEnd, FColor::Red, false, DebugShotDuration, 0, 1.f);
-        DrawDebugLine(World, MuzzleLocation, AimTarget, FColor::Green, false, DebugShotDuration, 0, 2.f);
-        DrawDebugSphere(World, MuzzleLocation, 8.f, 12, FColor::Green, false, DebugShotDuration);
-        DrawDebugSphere(World, AimTarget, 8.f, 12, FColor::Red, false, DebugShotDuration);
+        const float SafeDebugDuration = FMath::Clamp(
+            DebugShotDuration,
+            0.f,
+            MaximumServerDebugShotDurationSeconds);
+        DrawDebugLine(World, TraceStart, TraceEnd, FColor::Red, false, SafeDebugDuration, 0, 1.f);
+        DrawDebugLine(World, MuzzleLocation, AimTarget, FColor::Green, false, SafeDebugDuration, 0, 2.f);
+        DrawDebugSphere(World, MuzzleLocation, 8.f, 12, FColor::Green, false, SafeDebugDuration);
+        DrawDebugSphere(World, AimTarget, 8.f, 12, FColor::Red, false, SafeDebugDuration);
     }
 
     FActorSpawnParameters SpawnParams;
@@ -875,13 +888,16 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
 
     World->SpawnActor<ALastFPSProjectile>(ProjectileClass, MuzzleLocation, ProjectileRotation, SpawnParams);
 
-    if (!bHit || !HitResult.GetActor() || !DamageEffectClass)
+    AActor* HitActor = HitResult.GetActor();
+    if (!bHit || !HitActor || !DamageEffectClass
+        || !LastFPSDamage::IsDamageGameplayEffect(DamageEffectClass)
+        || LastFPSCombatAffiliation::AreFriendlyActors(Character, HitActor))
     {
         return;
     }
 
     IAbilitySystemInterface* SourceASI = Cast<IAbilitySystemInterface>(Character);
-    IAbilitySystemInterface* TargetASI = Cast<IAbilitySystemInterface>(HitResult.GetActor());
+    IAbilitySystemInterface* TargetASI = Cast<IAbilitySystemInterface>(HitActor);
     if (!SourceASI || !TargetASI)
     {
         return;
@@ -920,6 +936,48 @@ bool UWeaponComponent::ValidateClientMuzzleLocation(const FVector& ClientMuzzleL
     }
 
     const FVector ServerWeaponLocation = GetMuzzleTransform().GetLocation();
-    const float MaxAllowedDistance = 150.f;
-    return FVector::DistSquared(ClientMuzzleLocation, ServerWeaponLocation) <= FMath::Square(MaxAllowedDistance);
+    const float MaxError = FMath::Max(MaxClientMuzzleLocationError, 0.f);
+    return FVector::DistSquared(ClientMuzzleLocation, ServerWeaponLocation) <= FMath::Square(MaxError);
+}
+
+FVector UWeaponComponent::ResolveValidatedTraceStart(
+    const ACharacter& Character,
+    const FVector& ClientCameraLocation) const
+{
+    FVector ServerViewLocation;
+    FRotator ServerViewRotation;
+    if (const AController* Controller = Character.GetController())
+    {
+        Controller->GetPlayerViewPoint(ServerViewLocation, ServerViewRotation);
+    }
+    else
+    {
+        Character.GetActorEyesViewPoint(ServerViewLocation, ServerViewRotation);
+    }
+
+    const float MaxError = FMath::Max(MaxClientCameraLocationError, 0.f);
+    return FVector::DistSquared(ClientCameraLocation, ServerViewLocation) <= FMath::Square(MaxError)
+        ? ClientCameraLocation
+        : ServerViewLocation;
+}
+
+bool UWeaponComponent::TryConsumeServerFirePermission()
+{
+    const UWorld* World = GetWorld();
+    if (!World || !GetOwner() || !GetOwner()->HasAuthority())
+    {
+        return false;
+    }
+
+    const double CurrentTimeSeconds = World->GetTimeSeconds();
+    const double ToleranceSeconds = FMath::Max(ServerFireIntervalTolerance, 0.f);
+    if (CurrentTimeSeconds + ToleranceSeconds < NextAllowedServerFireTimeSeconds)
+    {
+        return false;
+    }
+
+    NextAllowedServerFireTimeSeconds =
+        FMath::Max(CurrentTimeSeconds, NextAllowedServerFireTimeSeconds)
+        + FMath::Max(FireRate, MinimumServerFireIntervalSeconds);
+    return true;
 }

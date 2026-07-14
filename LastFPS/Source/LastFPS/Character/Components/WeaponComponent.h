@@ -9,6 +9,7 @@
 class ALastFPSProjectile;
 class ALastFPSWeaponActor;
 class AActor;
+class ACharacter;
 class AWeaponPickupActor;
 class UAnimInstance;
 class UGameplayEffect;
@@ -106,6 +107,18 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon", meta=(ClampMin="0.0", Units="cm"))
     float AimTraceRange = 10000.f;
 
+    /** 클라이언트 카메라 위치와 서버 시점 위치 사이에 허용할 최대 오차이다. */
+    UPROPERTY(EditDefaultsOnly, Category="Weapon|Network", meta=(ClampMin="0.0", Units="cm"))
+    float MaxClientCameraLocationError = 200.f;
+
+    /** 클라이언트 총구 위치와 서버 무기 총구 사이에 허용할 최대 오차이다. */
+    UPROPERTY(EditDefaultsOnly, Category="Weapon|Network", meta=(ClampMin="0.0", Units="cm"))
+    float MaxClientMuzzleLocationError = 150.f;
+
+    /** 네트워크 지터로 정상 발사가 거절되지 않도록 서버 발사 간격에 적용하는 허용 오차이다. */
+    UPROPERTY(EditDefaultsOnly, Category="Weapon|Network", meta=(ClampMin="0.0", Units="s"))
+    float ServerFireIntervalTolerance = 0.02f;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Damage")
     FLastFPSDamageRange DamageRange;
 
@@ -171,6 +184,8 @@ private:
     void DestroyCurrentWeapon();
     void HandleFireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
     bool ValidateClientMuzzleLocation(const FVector& ClientMuzzleLocation) const;
+    FVector ResolveValidatedTraceStart(const ACharacter& Character, const FVector& ClientCameraLocation) const;
+    bool TryConsumeServerFirePermission();
     void ResetPendingAimRecoil();
     void ResetAimRecoilSequence();
     void ApplyDetachMagazineVisual();
@@ -190,5 +205,6 @@ private:
     float RecoverableAimRecoilPitch = 0.f;
     float RecoverableAimRecoilYaw = 0.f;
     double LastAimRecoilTimeSeconds = 0.0;
+    double NextAllowedServerFireTimeSeconds = 0.0;
     bool bHasFiredAimRecoil = false;
 };

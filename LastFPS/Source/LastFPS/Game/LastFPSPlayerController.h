@@ -118,6 +118,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
     void ShowHitMarker();
 
+    /** 월드 기준 공격 방향을 현재 HUD의 화면 방향 인디케이터로 전달한다. */
+    void ShowDamageDirection(const FVector& DamageSourceDirection);
+
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
     ULastFPSHUDWidget* GetHUDWidget() const { return HUDWidget; }
 

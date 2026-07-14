@@ -675,6 +675,14 @@ void ALastFPSPlayerController::ShowHitMarker()
     }
 }
 
+void ALastFPSPlayerController::ShowDamageDirection(const FVector& DamageSourceDirection)
+{
+    if (HUDWidget)
+    {
+        HUDWidget->ShowDamageDirection(DamageSourceDirection);
+    }
+}
+
 // ── 캐릭터 선택 ──────────────────────────────────────────────────────
 
 const ULastFPSCharacterRoster* ALastFPSPlayerController::GetCharacterRoster() const

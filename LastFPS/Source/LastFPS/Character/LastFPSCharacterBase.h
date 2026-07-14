@@ -82,6 +82,10 @@ public:
     UFUNCTION(Client, Reliable)
     void Client_NotifyHitMarker();
 
+    /** 서버가 판정한 공격자의 월드 방향을 소유 클라이언트 HUD에 전달한다. */
+    UFUNCTION(Client, Reliable)
+    void Client_NotifyDamageDirection(FVector_NetQuantizeNormal DamageSourceDirection);
+
     // ── 어시스트 추적 (서버 전용) ──────────────────────────────
     static constexpr float AssistTimeWindow = 10.f;
 

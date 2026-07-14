@@ -224,6 +224,18 @@ void ALastFPSCharacterBase::Client_NotifyHitMarker_Implementation()
     }
 }
 
+void ALastFPSCharacterBase::Client_NotifyDamageDirection_Implementation(
+    const FVector_NetQuantizeNormal DamageSourceDirection)
+{
+    ALastFPSPlayerController* LastPC = GetController<ALastFPSPlayerController>();
+    if (!LastPC)
+    {
+        return;
+    }
+
+    LastPC->ShowDamageDirection(DamageSourceDirection);
+}
+
 void ALastFPSCharacterBase::Multicast_SetStatusOverlayMaterial_Implementation(
     UMaterialInterface* OverlayMaterial,
     FName MixParameterName,

@@ -5,6 +5,7 @@
 #include "Character/LastFPSCharacterBase.h"
 #include "Engine/World.h"
 #include "Game/LastFPSPlayerState.h"
+#include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "Utility/LastFPSTags.h"
 
@@ -35,6 +36,49 @@ ALastFPSPlayerState* ResolveInstigatorPlayerState(const FGameplayEffectModCallba
 ALastFPSCharacterBase* ResolvePlayerStateCharacter(const ALastFPSPlayerState* PlayerState)
 {
     return PlayerState ? Cast<ALastFPSCharacterBase>(PlayerState->GetPawn()) : nullptr;
+}
+
+AActor* ResolveDamageSourceActor(const FGameplayEffectModCallbackData& Data)
+{
+    const FGameplayEffectContextHandle& Context = Data.EffectSpec.GetEffectContext();
+    AActor* const Candidates[] = {
+        Context.GetOriginalInstigator(),
+        Context.GetInstigator(),
+        Context.GetEffectCauser()
+    };
+
+    for (AActor* Candidate : Candidates)
+    {
+        if (!Candidate)
+        {
+            continue;
+        }
+
+        if (const APlayerState* PlayerState = Cast<APlayerState>(Candidate))
+        {
+            if (APawn* Pawn = PlayerState->GetPawn())
+            {
+                return Pawn;
+            }
+        }
+
+        if (const AController* Controller = Cast<AController>(Candidate))
+        {
+            if (APawn* Pawn = Controller->GetPawn())
+            {
+                return Pawn;
+            }
+        }
+
+        if (APawn* InstigatorPawn = Candidate->GetInstigator())
+        {
+            return InstigatorPawn;
+        }
+
+        return Candidate;
+    }
+
+    return nullptr;
 }
 }
 
@@ -149,6 +193,17 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
     if (TargetChar && ActualDamage > 0.f)
     {
         TargetChar->MarkCombatEngaged();
+
+        AActor* DamageSourceActor = ResolveDamageSourceActor(Data);
+        if (DamageSourceActor && DamageSourceActor != TargetChar && TargetChar->IsPlayerControlled())
+        {
+            const FVector DamageSourceDirection =
+                (DamageSourceActor->GetActorLocation() - TargetChar->GetActorLocation()).GetSafeNormal2D();
+            if (!DamageSourceDirection.IsNearlyZero())
+            {
+                TargetChar->Client_NotifyDamageDirection(DamageSourceDirection);
+            }
+        }
     }
 
     if (ALastFPSCharacterBase* AttackerChar = ResolvePlayerStateCharacter(AttackerPS))

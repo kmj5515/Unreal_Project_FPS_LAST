@@ -12,6 +12,7 @@
 #include "Particles/ParticleSystemComponent.h"
 #include "Data/Projectiles/LastFPSProjectileVisualData.h"
 #include "Utility/LastFPSCombatAffiliation.h"
+#include "Utility/LastFPSCollisionChannels.h"
 
 namespace
 {
@@ -86,6 +87,7 @@ void ALastFPSProjectile::EnableGameplayCollision()
     CollisionComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
     CollisionComp->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
     CollisionComp->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+    CollisionComp->SetCollisionResponseToChannel(LastFPSCollision::PickupObjectChannel, ECR_Ignore);
     CollisionComp->SetGenerateOverlapEvents(true);
     CollisionComp->OnComponentBeginOverlap.AddUniqueDynamic(this, &ALastFPSProjectile::OnProjectileOverlap);
 

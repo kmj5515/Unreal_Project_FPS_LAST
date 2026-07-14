@@ -6,6 +6,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Utility/LastFPSCollisionChannels.h"
 
 AWeaponPickupActor::AWeaponPickupActor()
 {
@@ -14,8 +15,7 @@ AWeaponPickupActor::AWeaponPickupActor()
 
     OverlapSphere = CreateDefaultSubobject<USphereComponent>(TEXT("OverlapSphere"));
     OverlapSphere->SetSphereRadius(PickupRadius);
-    OverlapSphere->SetCollisionProfileName(TEXT("Trigger"));
-    OverlapSphere->SetGenerateOverlapEvents(true);
+    LastFPSCollision::ConfigurePickupTriggerCollision(*OverlapSphere);
     OverlapSphere->OnComponentBeginOverlap.AddDynamic(this, &AWeaponPickupActor::OnOverlapBegin);
     RootComponent = OverlapSphere;
 
@@ -42,6 +42,11 @@ void AWeaponPickupActor::OnConstruction(const FTransform& Transform)
 void AWeaponPickupActor::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (OverlapSphere)
+    {
+        LastFPSCollision::ConfigurePickupTriggerCollision(*OverlapSphere);
+    }
 
     if (!HasAuthority())
     {
