@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
+#include "GameplayTagContainer.h"
 #include "LastFPSQuestData.generated.h"
 
 class UTexture2D;
@@ -17,7 +18,9 @@ enum class ELastFPSQuestType : uint8
 /**
  * 퀘스트 진행 상태.
  * DataTable 행의 Status 필드는 "초기 시드 상태"로만 쓰이고, 실제 런타임 진행/완료/수령은
- * ULastFPSQuestSubsystem 이 단조(monotonic) 전이로 소유한다: NotStarted→InProgress→Completed→Claimed.
+ * ULastFPSQuestSubsystem 이 단조(monotonic) 전이로 소유한다: (Locked→)NotStarted→InProgress→Completed→Claimed.
+ * Locked 는 선행 퀘스트 미완료로 아직 수락 불가한 상태다(체인 게이팅).
+ * 신규 값은 기존 DataTable 행의 직렬화 값 보존을 위해 끝에 추가한다.
  */
 UENUM(BlueprintType)
 enum class ELastFPSQuestStatus : uint8
@@ -25,20 +28,31 @@ enum class ELastFPSQuestStatus : uint8
 	NotStarted	UMETA(DisplayName="미시작"),
 	InProgress	UMETA(DisplayName="진행중"),
 	Completed	UMETA(DisplayName="완료"),		// 목표 달성, 보상 미수령
-	Claimed		UMETA(DisplayName="수령완료")	// 보상 지급 완료 (재지급 방지 래치)
+	Claimed		UMETA(DisplayName="수령완료"),	// 보상 지급 완료 (재지급 방지 래치)
+	Locked		UMETA(DisplayName="잠김")		// 선행 퀘스트 미완료 → 수락 불가
 };
 
-/** 퀘스트 목표 종류. 현재 AcquireItem 하나(추후 TalkToNPC/ReachCredits 확장 여지). */
+/**
+ * 퀘스트 목표 종류. 각 유형의 판정 소스는 서브시스템의 목표 트래커가 소유한다(Phase 2).
+ * 신규 값은 기존 DataTable 행의 직렬화 값 보존을 위해 끝에 추가한다.
+ */
 UENUM(BlueprintType)
 enum class ELastFPSObjectiveType : uint8
 {
-	AcquireItem	UMETA(DisplayName="아이템 획득")
+	AcquireItem		UMETA(DisplayName="아이템 획득"),	// TargetId = DT_ItemData 행, 기준선 이후 증가분
+	ReachLocation	UMETA(DisplayName="위치 도달"),		// TargetTag = 위치 마커, AcceptRadius 이내 도달
+	KillTarget		UMETA(DisplayName="대상 처치"),		// TargetTag = 적 종류, 서버 사망 이벤트로 카운트
+	TalkToNPC		UMETA(DisplayName="NPC 대화")		// TargetId = NPCRowName, 상호작용 완료로 카운트
 };
 
 /**
  * 퀘스트 목표 1건.
- * AcquireItem: TargetId(DT_ItemData 행) 아이템을 RequiredCount 개 "획득" — 수락 시점 보유량을
- * 기준선으로 잡고 그 이후 증가분으로 진행을 센다(서브시스템). 이미 갖고 있던 재고는 카운트하지 않음.
+ * - AcquireItem: TargetId(DT_ItemData 행)를 RequiredCount 개 획득 — 수락 시점 보유량을 기준선으로
+ *   잡고 이후 증가분을 센다. 이미 갖고 있던 재고는 카운트하지 않음.
+ * - ReachLocation: TargetTag 로 등록된 위치 마커에 AcceptRadius(m) 이내로 도달.
+ * - KillTarget: TargetTag 종류의 적을 RequiredCount 기 처치(서버 사망 이벤트가 오너 클라로 통지).
+ * - TalkToNPC: TargetId(NPCRowName) NPC 와 상호작용.
+ * TargetId(행 참조형)와 TargetTag(분류형)는 유형에 따라 각각 사용한다.
  */
 USTRUCT(BlueprintType)
 struct FLastFPSQuestObjective
@@ -48,11 +62,19 @@ struct FLastFPSQuestObjective
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	ELastFPSObjectiveType Type = ELastFPSObjectiveType::AcquireItem;
 
-	/** 대상 식별자 — AcquireItem 이면 DT_ItemData 행 이름 */
+	/** 행 참조형 대상 — AcquireItem=DT_ItemData 행, TalkToNPC=NPCRowName */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	FName TargetId;
 
-	/** 필요 수량 */
+	/** 분류형 대상 — KillTarget=적 종류 태그, ReachLocation=위치 마커 태그 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
+	FGameplayTag TargetTag;
+
+	/** ReachLocation 도달 판정 반경(m). 다른 유형은 무시. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(ClampMin=0.1, EditCondition="Type==ELastFPSObjectiveType::ReachLocation"))
+	float AcceptRadius = 3.f;
+
+	/** 필요 수량 (ReachLocation/TalkToNPC 는 1) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(ClampMin=1))
 	int32 RequiredCount = 1;
 
@@ -136,4 +158,20 @@ struct FLastFPSQuestData : public FTableRowBase
 	/** 목록 아이콘 (선택) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	TSoftObjectPtr<UTexture2D> Icon;
+
+	/** 선행 퀘스트 (지정 시 이 퀘스트가 Claimed 여야 잠금 해제). 비면 처음부터 열림. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Chain")
+	FName PrereqQuestId;
+
+	/** 다음 퀘스트 (완료·수령 후 자동 잠금 해제/수락). 비면 체인 종료. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Chain")
+	FName NextQuestId;
+
+	/** 수락 트리거 NPC (지정 시 이 NPC 와 대화해야 수락). 비면 잠금 해제 즉시 자동 수락(스토리 체인형). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Chain")
+	FName QuestGiverNPC;
+
+	/** 목표 달성 즉시 보상 자동 지급(Completed→Claimed). false 면 수동 Claim 버튼 사용. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Chain")
+	bool bAutoClaim = false;
 };
