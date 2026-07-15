@@ -30,6 +30,7 @@ namespace LastFPSGameplayTags
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_AbilityCommit);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_AbilityEnd);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_ProjectileSpawn);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_MeleeHit);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_ViolaIceAuraEffect);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_ViolaFrostStormEffect);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_IceStormSpawn);
@@ -65,4 +66,5 @@ namespace LastFPSGameplayTags
 
 	// 적 AI 공격 어빌리티
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Shoot);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Melee);
 }

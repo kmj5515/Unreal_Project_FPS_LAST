@@ -38,6 +38,9 @@ private:
 	FReply PlayLevelClicked(FLastFPSBattleLevelInfo BattleLevel);
 	FReply UseLevelForScenarioClicked(FLastFPSBattleLevelInfo BattleLevel);
 	TSharedRef<SWidget> BuildScenarioEditor();
+	TSharedRef<SWidget> BuildFormationSelector();
+	FReply SetPendingFormationClicked(ELastFPSBattleFormation Formation);
+	FText GetFormationLabel(ELastFPSBattleFormation Formation) const;
 	TSharedRef<SWidget> BuildLevelRow(const FLastFPSBattleLevelInfo& BattleLevel);
 	TSharedRef<SWidget> BuildValidationRow(const FLastFPSBattleLevelValidationMessage& Message) const;
 	FSlateColor GetSeverityColor(ELastFPSBattleLevelValidationSeverity Severity) const;
@@ -68,6 +71,9 @@ private:
 	int32 PendingMonsterCount = 1;
 	FName PendingMonsterSpawnTag = TEXT("EnemySpawn");
 	float PendingMonsterLevelScale = 1.f;
+	ELastFPSBattleFormation PendingMonsterFormation = ELastFPSBattleFormation::Horizontal;
+	float PendingMonsterFormationSpacing = 120.f;
+	int32 PendingMonsterGridColumns = 3;
 	TSharedPtr<SScrollBox> LevelListBox;
 	TSharedPtr<SScrollBox> MonsterDraftBox;
 	TSharedPtr<SScrollBox> ValidationBox;
