@@ -164,13 +164,28 @@ private:
 	/** 한 퀘스트의 pull형 진행을 절대상태에서 재계산. 완료 도달 시 Completed 로 단조 승격. 변경 시 true. */
 	bool RecomputeProgress(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def);
 
-	/** 외부 이벤트를 진행중 퀘스트들에 적용(push형 목표 누적) + 완료 승격 + 변경 시 브로드캐스트. */
-	void ApplyObjectiveEvent(const FLastFPSObjectiveEvent& Event);
+	/** 외부 이벤트를 진행중 퀘스트들에 적용(push형 목표 누적). 변경 시 true(브로드캐스트/연쇄는 호출부). */
+	bool ApplyObjectiveEventToActive(const FLastFPSObjectiveEvent& Event);
 	/** 한 퀘스트에 이벤트 적용. 변경 시 true. */
 	bool ApplyEventToQuest(FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def, const FLastFPSObjectiveEvent& Event);
 
 	/** 모든 목표 충족 시 Completed 로 단조 승격. 승격했으면 true. */
 	bool CheckCompletion(FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def) const;
+
+	/** 수락 코어(가드 없음) — InProgress 전이 + 기준선 + 즉시 재계산. */
+	bool AcceptQuestInternal(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def);
+
+	/** 보상 지급(크레딧/아이템) + 완료 토스트. 상태 래치/전이는 호출부 책임. */
+	void GrantReward(const FLastFPSQuestData& Def);
+
+	/**
+	 * 완료→(자동)수령→다음 퀘스트 해금/수락 연쇄를 안정될 때까지 처리. 변경 시 true.
+	 * 보상 지급이 유발하는 인벤토리 브로드캐스트 재진입은 가드로 차단(외부 루프가 이어서 처리).
+	 */
+	bool ProcessQuestTransitions();
+
+	/** 다음 퀘스트 해금 — QuestGiverNPC 없으면 즉시 수락, 있으면 NotStarted 로 해금만. 변경 시 true. */
+	bool AdvanceToNext(FName NextQuestId);
 
 	/** 목표별 기준선 캡처 (트래커 위임). */
 	void CaptureBaseline(const FLastFPSQuestData& Def, FLastFPSQuestRuntimeState& State) const;
@@ -194,6 +209,9 @@ private:
 
 	/** 위치 태그 → 마커 컴포넌트 (레벨 액터 수명이라 약참조). */
 	TMap<FGameplayTag, TWeakObjectPtr<USceneComponent>> LocationMarkers;
+
+	/** 전이 처리 재진입 가드 (보상 지급→인벤토리 브로드캐스트 재귀 차단). */
+	bool bProcessingTransitions = false;
 
 	FTimerHandle LocationPollTimerHandle;
 	bool bInventorySubscribed = false;

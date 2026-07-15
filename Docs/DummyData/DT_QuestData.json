@@ -9,7 +9,11 @@
 		"Objectives": [],
 		"Reward": { "Credits": 500, "Items": [ { "RowId": "Cons_Repair_01", "Count": 2 } ] },
 		"RewardText": "크레딧 500 · 나노 수리킷 ×2",
-		"Icon": ""
+		"Icon": "",
+		"PrereqQuestId": "",
+		"NextQuestId": "",
+		"QuestGiverNPC": "",
+		"bAutoClaim": false
 	},
 	{
 		"Name": "Q_Mobility",
@@ -19,11 +23,15 @@
 		"Summary": "질풍 모듈을 확보해 기동 규격을 맞춘다.",
 		"Description": "차기 작전은 고속 강습 위주로 편성된다. 상점에서 질풍 모듈을 조달해 외골격 기동 규격을 충족시켜라.",
 		"Objectives": [
-			{ "Type": "AcquireItem", "TargetId": "Mod_Swift_01", "RequiredCount": 1, "Label": "질풍 모듈 확보" }
+			{ "Type": "AcquireItem", "TargetId": "Mod_Swift_01", "TargetTag": "", "AcceptRadius": 3.0, "RequiredCount": 1, "Label": "질풍 모듈 확보" }
 		],
 		"Reward": { "Credits": 1200, "Items": [] },
 		"RewardText": "크레딧 1,200",
-		"Icon": ""
+		"Icon": "",
+		"PrereqQuestId": "",
+		"NextQuestId": "",
+		"QuestGiverNPC": "",
+		"bAutoClaim": false
 	},
 	{
 		"Name": "Q_Endurance",
@@ -33,11 +41,15 @@
 		"Summary": "지구력 코어를 조달해 장기 작전에 대비한다.",
 		"Description": "장기 침투 작전에는 안정적인 에너지 순환이 필수다. 지구력 코어를 확보해 스태미나 규격을 보강하라.",
 		"Objectives": [
-			{ "Type": "AcquireItem", "TargetId": "Mod_Endure_01", "RequiredCount": 1, "Label": "지구력 코어 확보" }
+			{ "Type": "AcquireItem", "TargetId": "Mod_Endure_01", "TargetTag": "", "AcceptRadius": 3.0, "RequiredCount": 1, "Label": "지구력 코어 확보" }
 		],
 		"Reward": { "Credits": 600, "Items": [ { "RowId": "Cons_Repair_01", "Count": 3 } ] },
 		"RewardText": "크레딧 600 · 나노 수리킷 ×3",
-		"Icon": ""
+		"Icon": "",
+		"PrereqQuestId": "",
+		"NextQuestId": "",
+		"QuestGiverNPC": "",
+		"bAutoClaim": false
 	},
 	{
 		"Name": "Q_Arsenal",
@@ -47,12 +59,16 @@
 		"Summary": "공격형 모듈 2종을 확보해 무장을 확충한다.",
 		"Description": "고강도 교전 구역 투입을 앞두고 화력 규격이 상향됐다. 광폭 회로와 질풍 모듈을 모두 조달해 공격 편성을 완성하라.",
 		"Objectives": [
-			{ "Type": "AcquireItem", "TargetId": "Mod_Berserk_01", "RequiredCount": 1, "Label": "광폭 회로 확보" },
-			{ "Type": "AcquireItem", "TargetId": "Mod_Swift_01", "RequiredCount": 1, "Label": "질풍 모듈 확보" }
+			{ "Type": "AcquireItem", "TargetId": "Mod_Berserk_01", "TargetTag": "", "AcceptRadius": 3.0, "RequiredCount": 1, "Label": "광폭 회로 확보" },
+			{ "Type": "AcquireItem", "TargetId": "Mod_Swift_01", "TargetTag": "", "AcceptRadius": 3.0, "RequiredCount": 1, "Label": "질풍 모듈 확보" }
 		],
 		"Reward": { "Credits": 2500, "Items": [] },
 		"RewardText": "크레딧 2,500",
-		"Icon": ""
+		"Icon": "",
+		"PrereqQuestId": "",
+		"NextQuestId": "",
+		"QuestGiverNPC": "",
+		"bAutoClaim": false
 	},
 	{
 		"Name": "Q_Fortress",
@@ -62,11 +78,15 @@
 		"Summary": "전설급 방어 시스템을 조달한다.",
 		"Description": "방어 거점 사수 임무에 대비해 최고 등급 방어 규격이 요구된다. 철벽 프로토콜을 확보하라.",
 		"Objectives": [
-			{ "Type": "AcquireItem", "TargetId": "Mod_Bastion_01", "RequiredCount": 1, "Label": "철벽 프로토콜 확보" }
+			{ "Type": "AcquireItem", "TargetId": "Mod_Bastion_01", "TargetTag": "", "AcceptRadius": 3.0, "RequiredCount": 1, "Label": "철벽 프로토콜 확보" }
 		],
 		"Reward": { "Credits": 1500, "Items": [] },
 		"RewardText": "크레딧 1,500",
-		"Icon": ""
+		"Icon": "",
+		"PrereqQuestId": "",
+		"NextQuestId": "",
+		"QuestGiverNPC": "",
+		"bAutoClaim": false
 	},
 	{
 		"Name": "Q_Apex",
@@ -76,11 +96,15 @@
 		"Summary": "관통자 레일건을 조달해 주무장을 교체한다.",
 		"Description": "차기 작전의 핵심 표적은 중장갑 유닛이다. 장갑을 무시하는 관통자 레일건을 조달해 주무장 규격을 최상위로 끌어올려라.",
 		"Objectives": [
-			{ "Type": "AcquireItem", "TargetId": "Wpn_Rail_01", "RequiredCount": 1, "Label": "관통자 레일건 확보" }
+			{ "Type": "AcquireItem", "TargetId": "Wpn_Rail_01", "TargetTag": "", "AcceptRadius": 3.0, "RequiredCount": 1, "Label": "관통자 레일건 확보" }
 		],
 		"Reward": { "Credits": 3000, "Items": [ { "RowId": "Mod_Amp_01", "Count": 1 } ] },
 		"RewardText": "크레딧 3,000 · 고출력 증폭기 ×1",
-		"Icon": ""
+		"Icon": "",
+		"PrereqQuestId": "",
+		"NextQuestId": "",
+		"QuestGiverNPC": "",
+		"bAutoClaim": false
 	},
 	{
 		"Name": "Q_FirstSync",
@@ -92,7 +116,11 @@
 		"Objectives": [],
 		"Reward": { "Credits": 500, "Items": [] },
 		"RewardText": "크레딧 500",
-		"Icon": ""
+		"Icon": "",
+		"PrereqQuestId": "",
+		"NextQuestId": "",
+		"QuestGiverNPC": "",
+		"bAutoClaim": false
 	},
 	{
 		"Name": "Q_Contamination",
@@ -104,6 +132,64 @@
 		"Objectives": [],
 		"Reward": { "Credits": 4000, "Items": [ { "RowId": "Mod_Berserk_01", "Count": 1 } ] },
 		"RewardText": "크레딧 4,000 · 광폭 회로 ×1",
-		"Icon": ""
+		"Icon": "",
+		"PrereqQuestId": "",
+		"NextQuestId": "",
+		"QuestGiverNPC": "",
+		"bAutoClaim": false
+	},
+	{
+		"Name": "Quest_Reach",
+		"Title": "보급창고로 이동",
+		"Type": "Main",
+		"Status": "InProgress",
+		"Summary": "표시된 보급창고 지점으로 이동하라.",
+		"Description": "화면 마커가 가리키는 지점까지 이동하면 완료된다. 거리(m)가 실시간 표시된다. 완료 시 자동 보상 후 다음 임무로 이어진다.",
+		"Objectives": [
+			{ "Type": "ReachLocation", "TargetId": "", "TargetTag": "Location.Quest.Depot", "AcceptRadius": 3.0, "RequiredCount": 1, "Label": "보급창고 도달" }
+		],
+		"Reward": { "Credits": 100, "Items": [] },
+		"RewardText": "크레딧 100",
+		"Icon": "",
+		"PrereqQuestId": "",
+		"NextQuestId": "Quest_Hunt",
+		"QuestGiverNPC": "",
+		"bAutoClaim": true
+	},
+	{
+		"Name": "Quest_Hunt",
+		"Title": "그런트 소탕",
+		"Type": "Main",
+		"Status": "NotStarted",
+		"Summary": "그런트 3기를 처치하라.",
+		"Description": "선행 임무(보급창고 이동) 완료 후 자동으로 시작된다. 그런트 3기 처치 시 완료.",
+		"Objectives": [
+			{ "Type": "KillTarget", "TargetId": "", "TargetTag": "Enemy.Type.Grunt", "AcceptRadius": 3.0, "RequiredCount": 3, "Label": "그런트 처치" }
+		],
+		"Reward": { "Credits": 200, "Items": [] },
+		"RewardText": "크레딧 200",
+		"Icon": "",
+		"PrereqQuestId": "Quest_Reach",
+		"NextQuestId": "Quest_Talk",
+		"QuestGiverNPC": "",
+		"bAutoClaim": true
+	},
+	{
+		"Name": "Quest_Talk",
+		"Title": "장교에게 보고",
+		"Type": "Side",
+		"Status": "NotStarted",
+		"Summary": "장교 NPC에게 말을 걸어 작전 결과를 보고하라.",
+		"Description": "선행 임무 완료 후 장교(NPC_Officer)에게 말을 걸면 수락과 동시에 완료되고 보상이 지급된다.",
+		"Objectives": [
+			{ "Type": "TalkToNPC", "TargetId": "NPC_Officer", "TargetTag": "", "AcceptRadius": 3.0, "RequiredCount": 1, "Label": "장교에게 보고" }
+		],
+		"Reward": { "Credits": 300, "Items": [] },
+		"RewardText": "크레딧 300",
+		"Icon": "",
+		"PrereqQuestId": "Quest_Hunt",
+		"NextQuestId": "",
+		"QuestGiverNPC": "NPC_Officer",
+		"bAutoClaim": true
 	}
 ]

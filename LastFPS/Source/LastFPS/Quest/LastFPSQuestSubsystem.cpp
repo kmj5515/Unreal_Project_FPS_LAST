@@ -86,6 +86,7 @@ void ULastFPSQuestSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 	BuildTrackers();
 	SeedRuntimeStates();
+	ProcessQuestTransitions(); // 시드 직후 완료/자동수령/체인 상태를 일관되게 정리
 	ValidateReferences();
 	UpdateLocationPollTimer();
 
@@ -199,6 +200,22 @@ void ULastFPSQuestSubsystem::SeedRuntimeStates()
 
 			RuntimeStates.Add(RowName, MoveTemp(State));
 		});
+
+	// 선행 게이팅 — 시드가 끝나 모든 상태가 존재하는 뒤에 적용.
+	// 선행 퀘스트가 아직 Claimed 가 아니면, 시작 전(NotStarted)인 후속을 Locked 로 잠근다.
+	for (TPair<FName, FLastFPSQuestRuntimeState>& Pair : RuntimeStates)
+	{
+		if (Pair.Value.Status != ELastFPSQuestStatus::NotStarted)
+		{
+			continue;
+		}
+		const FLastFPSQuestData* Def = FindQuest(Pair.Key);
+		if (Def && !Def->PrereqQuestId.IsNone()
+			&& GetStatus(Def->PrereqQuestId) != ELastFPSQuestStatus::Claimed)
+		{
+			Pair.Value.Status = ELastFPSQuestStatus::Locked;
+		}
+	}
 }
 
 void ULastFPSQuestSubsystem::ValidateReferences() const
@@ -342,7 +359,9 @@ bool ULastFPSQuestSubsystem::RecomputeAllActive()
 
 void ULastFPSQuestSubsystem::HandleInventoryChanged()
 {
-	if (RecomputeAllActive())
+	bool bChanged = RecomputeAllActive();
+	bChanged |= ProcessQuestTransitions();
+	if (bChanged)
 	{
 		BroadcastStateChanged();
 	}
@@ -350,13 +369,15 @@ void ULastFPSQuestSubsystem::HandleInventoryChanged()
 
 void ULastFPSQuestSubsystem::HandleLocationPoll()
 {
-	if (RecomputeAllActive())
+	bool bChanged = RecomputeAllActive();
+	bChanged |= ProcessQuestTransitions();
+	if (bChanged)
 	{
 		BroadcastStateChanged();
 	}
 }
 
-void ULastFPSQuestSubsystem::ApplyObjectiveEvent(const FLastFPSObjectiveEvent& Event)
+bool ULastFPSQuestSubsystem::ApplyObjectiveEventToActive(const FLastFPSObjectiveEvent& Event)
 {
 	bool bAnyChanged = false;
 	for (TPair<FName, FLastFPSQuestRuntimeState>& Pair : RuntimeStates)
@@ -370,11 +391,7 @@ void ULastFPSQuestSubsystem::ApplyObjectiveEvent(const FLastFPSObjectiveEvent& E
 			bAnyChanged |= ApplyEventToQuest(Pair.Value, *Def, Event);
 		}
 	}
-
-	if (bAnyChanged)
-	{
-		BroadcastStateChanged();
-	}
+	return bAnyChanged;
 }
 
 bool ULastFPSQuestSubsystem::ApplyEventToQuest(FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def, const FLastFPSObjectiveEvent& Event)
@@ -410,7 +427,13 @@ void ULastFPSQuestSubsystem::NotifyObjectiveKill(FGameplayTag EnemyTag)
 	FLastFPSObjectiveEvent Event;
 	Event.Type = ELastFPSObjectiveType::KillTarget;
 	Event.Tag = EnemyTag;
-	ApplyObjectiveEvent(Event);
+
+	bool bChanged = ApplyObjectiveEventToActive(Event);
+	bChanged |= ProcessQuestTransitions();
+	if (bChanged)
+	{
+		BroadcastStateChanged();
+	}
 }
 
 void ULastFPSQuestSubsystem::NotifyTalkedToNPC(FName NPCRowName)
@@ -419,10 +442,34 @@ void ULastFPSQuestSubsystem::NotifyTalkedToNPC(FName NPCRowName)
 	{
 		return;
 	}
+
+	bool bChanged = false;
+
+	// 1) 이 NPC 가 수락 트리거(QuestGiverNPC)인 NotStarted 퀘스트를 수락.
+	for (TPair<FName, FLastFPSQuestRuntimeState>& Pair : RuntimeStates)
+	{
+		if (Pair.Value.Status != ELastFPSQuestStatus::NotStarted)
+		{
+			continue;
+		}
+		const FLastFPSQuestData* Def = FindQuest(Pair.Key);
+		if (Def && !Def->QuestGiverNPC.IsNone() && Def->QuestGiverNPC == NPCRowName)
+		{
+			bChanged |= AcceptQuestInternal(Pair.Key, Pair.Value, *Def);
+		}
+	}
+
+	// 2) TalkToNPC 목표 진행.
 	FLastFPSObjectiveEvent Event;
 	Event.Type = ELastFPSObjectiveType::TalkToNPC;
 	Event.Id = NPCRowName;
-	ApplyObjectiveEvent(Event);
+	bChanged |= ApplyObjectiveEventToActive(Event);
+
+	bChanged |= ProcessQuestTransitions();
+	if (bChanged)
+	{
+		BroadcastStateChanged();
+	}
 }
 
 void ULastFPSQuestSubsystem::RegisterLocationMarker(FGameplayTag LocationTag, USceneComponent* Marker)
@@ -582,17 +629,24 @@ bool ULastFPSQuestSubsystem::AcceptQuest(FName QuestId)
 {
 	FLastFPSQuestRuntimeState* State = RuntimeStates.Find(QuestId);
 	const FLastFPSQuestData* Def = FindQuest(QuestId);
+	// NotStarted 에서만 수락 — Locked(선행 미충족)/진행중/완료는 거부.
 	if (!State || !Def || State->Status != ELastFPSQuestStatus::NotStarted)
 	{
 		return false;
 	}
 
-	State->Status = ELastFPSQuestStatus::InProgress;
-	State->Progress.Init(0, Def->Objectives.Num());
-	CaptureBaseline(*Def, *State);
-	RecomputeProgress(QuestId, *State, *Def); // 수락 즉시 충족되는 경우(목표 0개 등) 반영
-
+	AcceptQuestInternal(QuestId, *State, *Def);
+	ProcessQuestTransitions(); // 수락 즉시 완료→자동수령→다음 등 연쇄
 	BroadcastStateChanged();
+	return true;
+}
+
+bool ULastFPSQuestSubsystem::AcceptQuestInternal(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def)
+{
+	State.Status = ELastFPSQuestStatus::InProgress;
+	State.Progress.Init(0, Def.Objectives.Num());
+	CaptureBaseline(Def, State);
+	RecomputeProgress(QuestId, State, Def); // 수락 즉시 충족되는 경우(목표 0개 등) 반영
 	return true;
 }
 
@@ -607,22 +661,102 @@ bool ULastFPSQuestSubsystem::TryClaimReward(FName QuestId)
 
 	// 단조 래치: 지급 전에 상태를 먼저 올려 재진입 시 중복지급을 원천 차단.
 	State->Status = ELastFPSQuestStatus::Claimed;
+	GrantReward(*Def);
+	ProcessQuestTransitions(); // 다음 퀘스트 해금/자동수락 연쇄
+	BroadcastStateChanged();
+	return true;
+}
 
+void ULastFPSQuestSubsystem::GrantReward(const FLastFPSQuestData& Def)
+{
 	if (ULastFPSEconomySubsystem* Economy = GetEconomy())
 	{
-		if (Def->Reward.Credits > 0)
+		if (Def.Reward.Credits > 0)
 		{
-			Economy->AddCredits(Def->Reward.Credits);
+			Economy->AddCredits(Def.Reward.Credits);
 		}
-		for (const FLastFPSItemGrant& Grant : Def->Reward.Items)
+		for (const FLastFPSItemGrant& Grant : Def.Reward.Items)
 		{
 			Economy->AddItem(Grant.RowId, Grant.Count);
 		}
 	}
+	NotifyRewardGranted(Def);
+}
 
-	NotifyRewardGranted(*Def);
-	BroadcastStateChanged();
-	return true;
+bool ULastFPSQuestSubsystem::ProcessQuestTransitions()
+{
+	// 재진입 차단 — GrantReward 의 인벤토리 브로드캐스트가 이 함수를 다시 부르면
+	// 여기서 즉시 반환하고, 진행 중인 외부 루프가 이어서 처리한다.
+	if (bProcessingTransitions)
+	{
+		return false;
+	}
+	bProcessingTransitions = true;
+
+	bool bAny = false;
+	bool bLoop = true;
+	// 상태 전이는 단조(Completed→Claimed, Locked→NotStarted/InProgress)라 반드시 수렴한다.
+	while (bLoop)
+	{
+		bLoop = false;
+		for (TPair<FName, FLastFPSQuestRuntimeState>& Pair : RuntimeStates)
+		{
+			const FLastFPSQuestData* Def = FindQuest(Pair.Key);
+			if (!Def)
+			{
+				continue;
+			}
+
+			// 1) 자동 수령 — 완료 + bAutoClaim.
+			if (Pair.Value.Status == ELastFPSQuestStatus::Completed && Def->bAutoClaim)
+			{
+				Pair.Value.Status = ELastFPSQuestStatus::Claimed; // 래치 먼저
+				GrantReward(*Def);
+				bAny = bLoop = true;
+			}
+
+			// 2) 다음 퀘스트 해금/수락 — Claimed 이고 NextQuestId 지정.
+			if (Pair.Value.Status == ELastFPSQuestStatus::Claimed && !Def->NextQuestId.IsNone())
+			{
+				if (AdvanceToNext(Def->NextQuestId))
+				{
+					bAny = bLoop = true;
+				}
+			}
+		}
+	}
+
+	bProcessingTransitions = false;
+	return bAny;
+}
+
+bool ULastFPSQuestSubsystem::AdvanceToNext(FName NextQuestId)
+{
+	FLastFPSQuestRuntimeState* Next = RuntimeStates.Find(NextQuestId);
+	const FLastFPSQuestData* NextDef = FindQuest(NextQuestId);
+	if (!Next || !NextDef)
+	{
+		return false;
+	}
+
+	if (NextDef->QuestGiverNPC.IsNone())
+	{
+		// 스토리 체인형 — 시작 전(Locked/NotStarted)이면 즉시 자동 수락.
+		if (Next->Status == ELastFPSQuestStatus::Locked || Next->Status == ELastFPSQuestStatus::NotStarted)
+		{
+			Next->Status = ELastFPSQuestStatus::NotStarted;
+			return AcceptQuestInternal(NextQuestId, *Next, *NextDef);
+		}
+		return false;
+	}
+
+	// 대화 수락형 — Locked 만 해금(NotStarted). 수락은 QuestGiverNPC 대화 시.
+	if (Next->Status == ELastFPSQuestStatus::Locked)
+	{
+		Next->Status = ELastFPSQuestStatus::NotStarted;
+		return true;
+	}
+	return false;
 }
 
 void ULastFPSQuestSubsystem::NotifyRewardGranted(const FLastFPSQuestData& Def) const
