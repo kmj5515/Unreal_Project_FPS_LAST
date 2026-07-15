@@ -2,6 +2,7 @@
 
 #include "Data/Definitions/LastFPSCharacterRoster.h"
 #include "Data/Tables/LastFPSLoadingTipData.h"
+#include "Game/Loading/LastFPSLoadingProcessSubsystem.h"
 #include "UI/Framework/LastFPSUIManagerSubsystem.h"
 
 #include "CommonLocalPlayer.h"
@@ -155,6 +156,12 @@ void ULastFPSGameInstance::Init()
 	PostLoadMapDelegateHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
 		this, &ULastFPSGameInstance::HandlePostLoadMap);
 
+	if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GetSubsystem<ULastFPSLoadingProcessSubsystem>())
+	{
+		LoadingFinishedDelegateHandle = LoadingProcesses->OnLoadingFinished.AddUObject(
+			this, &ULastFPSGameInstance::HandleLoadingFinished);
+	}
+
 	// 로딩 팁 이미지를 미리 로드·상주시켜 캐싱 → 첫 로딩 화면부터 즉시 표시.
 	PreloadLoadingTipTextures();
 }
@@ -199,6 +206,10 @@ void ULastFPSGameInstance::PreloadLoadingTipTextures()
 
 void ULastFPSGameInstance::Shutdown()
 {
+	if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GetSubsystem<ULastFPSLoadingProcessSubsystem>())
+	{
+		LoadingProcesses->OnLoadingFinished.Remove(LoadingFinishedDelegateHandle);
+	}
 	FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapDelegateHandle);
 	Super::Shutdown();
 }
@@ -312,8 +323,17 @@ void ULastFPSGameInstance::HandlePostLoadMap(UWorld* LoadedWorld)
 		return;
 	}
 
-	ClearPendingTravelPresentation();
 	UE_LOG(LogLastFPSTravel, Log, TEXT("PostLoadMap: %s"), *LoadedWorld->GetMapName());
+	if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GetSubsystem<ULastFPSLoadingProcessSubsystem>())
+	{
+		LoadingProcesses->NotifyLevelLoadComplete(LoadedWorld);
+	}
+}
+
+void ULastFPSGameInstance::HandleLoadingFinished(const bool bSucceeded)
+{
+	ClearPendingTravelPresentation();
+	UE_LOG(LogLastFPSTravel, Log, TEXT("Loading processes finished: Success=%d"), bSucceeded ? 1 : 0);
 }
 
 void ULastFPSGameInstance::ExecuteServerTravel(const FString& MapURL, const ELastFPSTravelDestination DestinationForUI)
@@ -347,6 +367,16 @@ void ULastFPSGameInstance::ExecuteServerTravel(const FString& MapURL, const ELas
 		GetDefaultStatusTextForDestination(DestinationForUI),
 		GetDefaultMapNameTextForDestination(DestinationForUI));
 
+	ULastFPSLoadingProcessSubsystem* LoadingProcesses = GetSubsystem<ULastFPSLoadingProcessSubsystem>();
+	if (LoadingProcesses)
+	{
+		LoadingProcesses->BeginTravelLoading(DestinationForUI);
+	}
+	else
+	{
+		UE_LOG(LogLastFPSTravel, Error, TEXT("LoadingProcessSubsystem is unavailable"));
+	}
+
 	const ENetMode NetMode = World->GetNetMode();
 	UE_LOG(LogLastFPSTravel, Log, TEXT("Travel scheduled -> %s (%s, NetMode=%d)"),
 		*PackagePath,
@@ -360,6 +390,10 @@ void ULastFPSGameInstance::ExecuteServerTravel(const FString& MapURL, const ELas
 			UWorld* TravelWorld = GetWorld();
 			if (!TravelWorld)
 			{
+				if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GetSubsystem<ULastFPSLoadingProcessSubsystem>())
+				{
+					LoadingProcesses->CancelLoading(TEXT("world is no longer valid"));
+				}
 				return;
 			}
 
@@ -367,6 +401,10 @@ void ULastFPSGameInstance::ExecuteServerTravel(const FString& MapURL, const ELas
 			{
 				UE_LOG(LogLastFPSTravel, Error,
 					TEXT("Client cannot travel. Use Standalone PIE or Play -> Standalone Game."));
+				if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GetSubsystem<ULastFPSLoadingProcessSubsystem>())
+				{
+					LoadingProcesses->CancelLoading(TEXT("client attempted to initiate travel"));
+				}
 				return;
 			}
 

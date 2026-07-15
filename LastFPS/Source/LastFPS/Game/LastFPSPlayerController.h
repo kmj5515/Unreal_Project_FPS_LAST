@@ -46,6 +46,7 @@ public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    virtual void SetPawn(APawn* InPawn) override;
     virtual void SetupInputComponent() override;
     virtual void PlayerTick(float DeltaTime) override;
 
@@ -173,6 +174,9 @@ protected:
     /** 인게임 HUD push (휴면). 레이아웃 준비 전이면 재시도. */
     void TryPushHUDToUILayout();
 
+    /** 로컬 Pawn의 소유 및 BeginPlay 완료를 GameInstance의 로딩 흐름에 알린다. */
+    void TryNotifyLocalPawnReady();
+
     // ── 커서/입력 config 단일 소유 ──────────────────────────────────
     // "메뉴류가 있으면 커서 표시, 없으면 숨김" 불변식을 PC 가 단독 소유.
     // Modal/Menu/GameMenu 표시위젯 변경 이벤트에 구독해 전이마다 재적용한다.
@@ -234,6 +238,7 @@ protected:
     FTimerHandle InitialScreenRetryTimerHandle;
     FTimerHandle HUDPushRetryTimerHandle;
     FTimerHandle MenuLayerSyncBindRetryTimerHandle;
+    FTimerHandle LocalPawnReadyRetryTimerHandle;
     bool bHUDWidgetPushed = false;
     bool bMenuLayerSyncBound = false;
 

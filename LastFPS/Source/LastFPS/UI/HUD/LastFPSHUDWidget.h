@@ -11,9 +11,11 @@
 #include "LastFPSHUDWidget.generated.h"
 
 class UAbilitySystemComponent;
+class ULastFPSDamageDirectionIndicatorWidget;
 class ULastFPSDamageNumberWidget;
 class ULastFPSSkillCooldownSlotWidget;
 class UMaterialInstanceDynamic;
+class UOverlay;
 class UWeaponComponent;
 class AActor;
 class ALastFPSPlayerState;
@@ -79,30 +81,17 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="HUD|HitMarker", meta=(BindWidgetOptional))
     TObjectPtr<UImage> HitMarkerImage;
 
+    /** 동적으로 생성한 공격 방향 위젯을 쌓는 전체 화면 레이어다. */
     UPROPERTY(BlueprintReadOnly, Category="HUD|Damage Direction", meta=(BindWidgetOptional))
-    TObjectPtr<UWidget> DamageDirectionIndicatorRotationRoot;
+    TObjectPtr<UOverlay> DamageDirectionIndicatorLayer;
 
-    /** 화면 중앙에 배치한 정사각형 이미지 전체를 회전시켜 공격 방향을 표현한다. */
-    UPROPERTY(BlueprintReadOnly, Category="HUD|Damage Direction", meta=(BindWidgetOptional))
-    TObjectPtr<UImage> DamageDirectionIndicatorImage;
+    /** 무기나 캐릭터와 무관한 표시 모양과 수명 설정은 위젯 클래스 기본값에서 관리한다. */
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Damage Direction")
+    TSubclassOf<ULastFPSDamageDirectionIndicatorWidget> DamageDirectionIndicatorWidgetClass;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Damage Direction", meta=(ClampMin="0.05"))
-    float DamageDirectionVisibleDuration = 0.8f;
-
-    /** 감소가 끝난 뒤 화면에 남겨 둘 최소 게이지 비율이다. */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Damage Direction", meta=(ClampMin="0.0", ClampMax="1.0"))
-    float DamageDirectionMinimumProgress = 0.05f;
-
-    /** 최소 게이지 비율에 도달한 상태를 유지하는 시간이다. */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Damage Direction", meta=(ClampMin="0.0", Units="s"))
-    float DamageDirectionHoldDuration = 0.5f;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Damage Direction", meta=(ClampMin="0.0"))
-    float DamageDirectionFadeStartTime = 0.8f;
-
-    /** UI Material에서 좌우 대칭으로 마스크를 줄이는 Scalar Parameter 이름이다. */
-    UPROPERTY(EditDefaultsOnly, Category="HUD|Damage Direction|Material")
-    FName DamageDirectionProgressParameterName = TEXT("Progress");
+    /** 짧은 시간에 누적되는 위젯 수를 제한해 UI 객체가 무한히 증가하지 않게 한다. */
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Damage Direction", meta=(ClampMin="1", ClampMax="16"))
+    int32 MaxDamageDirectionIndicators = 6;
 
     UPROPERTY(BlueprintReadOnly, Category="HUD|Crosshair", meta=(BindWidgetOptional))
     TObjectPtr<UImage> CrosshairImage;
@@ -215,11 +204,8 @@ private:
     void InitializeHitMarkerMaterial();
     void TickHitMarkerSpread(float DeltaTime);
     void SetHitMarkerSpread(float Spread);
-    void TickDamageDirection(float DeltaTime);
-    void InitializeDamageDirectionMaterial();
-    void SetDamageDirectionProgress(float Progress);
-    void UpdateDamageDirectionAngle();
-    void HideDamageDirection();
+    void TickDamageDirectionIndicators(float DeltaTime);
+    void ClearDamageDirectionIndicators();
     void InitializeCrosshairMaterial();
     void TickCrosshairSpread(float DeltaTime);
     void SetCrosshairSpread(float Spread);
@@ -246,14 +232,15 @@ private:
     void HideHitMarker();
 
     TWeakObjectPtr<UMaterialInstanceDynamic> HitMarkerMaterial;
-    TWeakObjectPtr<UMaterialInstanceDynamic> DamageDirectionMaterial;
     TWeakObjectPtr<UMaterialInstanceDynamic> CrosshairMaterial;
+    
     float HitMarkerSpreadElapsed = 0.f;
     bool bHitMarkerSpreadAnimating = false;
-    FVector ActiveDamageSourceDirection = FVector::ZeroVector;
-    float DamageDirectionElapsed = 0.f;
-    bool bDamageDirectionVisible = false;
-    bool bDamageDirectionBindingWarningLogged = false;
+    
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<ULastFPSDamageDirectionIndicatorWidget>> ActiveDamageDirectionIndicators;
+    
+    bool bDamageDirectionConfigurationWarningLogged = false;
     float CurrentCrosshairSpread = 0.f;
     float FireCrosshairSpread = 0.f;
 

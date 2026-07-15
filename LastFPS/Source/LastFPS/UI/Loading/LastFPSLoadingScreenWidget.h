@@ -9,6 +9,8 @@ class UProgressBar;
 class UTextBlock;
 class UTexture2D;
 class UDataTable;
+class ULastFPSLoadingProcessSubsystem;
+struct FGameplayTag;
 
 UCLASS()
 class LASTFPS_API ULastFPSLoadingScreenWidget : public UUserWidget
@@ -32,7 +34,6 @@ public:
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
-    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
     void RefreshFromGameInstance();
 
@@ -46,7 +47,7 @@ protected:
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     TObjectPtr<UTextBlock> Text_MapName;
 
-    /** 없으면 C++에서 막대 애니메이션을 생략 */
+    /** 없으면 C++에서 진행 표시를 생략 */
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     TObjectPtr<UProgressBar> PB_Loading;
 
@@ -60,9 +61,6 @@ protected:
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     TObjectPtr<UTextBlock> Text_TipBody;
 
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Loading", meta=(ClampMin="0.05"))
-    float IndeterminateCycleSeconds = 1.5f;
-
     /**
      * 로딩 팁 테이블 (FLastFPSLoadingTipData, JSON) — 로딩 팁의 단일 소스.
      * 제목/본문/이미지 전부 여기서 랜덤 선택. WBP 클래스 디폴트에서 지정.
@@ -72,7 +70,8 @@ protected:
 
 private:
     void HandleTravelPresentationChanged(const FText& StatusText, const FText& MapNameText);
+    void HandleLoadingProgressChanged(float OverallProgress, FGameplayTag ChangedProcessTag);
 
     FDelegateHandle TravelPresentationChangedHandle;
-    float IndeterminatePhase = 0.0f;
+    FDelegateHandle LoadingProgressChangedHandle;
 };

@@ -1,4 +1,5 @@
 #include "UI/HUD/LastFPSHUDWidget.h"
+#include "UI/HUD/LastFPSDamageDirectionIndicatorWidget.h"
 #include "UI/LastFPSDamageNumberWidget.h"
 #include "UI/HUD/LastFPSSkillCooldownSlotWidget.h"
 #include "UI/HUD/LastFPSHUDStyle.h"
@@ -14,6 +15,8 @@
 #include "PrimaryGameLayout.h"
 #include "Skills/LastFPSSkillDataSubsystem.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
+#include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
 
 void FLastFPSSmoothedGaugeDisplay::Initialize(float Current, float InMax)
 {
@@ -96,9 +99,6 @@ void ULastFPSHUDWidget::NativeConstruct()
         HitMarkerImage->SetVisibility(ESlateVisibility::Collapsed);
     }
 
-    InitializeDamageDirectionMaterial();
-    HideDamageDirection();
-
     InitializeCrosshairMaterial();
     SetCrosshairSpread(CrosshairBaseSpread);
 
@@ -140,6 +140,8 @@ void ULastFPSHUDWidget::NativeDestruct()
         World->GetTimerManager().ClearTimer(RetryTimerHandle);
     }
 
+    ClearDamageDirectionIndicators();
+
     Super::NativeDestruct();
 }
 
@@ -180,7 +182,7 @@ void ULastFPSHUDWidget::HUDRefreshTick(const float DeltaTime)
 
     TickSmoothedGauges(DeltaTime);
     TickHitMarkerSpread(DeltaTime);
-    TickDamageDirection(DeltaTime);
+    TickDamageDirectionIndicators(DeltaTime);
     TickCrosshairSpread(DeltaTime);
 }
 
@@ -457,128 +459,112 @@ void ULastFPSHUDWidget::SetHitMarkerSpread(float Spread)
 
 void ULastFPSHUDWidget::ShowDamageDirection(const FVector& DamageSourceDirection)
 {
-    if (!DamageDirectionIndicatorImage)
+    APlayerController* OwningPlayer = GetOwningPlayer();
+    if (!DamageDirectionIndicatorLayer || !DamageDirectionIndicatorWidgetClass || !OwningPlayer)
     {
-        if (!bDamageDirectionBindingWarningLogged)
+        if (!bDamageDirectionConfigurationWarningLogged)
         {
             UE_LOG(
                 LogLastFPSHUDWidget,
                 Warning,
-                TEXT("HUD '%s'에서 공격 방향을 표시하지 못했습니다: DamageDirectionIndicatorImage 바인딩이 없습니다."),
-                *GetNameSafe(this));
-            bDamageDirectionBindingWarningLogged = true;
+                TEXT("HUD '%s'에서 공격 방향 위젯을 생성하지 못했습니다: Layer=%s, WidgetClass=%s, OwningPlayer=%s"),
+                *GetNameSafe(this),
+                *GetNameSafe(DamageDirectionIndicatorLayer.Get()),
+                *GetNameSafe(DamageDirectionIndicatorWidgetClass.Get()),
+                *GetNameSafe(OwningPlayer));
+            bDamageDirectionConfigurationWarningLogged = true;
         }
         return;
     }
 
-    const FVector HorizontalDirection(DamageSourceDirection.X, DamageSourceDirection.Y, 0.f);
-    ActiveDamageSourceDirection = HorizontalDirection.GetSafeNormal();
-    if (ActiveDamageSourceDirection.IsNearlyZero())
+    const int32 IndicatorLimit = FMath::Max(MaxDamageDirectionIndicators, 1);
+    while (ActiveDamageDirectionIndicators.Num() >= IndicatorLimit)
+    {
+        if (ULastFPSDamageDirectionIndicatorWidget* OldestIndicator = ActiveDamageDirectionIndicators[0])
+        {
+            OldestIndicator->RemoveFromParent();
+        }
+        ActiveDamageDirectionIndicators.RemoveAt(0);
+    }
+
+    ULastFPSDamageDirectionIndicatorWidget* Indicator = CreateWidget<ULastFPSDamageDirectionIndicatorWidget>(
+        OwningPlayer,
+        DamageDirectionIndicatorWidgetClass);
+    if (!Indicator)
+    {
+        UE_LOG(
+            LogLastFPSHUDWidget,
+            Warning,
+            TEXT("HUD '%s'에서 공격 방향 위젯 클래스 '%s'의 인스턴스를 만들지 못했습니다."),
+            *GetNameSafe(this),
+            *GetNameSafe(DamageDirectionIndicatorWidgetClass.Get()));
+        return;
+    }
+
+    UOverlaySlot* IndicatorSlot = DamageDirectionIndicatorLayer->AddChildToOverlay(Indicator);
+    if (!IndicatorSlot)
+    {
+        UE_LOG(
+            LogLastFPSHUDWidget,
+            Warning,
+            TEXT("HUD '%s'의 공격 방향 레이어 '%s'에 위젯을 추가하지 못했습니다."),
+            *GetNameSafe(this),
+            *GetNameSafe(DamageDirectionIndicatorLayer.Get()));
+        Indicator->RemoveFromParent();
+        return;
+    }
+
+    IndicatorSlot->SetHorizontalAlignment(HAlign_Fill);
+    IndicatorSlot->SetVerticalAlignment(VAlign_Fill);
+    if (!Indicator->InitializeDamageDirection(DamageSourceDirection))
+    {
+        Indicator->RemoveFromParent();
+        return;
+    }
+
+    Indicator->AdvanceIndicator(0.f, OwningPlayer->GetControlRotation());
+    ActiveDamageDirectionIndicators.Add(Indicator);
+}
+
+void ULastFPSHUDWidget::TickDamageDirectionIndicators(const float DeltaTime)
+{
+    if (ActiveDamageDirectionIndicators.IsEmpty())
     {
         return;
     }
 
-    DamageDirectionElapsed = 0.f;
-    bDamageDirectionVisible = true;
-    SetDamageDirectionProgress(1.f);
-    DamageDirectionIndicatorImage->SetRenderOpacity(1.f);
-    DamageDirectionIndicatorImage->SetVisibility(ESlateVisibility::HitTestInvisible);
-    UpdateDamageDirectionAngle();
-}
-
-void ULastFPSHUDWidget::TickDamageDirection(const float DeltaTime)
-{
-    if (!bDamageDirectionVisible || !DamageDirectionIndicatorImage)
+    const APlayerController* OwningPlayer = GetOwningPlayer();
+    if (!OwningPlayer)
     {
+        ClearDamageDirectionIndicators();
         return;
     }
 
-    DamageDirectionElapsed += FMath::Max(DeltaTime, 0.f);
-    const float ShrinkDuration = FMath::Max(DamageDirectionVisibleDuration, KINDA_SMALL_NUMBER);
-    const float HoldDuration = FMath::Max(DamageDirectionHoldDuration, 0.f);
-    if (DamageDirectionElapsed >= ShrinkDuration + HoldDuration)
+    const FRotator ViewRotation = OwningPlayer->GetControlRotation();
+    for (int32 Index = ActiveDamageDirectionIndicators.Num() - 1; Index >= 0; --Index)
     {
-        HideDamageDirection();
-        return;
-    }
-
-    UpdateDamageDirectionAngle();
-
-    const float MinimumProgress = FMath::Clamp(DamageDirectionMinimumProgress, 0.f, 1.f);
-    const float ShrinkAlpha = FMath::Clamp(DamageDirectionElapsed / ShrinkDuration, 0.f, 1.f);
-    const float RemainingProgress = FMath::Lerp(1.f, MinimumProgress, ShrinkAlpha);
-    SetDamageDirectionProgress(RemainingProgress);
-
-    const float FadeStartTime = FMath::Clamp(
-        DamageDirectionFadeStartTime,
-        0.f,
-        DamageDirectionVisibleDuration);
-    const float FadeDuration = DamageDirectionVisibleDuration - FadeStartTime;
-    const float Opacity = FadeDuration > KINDA_SMALL_NUMBER
-        ? 1.f - FMath::Clamp((DamageDirectionElapsed - FadeStartTime) / FadeDuration, 0.f, 1.f)
-        : 1.f;
-    DamageDirectionIndicatorImage->SetRenderOpacity(Opacity);
-}
-
-void ULastFPSHUDWidget::InitializeDamageDirectionMaterial()
-{
-    if (!DamageDirectionIndicatorImage || DamageDirectionMaterial.IsValid())
-    {
-        return;
-    }
-
-    DamageDirectionMaterial = DamageDirectionIndicatorImage->GetDynamicMaterial();
-}
-
-void ULastFPSHUDWidget::SetDamageDirectionProgress(const float Progress)
-{
-    InitializeDamageDirectionMaterial();
-
-    if (UMaterialInstanceDynamic* Material = DamageDirectionMaterial.Get())
-    {
-        Material->SetScalarParameterValue(
-            DamageDirectionProgressParameterName,
-            FMath::Clamp(Progress, 0.f, 1.f));
+        ULastFPSDamageDirectionIndicatorWidget* Indicator = ActiveDamageDirectionIndicators[Index];
+        if (!IsValid(Indicator) || !Indicator->AdvanceIndicator(DeltaTime, ViewRotation))
+        {
+            if (IsValid(Indicator))
+            {
+                Indicator->RemoveFromParent();
+            }
+            ActiveDamageDirectionIndicators.RemoveAt(Index);
+        }
     }
 }
 
-void ULastFPSHUDWidget::UpdateDamageDirectionAngle()
+void ULastFPSHUDWidget::ClearDamageDirectionIndicators()
 {
-    const APlayerController* PC = GetOwningPlayer();
-    if (!PC || !DamageDirectionIndicatorImage || ActiveDamageSourceDirection.IsNearlyZero())
+    for (ULastFPSDamageDirectionIndicatorWidget* Indicator : ActiveDamageDirectionIndicators)
     {
-        return;
+        if (IsValid(Indicator))
+        {
+            Indicator->RemoveFromParent();
+        }
     }
-
-    const FRotator ViewYawRotation(0.f, PC->GetControlRotation().Yaw, 0.f);
-    const FVector ViewForward = ViewYawRotation.Vector();
-    const FVector ViewRight = FRotationMatrix(ViewYawRotation).GetUnitAxis(EAxis::Y);
-    const float ForwardAmount = FVector::DotProduct(ViewForward, ActiveDamageSourceDirection);
-    const float RightAmount = FVector::DotProduct(ViewRight, ActiveDamageSourceDirection);
-    const float ScreenAngleDegrees = FMath::RadiansToDegrees(FMath::Atan2(RightAmount, ForwardAmount));
-
-    UWidget* RotationTarget = DamageDirectionIndicatorRotationRoot
-        ? DamageDirectionIndicatorRotationRoot.Get()
-        : DamageDirectionIndicatorImage.Get();
-
-    if (RotationTarget)
-    {
-        RotationTarget->SetRenderTransformAngle(ScreenAngleDegrees);
-    }
-}
-
-void ULastFPSHUDWidget::HideDamageDirection()
-{
-    if (DamageDirectionIndicatorImage)
-    {
-        DamageDirectionIndicatorImage->SetRenderOpacity(0.f);
-        DamageDirectionIndicatorImage->SetVisibility(ESlateVisibility::Collapsed);
-    }
-
-    ActiveDamageSourceDirection = FVector::ZeroVector;
-    DamageDirectionElapsed = 0.f;
-    bDamageDirectionVisible = false;
-    SetDamageDirectionProgress(0.f);
+    ActiveDamageDirectionIndicators.Reset();
 }
 
 void ULastFPSHUDWidget::InitializeCrosshairMaterial()
