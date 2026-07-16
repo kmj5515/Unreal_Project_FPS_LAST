@@ -37,13 +37,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin=0))
 	float LoseSightRange = 1600.f;
 
-	/** 이 거리 안에 들어오면 이동을 멈추고 공격을 시도한다(cm). */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin=0))
-	float AttackRange = 200.f;
-
 	/**
 	 * 카이팅: 타깃이 이 거리보다 가까워지면 뒤로/옆으로 빠져 거리를 유지한다(cm).
-	 * 0 이하면 카이팅 안 함(제자리 사격). 보통 AttackRange 보다 작게(예: AttackRange*0.5) 둔다.
+	 * 0 이하면 카이팅 안 함(제자리 사격). 보통 AttributeSet의 AttackRange보다 작게 둔다.
 	 * 원거리 적 전용 — 근접 적은 0.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin=0))

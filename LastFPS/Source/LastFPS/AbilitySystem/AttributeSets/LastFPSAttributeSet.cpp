@@ -193,15 +193,24 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
     if (TargetChar && ActualDamage > 0.f)
     {
         TargetChar->MarkCombatEngaged();
+        if (TargetChar->IsPlayerControlled())
+        {
+            TargetChar->Client_PlayDamageCameraShake();
+        }
 
         AActor* DamageSourceActor = ResolveDamageSourceActor(Data);
-        if (DamageSourceActor && DamageSourceActor != TargetChar && TargetChar->IsPlayerControlled())
+        if (DamageSourceActor && DamageSourceActor != TargetChar)
         {
             const FVector DamageSourceDirection =
                 (DamageSourceActor->GetActorLocation() - TargetChar->GetActorLocation()).GetSafeNormal2D();
             if (!DamageSourceDirection.IsNearlyZero())
             {
-                TargetChar->Client_NotifyDamageDirection(DamageSourceDirection);
+                // UI는 공격자가 있는 방향을, 랙돌은 공격자로부터 밀려나는 반대 방향을 사용한다.
+                TargetChar->SetLastDamageImpulseDirection(-DamageSourceDirection);
+                if (TargetChar->IsPlayerControlled())
+                {
+                    TargetChar->Client_NotifyDamageDirection(DamageSourceDirection);
+                }
             }
         }
     }

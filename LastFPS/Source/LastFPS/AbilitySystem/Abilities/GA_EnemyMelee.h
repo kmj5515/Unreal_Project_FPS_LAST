@@ -65,6 +65,4 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_WaitGameplayEvent> HitEventTask;
-
-	bool bHitEventConsumed = false;
 };

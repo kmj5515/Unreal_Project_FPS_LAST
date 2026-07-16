@@ -277,7 +277,7 @@ void ALastFPSHero::HandleSpeedBoostCameraTagChanged(const FGameplayTag Tag, cons
 		return;
 	}
 
-	bSpeedBoostCameraActive = NewCount > 0;
+	bSpeedBoostCameraActive = bIsSprinting || NewCount > 0;
 	const UCharacterMovementComponent* Movement = GetCharacterMovement();
 	UpdateSpeedBoostCameraOffset(Movement ? Movement->MaxWalkSpeed : 0.f);
 }
@@ -676,6 +676,12 @@ void ALastFPSHero::SetSprinting(bool bEnabled)
 
     bIsSprinting = bEnabled;
     ApplyRotationModeSettings();
+
+	const UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	bSpeedBoostCameraActive = bIsSprinting
+		|| (ASC && ASC->HasMatchingGameplayTag(SpeedBoostCameraTag));
+	const UCharacterMovementComponent* Movement = GetCharacterMovement();
+	UpdateSpeedBoostCameraOffset(Movement ? Movement->MaxWalkSpeed : 0.f);
 
     if (!bEnabled)
     {

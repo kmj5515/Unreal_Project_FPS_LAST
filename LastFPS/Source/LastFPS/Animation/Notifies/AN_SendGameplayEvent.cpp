@@ -58,12 +58,6 @@ void UAN_SendGameplayEvent::Notify(
         return;
     }
 
-    UE_LOG(LogTemp, Warning, TEXT("AN_SendGameplayEvent fired: Owner=%s Animation=%s Tag=%s Authority=%s"),
-        *GetNameSafe(Owner),
-        *GetNameSafe(Animation),
-        *TagToSend.ToString(),
-        Owner->HasAuthority() ? TEXT("true") : TEXT("false"));
-
     FGameplayEventData Payload;
     Payload.EventTag = TagToSend;
     Payload.Instigator = Owner;

@@ -68,7 +68,6 @@ void UGA_EnemyMelee::ActivateAbility(
 		return;
 	}
 
-	bHitEventConsumed = false;
 	StartHitEventTask();
 	if (!HitEventTask || !StartAttackMontage())
 	{
@@ -101,7 +100,6 @@ void UGA_EnemyMelee::EndAbility(
 		MontageTask = nullptr;
 	}
 
-	bHitEventConsumed = false;
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
@@ -140,7 +138,7 @@ void UGA_EnemyMelee::StartHitEventTask()
 		this,
 		AttackData->HitEventTag,
 		nullptr,
-		true,
+		false,
 		true);
 	if (HitEventTask)
 	{
@@ -271,12 +269,12 @@ void UGA_EnemyMelee::FinishCurrentAbility(const bool bWasCancelled)
 
 void UGA_EnemyMelee::OnHitEventReceived(FGameplayEventData Payload)
 {
-	if (bHitEventConsumed || !AttackData || !Payload.EventTag.MatchesTagExact(AttackData->HitEventTag))
+	if (!AttackData || !Payload.EventTag.MatchesTagExact(AttackData->HitEventTag))
 	{
 		return;
 	}
 
-	bHitEventConsumed = true;
+	// 몽타주에 배치된 각 Gameplay Event Notify가 독립적인 한 번의 타격 판정을 요청한다.
 	if (ALastFPSCharacterBase* SourceCharacter = Cast<ALastFPSCharacterBase>(GetAvatarActorFromActorInfo()))
 	{
 		PerformMeleeHit(*SourceCharacter);

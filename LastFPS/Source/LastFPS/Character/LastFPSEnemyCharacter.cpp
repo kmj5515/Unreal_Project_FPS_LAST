@@ -48,6 +48,22 @@ const ULastFPSAIProfile* ALastFPSEnemyCharacter::GetAIProfile() const
     return nullptr;
 }
 
+void ALastFPSEnemyCharacter::PostInitializeComponents()
+{
+    // APawn이 자동 AI Controller를 생성하기 전에 프로필의 Controller 클래스를 반영해야 한다.
+    ApplyAIControllerClassFromProfile();
+    Super::PostInitializeComponents();
+}
+
+void ALastFPSEnemyCharacter::ApplyAIControllerClassFromProfile()
+{
+    const ULastFPSAIProfile* Profile = GetAIProfile();
+    if (Profile && Profile->AIControllerClass)
+    {
+        AIControllerClass = Profile->AIControllerClass;
+    }
+}
+
 void ALastFPSEnemyCharacter::BeginPlay()
 {
     Super::BeginPlay();
@@ -67,6 +83,7 @@ void ALastFPSEnemyCharacter::BeginPlay()
 
 void ALastFPSEnemyCharacter::HandleOwnDeath(ALastFPSCharacterBase* /*DeadChar*/)
 {
+    Multicast_ApplyDeathRagdollImpulse(GetLastDamageImpulseDirection());
     SetLifeSpan(DeathRemovalDelay);
 
     UWorld* World = GetWorld();
@@ -157,11 +174,6 @@ void ALastFPSEnemyCharacter::UpdateAliveCollisionState(bool bAlive)
 
 void ALastFPSEnemyCharacter::StartDeathRagdoll()
 {
-    if (bDeathRagdollStarted)
-    {
-        return;
-    }
-
     USkeletalMeshComponent* MeshComp = GetMesh();
     if (!MeshComp || !MeshComp->GetPhysicsAsset())
     {
@@ -171,11 +183,46 @@ void ALastFPSEnemyCharacter::StartDeathRagdoll()
         return;
     }
 
-    bDeathRagdollStarted = true;
+    // 체력 복제나 사망 RPC 순서에 따라 이 함수가 여러 번 호출될 수 있다.
+    // 이전 호출 이후 충돌 상태가 덮어써졌더라도 랙돌에 필요한 상태는 항상 복구한다.
+    // 다른 애니메이션 시스템의 정지 상태까지 포함해 물리 전환 전에는 반드시 포즈 고정을 해제한다.
+    MeshComp->bPauseAnims = false;
     MeshComp->SetCollisionProfileName(TEXT("Ragdoll"));
     MeshComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+    MeshComp->SetEnableGravity(true);
+    MeshComp->SetEnableGravityOnAllBodiesBelow(true, NAME_None, /*bIncludeSelf*/ true);
+    MeshComp->SetSimulatePhysics(true);
     MeshComp->SetAllBodiesSimulatePhysics(true);
+    MeshComp->SetAllBodiesPhysicsBlendWeight(1.f, /*bSkipCustomPhysicsType*/ false);
     MeshComp->WakeAllRigidBodies();
+    bDeathRagdollStarted = true;
+}
+
+void ALastFPSEnemyCharacter::Multicast_ApplyDeathRagdollImpulse_Implementation(
+    const FVector_NetQuantizeNormal ImpulseDirection)
+{
+    StartDeathRagdoll();
+
+    USkeletalMeshComponent* MeshComp = GetMesh();
+    if (!MeshComp || !bDeathRagdollStarted)
+    {
+        return;
+    }
+
+    const FVector Impulse =
+        FVector(ImpulseDirection) * FMath::Max(DeathRagdollImpulseVelocity, 0.f)
+        + FVector::UpVector * FMath::Max(DeathRagdollUpwardVelocity, 0.f);
+    if (Impulse.IsNearlyZero())
+    {
+        return;
+    }
+
+    MeshComp->AddImpulseToAllBodiesBelow(
+        Impulse,
+        DeathRagdollImpulseBoneName,
+        /*bVelChange*/ true,
+        /*bIncludeSelf*/ true);
 }
 
 FName ALastFPSEnemyCharacter::PickWeightedDropRowId(float TotalWeight) const

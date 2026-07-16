@@ -1,7 +1,9 @@
 #include "UI/HUD/LastFPSHUDWidget.h"
 #include "UI/HUD/LastFPSDamageDirectionIndicatorWidget.h"
+#include "UI/HUD/LastFPSEnemyHealthBarWidget.h"
 #include "UI/LastFPSDamageNumberWidget.h"
 #include "UI/HUD/LastFPSSkillCooldownSlotWidget.h"
+#include "UI/HUD/LastFPSStatusEffectListWidget.h"
 #include "UI/HUD/LastFPSHUDStyle.h"
 #include "AbilitySystemComponent.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
@@ -83,6 +85,7 @@ ULastFPSHUDWidget::ULastFPSHUDWidget(const FObjectInitializer& ObjectInitializer
     StaminaFillColor         = LastFPSHUDStyle::StaminaFill();
     StaminaLowFillColor      = LastFPSHUDStyle::StaminaLowFill();
     DamageNumberWidgetClass  = ULastFPSDamageNumberWidget::StaticClass();
+    EnemyHealthBarSettings.WidgetClass = ULastFPSEnemyHealthBarWidget::StaticClass();
 }
 
 void ULastFPSHUDWidget::NativeConstruct()
@@ -141,6 +144,11 @@ void ULastFPSHUDWidget::NativeDestruct()
     }
 
     ClearDamageDirectionIndicators();
+    ClearEnemyHealthBars();
+    if (WBP_StatusEffectList)
+    {
+        WBP_StatusEffectList->UninitializeFromAbilitySystem();
+    }
 
     Super::NativeDestruct();
 }
@@ -183,6 +191,11 @@ void ULastFPSHUDWidget::HUDRefreshTick(const float DeltaTime)
     TickSmoothedGauges(DeltaTime);
     TickHitMarkerSpread(DeltaTime);
     TickDamageDirectionIndicators(DeltaTime);
+    TickEnemyHealthBars(DeltaTime);
+    if (WBP_StatusEffectList)
+    {
+        WBP_StatusEffectList->UpdateRuntimeStates();
+    }
     TickCrosshairSpread(DeltaTime);
 }
 
@@ -369,6 +382,10 @@ bool ULastFPSHUDWidget::InitializeHUD()
     BroadcastStaminaDisplay();
 
     CachedASC = ASC;
+    if (WBP_StatusEffectList)
+    {
+        WBP_StatusEffectList->InitializeWithAbilitySystem(ASC);
+    }
     TryBindPawnComponents();
     return TryInitSkillSlots();
 }
@@ -399,6 +416,103 @@ void ULastFPSHUDWidget::HandleDamageDealt(
     bool bCriticalHit)
 {
     SpawnDamageNumber(DamageAmount, TotalDamageDealt, DamageWorldLocation, DamageTargetActor, bCriticalHit);
+    ShowEnemyHealthBar(DamageTargetActor, DamageAmount);
+}
+
+void ULastFPSHUDWidget::ShowEnemyHealthBar(AActor* DamageTargetActor, const float DamageAmount)
+{
+    ALastFPSCharacterBase* Enemy = Cast<ALastFPSCharacterBase>(DamageTargetActor);
+    APlayerController* PC = GetOwningPlayer();
+    if (!Enemy || Enemy->IsPlayerControlled() || !PC || !EnemyHealthBarSettings.WidgetClass)
+    {
+        return;
+    }
+
+    if (!Enemy->IsAlive())
+    {
+        for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+        {
+            if (Widget && Widget->IsTrackingEnemy(Enemy))
+            {
+                Widget->ReleaseFromEnemy();
+                break;
+            }
+        }
+        return;
+    }
+
+    for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+    {
+        if (Widget && Widget->IsTrackingEnemy(Enemy))
+        {
+            Widget->RefreshDisplayDuration(EnemyHealthBarSettings.DisplayDuration);
+            Widget->NotifyDamage(DamageAmount, EnemyHealthBarSettings);
+            return;
+        }
+    }
+
+    ULastFPSEnemyHealthBarWidget* SelectedWidget = nullptr;
+    for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+    {
+        if (Widget && Widget->IsAvailable())
+        {
+            SelectedWidget = Widget;
+            break;
+        }
+    }
+
+    const int32 MaxActiveBars = FMath::Max(EnemyHealthBarSettings.MaxActiveBars, 1);
+    if (!SelectedWidget && EnemyHealthBarPool.Num() < MaxActiveBars)
+    {
+        SelectedWidget = CreateWidget<ULastFPSEnemyHealthBarWidget>(
+            PC, EnemyHealthBarSettings.WidgetClass);
+        if (SelectedWidget)
+        {
+            SelectedWidget->AddToViewport(EnemyHealthBarSettings.ViewportZOrder);
+            EnemyHealthBarPool.Add(SelectedWidget);
+        }
+    }
+
+    if (!SelectedWidget)
+    {
+        for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+        {
+            if (Widget && (!SelectedWidget
+                || Widget->GetRemainingDisplayTime() < SelectedWidget->GetRemainingDisplayTime()))
+            {
+                SelectedWidget = Widget;
+            }
+        }
+    }
+
+    if (SelectedWidget)
+    {
+        SelectedWidget->InitializeForEnemy(Enemy, EnemyHealthBarSettings, DamageAmount);
+    }
+}
+
+void ULastFPSHUDWidget::TickEnemyHealthBars(const float DeltaTime)
+{
+    for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+    {
+        if (Widget && !Widget->IsAvailable())
+        {
+            Widget->UpdateTrackedEnemy(DeltaTime, EnemyHealthBarSettings);
+        }
+    }
+}
+
+void ULastFPSHUDWidget::ClearEnemyHealthBars()
+{
+    for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+    {
+        if (Widget)
+        {
+            Widget->ReleaseFromEnemy();
+            Widget->RemoveFromParent();
+        }
+    }
+    EnemyHealthBarPool.Reset();
 }
 
 void ULastFPSHUDWidget::TickSmoothedGauges(float DeltaTime)

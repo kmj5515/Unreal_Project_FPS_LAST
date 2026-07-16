@@ -5,7 +5,6 @@
 #include "AbilitySystemInterface.h"
 #include "GameplayEffectTypes.h"
 #include "TimerManager.h"
-#include "Data/Status/LastFPSStatusOverlayConfig.h"
 #include "LastFPSCharacterBase.generated.h"
 
 class UAbilitySystemComponent;
@@ -13,9 +12,9 @@ class ULastFPSAttributeSet;
 class ULastFPSCharacterDefinition;
 class UGameplayEffect;
 class UGameplayAbility;
-class ULastFPSStatusOverlayConfig;
-class UMaterialInterface;
-class UMaterialInstanceDynamic;
+class UCameraShakeBase;
+class ULastFPSStatusAnimationComponent;
+class ULastFPSStatusOverlayComponent;
 class USoundBase;
 class APlayerState;
 
@@ -70,14 +69,6 @@ public:
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayHitSound();
 
-    UFUNCTION(NetMulticast, Reliable)
-    void Multicast_SetStatusOverlayMaterial(
-        UMaterialInterface* OverlayMaterial,
-        FName MixParameterName,
-        float MixValue,
-        bool bInterpolateMix,
-        float MixInterpSpeed);
-
     /** 서버: 명중 처리 후 발사자 클라이언트에서만 히트마커 표시 */
     UFUNCTION(Client, Reliable)
     void Client_NotifyHitMarker();
@@ -86,12 +77,20 @@ public:
     UFUNCTION(Client, Reliable)
     void Client_NotifyDamageDirection(FVector_NetQuantizeNormal DamageSourceDirection);
 
+    /** 서버가 확정한 체력 피해의 공통 카메라 피드백을 소유 클라이언트에서 재생한다. */
+    UFUNCTION(Client, Unreliable)
+    void Client_PlayDamageCameraShake();
+
     // ── 어시스트 추적 (서버 전용) ──────────────────────────────
     static constexpr float AssistTimeWindow = 10.f;
 
     void RecordAttacker(APlayerState* Attacker);
     void ClearRecentAttackers();
     const TMap<TWeakObjectPtr<APlayerState>, float>& GetRecentAttackers() const { return RecentAttackers; }
+
+    /** 마지막 피해가 밀어내는 월드 방향을 기록한다. 사망 랙돌 같은 공통 피드백이 사용한다. */
+    void SetLastDamageImpulseDirection(const FVector& Direction);
+    const FVector& GetLastDamageImpulseDirection() const { return LastDamageImpulseDirection; }
 
     // 서버: HP 0 도달 시 1회 호출되는 사망 훅. 래치되어 중복 호출은 무시된다.
     void HandleDeath();
@@ -116,21 +115,6 @@ protected:
     virtual void UpdateAliveCollisionState(bool bAlive);
     virtual void OnMoveSpeedChanged(const FOnAttributeChangeData& Data);
     virtual float ResolveMaxWalkSpeed(float AttributeMoveSpeed) const;
-    void BindStatusOverlayMaterials(UAbilitySystemComponent* ASC);
-    void UnbindStatusOverlayMaterials(UAbilitySystemComponent* ASC);
-    void OnStatusOverlayTagChanged(FGameplayTag StatusTag, int32 NewCount);
-    void RefreshStatusOverlayMaterial();
-    bool IsStatusOverlayActive(UAbilitySystemComponent* ASC, const FLastFPSStatusOverlayMaterial& OverlayConfig) const;
-    float GetStatusOverlayMix(UAbilitySystemComponent* ASC, const FLastFPSStatusOverlayMaterial& OverlayConfig) const;
-    int32 GetStatusOverlayStackCount(UAbilitySystemComponent* ASC, const FLastFPSStatusOverlayMaterial& OverlayConfig) const;
-    int32 GetStatusOverlayFullStackCount(const FLastFPSStatusOverlayMaterial& OverlayConfig) const;
-    void ApplyStatusOverlayMaterial(
-        UMaterialInterface* OverlayMaterial,
-        FName MixParameterName,
-        float MixValue,
-        bool bInterpolateMix,
-        float MixInterpSpeed);
-    void UpdateStatusOverlayMixInterpolation();
     const ULastFPSCharacterDefinition* ResolveCharacterDefinition() const;
     void ApplyCharacterVisuals(const ULastFPSCharacterDefinition* Definition);
     void ClearCombatEngaged();
@@ -143,11 +127,18 @@ protected:
     UPROPERTY()
     TObjectPtr<ULastFPSAttributeSet> OwnedAttributeSet;
 
-    UPROPERTY()
-    TObjectPtr<ULastFPSAttributeSet> AttributeSet;
+	UPROPERTY()
+	TObjectPtr<ULastFPSAttributeSet> AttributeSet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LastFPS|Status Overlay")
+	TObjectPtr<ULastFPSStatusOverlayComponent> StatusOverlayComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LastFPS|Status Animation")
+	TObjectPtr<ULastFPSStatusAnimationComponent> StatusAnimationComponent;
 
     bool bOwnedGASDefaultsGranted = false;
     bool bHasDied = false;
+    FVector LastDamageImpulseDirection = FVector::ZeroVector;
     TWeakObjectPtr<UAbilitySystemComponent> BoundAttributeASC;
 
     /** BP/에디터에서 캐릭터별 닉네임 지정. 비어 있으면 GetPlayerName() */
@@ -160,6 +151,13 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Sound")
     TObjectPtr<USoundBase> HitSound;
 
+    /** 모든 실제 체력 피해에 공통으로 사용하는 피격 카메라 흔들림이다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Feedback|Damage")
+    TSubclassOf<UCameraShakeBase> DamageCameraShakeClass;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Feedback|Damage", meta=(ClampMin="0.0"))
+    float DamageCameraShakeScale = 1.f;
+
     // 기본 어빌리티 목록 (에디터에서 할당)
     UPROPERTY(EditDefaultsOnly, Category="GAS")
     TArray<TSubclassOf<UGameplayAbility>> DefaultAbilities;
@@ -168,18 +166,8 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="GAS")
     TArray<TSubclassOf<UGameplayEffect>> DefaultEffects;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Status Overlay")
-    TObjectPtr<ULastFPSStatusOverlayConfig> StatusOverlayConfig;
-
-    FDelegateHandle MoveSpeedDelegateHandle;
-    FDelegateHandle HealthDelegateHandle;
-    TMap<FGameplayTag, FDelegateHandle> StatusOverlayDelegateHandles;
-
-    UPROPERTY()
-    TObjectPtr<UMaterialInstanceDynamic> ActiveStatusOverlayMID;
-
-    UPROPERTY()
-    TObjectPtr<UMaterialInterface> ActiveStatusOverlaySourceMaterial;
+	FDelegateHandle MoveSpeedDelegateHandle;
+	FDelegateHandle HealthDelegateHandle;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Combat", meta=(ClampMin="0.0"))
     float CombatEngagedDuration = 3.f;
@@ -187,12 +175,7 @@ protected:
     UPROPERTY(ReplicatedUsing=OnRep_IsInCombat, BlueprintReadOnly, Category="LastFPS|Combat")
     bool bIsInCombat = false;
 
-    FTimerHandle StatusOverlayMixInterpolationTimerHandle;
-    FTimerHandle CombatEngagedTimerHandle;
-    FName ActiveStatusOverlayMixParameterName = NAME_None;
-    float ActiveStatusOverlayMixValue = 0.f;
-    float TargetStatusOverlayMixValue = 0.f;
-    float ActiveStatusOverlayMixInterpSpeed = 0.f;
+	FTimerHandle CombatEngagedTimerHandle;
 
 private:
     UFUNCTION()

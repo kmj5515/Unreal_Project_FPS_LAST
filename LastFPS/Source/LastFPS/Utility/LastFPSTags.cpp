@@ -4,11 +4,13 @@ namespace LastFPSGameplayTags
 {
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Character_State_Dead, "Character.State.Dead", "Character is dead")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Character_State_Crouched, "Character.State.Crouched", "Character is crouching")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Character_State_Sprinting, "Character.State.Sprinting", "캐릭터가 달리는 상태")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_AuraDamageCooldown, "Status.AuraDamageCooldown", "오라 데미지 재적용 대기 상태")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Freeze, "Status.Freeze", "빙결 상태")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_FreezeStack, "Status.FreezeStack", "빙결 누적 상태")
 
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Movement_Slow, "Status.Movement.Slow", "이동 속도 감소 효과가 활성화된 상태")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Movement_SpeedBoost, "Status.Movement.SpeedBoost", "이동속도 증가 효과가 활성화된 상태")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_Dash, "Cooldown.Skill.Dash", "Dash cooldown")
