@@ -1,7 +1,0 @@
-[
-	{ "Name": "Shop_Rail_01",    "ItemName": "관통자 레일건",   "Description": "단발 고관통 레일건. 장갑을 무시하고 꿰뚫는다.",      "Icon": "", "Rarity": "Legendary", "Price": 5000, "GrantItemRowId": "Wpn_Rail_01" },
-	{ "Name": "Shop_Bastion_01", "ItemName": "철벽 프로토콜",     "Description": "전설급 방어 시스템. 방어력과 체력을 대폭 강화.",    "Icon": "", "Rarity": "Legendary", "Price": 4000, "GrantItemRowId": "Mod_Bastion_01" },
-	{ "Name": "Shop_Berserk_01", "ItemName": "광폭 회로",         "Description": "방어 한계를 풀어 공격력을 폭증시키나 체력을 깎는다.", "Icon": "", "Rarity": "Epic",      "Price": 2500, "GrantItemRowId": "Mod_Berserk_01" },
-	{ "Name": "Shop_Swift_01",   "ItemName": "질풍 모듈",         "Description": "경량화 구동계. 이동 속도와 스태미나를 함께 강화.",   "Icon": "", "Rarity": "Rare",      "Price": 1500, "GrantItemRowId": "Mod_Swift_01" },
-	{ "Name": "Shop_Endure_01",  "ItemName": "지구력 코어",       "Description": "에너지 순환을 개선해 최대 스태미나를 늘린다.",       "Icon": "", "Rarity": "Common",    "Price": 800,  "GrantItemRowId": "Mod_Endure_01" }
-]

@@ -1,0 +1,6 @@
+﻿Name,ItemName,Description,Icon,Rarity,Price,GrantItemRowId
+Shop_Rail_01,관통자 레일건,단발 고관통 레일건. 장갑을 무시하고 꿰뚫는다.,,Legendary,5000,Wpn_Rail_01
+Shop_Bastion_01,철벽 프로토콜,전설급 방어 시스템. 방어력과 체력을 대폭 강화.,,Legendary,4000,Mod_Bastion_01
+Shop_Berserk_01,광폭 회로,방어 한계를 풀어 공격력을 폭증시키나 체력을 깎는다.,,Epic,2500,Mod_Berserk_01
+Shop_Swift_01,질풍 모듈,경량화 구동계. 이동 속도와 스태미나를 함께 강화.,,Rare,1500,Mod_Swift_01
+Shop_Endure_01,지구력 코어,에너지 순환을 개선해 최대 스태미나를 늘린다.,,Common,800,Mod_Endure_01
