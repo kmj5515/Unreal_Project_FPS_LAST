@@ -52,12 +52,8 @@ void UBTService_UpdateCombatTarget::TickNode(UBehaviorTreeComponent& OwnerComp, 
 	}
 
 	const ULastFPSAIProfile* Profile = Enemy->GetAIProfile();
-	// 공격 사거리는 AttributeSet(GE·스탯으로 세팅)에서. 미설정(0)이면 프로파일로 폴백.
-	float AttackRange = Enemy->GetAttackRange();
-	if (AttackRange <= 0.f)
-	{
-		AttackRange = Profile ? Profile->AttackRange : 200.f;
-	}
+	// 공격 사거리는 CharacterStatData로 초기화되고 GE로 변경되는 AttributeSet 값만 사용한다.
+	const float AttackRange = Enemy->GetAttackRange();
 	const float LoseRange = Profile
 		? ((Profile->LoseSightRange > Profile->DetectionRange) ? Profile->LoseSightRange : Profile->DetectionRange)
 		: 1600.f;

@@ -77,17 +77,17 @@ Selector  [Service: Update Combat Target]
 
 ---
 
-## 5. AIProfile 값 (원거리 적 예시)
+## 5. 원거리 적 설정 예시
 
-| 필드 | 예시값 |
-|------|--------|
-| DetectionRange | 1600 |
-| LoseSightRange | 2000 |
-| AttackRange | 1200 |
-| **KeepDistance** | 600 |
-| ReactionDelay | 1.0 |
-| bCanAttack | ✔ |
-| AttackAbilityTag | `Ability.Enemy.Shoot` |
+| 데이터 에셋 | 필드 | 예시값 |
+|-------------|------|--------|
+| CharacterStatData | AttackRange | 1200 |
+| AIProfile | DetectionRange | 1600 |
+| AIProfile | LoseSightRange | 2000 |
+| AIProfile | **KeepDistance** | 600 |
+| AIProfile | ReactionDelay | 1.0 |
+| AIProfile | bCanAttack | ✔ |
+| AIProfile | AttackAbilityTag | `Ability.Enemy.Shoot` |
 
 `KeepDistance(600) < AttackRange(1200)`이라, 플레이어가 600 안으로 들어오면 빠지고, 600~1200 사이에서 사격하는 원거리 카이터가 된다.
 

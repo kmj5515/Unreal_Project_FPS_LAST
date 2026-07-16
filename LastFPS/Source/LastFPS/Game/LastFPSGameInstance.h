@@ -72,6 +72,7 @@ protected:
     void ClearPendingTravelPresentation();
 
     void HandlePostLoadMap(UWorld* LoadedWorld);
+    void HandleLoadingFinished(bool bSucceeded);
 
     UPROPERTY(Config, EditAnywhere, Category="LastFPS|Travel")
     FString MainMenuMap = TEXT("/Game/Maps/Test/MainMenuMap");
@@ -80,7 +81,7 @@ protected:
     FString CharacterSelectMap = TEXT("/Game/Maps/Test/CharacterSelectMap");
 
     UPROPERTY(Config, EditAnywhere, Category="LastFPS|Travel")
-    FString HubMap = TEXT("/Game/Maps/Test/HubMap");
+    FString HubMap = TEXT("/Game/Maps/IngameMap/HubMap_New");
 
     /** 캐릭터 로스터 에셋 경로 — DefaultGame.ini의 [/Script/LastFPS.LastFPSGameInstance] 에서 지정 */
     UPROPERTY(Config, EditAnywhere, Category="LastFPS|Character")
@@ -110,4 +111,5 @@ private:
     FText PendingTravelMapNameText;
 
     FDelegateHandle PostLoadMapDelegateHandle;
+    FDelegateHandle LoadingFinishedDelegateHandle;
 };

@@ -54,6 +54,45 @@ namespace
 		}
 	}
 
+	// 스폰 지점 로컬 축 기준의 배치 오프셋을 계산한다(중앙 정렬).
+	// X=전방(세로/행), Y=우측(가로/열). 반환값은 로컬 오프셋이며 스폰 회전으로 회전시켜 사용한다.
+	FVector ComputeFormationLocalOffset(const FLastFPSBattleScenarioMonsterEntry& Monster, int32 Index, int32 Count)
+	{
+		const float Spacing = FMath::Max(Monster.FormationSpacing, 0.f);
+		if (Spacing <= 0.f || Count <= 1)
+		{
+			return FVector::ZeroVector;
+		}
+
+		// 대칭 중앙 정렬용 오프셋(예: 3개면 -1,0,+1). N개를 (N-1)/2 만큼 당긴다.
+		auto CenteredStep = [Spacing](int32 SlotIndex, int32 SlotCount)
+		{
+			return (static_cast<float>(SlotIndex) - static_cast<float>(SlotCount - 1) * 0.5f) * Spacing;
+		};
+
+		switch (Monster.Formation)
+		{
+		case ELastFPSBattleFormation::Vertical:
+			// 앞뒤 일렬(전방 축).
+			return FVector(CenteredStep(Index, Count), 0.f, 0.f);
+
+		case ELastFPSBattleFormation::Grid:
+		{
+			const int32 Columns = FMath::Max(Monster.GridColumns, 1);
+			const int32 Rows = FMath::DivideAndRoundUp(Count, Columns);
+			const int32 Row = Index / Columns;
+			const int32 Column = Index % Columns;
+			// 행 = 전방(X), 열 = 우측(Y). 둘 다 중앙 정렬.
+			return FVector(CenteredStep(Row, Rows), CenteredStep(Column, Columns), 0.f);
+		}
+
+		case ELastFPSBattleFormation::Horizontal:
+		default:
+			// 좌우 일렬(우측 축).
+			return FVector(0.f, CenteredStep(Index, Count), 0.f);
+		}
+	}
+
 	bool SpawnScenarioMonster(UWorld& World, const FLastFPSBattleScenarioMonsterEntry& Monster, const FTransform& SpawnTransform)
 	{
 		ULastFPSCharacterDefinition* Definition = Monster.MonsterDefinition.LoadSynchronous();
@@ -164,7 +203,10 @@ namespace
 			for (int32 SpawnIndex = 0; SpawnIndex < Count; ++SpawnIndex)
 			{
 				FTransform SpawnTransform = SpawnTransforms[SpawnIndex % SpawnTransforms.Num()];
-				SpawnTransform.AddToTranslation(FVector(0.f, SpawnIndex * 120.f, 0.f));
+
+				// 배치 오프셋은 스폰 지점의 방향을 따르도록 로컬 → 월드로 회전시켜 적용한다.
+				const FVector LocalOffset = ComputeFormationLocalOffset(Monster, SpawnIndex, Count);
+				SpawnTransform.AddToTranslation(SpawnTransform.GetRotation().RotateVector(LocalOffset));
 
 				if (SpawnScenarioMonster(PlayWorld, Monster, SpawnTransform))
 				{

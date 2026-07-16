@@ -1,10 +1,10 @@
 #include "Character/AI/BTTask_ChaseTarget.h"
 
 #include "Character/AI/LastFPSEnemyBlackboardKeys.h"
-#include "Character/LastFPSAIProfile.h"
 #include "Character/LastFPSEnemyCharacter.h"
 
 #include "AIController.h"
+#include "AITypes.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -43,15 +43,32 @@ bool UBTTask_ChaseTarget::GetTargetDistance(UBehaviorTreeComponent& OwnerComp, f
 		return false;
 	}
 
-	// 공격 사거리는 AttributeSet 에서(원거리/근접 구분). 미설정(0)이면 프로파일로 폴백.
+	// 공격 사거리는 GE로 변경될 수 있는 전투 스탯이므로 AttributeSet만 사용한다.
 	OutAttackRange = Enemy->GetAttackRange();
-	if (OutAttackRange <= 0.f)
-	{
-		const ULastFPSAIProfile* Profile = Enemy->GetAIProfile();
-		OutAttackRange = Profile ? Profile->AttackRange : 200.f;
-	}
 	OutDistance = FVector::Dist(Enemy->GetActorLocation(), OutTarget->GetActorLocation());
 	return true;
+}
+
+EPathFollowingRequestResult::Type UBTTask_ChaseTarget::RequestChaseMove(
+	AAIController& AIController,
+	AActor& Target,
+	const float AcceptanceRadius) const
+{
+	FAIMoveRequest MoveRequest(&Target);
+	MoveRequest.SetAcceptanceRadius(FMath::Max(AcceptanceRadius, 0.f));
+	MoveRequest.SetUsePathfinding(true);
+	MoveRequest.SetAllowPartialPath(true);
+	MoveRequest.SetCanStrafe(true);
+	MoveRequest.SetNavigationFilter(AIController.GetDefaultNavigationFilterClass());
+	MoveRequest.SetReachTestIncludesAgentRadius(bReachTestIncludesAgentRadius);
+	MoveRequest.SetReachTestIncludesGoalRadius(bReachTestIncludesGoalRadius);
+
+	if (AIController.GetMoveStatus() != EPathFollowingStatus::Idle)
+	{
+		AIController.StopMovement();
+	}
+
+	return AIController.MoveTo(MoveRequest).Code;
 }
 
 EBTNodeResult::Type UBTTask_ChaseTarget::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* /*NodeMemory*/)
@@ -76,8 +93,19 @@ EBTNodeResult::Type UBTTask_ChaseTarget::ExecuteTask(UBehaviorTreeComponent& Own
 	}
 
 	// 시야가 있으면 사거리 살짝 안쪽까지, 없으면 더 바짝 붙어 장애물을 우회한다.
-	const float Acceptance = bHasLoS ? AttackRange * 0.9f : 60.f;
-	AICon->MoveToActor(Target, Acceptance, /*bStopOnOverlap*/ true, /*bUsePathfinding*/ true);
+	const float Acceptance = bHasLoS
+		? AttackRange * AttackRangeAcceptanceScale
+		: NoLineOfSightAcceptanceRadius;
+	const EPathFollowingRequestResult::Type MoveResult = RequestChaseMove(*AICon, *Target, Acceptance);
+	if (MoveResult == EPathFollowingRequestResult::Failed)
+	{
+		AICon->ClearFocus(EAIFocusPriority::Gameplay);
+		return EBTNodeResult::Failed;
+	}
+	if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
+	{
+		return EBTNodeResult::Succeeded;
+	}
 	return EBTNodeResult::InProgress;
 }
 
@@ -115,7 +143,18 @@ void UBTTask_ChaseTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 	// 시야가 막혔으면 사거리 안이어도 더 접근해 시야를 확보한다.
 	if (AICon->GetMoveStatus() == EPathFollowingStatus::Idle)
 	{
-		const float Acceptance = bHasLoS ? AttackRange * 0.9f : 60.f;
-		AICon->MoveToActor(Target, Acceptance, true, true);
+		const float Acceptance = bHasLoS
+			? AttackRange * AttackRangeAcceptanceScale
+			: NoLineOfSightAcceptanceRadius;
+		const EPathFollowingRequestResult::Type MoveResult = RequestChaseMove(*AICon, *Target, Acceptance);
+		if (MoveResult == EPathFollowingRequestResult::Failed)
+		{
+			AICon->ClearFocus(EAIFocusPriority::Gameplay);
+			FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+		}
+		else if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
+		{
+			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+		}
 	}
 }

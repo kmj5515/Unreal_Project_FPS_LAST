@@ -25,6 +25,7 @@
 #include "Engine/World.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
 #include "Data/Definitions/LastFPSCharacterRoster.h"
+#include "Game/Loading/LastFPSLoadingProcessSubsystem.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSGameModeBase.h"
 #include "Game/LastFPSPlayerState.h"
@@ -94,6 +95,15 @@ void ALastFPSPlayerController::BeginPlay()
     TryBindMenuLayerInputSync();
 
     OnSelectedCharacterIndexChanged(SelectedCharacterIndex);
+
+    UGameInstance* GameInstance = GetGameInstance();
+    if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GameInstance
+        ? GameInstance->GetSubsystem<ULastFPSLoadingProcessSubsystem>()
+        : nullptr)
+    {
+        LoadingProcesses->NotifyLocalPlayerControllerReady(this);
+    }
+    TryNotifyLocalPawnReady();
 }
 
 void ALastFPSPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -103,9 +113,55 @@ void ALastFPSPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
         World->GetTimerManager().ClearTimer(InitialScreenRetryTimerHandle);
         World->GetTimerManager().ClearTimer(HUDPushRetryTimerHandle);
         World->GetTimerManager().ClearTimer(MenuLayerSyncBindRetryTimerHandle);
+        World->GetTimerManager().ClearTimer(LocalPawnReadyRetryTimerHandle);
     }
 
     Super::EndPlay(EndPlayReason);
+}
+
+void ALastFPSPlayerController::SetPawn(APawn* InPawn)
+{
+    Super::SetPawn(InPawn);
+    TryNotifyLocalPawnReady();
+}
+
+void ALastFPSPlayerController::TryNotifyLocalPawnReady()
+{
+    if (!IsLocalController())
+    {
+        return;
+    }
+
+    UGameInstance* GameInstance = GetGameInstance();
+    ULastFPSLoadingProcessSubsystem* LoadingProcesses = GameInstance
+        ? GameInstance->GetSubsystem<ULastFPSLoadingProcessSubsystem>()
+        : nullptr;
+    if (!LoadingProcesses || !LoadingProcesses->IsWaitingForLocalPlayerPawn())
+    {
+        return;
+    }
+
+    APawn* CurrentPawn = GetPawn();
+    if (!IsValid(CurrentPawn))
+    {
+        return;
+    }
+
+    if (CurrentPawn->GetController() == this && CurrentPawn->HasActorBegunPlay())
+    {
+        LoadingProcesses->NotifyLocalPlayerPawnReady(this);
+        return;
+    }
+
+    if (UWorld* World = GetWorld();
+        World && !World->GetTimerManager().IsTimerActive(LocalPawnReadyRetryTimerHandle))
+    {
+        LocalPawnReadyRetryTimerHandle = World->GetTimerManager().SetTimerForNextTick(
+            FTimerDelegate::CreateWeakLambda(this, [this]()
+            {
+                TryNotifyLocalPawnReady();
+            }));
+    }
 }
 
 // ── UI 진입점 (Subsystem에 위임) ─────────────────────────────────────
@@ -687,6 +743,14 @@ void ALastFPSPlayerController::ShowHitMarker()
     if (HUDWidget)
     {
         HUDWidget->ShowHitMarker();
+    }
+}
+
+void ALastFPSPlayerController::ShowDamageDirection(const FVector& DamageSourceDirection)
+{
+    if (HUDWidget)
+    {
+        HUDWidget->ShowDamageDirection(DamageSourceDirection);
     }
 }
 

@@ -44,7 +44,8 @@ struct FLastFPSStatusOverlayMaterial
 	int32 Priority = 0;
 };
 
-UCLASS(BlueprintType)
+/** 기존 Overlay Data Asset을 DT_StatusData로 옮기는 동안만 에셋을 열기 위해 유지한다. 마이그레이션 후 제거한다. */
+UCLASS(BlueprintType, meta=(DeprecatedNode, DeprecationMessage="DT_StatusData의 Overlay 필드를 사용하세요."))
 class LASTFPS_API ULastFPSStatusOverlayConfig : public UPrimaryDataAsset
 {
 	GENERATED_BODY()

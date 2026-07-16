@@ -313,14 +313,17 @@ private:
 
 	float PreviousActorYaw = 0.f;
 	FVector PreviousActorLocation = FVector::ZeroVector;
+	
 	bool bHasPreviousActorYaw = false;
 	bool bHasPreviousActorLocation = false;
 	bool bStartRequestConsumed = false;
 	bool bStopRequestConsumed = false;
 	float StartRequestRemainingTime = 0.f;
 	float StopRequestRemainingTime = 0.f;
+	
 	bool bHasLatchedStartCardinalDirection = false;
 	EMMCardinalDirection LatchedStartCardinalDirection = EMMCardinalDirection::Forward;
+	
 	bool bHasThreadSafeInputs = false;
 	bool bCachedIsMovingOnGround = false;
 	bool bCachedHasMovementComponent = false;
@@ -328,6 +331,7 @@ private:
 	bool bCachedIsFalling = false;
 	bool bCachedIsCrouching = false;
 	bool bCachedUseSeparateBrakingFriction = false;
+	
 	float CachedGroundFriction = 0.f;
 	float CachedBrakingFriction = 0.f;
 	float CachedBrakingFrictionFactor = 0.f;
@@ -335,6 +339,7 @@ private:
 	float CachedBrakingDecelerationWalking = 0.f;
 	float CachedMaxWalkSpeed = 0.f;
 	float CachedGravityZ = 0.f;
+	
 	FVector CachedActorLocation = FVector::ZeroVector;
 	FVector CachedActorForwardVector = FVector::ForwardVector;
 	FVector CachedVelocity = FVector::ZeroVector;

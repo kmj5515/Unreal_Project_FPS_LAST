@@ -69,7 +69,7 @@ void UGA_Sprint::ActivateAbility(
         FGameplayEffectSpecHandle Spec = MakeOutgoingGameplayEffectSpec(SprintSpeedEffect);
 		if (Spec.IsValid())
 		{
-			Spec.Data->DynamicGrantedTags.AddTag(LastFPSGameplayTags::Status_Movement_SpeedBoost);
+			Spec.Data->DynamicGrantedTags.AddTag(LastFPSGameplayTags::Character_State_Sprinting);
 		}
         SpeedEffectHandle = ApplyGameplayEffectSpecToOwner(Handle, ActorInfo, ActivationInfo, Spec);
     }

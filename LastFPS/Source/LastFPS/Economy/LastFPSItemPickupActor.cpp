@@ -13,6 +13,7 @@
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "Net/UnrealNetwork.h"
+#include "Utility/LastFPSCollisionChannels.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPickup, Log, All);
 
@@ -24,8 +25,7 @@ ALastFPSItemPickupActor::ALastFPSItemPickupActor()
 
     OverlapSphere = CreateDefaultSubobject<USphereComponent>(TEXT("OverlapSphere"));
     OverlapSphere->SetSphereRadius(PickupRadius);
-    OverlapSphere->SetCollisionProfileName(TEXT("Trigger"));
-    OverlapSphere->SetGenerateOverlapEvents(true);
+    LastFPSCollision::ConfigurePickupTriggerCollision(*OverlapSphere);
     OverlapSphere->OnComponentBeginOverlap.AddDynamic(this, &ALastFPSItemPickupActor::OnOverlapBegin);
     RootComponent = OverlapSphere;
 
@@ -110,6 +110,11 @@ void ALastFPSItemPickupActor::ApplyRarityVisual()
 void ALastFPSItemPickupActor::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (OverlapSphere)
+    {
+        LastFPSCollision::ConfigurePickupTriggerCollision(*OverlapSphere);
+    }
 
     // 서버/스탠드얼론: 스폰 시 RowId 가 이미 세팅됨. 순수 클라: OnRep_ItemRowId 가 도착 시 재적용.
     ApplyRarityVisual();

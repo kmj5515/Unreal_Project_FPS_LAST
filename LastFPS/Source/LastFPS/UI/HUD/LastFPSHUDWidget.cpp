@@ -1,6 +1,9 @@
 #include "UI/HUD/LastFPSHUDWidget.h"
+#include "UI/HUD/LastFPSDamageDirectionIndicatorWidget.h"
+#include "UI/HUD/LastFPSEnemyHealthBarWidget.h"
 #include "UI/LastFPSDamageNumberWidget.h"
 #include "UI/HUD/LastFPSSkillCooldownSlotWidget.h"
+#include "UI/HUD/LastFPSStatusEffectListWidget.h"
 #include "UI/HUD/LastFPSHUDStyle.h"
 #include "AbilitySystemComponent.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
@@ -14,6 +17,8 @@
 #include "PrimaryGameLayout.h"
 #include "Skills/LastFPSSkillDataSubsystem.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
+#include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
 
 void FLastFPSSmoothedGaugeDisplay::Initialize(float Current, float InMax)
 {
@@ -69,6 +74,8 @@ bool FLastFPSSmoothedGaugeDisplay::Tick(float DeltaTime, float FillDuration)
 #include "NativeGameplayTags.h"
 #include "TimerManager.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogLastFPSHUDWidget, Log, All);
+
 ULastFPSHUDWidget::ULastFPSHUDWidget(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
 {
@@ -78,6 +85,7 @@ ULastFPSHUDWidget::ULastFPSHUDWidget(const FObjectInitializer& ObjectInitializer
     StaminaFillColor         = LastFPSHUDStyle::StaminaFill();
     StaminaLowFillColor      = LastFPSHUDStyle::StaminaLowFill();
     DamageNumberWidgetClass  = ULastFPSDamageNumberWidget::StaticClass();
+    EnemyHealthBarSettings.WidgetClass = ULastFPSEnemyHealthBarWidget::StaticClass();
 }
 
 void ULastFPSHUDWidget::NativeConstruct()
@@ -135,6 +143,13 @@ void ULastFPSHUDWidget::NativeDestruct()
         World->GetTimerManager().ClearTimer(RetryTimerHandle);
     }
 
+    ClearDamageDirectionIndicators();
+    ClearEnemyHealthBars();
+    if (WBP_StatusEffectList)
+    {
+        WBP_StatusEffectList->UninitializeFromAbilitySystem();
+    }
+
     Super::NativeDestruct();
 }
 
@@ -175,6 +190,12 @@ void ULastFPSHUDWidget::HUDRefreshTick(const float DeltaTime)
 
     TickSmoothedGauges(DeltaTime);
     TickHitMarkerSpread(DeltaTime);
+    TickDamageDirectionIndicators(DeltaTime);
+    TickEnemyHealthBars(DeltaTime);
+    if (WBP_StatusEffectList)
+    {
+        WBP_StatusEffectList->UpdateRuntimeStates();
+    }
     TickCrosshairSpread(DeltaTime);
 }
 
@@ -361,6 +382,10 @@ bool ULastFPSHUDWidget::InitializeHUD()
     BroadcastStaminaDisplay();
 
     CachedASC = ASC;
+    if (WBP_StatusEffectList)
+    {
+        WBP_StatusEffectList->InitializeWithAbilitySystem(ASC);
+    }
     TryBindPawnComponents();
     return TryInitSkillSlots();
 }
@@ -391,6 +416,103 @@ void ULastFPSHUDWidget::HandleDamageDealt(
     bool bCriticalHit)
 {
     SpawnDamageNumber(DamageAmount, TotalDamageDealt, DamageWorldLocation, DamageTargetActor, bCriticalHit);
+    ShowEnemyHealthBar(DamageTargetActor, DamageAmount);
+}
+
+void ULastFPSHUDWidget::ShowEnemyHealthBar(AActor* DamageTargetActor, const float DamageAmount)
+{
+    ALastFPSCharacterBase* Enemy = Cast<ALastFPSCharacterBase>(DamageTargetActor);
+    APlayerController* PC = GetOwningPlayer();
+    if (!Enemy || Enemy->IsPlayerControlled() || !PC || !EnemyHealthBarSettings.WidgetClass)
+    {
+        return;
+    }
+
+    if (!Enemy->IsAlive())
+    {
+        for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+        {
+            if (Widget && Widget->IsTrackingEnemy(Enemy))
+            {
+                Widget->ReleaseFromEnemy();
+                break;
+            }
+        }
+        return;
+    }
+
+    for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+    {
+        if (Widget && Widget->IsTrackingEnemy(Enemy))
+        {
+            Widget->RefreshDisplayDuration(EnemyHealthBarSettings.DisplayDuration);
+            Widget->NotifyDamage(DamageAmount, EnemyHealthBarSettings);
+            return;
+        }
+    }
+
+    ULastFPSEnemyHealthBarWidget* SelectedWidget = nullptr;
+    for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+    {
+        if (Widget && Widget->IsAvailable())
+        {
+            SelectedWidget = Widget;
+            break;
+        }
+    }
+
+    const int32 MaxActiveBars = FMath::Max(EnemyHealthBarSettings.MaxActiveBars, 1);
+    if (!SelectedWidget && EnemyHealthBarPool.Num() < MaxActiveBars)
+    {
+        SelectedWidget = CreateWidget<ULastFPSEnemyHealthBarWidget>(
+            PC, EnemyHealthBarSettings.WidgetClass);
+        if (SelectedWidget)
+        {
+            SelectedWidget->AddToViewport(EnemyHealthBarSettings.ViewportZOrder);
+            EnemyHealthBarPool.Add(SelectedWidget);
+        }
+    }
+
+    if (!SelectedWidget)
+    {
+        for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+        {
+            if (Widget && (!SelectedWidget
+                || Widget->GetRemainingDisplayTime() < SelectedWidget->GetRemainingDisplayTime()))
+            {
+                SelectedWidget = Widget;
+            }
+        }
+    }
+
+    if (SelectedWidget)
+    {
+        SelectedWidget->InitializeForEnemy(Enemy, EnemyHealthBarSettings, DamageAmount);
+    }
+}
+
+void ULastFPSHUDWidget::TickEnemyHealthBars(const float DeltaTime)
+{
+    for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+    {
+        if (Widget && !Widget->IsAvailable())
+        {
+            Widget->UpdateTrackedEnemy(DeltaTime, EnemyHealthBarSettings);
+        }
+    }
+}
+
+void ULastFPSHUDWidget::ClearEnemyHealthBars()
+{
+    for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+    {
+        if (Widget)
+        {
+            Widget->ReleaseFromEnemy();
+            Widget->RemoveFromParent();
+        }
+    }
+    EnemyHealthBarPool.Reset();
 }
 
 void ULastFPSHUDWidget::TickSmoothedGauges(float DeltaTime)
@@ -447,6 +569,116 @@ void ULastFPSHUDWidget::SetHitMarkerSpread(float Spread)
     {
         Material->SetScalarParameterValue(HitMarkerSpreadParameterName, Spread);
     }
+}
+
+void ULastFPSHUDWidget::ShowDamageDirection(const FVector& DamageSourceDirection)
+{
+    APlayerController* OwningPlayer = GetOwningPlayer();
+    if (!DamageDirectionIndicatorLayer || !DamageDirectionIndicatorWidgetClass || !OwningPlayer)
+    {
+        if (!bDamageDirectionConfigurationWarningLogged)
+        {
+            UE_LOG(
+                LogLastFPSHUDWidget,
+                Warning,
+                TEXT("HUD '%s'에서 공격 방향 위젯을 생성하지 못했습니다: Layer=%s, WidgetClass=%s, OwningPlayer=%s"),
+                *GetNameSafe(this),
+                *GetNameSafe(DamageDirectionIndicatorLayer.Get()),
+                *GetNameSafe(DamageDirectionIndicatorWidgetClass.Get()),
+                *GetNameSafe(OwningPlayer));
+            bDamageDirectionConfigurationWarningLogged = true;
+        }
+        return;
+    }
+
+    const int32 IndicatorLimit = FMath::Max(MaxDamageDirectionIndicators, 1);
+    while (ActiveDamageDirectionIndicators.Num() >= IndicatorLimit)
+    {
+        if (ULastFPSDamageDirectionIndicatorWidget* OldestIndicator = ActiveDamageDirectionIndicators[0])
+        {
+            OldestIndicator->RemoveFromParent();
+        }
+        ActiveDamageDirectionIndicators.RemoveAt(0);
+    }
+
+    ULastFPSDamageDirectionIndicatorWidget* Indicator = CreateWidget<ULastFPSDamageDirectionIndicatorWidget>(
+        OwningPlayer,
+        DamageDirectionIndicatorWidgetClass);
+    if (!Indicator)
+    {
+        UE_LOG(
+            LogLastFPSHUDWidget,
+            Warning,
+            TEXT("HUD '%s'에서 공격 방향 위젯 클래스 '%s'의 인스턴스를 만들지 못했습니다."),
+            *GetNameSafe(this),
+            *GetNameSafe(DamageDirectionIndicatorWidgetClass.Get()));
+        return;
+    }
+
+    UOverlaySlot* IndicatorSlot = DamageDirectionIndicatorLayer->AddChildToOverlay(Indicator);
+    if (!IndicatorSlot)
+    {
+        UE_LOG(
+            LogLastFPSHUDWidget,
+            Warning,
+            TEXT("HUD '%s'의 공격 방향 레이어 '%s'에 위젯을 추가하지 못했습니다."),
+            *GetNameSafe(this),
+            *GetNameSafe(DamageDirectionIndicatorLayer.Get()));
+        Indicator->RemoveFromParent();
+        return;
+    }
+
+    IndicatorSlot->SetHorizontalAlignment(HAlign_Fill);
+    IndicatorSlot->SetVerticalAlignment(VAlign_Fill);
+    if (!Indicator->InitializeDamageDirection(DamageSourceDirection))
+    {
+        Indicator->RemoveFromParent();
+        return;
+    }
+
+    Indicator->AdvanceIndicator(0.f, OwningPlayer->GetControlRotation());
+    ActiveDamageDirectionIndicators.Add(Indicator);
+}
+
+void ULastFPSHUDWidget::TickDamageDirectionIndicators(const float DeltaTime)
+{
+    if (ActiveDamageDirectionIndicators.IsEmpty())
+    {
+        return;
+    }
+
+    const APlayerController* OwningPlayer = GetOwningPlayer();
+    if (!OwningPlayer)
+    {
+        ClearDamageDirectionIndicators();
+        return;
+    }
+
+    const FRotator ViewRotation = OwningPlayer->GetControlRotation();
+    for (int32 Index = ActiveDamageDirectionIndicators.Num() - 1; Index >= 0; --Index)
+    {
+        ULastFPSDamageDirectionIndicatorWidget* Indicator = ActiveDamageDirectionIndicators[Index];
+        if (!IsValid(Indicator) || !Indicator->AdvanceIndicator(DeltaTime, ViewRotation))
+        {
+            if (IsValid(Indicator))
+            {
+                Indicator->RemoveFromParent();
+            }
+            ActiveDamageDirectionIndicators.RemoveAt(Index);
+        }
+    }
+}
+
+void ULastFPSHUDWidget::ClearDamageDirectionIndicators()
+{
+    for (ULastFPSDamageDirectionIndicatorWidget* Indicator : ActiveDamageDirectionIndicators)
+    {
+        if (IsValid(Indicator))
+        {
+            Indicator->RemoveFromParent();
+        }
+    }
+    ActiveDamageDirectionIndicators.Reset();
 }
 
 void ULastFPSHUDWidget::InitializeCrosshairMaterial()

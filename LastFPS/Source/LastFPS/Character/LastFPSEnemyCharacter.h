@@ -43,6 +43,7 @@ public:
     const ULastFPSAIProfile* GetAIProfile() const;
 
 protected:
+    virtual void PostInitializeComponents() override;
     virtual void BeginPlay() override;
     virtual void PossessedBy(AController* NewController) override;
     virtual void UpdateAliveCollisionState(bool bAlive) override;
@@ -77,9 +78,25 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Enemy|Death", meta=(ClampMin="0.1", Units="s"))
     float DeathRemovalDelay = 5.f;
 
+    /** 사망 시 마지막 공격자로부터 멀어지는 방향으로 적용할 속도 변화량이다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Enemy|Death|Ragdoll", meta=(ClampMin="0.0", Units="cm/s"))
+    float DeathRagdollImpulseVelocity = 400.f;
+
+    /** 사망 Impulse에 추가할 위쪽 속도 변화량이다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Enemy|Death|Ragdoll", meta=(ClampMin="0.0", Units="cm/s"))
+    float DeathRagdollUpwardVelocity = 150.f;
+
+    /** None이면 전체 Physics Body에 적용하고, 지정하면 해당 Bone과 하위 Body에 적용한다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Enemy|Death|Ragdoll")
+    FName DeathRagdollImpulseBoneName = NAME_None;
+
 private:
+    void ApplyAIControllerClassFromProfile();
     void HandleOwnDeath(ALastFPSCharacterBase* DeadChar);
     void StartDeathRagdoll();
+
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_ApplyDeathRagdollImpulse(FVector_NetQuantizeNormal ImpulseDirection);
 
     // DropTable 에서 가중치로 RowId 1개 추첨. TotalWeight 는 유효 항목 가중치 합. 실패 시 NAME_None.
     FName PickWeightedDropRowId(float TotalWeight) const;

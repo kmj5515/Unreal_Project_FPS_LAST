@@ -303,9 +303,13 @@ void SLastFPSBattleLevelTool::RefreshMonsterDraftList()
 				[
 					SNew(STextBlock)
 					.Text(FText::Format(
-						LOCTEXT("DraftMonsterMeta", "{0} · 스케일 {1}"),
+						LOCTEXT("DraftMonsterMeta", "{0} · 스케일 {1} · 배치 {2} · {3}cm"),
 						FText::FromName(Monster.SpawnTag),
-						FText::AsNumber(Monster.LevelScale)))
+						FText::AsNumber(Monster.LevelScale),
+						Monster.Formation == ELastFPSBattleFormation::Grid
+							? FText::Format(LOCTEXT("DraftMonsterGridFmt", "격자({0}열)"), FText::AsNumber(FMath::Max(Monster.GridColumns, 1)))
+							: GetFormationLabel(Monster.Formation),
+						FText::AsNumber(Monster.FormationSpacing)))
 					.ColorAndOpacity(LastFPSEditorWidgets::GetToolMutedTextColor())
 				]
 
@@ -493,6 +497,9 @@ FReply SLastFPSBattleLevelTool::AddMonsterClicked()
 	MonsterEntry.Count = FMath::Max(PendingMonsterCount, 1);
 	MonsterEntry.SpawnTag = PendingMonsterSpawnTag.IsNone() ? FName(TEXT("EnemySpawn")) : PendingMonsterSpawnTag;
 	MonsterEntry.LevelScale = FMath::Max(PendingMonsterLevelScale, 0.01f);
+	MonsterEntry.Formation = PendingMonsterFormation;
+	MonsterEntry.FormationSpacing = FMath::Max(PendingMonsterFormationSpacing, 0.f);
+	MonsterEntry.GridColumns = FMath::Max(PendingMonsterGridColumns, 1);
 
 	DraftMonsters.Add(MonsterEntry);
 	RefreshMonsterDraftList();
@@ -804,6 +811,14 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildScenarioEditor()
 				])
 		]
 
+		// 배치 방식 선택: 가로/세로/격자 + 간격/열. 추가 시 몬스터 항목에 반영된다.
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0.f, 6.f, 0.f, 0.f)
+		[
+			BuildFormationSelector()
+		]
+
 		// 스폰 목록 헤더: 현재 개수와 전체 비우기 액션.
 		+ SVerticalBox::Slot()
 		.AutoHeight()
@@ -874,6 +889,89 @@ TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildScenarioEditor()
 			]
 		]
 	);
+}
+
+TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildFormationSelector()
+{
+	// 배치 방식 토글 버튼. 활성 항목은 강조색 라벨로 표시된다.
+	auto MakeFormationButton = [this](ELastFPSBattleFormation Formation)
+	{
+		return SNew(SButton)
+			.ButtonStyle(&LastFPSEditorWidgets::GetToolButtonStyle())
+			.OnClicked(this, &SLastFPSBattleLevelTool::SetPendingFormationClicked, Formation)
+			[
+				SNew(STextBlock)
+				.Text(GetFormationLabel(Formation))
+				.ColorAndOpacity_Lambda([this, Formation]()
+				{
+					return FSlateColor(PendingMonsterFormation == Formation
+						? LastFPSEditorWidgets::GetToolAccentColor()
+						: LastFPSEditorWidgets::GetToolMutedTextColor());
+				})
+			];
+	};
+
+	return LastFPSEditorWidgets::MakeRowBox(
+		SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		.VAlign(VAlign_Center)
+		.Padding(0.f, 0.f, 10.f, 0.f)
+		[
+			SNew(STextBlock)
+			.Text(LOCTEXT("FormationLabel", "배치"))
+			.ColorAndOpacity(LastFPSEditorWidgets::GetToolTextColor())
+		]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 4.f, 0.f)
+		[ MakeFormationButton(ELastFPSBattleFormation::Horizontal) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 4.f, 0.f)
+		[ MakeFormationButton(ELastFPSBattleFormation::Vertical) ]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 14.f, 0.f)
+		[ MakeFormationButton(ELastFPSBattleFormation::Grid) ]
+
+		+ SHorizontalBox::Slot()
+		.FillWidth(0.42f)
+		.Padding(0.f, 0.f, 6.f, 0.f)
+		[
+			MakeLabeledField(
+				LOCTEXT("FormationSpacingLabel", "간격(cm)"),
+				SNew(SSpinBox<float>)
+				.MinValue(0.f)
+				.MaxValue(2000.f)
+				.Value_Lambda([this]() { return PendingMonsterFormationSpacing; })
+				.OnValueChanged_Lambda([this](float NewValue) { PendingMonsterFormationSpacing = FMath::Max(NewValue, 0.f); }))
+		]
+		+ SHorizontalBox::Slot()
+		.FillWidth(0.30f)
+		[
+			MakeLabeledField(
+				LOCTEXT("FormationColumnsLabel", "열(격자)"),
+				SNew(SSpinBox<int32>)
+				.MinValue(1)
+				.MaxValue(50)
+				// 격자일 때만 의미가 있으므로 다른 배치에서는 비활성화한다.
+				.IsEnabled_Lambda([this]() { return PendingMonsterFormation == ELastFPSBattleFormation::Grid; })
+				.Value_Lambda([this]() { return PendingMonsterGridColumns; })
+				.OnValueChanged_Lambda([this](int32 NewValue) { PendingMonsterGridColumns = FMath::Max(NewValue, 1); }))
+		]
+	);
+}
+
+FReply SLastFPSBattleLevelTool::SetPendingFormationClicked(ELastFPSBattleFormation Formation)
+{
+	PendingMonsterFormation = Formation;
+	return FReply::Handled();
+}
+
+FText SLastFPSBattleLevelTool::GetFormationLabel(ELastFPSBattleFormation Formation) const
+{
+	switch (Formation)
+	{
+	case ELastFPSBattleFormation::Vertical: return LOCTEXT("FormationVertical", "세로");
+	case ELastFPSBattleFormation::Grid:     return LOCTEXT("FormationGrid", "격자");
+	case ELastFPSBattleFormation::Horizontal:
+	default:                                 return LOCTEXT("FormationHorizontal", "가로");
+	}
 }
 
 TSharedRef<SWidget> SLastFPSBattleLevelTool::BuildLevelRow(const FLastFPSBattleLevelInfo& BattleLevel)

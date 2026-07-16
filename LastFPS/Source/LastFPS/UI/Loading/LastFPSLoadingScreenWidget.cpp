@@ -1,5 +1,6 @@
 #include "UI/Loading/LastFPSLoadingScreenWidget.h"
 
+#include "Game/Loading/LastFPSLoadingProcessSubsystem.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Data/Tables/LastFPSLoadingTipData.h"
 
@@ -9,6 +10,8 @@
 #include "Engine/DataTable.h"
 #include "Engine/GameInstance.h"
 #include "Engine/Texture2D.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogLastFPSLoadingScreen, Log, All);
 
 void ULastFPSLoadingScreenWidget::SetStatusText(const FText& InText)
 {
@@ -32,10 +35,36 @@ void ULastFPSLoadingScreenWidget::NativeConstruct()
     RefreshFromGameInstance();
     ApplyRandomTip();
 
+    if (PB_Loading)
+    {
+        PB_Loading->SetPercent(0.0f);
+        PB_Loading->SetIsMarquee(true);
+    }
+    else
+    {
+        UE_LOG(LogLastFPSLoadingScreen, Warning,
+            TEXT("WBP_LoadingScreen에 이름이 PB_Loading인 Progress Bar가 없어 진행 표시를 바인딩하지 못했습니다."));
+    }
+
     if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
     {
         TravelPresentationChangedHandle = GI->OnTravelPresentationChanged.AddUObject(
             this, &ULastFPSLoadingScreenWidget::HandleTravelPresentationChanged);
+    }
+
+    if (UGameInstance* GameInstance = GetGameInstance())
+    {
+        if (ULastFPSLoadingProcessSubsystem* LoadingProcesses =
+            GameInstance->GetSubsystem<ULastFPSLoadingProcessSubsystem>())
+        {
+            LoadingProgressChangedHandle = LoadingProcesses->OnLoadingProgressChanged.AddUObject(
+                this, &ULastFPSLoadingScreenWidget::HandleLoadingProgressChanged);
+
+            if (LoadingProcesses->IsLoadingActive())
+            {
+                HandleLoadingProgressChanged(LoadingProcesses->GetOverallProgress(), FGameplayTag());
+            }
+        }
     }
 }
 
@@ -44,6 +73,15 @@ void ULastFPSLoadingScreenWidget::NativeDestruct()
     if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
     {
         GI->OnTravelPresentationChanged.Remove(TravelPresentationChangedHandle);
+    }
+
+    if (UGameInstance* GameInstance = GetGameInstance())
+    {
+        if (ULastFPSLoadingProcessSubsystem* LoadingProcesses =
+            GameInstance->GetSubsystem<ULastFPSLoadingProcessSubsystem>())
+        {
+            LoadingProcesses->OnLoadingProgressChanged.Remove(LoadingProgressChangedHandle);
+        }
     }
     Super::NativeDestruct();
 }
@@ -126,21 +164,15 @@ void ULastFPSLoadingScreenWidget::HandleTravelPresentationChanged(const FText& S
     OnLoadingScreenUpdated(StatusText, MapNameText);
 }
 
-void ULastFPSLoadingScreenWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+void ULastFPSLoadingScreenWidget::HandleLoadingProgressChanged(
+    const float OverallProgress,
+    FGameplayTag /*변경된 프로세스 태그*/)
 {
-    Super::NativeTick(MyGeometry, InDeltaTime);
-
-    if (!PB_Loading || IndeterminateCycleSeconds <= KINDA_SMALL_NUMBER)
+    if (!PB_Loading)
     {
         return;
     }
 
-    IndeterminatePhase += InDeltaTime / IndeterminateCycleSeconds;
-    if (IndeterminatePhase > 1.0f)
-    {
-        IndeterminatePhase = FMath::Fmod(IndeterminatePhase, 1.0f);
-    }
-
-    const float PingPong = 0.5f - 0.5f * FMath::Cos(IndeterminatePhase * 2.0f * PI);
-    PB_Loading->SetPercent(PingPong);
+    PB_Loading->SetIsMarquee(false);
+    PB_Loading->SetPercent(FMath::Clamp(OverallProgress, 0.0f, 1.0f));
 }
