@@ -11,28 +11,6 @@
 
 namespace
 {
-ALastFPSPlayerState* ResolveInstigatorPlayerState(const FGameplayEffectModCallbackData& Data)
-{
-    const FGameplayEffectContextHandle& Ctx = Data.EffectSpec.GetEffectContext();
-    if (APawn* PawnInstigator = Cast<APawn>(Ctx.GetInstigator()))
-    {
-        if (ALastFPSPlayerState* PS = PawnInstigator->GetPlayerState<ALastFPSPlayerState>())
-        {
-            return PS;
-        }
-    }
-
-    if (AActor* Causer = Ctx.GetEffectCauser())
-    {
-        if (APawn* PawnCauser = Cast<APawn>(Causer))
-        {
-            return PawnCauser->GetPlayerState<ALastFPSPlayerState>();
-        }
-    }
-
-    return nullptr;
-}
-
 ALastFPSCharacterBase* ResolvePlayerStateCharacter(const ALastFPSPlayerState* PlayerState)
 {
     return PlayerState ? Cast<ALastFPSCharacterBase>(PlayerState->GetPawn()) : nullptr;
@@ -78,6 +56,17 @@ AActor* ResolveDamageSourceActor(const FGameplayEffectModCallbackData& Data)
         return Candidate;
     }
 
+    return nullptr;
+}
+
+// 데미지 컨텍스트의 instigator 가 PlayerState/Controller/Pawn 어느 형태든 공격자 Pawn 으로 정규화한 뒤
+// 그 Pawn 의 PlayerState 를 반환한다. (ASC 가 PlayerState 소유라 컨텍스트 instigator 가 Pawn 이 아닐 수 있음)
+ALastFPSPlayerState* ResolveInstigatorPlayerState(const FGameplayEffectModCallbackData& Data)
+{
+    if (const APawn* SourcePawn = Cast<APawn>(ResolveDamageSourceActor(Data)))
+    {
+        return SourcePawn->GetPlayerState<ALastFPSPlayerState>();
+    }
     return nullptr;
 }
 }
@@ -234,7 +223,8 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
         AttackerPS->Auth_AddDamageDealt(ActualDamage, DamageWorldLocation, TargetChar, bCriticalHit);
     }
 
-    // HP가 0에 도달하면 사망 훅 1회 호출 (PlayerState 유무와 무관 — 드랍/미션 등 구독자에게 브로드캐스트)
+    // HP가 0에 도달하면 사망 훅 1회 호출 (PlayerState 유무와 무관 — 드랍/미션/퀘스트 등 구독자에게 브로드캐스트).
+    // 처치 목표(KillTarget) 통지도 HandleDeath 내부에서 GameInstance 퀘스트 서브시스템으로 직접 나간다.
     if (TargetChar && NewHealth <= KINDA_SMALL_NUMBER && ActualDamage > 0.f)
         TargetChar->HandleDeath();
 
@@ -250,16 +240,6 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
     if (AttackerPS && AttackerPS != VictimPS)
     {
         AttackerPS->Auth_AddKill();
-
-        // 처치 목표(KillTarget) 진행 — 피격자 종류 태그를 가해자 소유 클라 퀘스트에 통지.
-        if (TargetChar)
-        {
-            const FGameplayTag KillTag = TargetChar->GetQuestKillTag();
-            if (KillTag.IsValid())
-            {
-                AttackerPS->Auth_NotifyQuestKill(KillTag);
-            }
-        }
     }
 
     if (!TargetChar)

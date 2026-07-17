@@ -68,9 +68,6 @@ public:
     // 서버: 이 플레이어 소유 클라의 로컬 Economy 에 인게임 드랍 아이템 지급.
     void Auth_GrantItem(FName ItemRowId, int32 Count);
 
-    // 서버: 이 플레이어가 처치한 적의 종류 태그를 소유 클라의 로컬 퀘스트에 통지(KillTarget 진행).
-    void Auth_NotifyQuestKill(FGameplayTag EnemyTag);
-
 protected:
     UPROPERTY(Replicated, BlueprintReadOnly, Category="LastFPS|Stats")
     int32 StatKills = 0;
@@ -112,12 +109,6 @@ private:
     void Client_GrantItem(FName ItemRowId, int32 Count);
 
     void GrantItemLocal(FName ItemRowId, int32 Count);
-
-    // 퀘스트 진행 상태라 Reliable — 소유 클라의 로컬 퀘스트 서브시스템에 처치 통지.
-    UFUNCTION(Client, Reliable)
-    void Client_NotifyQuestKill(FGameplayTag EnemyTag);
-
-    void NotifyQuestKillLocal(FGameplayTag EnemyTag);
 
     bool bGASDefaultsGranted = false;
     UPROPERTY(VisibleAnywhere, Category="GAS")
