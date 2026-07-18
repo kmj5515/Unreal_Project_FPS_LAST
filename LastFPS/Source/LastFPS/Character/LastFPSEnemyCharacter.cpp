@@ -4,6 +4,7 @@
 #include "Character/LastFPSAIProfile.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Character/Components/LastFPSCombatAimComponent.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Data/Definitions/LastFPSEnemyDefinition.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
@@ -22,6 +23,7 @@ ALastFPSEnemyCharacter::ALastFPSEnemyCharacter()
 
     AIPerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>("AIPerceptionComp");
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComp"));
+    CombatAimComponent = CreateDefaultSubobject<ULastFPSCombatAimComponent>(TEXT("CombatAimComp"));
 
     // AI 는 컨트롤러가 SetFocus 로 준 방향(desired rotation)으로 몸을 돌린다.
     // 플레이어(Hero)와 달리 컨트롤러 Yaw 를 직접 쓰지 않고 이동 컴포넌트가 부드럽게 회전시킨다.

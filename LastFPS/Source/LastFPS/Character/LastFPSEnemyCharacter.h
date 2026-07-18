@@ -8,6 +8,7 @@
 
 class ALastFPSItemPickupActor;
 class ULastFPSAIProfile;
+class ULastFPSCombatAimComponent;
 class UWeaponComponent;
 
 /** 가중치 기반 드랍 항목 1종. Weight 가 클수록 자주 뽑힌다. */
@@ -34,6 +35,9 @@ public:
 
     virtual UWeaponComponent* GetWeaponComponent() const override { return WeaponComponent; }
 
+    UFUNCTION(BlueprintPure, Category="Enemy|Combat Aim")
+    ULastFPSCombatAimComponent* GetCombatAimComponent() const { return CombatAimComponent; }
+
     /**
      * 이 적의 AI 행동 프로파일. 해석된 CharacterDefinition 이 ULastFPSEnemyDefinition 일 때
      * 그 AIProfile 을 반환한다. 없으면 nullptr.
@@ -53,6 +57,10 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Enemy|Weapon")
     TObjectPtr<UWeaponComponent> WeaponComponent;
+
+    /** GA가 생산한 조준 상태를 AnimBP와 원격 클라이언트에 전달한다. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Enemy|Combat Aim")
+    TObjectPtr<ULastFPSCombatAimComponent> CombatAimComponent;
     
     // 사망 시 드랍할 픽업 (비우면 드랍 없음).
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Drop")

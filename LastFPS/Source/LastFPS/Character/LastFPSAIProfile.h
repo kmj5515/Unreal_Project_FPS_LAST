@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
-#include "GameplayTagContainer.h"
 #include "Character/LastFPSCharacterTypes.h"
 #include "LastFPSAIProfile.generated.h"
 
@@ -11,7 +10,7 @@ class AAIController;
 /**
  * 적 AI의 행동 파라미터를 담는 데이터 에셋.
  * 컨트롤러/BT 노드는 코드에 값을 박지 않고 이 프로파일에서 읽어 동작한다(데이터 주도).
- * 근접/원거리 구분도 AttackAbilityTag 로 지정한 GAS 어빌리티에 위임한다.
+ * 공격 종류는 Behavior Tree의 공격 Task가 결정한다.
  */
 UCLASS(BlueprintType)
 class LASTFPS_API ULastFPSAIProfile : public UPrimaryDataAsset
@@ -50,13 +49,6 @@ public:
 	float ReactionDelay = 0.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI")
-	bool bCanAttack = false;
+	bool bCanAttack = true;
 
-	/**
-	 * 공격 시 발동할 GAS 어빌리티 태그(예: Ability.Enemy.MeleeSwing / Ability.Enemy.Shoot).
-	 * 이 태그를 AssetTags 로 가진 어빌리티가 캐릭터 AbilitySet 에 부여돼 있어야 한다.
-	 * 근접이냐 원거리냐는 어빌리티 구현이 결정하므로, 프로파일만 바꿔 공격 방식을 교체할 수 있다.
-	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(EditCondition="bCanAttack"))
-	FGameplayTag AttackAbilityTag;
 };

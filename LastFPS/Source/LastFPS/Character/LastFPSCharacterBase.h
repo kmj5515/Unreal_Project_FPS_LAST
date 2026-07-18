@@ -65,6 +65,10 @@ public:
     UFUNCTION(BlueprintPure, Category="LastFPS|Character")
     const ULastFPSCharacterDefinition* GetCharacterDefinition() const;
 
+    /** 런타임 캐릭터 정의에 지정된 분류 태그를 조회한다. */
+    UFUNCTION(BlueprintPure, Category="LastFPS|Character", meta=(Categories="Character.Type"))
+    bool HasCharacterClassificationTag(FGameplayTag TagToCheck) const;
+
     /** 이 캐릭터를 처치했을 때 KillTarget 퀘스트에 통지할 종류 태그. 비면 통지 안 함(플레이어 등). */
     UFUNCTION(BlueprintPure, Category="LastFPS|Quest")
     FGameplayTag GetQuestKillTag() const { return QuestKillTag; }
@@ -152,6 +156,10 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
     TObjectPtr<ULastFPSCharacterDefinition> CharacterDefinition;
+
+    /** 서버가 적용한 정의의 분류 태그를 클라이언트 HUD에서도 조회하기 위한 읽기 전용 복제 캐시다. */
+    UPROPERTY(Replicated)
+    FGameplayTagContainer ReplicatedClassificationTags;
 
     /** KillTarget 퀘스트용 종류 태그(예: Enemy.Type.Grunt). 적 BP 에서 설정, 플레이어는 비움. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Quest")

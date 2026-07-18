@@ -8,6 +8,7 @@
 #include "AIController.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "GameplayAbilitySpec.h"
 
 UBTTask_EnemyAttack::UBTTask_EnemyAttack()
 {
@@ -38,7 +39,7 @@ EBTNodeResult::Type UBTTask_EnemyAttack::ExecuteTask(UBehaviorTreeComponent& Own
 	}
 
 	const ULastFPSAIProfile* Profile = Enemy->GetAIProfile();
-	if (!Profile || !Profile->bCanAttack || !Profile->AttackAbilityTag.IsValid())
+	if (!Profile || !Profile->bCanAttack || !AttackAbilityTag.IsValid())
 	{
 		// 공격 능력이 없는 적(더미/오브젝트 등)은 이 태스크를 쓰지 않는다.
 		return EBTNodeResult::Failed;
@@ -52,25 +53,31 @@ EBTNodeResult::Type UBTTask_EnemyAttack::ExecuteTask(UBehaviorTreeComponent& Own
 		return EBTNodeResult::Failed;
 	}
 
-	// 타깃을 바라본다(발사/스윙 방향 정렬).
-	AICon->SetFocus(Target);
-
-	// AttackAbilityTag 로 어빌리티 발동. 쿨다운이면 활성화 실패할 수 있으나,
-	// 그 경우에도 ReactionDelay 만큼 사거리에서 대기했다가 재시도하도록 InProgress 로 진행한다.
-	if (UAbilitySystemComponent* ASC = Enemy->GetAbilitySystemComponent())
+	// 태그가 여러 GA와 일치하면 어떤 공격을 기다려야 하는지 모호하므로 설정 오류로 처리한다.
+	UAbilitySystemComponent* ASC = Enemy->GetAbilitySystemComponent();
+	if (!ASC)
 	{
-		FGameplayTagContainer AbilityTags;
-		AbilityTags.AddTag(Profile->AttackAbilityTag);
-		ASC->TryActivateAbilitiesByTag(AbilityTags);
+		return EBTNodeResult::Failed;
+	}
+
+	FGameplayTagContainer AbilityTags;
+	AbilityTags.AddTag(AttackAbilityTag);
+	TArray<FGameplayAbilitySpec*> MatchingAbilitySpecs;
+	ASC->GetActivatableGameplayAbilitySpecsByAllMatchingTags(
+		AbilityTags,
+		MatchingAbilitySpecs,
+		true);
+	if (MatchingAbilitySpecs.Num() != 1 || !MatchingAbilitySpecs[0])
+	{
+		return EBTNodeResult::Failed;
 	}
 
 	FBTEnemyAttackMemory* Memory = reinterpret_cast<FBTEnemyAttackMemory*>(NodeMemory);
-	Memory->Elapsed = 0.f;
-
-	// ReactionDelay 가 0 이하이면 즉시 종료(다음 틱에 상위 트리가 재판단).
-	if (Profile->ReactionDelay <= 0.f)
+	*Memory = FBTEnemyAttackMemory();
+	Memory->ActivatedAbilityHandle = MatchingAbilitySpecs[0]->Handle;
+	if (!ASC->TryActivateAbility(Memory->ActivatedAbilityHandle))
 	{
-		return EBTNodeResult::Succeeded;
+		return EBTNodeResult::Failed;
 	}
 
 	return EBTNodeResult::InProgress;
@@ -80,28 +87,32 @@ void UBTTask_EnemyAttack::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 {
 	AAIController* AICon = OwnerComp.GetAIOwner();
 	ALastFPSEnemyCharacter* Enemy = AICon ? Cast<ALastFPSEnemyCharacter>(AICon->GetPawn()) : nullptr;
-	if (!Enemy)
+	UAbilitySystemComponent* ASC = Enemy ? Enemy->GetAbilitySystemComponent() : nullptr;
+	if (!Enemy || !ASC)
 	{
 		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
 		return;
 	}
 
-	// 대기 중에도 타깃을 계속 바라본다.
-	if (UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent())
+	FBTEnemyAttackMemory* Memory = reinterpret_cast<FBTEnemyAttackMemory*>(NodeMemory);
+	if (!Memory->ActivatedAbilityHandle.IsValid())
 	{
-		if (AActor* Target = Cast<AActor>(BB->GetValueAsObject(TargetActorKey.SelectedKeyName)))
-		{
-			AICon->SetFocus(Target);
-		}
+		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+		return;
+	}
+
+	const FGameplayAbilitySpec* AbilitySpec = ASC->FindAbilitySpecFromHandle(Memory->ActivatedAbilityHandle);
+	if (AbilitySpec && AbilitySpec->IsActive())
+	{
+		return;
 	}
 
 	const ULastFPSAIProfile* Profile = Enemy->GetAIProfile();
 	const float ReactionDelay = Profile ? Profile->ReactionDelay : 0.f;
 
-	FBTEnemyAttackMemory* Memory = reinterpret_cast<FBTEnemyAttackMemory*>(NodeMemory);
-	Memory->Elapsed += DeltaSeconds;
+	Memory->ElapsedAfterAbilityEnd += DeltaSeconds;
 
-	if (Memory->Elapsed >= ReactionDelay)
+	if (Memory->ElapsedAfterAbilityEnd >= ReactionDelay)
 	{
 		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 	}

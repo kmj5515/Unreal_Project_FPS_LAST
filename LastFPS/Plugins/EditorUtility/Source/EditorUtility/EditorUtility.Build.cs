@@ -52,6 +52,7 @@ public class EditorUtility : ModuleRules
 			{
 				"ApplicationCore",
 				"GameplayAbilities",
+				"GameplayTags",
 				"Slate",
 				"SlateCore",
 				"UnrealEd",

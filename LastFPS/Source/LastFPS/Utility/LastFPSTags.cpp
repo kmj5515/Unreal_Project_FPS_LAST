@@ -4,6 +4,7 @@ namespace LastFPSGameplayTags
 {
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Character_State_Dead, "Character.State.Dead", "Character is dead")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Character_State_Crouched, "Character.State.Crouched", "Character is crouching")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Character_Type_Boss, "Character.Type.Boss", "보스 캐릭터 분류")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Character_State_Sprinting, "Character.State.Sprinting", "캐릭터가 달리는 상태")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_AuraDamageCooldown, "Status.AuraDamageCooldown", "오라 데미지 재적용 대기 상태")
@@ -29,7 +30,12 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Parameter_ConeAngle, "Skill.Parameter.ConeA
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_AbilityCommit, "Event.Montage.Ability.Commit", "Commit an ability from an ability montage")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_AbilityEnd, "Event.Montage.Ability.End", "End an ability from an ability montage")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ProjectileSpawn, "Event.Montage.Projectile.Spawn", "Spawn a projectile from an ability montage")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_MeleeTrace, "Event.Montage.Melee.Trace", "근접 연속 판정 이벤트")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_MeleeTrace_Begin, "Event.Montage.Melee.Trace.Begin", "근접 연속 판정 시작")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_MeleeTrace_Tick, "Event.Montage.Melee.Trace.Tick", "근접 연속 판정 갱신")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_MeleeTrace_End, "Event.Montage.Melee.Trace.End", "근접 연속 판정 종료")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_MeleeHit, "Event.Montage.Melee.Hit", "적 근접 공격 판정 실행")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_GroundSlamImpact, "Event.Montage.GroundSlam.Impact", "보스 지면 강타 충격 판정 실행")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ViolaIceAuraEffect, "Event.Montage.ViolaIceAura.Effect", "비올라 얼음 오라 이펙트 실행")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ViolaFrostStormEffect, "Event.Montage.ViolaFrostStorm.Effect", "비올라 냉기 폭풍 효과 실행")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_IceStormSpawn, "Event.Montage.IceStorm.Spawn", "Spawn an ice storm area from an ability montage")
@@ -64,4 +70,7 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_ProbePassive, "Ability.Passive.Probe", "�
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Trigger_SpawnProbe, "Ability.Trigger.SpawnProbe", "프로브 생성 트리거 어빌리티")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Enemy_Shoot, "Ability.Enemy.Shoot", "적 AI 원거리 발사 공격")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Enemy_Melee, "Ability.Enemy.Melee", "적 AI 근거리 공격")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Enemy_Boss_BurstShoot, "Ability.Enemy.Boss.BurstShoot", "보스 추적 조준 후 버스트 발사 공격")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Enemy_Boss_GroundSlam, "Ability.Enemy.Boss.GroundSlam", "보스 지면 강타 도넛 공격")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Enemy_Boss_BurstCharge, "GameplayCue.Enemy.Boss.BurstCharge", "보스 버스트 공격 차지 연출")
 }

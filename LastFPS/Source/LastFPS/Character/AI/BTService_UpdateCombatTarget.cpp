@@ -8,6 +8,11 @@
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 
+namespace
+{
+	constexpr float InvalidTargetDistance = TNumericLimits<float>::Max();
+}
+
 UBTService_UpdateCombatTarget::UBTService_UpdateCombatTarget()
 {
 	NodeName = TEXT("Update Combat Target");
@@ -31,7 +36,7 @@ void UBTService_UpdateCombatTarget::TickNode(UBehaviorTreeComponent& OwnerComp, 
 	auto ClearTarget = [BB]()
 	{
 		BB->ClearValue(LastFPSEnemyBBKeys::TargetActor);
-		BB->SetValueAsBool(LastFPSEnemyBBKeys::bInAttackRange, false);
+		BB->SetValueAsFloat(LastFPSEnemyBBKeys::TargetDistance, InvalidTargetDistance);
 		BB->SetValueAsBool(LastFPSEnemyBBKeys::bHasLineOfSight, false);
 		BB->SetValueAsBool(LastFPSEnemyBBKeys::bTargetTooClose, false);
 	};
@@ -52,8 +57,6 @@ void UBTService_UpdateCombatTarget::TickNode(UBehaviorTreeComponent& OwnerComp, 
 	}
 
 	const ULastFPSAIProfile* Profile = Enemy->GetAIProfile();
-	// 공격 사거리는 CharacterStatData로 초기화되고 GE로 변경되는 AttributeSet 값만 사용한다.
-	const float AttackRange = Enemy->GetAttackRange();
 	const float LoseRange = Profile
 		? ((Profile->LoseSightRange > Profile->DetectionRange) ? Profile->LoseSightRange : Profile->DetectionRange)
 		: 1600.f;
@@ -67,9 +70,9 @@ void UBTService_UpdateCombatTarget::TickNode(UBehaviorTreeComponent& OwnerComp, 
 		return;
 	}
 
-	// 유효 타깃: 마지막 위치·사거리·시야 갱신.
+	// 유효 타깃의 마지막 위치, 현재 거리와 시야 상태를 갱신한다.
 	BB->SetValueAsVector(LastFPSEnemyBBKeys::TargetLocation, TargetActor->GetActorLocation());
-	BB->SetValueAsBool(LastFPSEnemyBBKeys::bInAttackRange, Distance <= AttackRange);
+	BB->SetValueAsFloat(LastFPSEnemyBBKeys::TargetDistance, Distance);
 	// 시야는 컨트롤러의 LineOfSightTo(폰 시점 기준 트레이스)로 판정.
 	BB->SetValueAsBool(LastFPSEnemyBBKeys::bHasLineOfSight, AICon->LineOfSightTo(TargetActor));
 

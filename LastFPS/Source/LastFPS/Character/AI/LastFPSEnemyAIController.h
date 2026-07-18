@@ -30,6 +30,10 @@ class LASTFPS_API ALastFPSEnemyAIController : public AAIController
 public:
 	ALastFPSEnemyAIController();
 
+	/** 블랙보드에 저장된 현재 전투 대상을 반환한다. 대상이 없으면 nullptr을 반환한다. */
+	UFUNCTION(BlueprintPure, Category = "LastFPS|Enemy AI")
+	AActor* GetCombatTargetActor() const;
+
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;

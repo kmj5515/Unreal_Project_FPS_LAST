@@ -66,10 +66,16 @@ public:
         ALastFPSCharacterBase* Enemy,
         const FLastFPSEnemyHealthBarSettings& Settings,
         float InitialDamageAmount);
+    /** HUD에 고정된 전용 체력바용 초기화다. 월드 위치 추적과 자동 숨김을 사용하지 않는다. */
+    void InitializeForFixedHUDTarget(
+        ALastFPSCharacterBase* Enemy,
+        const FLastFPSEnemyHealthBarSettings& Settings,
+        float InitialDamageAmount);
     void NotifyDamage(float DamageAmount, const FLastFPSEnemyHealthBarSettings& Settings);
     void RefreshDisplayDuration(float DisplayDuration);
     void ReleaseFromEnemy();
     bool UpdateTrackedEnemy(float DeltaTime, const FLastFPSEnemyHealthBarSettings& Settings);
+    bool UpdateFixedHUDTarget(float DeltaTime, const FLastFPSEnemyHealthBarSettings& Settings);
 
     bool IsTrackingEnemy(const ALastFPSCharacterBase* Enemy) const;
     bool IsAvailable() const { return !TrackedEnemy.IsValid(); }

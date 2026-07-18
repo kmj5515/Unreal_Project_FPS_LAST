@@ -10,7 +10,10 @@ ULastFPSGE_StatusFreeze::ULastFPSGE_StatusFreeze()
     DurationPolicy = EGameplayEffectDurationType::HasDuration;
     DurationMagnitude = FGameplayEffectModifierMagnitude(FScalableFloat(1.25f));
 
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+    // UE 5.7의 SetStackingType은 Editor 전용 비공개 심볼이라 게임 모듈에서 링크할 수 없다.
     StackingType = EGameplayEffectStackingType::AggregateByTarget;
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
     StackLimitCount = 1;
     StackDurationRefreshPolicy =
         EGameplayEffectStackingDurationPolicy::RefreshOnSuccessfulApplication;

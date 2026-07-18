@@ -254,7 +254,7 @@ bool ALastFPSOrbitingProjectileEmitter::ResolveFireTarget(
 	{
 		if (const AActor* TargetActor = FindBestTargetActor(World, SpawnLocation, CameraAimDirection))
 		{
-			OutTargetLocation = GetTargetLocation(TargetActor);
+			OutTargetLocation = ResolveTargetLocation(TargetActor);
 			return true;
 		}
 	}
@@ -331,7 +331,7 @@ AActor* ALastFPSOrbitingProjectileEmitter::FindBestTargetActor(
 		}
 		VisitedTargets.Add(Candidate);
 
-		const FVector TargetLocation = GetTargetLocation(Candidate);
+		const FVector TargetLocation = ResolveTargetLocation(Candidate);
 		const FVector ViewToTarget = TargetLocation - ViewLocation;
 		const float ViewDistance = ViewToTarget.Size();
 		if (ViewDistance <= KINDA_SMALL_NUMBER)
@@ -380,7 +380,7 @@ bool ALastFPSOrbitingProjectileEmitter::IsValidTargetActor(const AActor* TargetA
 	return Cast<IAbilitySystemInterface>(TargetActor) != nullptr;
 }
 
-FVector ALastFPSOrbitingProjectileEmitter::GetTargetLocation(const AActor* TargetActor) const
+FVector ALastFPSOrbitingProjectileEmitter::ResolveTargetLocation(const AActor* TargetActor) const
 {
 	if (!TargetActor)
 	{

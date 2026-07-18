@@ -2,6 +2,11 @@
 
 #include "Data/Characters/LastFPSCharacterStatData.h"
 
+bool ULastFPSCharacterDefinition::HasClassificationTag(const FGameplayTag TagToCheck) const
+{
+	return TagToCheck.IsValid() && ClassificationTags.HasTag(TagToCheck);
+}
+
 void ULastFPSCharacterDefinition::GiveToAbilitySystem(UAbilitySystemComponent* ASC) const
 {
 	if (!ASC)

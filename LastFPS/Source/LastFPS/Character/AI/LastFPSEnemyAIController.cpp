@@ -30,6 +30,17 @@ ALastFPSEnemyAIController::ALastFPSEnemyAIController()
 	SetPerceptionComponent(*EnemyPerception);
 }
 
+AActor* ALastFPSEnemyAIController::GetCombatTargetActor() const
+{
+	const UBlackboardComponent* BlackboardComponent = GetBlackboardComponent();
+	if (!BlackboardComponent)
+	{
+		return nullptr;
+	}
+
+	return Cast<AActor>(BlackboardComponent->GetValueAsObject(LastFPSEnemyBBKeys::TargetActor));
+}
+
 void ALastFPSEnemyAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);

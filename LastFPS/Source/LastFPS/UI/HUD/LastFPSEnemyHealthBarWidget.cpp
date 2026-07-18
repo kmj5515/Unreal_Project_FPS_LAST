@@ -74,6 +74,39 @@ void ULastFPSEnemyHealthBarWidget::InitializeForEnemy(
     UpdateScreenPosition(Settings);
 }
 
+void ULastFPSEnemyHealthBarWidget::InitializeForFixedHUDTarget(
+    ALastFPSCharacterBase* Enemy,
+    const FLastFPSEnemyHealthBarSettings& Settings,
+    const float InitialDamageAmount)
+{
+    if (!IsValid(Enemy) || Enemy->IsPlayerControlled() || !Enemy->IsAlive())
+    {
+        ReleaseFromEnemy();
+        return;
+    }
+
+    if (TrackedEnemy.Get() != Enemy)
+    {
+        UnbindFromEnemy();
+        BindToEnemy(Enemy);
+    }
+
+    if (PB_EnemyHealthDamageTrail)
+    {
+        PB_EnemyHealthDamageTrail->SetFillColorAndOpacity(Settings.DamageTrailFillColor);
+    }
+
+    if (WBP_StatusEffectList)
+    {
+        WBP_StatusEffectList->InitializeWithAbilitySystem(BoundASC.Get());
+    }
+
+    RefreshHealthDisplay();
+    DamageTrailHealth = CurrentHealth;
+    NotifyDamage(InitialDamageAmount, Settings);
+    SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
 void ULastFPSEnemyHealthBarWidget::NotifyDamage(
     const float DamageAmount,
     const FLastFPSEnemyHealthBarSettings& Settings)
@@ -142,6 +175,25 @@ bool ULastFPSEnemyHealthBarWidget::UpdateTrackedEnemy(
         WBP_StatusEffectList->UpdateRuntimeStates();
     }
     UpdateScreenPosition(Settings);
+    return true;
+}
+
+bool ULastFPSEnemyHealthBarWidget::UpdateFixedHUDTarget(
+    const float DeltaTime,
+    const FLastFPSEnemyHealthBarSettings& Settings)
+{
+    ALastFPSCharacterBase* Enemy = TrackedEnemy.Get();
+    if (!IsValid(Enemy) || !Enemy->IsAlive())
+    {
+        ReleaseFromEnemy();
+        return false;
+    }
+
+    UpdateDamageTrail(DeltaTime, Settings);
+    if (WBP_StatusEffectList)
+    {
+        WBP_StatusEffectList->UpdateRuntimeStates();
+    }
     return true;
 }
 

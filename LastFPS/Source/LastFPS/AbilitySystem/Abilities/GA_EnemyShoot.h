@@ -14,7 +14,7 @@ class ULastFPSAbilityProjectileData;
  * 이 어빌리티는 Hero 의존 없이 ALastFPSCharacterBase 기준으로 동작한다:
  *   - 조준: AIController 의 FocusActor(=BT 가 SetFocus 한 타깃)를 향해 발사.
  *   - 스폰: ProjectileData 로 발사체를 스폰하고 데미지/임팩트 규칙을 초기화(서버 권위).
- * 발동은 AttackAbilityTag(=Ability.Enemy.Shoot)로 BTTask_EnemyAttack 이 TryActivateAbilitiesByTag 한다.
+ * 발동은 BTTask_EnemyAttack에 지정된 Ability.Enemy.Shoot 태그로 수행한다.
  */
 UCLASS()
 class LASTFPS_API UGA_EnemyShoot : public ULastFPSGameplayAbility

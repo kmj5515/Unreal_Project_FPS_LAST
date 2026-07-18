@@ -21,6 +21,7 @@ class UMaterialInstanceDynamic;
 class UOverlay;
 class UWeaponComponent;
 class AActor;
+class ALastFPSCharacterBase;
 class ALastFPSPlayerState;
 
 struct FLastFPSSmoothedGaugeDisplay
@@ -188,6 +189,10 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="HUD|Damage", meta=(ClampMin="0.0"))
     float DamageNumberRandomRadiusOffset = 0.f;
 
+    /** 화면에 고정되어 보스가 죽을 때까지 유지되는 전용 체력바다. */
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Boss Health", meta=(BindWidgetOptional))
+    TObjectPtr<ULastFPSEnemyHealthBarWidget> WBP_BossHealthBar;
+
 private:
     bool InitializeHUD();
 
@@ -229,8 +234,11 @@ private:
         AActor* DamageTargetActor,
         bool bCriticalHit);
     void ShowEnemyHealthBar(AActor* DamageTargetActor, float DamageAmount);
+    void ReleaseEnemyHealthBarFor(const ALastFPSCharacterBase* Enemy);
     void TickEnemyHealthBars(float DeltaTime);
     void ClearEnemyHealthBars();
+    void TickBossHealthBar(float DeltaTime);
+    void ClearBossHealthBar();
     FVector2D MakeDamageNumberRandomOffset() const;
     void ApplyGaugeBarBackground(UProgressBar* Bar) const;
     void ApplyGaugeBar(UProgressBar* Bar, float Current, float Max, const FLinearColor& FillColor) const;

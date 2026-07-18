@@ -92,6 +92,8 @@ void ULastFPSHUDWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
+    ClearBossHealthBar();
+
     ApplyGaugeBarBackground(PB_Health);
     ApplyGaugeBarBackground(PB_Stamina);
 
@@ -145,6 +147,7 @@ void ULastFPSHUDWidget::NativeDestruct()
 
     ClearDamageDirectionIndicators();
     ClearEnemyHealthBars();
+    ClearBossHealthBar();
     if (WBP_StatusEffectList)
     {
         WBP_StatusEffectList->UninitializeFromAbilitySystem();
@@ -192,6 +195,7 @@ void ULastFPSHUDWidget::HUDRefreshTick(const float DeltaTime)
     TickHitMarkerSpread(DeltaTime);
     TickDamageDirectionIndicators(DeltaTime);
     TickEnemyHealthBars(DeltaTime);
+    TickBossHealthBar(DeltaTime);
     if (WBP_StatusEffectList)
     {
         WBP_StatusEffectList->UpdateRuntimeStates();
@@ -428,16 +432,28 @@ void ULastFPSHUDWidget::ShowEnemyHealthBar(AActor* DamageTargetActor, const floa
         return;
     }
 
+    if (Enemy->HasCharacterClassificationTag(LastFPSGameplayTags::Character_Type_Boss))
+    {
+        // 보스 체력은 전용 HUD에서 표시하므로 일반 적 체력바를 사용하지 않는다.
+        ReleaseEnemyHealthBarFor(Enemy);
+
+        if (!Enemy->IsAlive())
+        {
+            ClearBossHealthBar();
+        }
+        else if (WBP_BossHealthBar)
+        {
+            WBP_BossHealthBar->InitializeForFixedHUDTarget(
+                Enemy,
+                EnemyHealthBarSettings,
+                DamageAmount);
+        }
+        return;
+    }
+
     if (!Enemy->IsAlive())
     {
-        for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
-        {
-            if (Widget && Widget->IsTrackingEnemy(Enemy))
-            {
-                Widget->ReleaseFromEnemy();
-                break;
-            }
-        }
+        ReleaseEnemyHealthBarFor(Enemy);
         return;
     }
 
@@ -491,6 +507,23 @@ void ULastFPSHUDWidget::ShowEnemyHealthBar(AActor* DamageTargetActor, const floa
     }
 }
 
+void ULastFPSHUDWidget::ReleaseEnemyHealthBarFor(const ALastFPSCharacterBase* Enemy)
+{
+    if (!Enemy)
+    {
+        return;
+    }
+
+    for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
+    {
+        if (Widget && Widget->IsTrackingEnemy(Enemy))
+        {
+            Widget->ReleaseFromEnemy();
+            return;
+        }
+    }
+}
+
 void ULastFPSHUDWidget::TickEnemyHealthBars(const float DeltaTime)
 {
     for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
@@ -513,6 +546,22 @@ void ULastFPSHUDWidget::ClearEnemyHealthBars()
         }
     }
     EnemyHealthBarPool.Reset();
+}
+
+void ULastFPSHUDWidget::TickBossHealthBar(const float DeltaTime)
+{
+    if (WBP_BossHealthBar && !WBP_BossHealthBar->IsAvailable())
+    {
+        WBP_BossHealthBar->UpdateFixedHUDTarget(DeltaTime, EnemyHealthBarSettings);
+    }
+}
+
+void ULastFPSHUDWidget::ClearBossHealthBar()
+{
+    if (WBP_BossHealthBar)
+    {
+        WBP_BossHealthBar->ReleaseFromEnemy();
+    }
 }
 
 void ULastFPSHUDWidget::TickSmoothedGauges(float DeltaTime)

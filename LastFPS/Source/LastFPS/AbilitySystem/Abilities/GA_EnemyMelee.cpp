@@ -7,7 +7,10 @@
 #include "AIController.h"
 #include "Character/LastFPSCharacterBase.h"
 #include "CollisionShape.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Data/Enemies/LastFPSEnemyMeleeAttackData.h"
+#include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "GameplayEffect.h"
 #include "Utility/LastFPSCombatAffiliation.h"
@@ -69,7 +72,8 @@ void UGA_EnemyMelee::ActivateAbility(
 	}
 
 	StartHitEventTask();
-	if (!HitEventTask || !StartAttackMontage())
+	StartTraceEventTask();
+	if (!HitEventTask || !TraceEventTask || !StartAttackMontage())
 	{
 		UE_LOG(LogLastFPSEnemyMelee, Error,
 			TEXT("근접 공격 시작 실패: Source=%s, Data=%s, Montage=%s, EventTag=%s"),
@@ -88,10 +92,18 @@ void UGA_EnemyMelee::EndAbility(
 	const bool bReplicateEndAbility,
 	const bool bWasCancelled)
 {
+	EndContinuousTrace();
+
 	if (HitEventTask)
 	{
 		HitEventTask->EndTask();
 		HitEventTask = nullptr;
+	}
+
+	if (TraceEventTask)
+	{
+		TraceEventTask->EndTask();
+		TraceEventTask = nullptr;
 	}
 
 	if (MontageTask)
@@ -144,6 +156,21 @@ void UGA_EnemyMelee::StartHitEventTask()
 	{
 		HitEventTask->EventReceived.AddDynamic(this, &UGA_EnemyMelee::OnHitEventReceived);
 		HitEventTask->ReadyForActivation();
+	}
+}
+
+void UGA_EnemyMelee::StartTraceEventTask()
+{
+	TraceEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
+		this,
+		LastFPSGameplayTags::Event_Montage_MeleeTrace,
+		nullptr,
+		false,
+		false);
+	if (TraceEventTask)
+	{
+		TraceEventTask->EventReceived.AddDynamic(this, &UGA_EnemyMelee::OnTraceEventReceived);
+		TraceEventTask->ReadyForActivation();
 	}
 }
 
@@ -204,6 +231,165 @@ void UGA_EnemyMelee::PerformMeleeHit(ALastFPSCharacterBase& SourceCharacter)
 
 		if (ApplyEffectsToTarget(SourceCharacter, *TargetActor) && !AttackData->bHitMultipleTargets)
 		{
+			break;
+		}
+	}
+}
+
+void UGA_EnemyMelee::BeginContinuousTrace(ALastFPSCharacterBase& SourceCharacter)
+{
+	EndContinuousTrace();
+
+	FVector InitialTraceCenter;
+	if (!ResolveContinuousTraceCenter(SourceCharacter, InitialTraceCenter))
+	{
+		UE_LOG(LogLastFPSEnemyMelee, Error,
+			TEXT("근접 연속 판정 시작 실패: Source=%s, Data=%s, Socket=%s"),
+			*GetNameSafe(&SourceCharacter),
+			*GetNameSafe(AttackData),
+			AttackData ? *AttackData->ContinuousTraceSocketName.ToString() : TEXT("None"));
+		return;
+	}
+
+	ContinuousTraceHitActors.Reset();
+	PreviousContinuousTraceCenter = InitialTraceCenter;
+	bContinuousTraceActive = true;
+	SweepContinuousTrace(SourceCharacter, InitialTraceCenter);
+}
+
+void UGA_EnemyMelee::UpdateContinuousTrace(ALastFPSCharacterBase& SourceCharacter)
+{
+	if (!bContinuousTraceActive)
+	{
+		return;
+	}
+
+	FVector CurrentTraceCenter;
+	if (!ResolveContinuousTraceCenter(SourceCharacter, CurrentTraceCenter))
+	{
+		EndContinuousTrace();
+		return;
+	}
+
+	SweepContinuousTrace(SourceCharacter, CurrentTraceCenter);
+}
+
+void UGA_EnemyMelee::EndContinuousTrace()
+{
+	bContinuousTraceActive = false;
+	PreviousContinuousTraceCenter = FVector::ZeroVector;
+	ContinuousTraceHitActors.Reset();
+}
+
+bool UGA_EnemyMelee::ResolveContinuousTraceCenter(
+	const ALastFPSCharacterBase& SourceCharacter,
+	FVector& OutTraceCenter) const
+{
+	if (!AttackData || AttackData->ContinuousTraceSocketName.IsNone())
+	{
+		return false;
+	}
+
+	const USkeletalMeshComponent* Mesh = SourceCharacter.GetMesh();
+	if (!Mesh || !Mesh->DoesSocketExist(AttackData->ContinuousTraceSocketName))
+	{
+		return false;
+	}
+
+	const FVector SocketLocation = Mesh->GetSocketLocation(AttackData->ContinuousTraceSocketName);
+	float GroundZ = SourceCharacter.GetActorLocation().Z;
+	if (const UCapsuleComponent* Capsule = SourceCharacter.GetCapsuleComponent())
+	{
+		GroundZ -= Capsule->GetScaledCapsuleHalfHeight();
+	}
+
+	OutTraceCenter = FVector(
+		SocketLocation.X,
+		SocketLocation.Y,
+		GroundZ + FMath::Max(AttackData->ContinuousTraceCenterHeight, 0.f));
+	return true;
+}
+
+void UGA_EnemyMelee::SweepContinuousTrace(
+	ALastFPSCharacterBase& SourceCharacter,
+	const FVector& CurrentTraceCenter)
+{
+	UWorld* World = SourceCharacter.GetWorld();
+	if (!World || !SourceCharacter.HasAuthority() || !AttackData || !bContinuousTraceActive)
+	{
+		return;
+	}
+
+	const float TraceRadius = FMath::Max(AttackData->ContinuousTraceRadius, 1.f);
+	const float TraceHalfHeight = FMath::Max(AttackData->ContinuousTraceHalfHeight, TraceRadius);
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EnemyContinuousMeleeAttack), false, &SourceCharacter);
+	QueryParams.AddIgnoredActor(&SourceCharacter);
+
+	FCollisionObjectQueryParams ObjectParams;
+	ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
+
+	TArray<FHitResult> HitResults;
+	World->SweepMultiByObjectType(
+		HitResults,
+		PreviousContinuousTraceCenter,
+		CurrentTraceCenter,
+		FQuat::Identity,
+		ObjectParams,
+		FCollisionShape::MakeCapsule(TraceRadius, TraceHalfHeight),
+		QueryParams);
+
+#if ENABLE_DRAW_DEBUG
+	if (ShouldDrawDebug())
+	{
+		::DrawDebugCapsule(
+			World,
+			PreviousContinuousTraceCenter,
+			TraceHalfHeight,
+			TraceRadius,
+			FQuat::Identity,
+			GetDebugColor(),
+			false,
+			GetDebugDrawTime(),
+			0,
+			GetDebugLineThickness());
+		::DrawDebugCapsule(
+			World,
+			CurrentTraceCenter,
+			TraceHalfHeight,
+			TraceRadius,
+			FQuat::Identity,
+			GetDebugColor(),
+			false,
+			GetDebugDrawTime(),
+			0,
+			GetDebugLineThickness());
+		DrawDebugLine(GetCurrentActorInfo(), PreviousContinuousTraceCenter, CurrentTraceCenter);
+	}
+#endif
+
+	PreviousContinuousTraceCenter = CurrentTraceCenter;
+	const AAIController* AIController = Cast<AAIController>(SourceCharacter.GetController());
+	for (const FHitResult& HitResult : HitResults)
+	{
+		AActor* TargetActor = HitResult.GetActor();
+		if (!IsValid(TargetActor) || ContinuousTraceHitActors.Contains(TargetActor))
+		{
+			continue;
+		}
+
+		const ALastFPSCharacterBase* TargetCharacter = Cast<ALastFPSCharacterBase>(TargetActor);
+		if ((TargetCharacter && !TargetCharacter->IsAlive())
+			|| LastFPSCombatAffiliation::AreFriendlyActors(&SourceCharacter, TargetActor)
+			|| (AIController && !AIController->LineOfSightTo(TargetActor)))
+		{
+			continue;
+		}
+
+		ContinuousTraceHitActors.Add(TargetActor);
+		if (ApplyEffectsToTarget(SourceCharacter, *TargetActor) && !AttackData->bHitMultipleTargets)
+		{
+			bContinuousTraceActive = false;
 			break;
 		}
 	}
@@ -278,6 +464,29 @@ void UGA_EnemyMelee::OnHitEventReceived(FGameplayEventData Payload)
 	if (ALastFPSCharacterBase* SourceCharacter = Cast<ALastFPSCharacterBase>(GetAvatarActorFromActorInfo()))
 	{
 		PerformMeleeHit(*SourceCharacter);
+	}
+}
+
+void UGA_EnemyMelee::OnTraceEventReceived(FGameplayEventData Payload)
+{
+	ALastFPSCharacterBase* SourceCharacter = Cast<ALastFPSCharacterBase>(GetAvatarActorFromActorInfo());
+	if (!SourceCharacter || !SourceCharacter->HasAuthority())
+	{
+		return;
+	}
+
+	if (Payload.EventTag.MatchesTagExact(LastFPSGameplayTags::Event_Montage_MeleeTrace_Begin))
+	{
+		BeginContinuousTrace(*SourceCharacter);
+	}
+	else if (Payload.EventTag.MatchesTagExact(LastFPSGameplayTags::Event_Montage_MeleeTrace_Tick))
+	{
+		UpdateContinuousTrace(*SourceCharacter);
+	}
+	else if (Payload.EventTag.MatchesTagExact(LastFPSGameplayTags::Event_Montage_MeleeTrace_End))
+	{
+		UpdateContinuousTrace(*SourceCharacter);
+		EndContinuousTrace();
 	}
 }
 

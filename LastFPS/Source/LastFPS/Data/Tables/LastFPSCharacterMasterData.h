@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
+#include "GameplayTagContainer.h"
 #include "Character/LastFPSCharacterTypes.h"
 #include "Data/Characters/LastFPSCharacterAcceleratorData.h"
 #include "LastFPSCharacterMasterData.generated.h"
@@ -28,6 +29,10 @@ struct LASTFPS_API FLastFPSCharacterMasterData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character")
 	ELastFPSCharacterType CharacterType = ELastFPSCharacterType::Player;
+
+	/** 캐릭터의 역할과 분류를 나타내는 데이터 기반 태그다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character", meta=(Categories="Character.Type"))
+	FGameplayTagContainer ClassificationTags;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character")
 	FString DisplayName;

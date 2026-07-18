@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "GameplayTagContainer.h"
 #include "Character/LastFPSCharacterTypes.h"
 #include "Data/Characters/LastFPSCharacterAcceleratorData.h"
 #include "LastFPSCharacterDefinition.generated.h"
@@ -33,6 +34,13 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character")
 	ELastFPSCharacterType CharacterType = ELastFPSCharacterType::Player;
+
+	/** 보스처럼 여러 시스템에서 공유하는 캐릭터 분류를 데이터로 표현한다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character", meta=(Categories="Character.Type"))
+	FGameplayTagContainer ClassificationTags;
+
+	UFUNCTION(BlueprintPure, Category="LastFPS|Character", meta=(Categories="Character.Type"))
+	bool HasClassificationTag(FGameplayTag TagToCheck) const;
 
 	/** 킬피드/체력바/보스 인트로 등 어디서나 쓰이므로 베이스에 둔다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character")

@@ -92,7 +92,7 @@ private:
 	bool ResolveFireTarget(UWorld* World, const FVector& SpawnLocation, const FVector& CameraAimDirection, FVector& OutTargetLocation) const;
 	AActor* FindBestTargetActor(UWorld* World, const FVector& SpawnLocation, const FVector& CameraAimDirection) const;
 	bool IsValidTargetActor(const AActor* TargetActor) const;
-	FVector GetTargetLocation(const AActor* TargetActor) const;
+	FVector ResolveTargetLocation(const AActor* TargetActor) const;
 
 	UPROPERTY()
 	TObjectPtr<ALastFPSCharacterBase> SourceCharacter;

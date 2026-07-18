@@ -41,12 +41,21 @@ public:
 private:
 	bool StartAttackMontage();
 	void StartHitEventTask();
+	void StartTraceEventTask();
 	void PerformMeleeHit(ALastFPSCharacterBase& SourceCharacter);
+	void BeginContinuousTrace(ALastFPSCharacterBase& SourceCharacter);
+	void UpdateContinuousTrace(ALastFPSCharacterBase& SourceCharacter);
+	void EndContinuousTrace();
+	bool ResolveContinuousTraceCenter(const ALastFPSCharacterBase& SourceCharacter, FVector& OutTraceCenter) const;
+	void SweepContinuousTrace(ALastFPSCharacterBase& SourceCharacter, const FVector& CurrentTraceCenter);
 	bool ApplyEffectsToTarget(ALastFPSCharacterBase& SourceCharacter, AActor& TargetActor) const;
 	void FinishCurrentAbility(bool bWasCancelled);
 
 	UFUNCTION()
 	void OnHitEventReceived(FGameplayEventData Payload);
+
+	UFUNCTION()
+	void OnTraceEventReceived(FGameplayEventData Payload);
 
 	UFUNCTION()
 	void OnMontageCompleted();
@@ -65,4 +74,11 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_WaitGameplayEvent> HitEventTask;
+
+	UPROPERTY()
+	TObjectPtr<UAbilityTask_WaitGameplayEvent> TraceEventTask;
+
+	TSet<TWeakObjectPtr<AActor>> ContinuousTraceHitActors;
+	FVector PreviousContinuousTraceCenter = FVector::ZeroVector;
+	bool bContinuousTraceActive = false;
 };

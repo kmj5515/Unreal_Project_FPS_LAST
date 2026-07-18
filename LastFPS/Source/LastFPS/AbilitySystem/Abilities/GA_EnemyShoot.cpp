@@ -15,7 +15,7 @@ UGA_EnemyShoot::UGA_EnemyShoot()
 	// AI 는 서버에서만 도므로 예측 없이 서버 권위로 실행.
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 
-	// 이 태그로 BTTask_EnemyAttack 이 발동한다(AIProfile.AttackAbilityTag 와 일치해야 함).
+	// BTTask_EnemyAttack에 같은 태그를 지정해 이 어빌리티를 활성화한다.
 	FGameplayTagContainer Tags;
 	Tags.AddTag(LastFPSGameplayTags::Ability_Enemy_Shoot);
 	SetAssetTags(Tags);

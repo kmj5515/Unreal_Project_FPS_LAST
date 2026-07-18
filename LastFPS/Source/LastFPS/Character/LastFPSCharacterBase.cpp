@@ -39,6 +39,7 @@ void ALastFPSCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ALastFPSCharacterBase, bIsInCombat);
+    DOREPLIFETIME(ALastFPSCharacterBase, ReplicatedClassificationTags);
 }
 
 UAbilitySystemComponent* ALastFPSCharacterBase::GetAbilitySystemComponent() const
@@ -74,9 +75,28 @@ const ULastFPSCharacterDefinition* ALastFPSCharacterBase::GetCharacterDefinition
     return ResolveCharacterDefinition();
 }
 
+bool ALastFPSCharacterBase::HasCharacterClassificationTag(const FGameplayTag TagToCheck) const
+{
+    if (!TagToCheck.IsValid())
+    {
+        return false;
+    }
+
+    if (ReplicatedClassificationTags.HasTag(TagToCheck))
+    {
+        return true;
+    }
+
+    const ULastFPSCharacterDefinition* Definition = ResolveCharacterDefinition();
+    return Definition && Definition->HasClassificationTag(TagToCheck);
+}
+
 void ALastFPSCharacterBase::SetCharacterDefinitionForSpawn(ULastFPSCharacterDefinition* InDefinition)
 {
     CharacterDefinition = InDefinition;
+    ReplicatedClassificationTags = InDefinition
+        ? InDefinition->ClassificationTags
+        : FGameplayTagContainer();
 }
 
 const ULastFPSCharacterDefinition* ALastFPSCharacterBase::ResolveCharacterDefinition() const
@@ -293,6 +313,11 @@ void ALastFPSCharacterBase::BeginPlay()
 
     if (const ULastFPSCharacterDefinition* Definition = ResolveCharacterDefinition())
     {
+        if (HasAuthority())
+        {
+            ReplicatedClassificationTags = Definition->ClassificationTags;
+        }
+
         if (Definition->CharacterType != ELastFPSCharacterType::Player)
         {
             InitAbilitySystem();

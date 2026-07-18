@@ -781,6 +781,7 @@ void SCharacterDataAssetTool::ApplyRowToDefinition(
 	Definition->Modify();
 	Definition->CharacterId = Row.CharacterId.IsNone() ? RowName : Row.CharacterId;
 	Definition->CharacterType = Row.CharacterType;
+	Definition->ClassificationTags = Row.ClassificationTags;
 	Definition->DisplayName = FText::FromString(Row.DisplayName);
 	Definition->Icon = Cast<UTexture2D>(Row.Icon.LoadSynchronous());
 	Definition->PawnClass = Row.PawnClass.LoadSynchronous();
