@@ -13,6 +13,9 @@
 
 ALastFPSGameModeBase::ALastFPSGameModeBase()
 {
+    // 플레이어 ASC(PlayerState 소유)·스탯·캐릭터 선택이 ALastFPSPlayerState 를 전제하므로 명시적으로 지정한다.
+    // (미지정 시 AGameModeBase 기본 APlayerState 가 쓰여 GetPlayerState<ALastFPSPlayerState> 가 항상 null → ASC/스탯 소실.)
+    PlayerStateClass = ALastFPSPlayerState::StaticClass();
 }
 
 void ALastFPSGameModeBase::PostLogin(APlayerController* NewPlayer)

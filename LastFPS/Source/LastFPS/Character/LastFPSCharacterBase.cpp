@@ -19,6 +19,8 @@
 #include "Game/LastFPSPlayerController.h"
 #include "Utility/LastFPSDamageCalculation.h"
 #include "Net/UnrealNetwork.h"
+#include "Engine/GameInstance.h"
+#include "Quest/LastFPSQuestSubsystem.h"
 
 ALastFPSCharacterBase::ALastFPSCharacterBase()
 {
@@ -305,6 +307,16 @@ void ALastFPSCharacterBase::HandleDeath()
 
     bHasDied = true;
     OnDeath.Broadcast(this);
+
+    // 처치 목표(KillTarget) 통지 — 퀘스트 진행은 레벨 이동에도 유지되는 GameInstance 서브시스템이 소유하므로
+    // PlayerState 를 거치지 않고 여기서 직접 통지한다. QuestKillTag 가 비면(플레이어/아군) 서브시스템이 무시한다.
+    if (UGameInstance* GI = GetGameInstance())
+    {
+        if (ULastFPSQuestSubsystem* Quest = GI->GetSubsystem<ULastFPSQuestSubsystem>())
+        {
+            Quest->NotifyObjectiveKill(QuestKillTag);
+        }
+    }
 }
 
 void ALastFPSCharacterBase::BeginPlay()

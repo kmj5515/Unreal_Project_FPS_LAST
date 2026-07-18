@@ -2,7 +2,6 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Economy/LastFPSEconomySubsystem.h"
-#include "Quest/LastFPSQuestSubsystem.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
@@ -126,29 +125,6 @@ void ALastFPSPlayerState::GrantItemLocal(FName ItemRowId, int32 Count)
     if (UGameInstance* GI = GetGameInstance())
         if (ULastFPSEconomySubsystem* Econ = GI->GetSubsystem<ULastFPSEconomySubsystem>())
             Econ->AddItem(ItemRowId, Count);
-}
-
-void ALastFPSPlayerState::Auth_NotifyQuestKill(FGameplayTag EnemyTag)
-{
-    if (!HasAuthority() || !EnemyTag.IsValid())
-        return;
-
-    if (GetNetMode() == NM_Standalone)
-        NotifyQuestKillLocal(EnemyTag);
-    else
-        Client_NotifyQuestKill(EnemyTag);   // 호스트 자기 폰이면 로컬 실행됨
-}
-
-void ALastFPSPlayerState::Client_NotifyQuestKill_Implementation(FGameplayTag EnemyTag)
-{
-    NotifyQuestKillLocal(EnemyTag);
-}
-
-void ALastFPSPlayerState::NotifyQuestKillLocal(FGameplayTag EnemyTag)
-{
-    if (UGameInstance* GI = GetGameInstance())
-        if (ULastFPSQuestSubsystem* Quest = GI->GetSubsystem<ULastFPSQuestSubsystem>())
-            Quest->NotifyObjectiveKill(EnemyTag);
 }
 
 void ALastFPSPlayerState::Auth_AddDamageTaken(float Amount)   { Auth_AddFloatStat(StatDamageTaken,     Amount); }
