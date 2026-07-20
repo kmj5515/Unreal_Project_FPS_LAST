@@ -14,6 +14,8 @@ UGA_Ultimate::UGA_Ultimate()
     Tags.AddTag(LastFPSGameplayTags::Ability_Ultimate);
     Tags.AddTag(LastFPSGameplayTags::Input_Ultimate);
     SetAssetTags(Tags);
+
+    ActivationBlockedTags.AddTag(LastFPSGameplayTags::State_Combat_Disabled);
 }
 
 bool UGA_Ultimate::CanActivateAbility(

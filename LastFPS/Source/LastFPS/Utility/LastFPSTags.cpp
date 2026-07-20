@@ -14,6 +14,8 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_FreezeStack, "Status.FreezeStack", "빙결
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Movement_Slow, "Status.Movement.Slow", "이동 속도 감소 효과가 활성화된 상태")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Movement_SpeedBoost, "Status.Movement.SpeedBoost", "이동속도 증가 효과가 활성화된 상태")
 
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Combat_Disabled, "State.Combat.Disabled", "전투(무기/스킬) 어빌리티 사용이 금지된 상태")
+
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_Dash, "Cooldown.Skill.Dash", "Dash cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill1, "Cooldown.Skill1", "Skill 1 cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill2, "Cooldown.Skill2", "Skill 2 cooldown")

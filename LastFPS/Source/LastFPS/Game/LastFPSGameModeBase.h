@@ -7,6 +7,7 @@
 
 class ALastFPSPlayerState;
 class UAbilitySystemComponent;
+class UGameplayEffect;
 class ULastFPSCharacterDefinition;
 class ULastFPSCharacterRoster;
 
@@ -31,6 +32,10 @@ public:
         UAbilitySystemComponent* ASC,
         const ULastFPSCharacterDefinition* CharacterDefinition) const;
 
+    // 서버: 이 맵의 제한 효과(예: 전투 금지)를 대상 ASC 에 적용한다.
+    // "어떤 제한을 걸지"는 맵마다 다른 규칙이므로 InitialScreenTag 처럼 GameMode 가 소유한다.
+    void ApplyLevelRestrictionsToAbilitySystem(UAbilitySystemComponent* ASC) const;
+
     // ── 이 맵의 UI 진입 설정 (PlayerController가 읽어 OpenScreen) ──
     // "어떤 화면을 띄울지"는 맵마다 다른 규칙이므로 GameMode가 소유한다.
     // 덕분에 PlayerController는 맵마다 다를 필요 없이 1개로 공유된다.
@@ -45,6 +50,10 @@ public:
     /** ESC로 열 화면 (예: 허브 메뉴). 비우면 ESC 무시. 닫기는 CommonUI Back. */
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI", meta=(Categories="UI.Screen"))
     FGameplayTag EscMenuScreenTag;
+
+    /** 이 맵 진입 시 플레이어 ASC 에 적용할 제한 효과. 비우면 제한 없음(전투 맵). 허브 GameMode BP 에서 전투 금지 GE 지정. */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Combat")
+    TSubclassOf<UGameplayEffect> LevelRestrictionEffect;
 
 protected:
     // 화면 디버그 + 로그를 한 번에 — 파생 GameMode들의 공용 헬퍼

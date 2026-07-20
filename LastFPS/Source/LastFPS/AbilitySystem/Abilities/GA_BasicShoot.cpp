@@ -22,6 +22,8 @@ UGA_BasicShoot::UGA_BasicShoot()
     Tags.AddTag(LastFPSGameplayTags::Ability_Fire);
     Tags.AddTag(LastFPSGameplayTags::Input_Fire);
     SetAssetTags(Tags);
+
+    ActivationBlockedTags.AddTag(LastFPSGameplayTags::State_Combat_Disabled);
 }
 
 void UGA_BasicShoot::ActivateAbility(

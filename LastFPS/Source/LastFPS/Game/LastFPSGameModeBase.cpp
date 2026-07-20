@@ -1,4 +1,5 @@
 #include "Game/LastFPSGameModeBase.h"
+#include "AbilitySystemComponent.h"
 #include "Data/Characters/LastFPSCharacterStatData.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
@@ -89,6 +90,23 @@ bool ALastFPSGameModeBase::ApplyCharacterDefinitionToAbilitySystem(
     CharacterDefinition->GiveToAbilitySystem(ASC);
 
     return CharacterDefinition->StatData != nullptr;
+}
+
+void ALastFPSGameModeBase::ApplyLevelRestrictionsToAbilitySystem(UAbilitySystemComponent* ASC) const
+{
+    if (!ASC || !LevelRestrictionEffect)
+    {
+        return;
+    }
+
+    FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
+    Context.AddSourceObject(this);
+
+    const FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(LevelRestrictionEffect, 1.f, Context);
+    if (Spec.IsValid())
+    {
+        ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+    }
 }
 
 int32 ALastFPSGameModeBase::GetTotalConnectedPlayers() const

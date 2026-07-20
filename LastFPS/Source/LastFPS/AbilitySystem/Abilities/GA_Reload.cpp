@@ -16,6 +16,8 @@ UGA_Reload::UGA_Reload()
     Tags.AddTag(LastFPSGameplayTags::Ability_Reload);
     Tags.AddTag(LastFPSGameplayTags::Input_Reload);
     SetAssetTags(Tags);
+
+    ActivationBlockedTags.AddTag(LastFPSGameplayTags::State_Combat_Disabled);
 }
 
 void UGA_Reload::ActivateAbility(
