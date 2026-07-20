@@ -17,6 +17,9 @@ namespace LastFPSGameplayTags
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Movement_Slow);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Movement_SpeedBoost);
 
+	// 레벨 규칙으로 부여되는 전투 금지 상태. 전투 어빌리티의 ActivationBlockedTags 가 참조한다.
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Disabled);
+
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill_Dash);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill1);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill2);

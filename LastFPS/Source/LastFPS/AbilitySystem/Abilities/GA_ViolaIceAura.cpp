@@ -27,6 +27,8 @@ UGA_ViolaIceAura::UGA_ViolaIceAura()
 	Tags.AddTag(LastFPSGameplayTags::Ability_Skill2);
 	Tags.AddTag(LastFPSGameplayTags::Input_Skill2);
 	SetAssetTags(Tags);
+
+	ActivationBlockedTags.AddTag(LastFPSGameplayTags::State_Combat_Disabled);
 }
 
 bool UGA_ViolaIceAura::CanActivateAbility(

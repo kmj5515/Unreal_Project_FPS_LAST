@@ -16,6 +16,8 @@ UGA_SkillMoveBoost::UGA_SkillMoveBoost()
     Tags.AddTag(LastFPSGameplayTags::Ability_Skill1);
     Tags.AddTag(LastFPSGameplayTags::Input_Skill1);
     SetAssetTags(Tags);
+
+    ActivationBlockedTags.AddTag(LastFPSGameplayTags::State_Combat_Disabled);
 }
 
 void UGA_SkillMoveBoost::ActivateAbility(

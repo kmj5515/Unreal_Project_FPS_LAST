@@ -458,6 +458,7 @@ void ALastFPSCharacterBase::InitAbilitySystem()
         if (ALastFPSGameModeBase* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALastFPSGameModeBase>() : nullptr)
         {
             GM->ApplyCharacterDefinitionToAbilitySystem(ASC, ResolvedDefinition);
+            GM->ApplyLevelRestrictionsToAbilitySystem(ASC);
         }
 
         // 베이스 스탯 적용 직후, 장착 모듈 보정을 Infinite GE 로 얹는다 (서버 권위).

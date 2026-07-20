@@ -33,6 +33,8 @@ UGA_IceStorm::UGA_IceStorm()
 	Tags.AddTag(LastFPSGameplayTags::Ability_Skill3);
 	Tags.AddTag(LastFPSGameplayTags::Input_Skill3);
 	SetAssetTags(Tags);
+
+	ActivationBlockedTags.AddTag(LastFPSGameplayTags::State_Combat_Disabled);
 }
 
 bool UGA_IceStorm::CanActivateAbility(
