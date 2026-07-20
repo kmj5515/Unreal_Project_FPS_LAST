@@ -52,6 +52,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Weapon|IK")
     bool GetLeftHandIKTransformForTarget(FName TargetName, USkeletalMeshComponent* CharacterMesh, FName RelativeToBoneName, FTransform& OutTransform) const;
 
+    /** 일반 무기 왼손 Two Bone IK에서 사용할 메시 컴포넌트 공간 팔꿈치 목표를 반환한다. */
+    bool GetLeftHandIKJointTargetLocation(USkeletalMeshComponent* CharacterMesh, FVector& OutLocation) const;
+
     // 런타임 무기 장착 (서버에서 호출 → Multicast로 전체 적용)
     void EquipWeapon(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass = nullptr);
 
@@ -70,6 +73,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="Weapon")
     EMMWeaponType GetWeaponType() const { return HasWeapon() ? WeaponType : EMMWeaponType::Unarmed; }
+
+    UFUNCTION(BlueprintPure, Category="Weapon")
+    ULastFPSWeaponDefinition* GetWeaponDefinition() const { return WeaponDefinition; }
 
     // 무기 BP마다 Unarmed / Rifle / Pistol 지정 (Chooser Table 분기 입력)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, ReplicatedUsing=OnRep_WeaponType, Category="Weapon")
@@ -96,6 +102,16 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|IK")
     FName LeftHandIKSocketName = TEXT("LeftHandIK");
+
+    /** 비전투 준비 자세에서 기본 왼손 IK 소켓 대신 사용할 무기 소켓이다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|IK")
+    FName ReadyLeftHandIKSocketName = TEXT("LeftHandIK_Ready");
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|IK")
+    FName LeftHandIKJointRootBoneName = TEXT("upperarm_l");
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|IK", meta=(Units="cm"))
+    FVector LeftHandIKJointTargetOffset = FVector(-15.f, -40.f, 5.f);
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|IK")
     FName ReloadLeftHandIKTargetName = TEXT("Clip_Bone");

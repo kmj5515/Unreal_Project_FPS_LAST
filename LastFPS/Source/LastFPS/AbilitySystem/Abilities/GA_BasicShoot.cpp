@@ -181,7 +181,7 @@ void UGA_BasicShoot::LocalFire(UWeaponComponent* Weapon)
     {
         if (ULastFPSHUDWidget* HUDWidget = PC->GetHUDWidget())
         {
-            HUDWidget->AddCrosshairFireSpread();
+            HUDWidget->PlayCrosshairFireAnimation();
         }
     }
 

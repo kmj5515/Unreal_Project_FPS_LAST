@@ -20,6 +20,8 @@ class LASTFPS_API ULastFPSUIManagerSubsystem : public UGameUIManagerSubsystem
 	GENERATED_BODY()
 
 public:
+	virtual void Deinitialize() override;
+
 	/** WorldContext로 인스턴스 획득 (BP/C++ 공용) */
 	static ULastFPSUIManagerSubsystem* Get(const UObject* WorldContext);
 

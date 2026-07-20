@@ -6,6 +6,7 @@
 #include "UI/Framework/LastFPSUITags.h"
 
 #include "CommonActivatableWidget.h"
+#include "CommonLocalPlayer.h"
 #include "Engine/GameInstance.h"
 #include "GameFramework/PlayerController.h"
 #include "PrimaryGameLayout.h"
@@ -13,6 +14,27 @@
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LastFPSUIManagerSubsystem)
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSUI, Log, All);
+
+void ULastFPSUIManagerSubsystem::Deinitialize()
+{
+	// 부모 종료가 UI 정책을 해제하기 전에 로컬 플레이어별 루트 레이아웃을 Viewport와 정책 캐시에서 제거한다.
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		const int32 LocalPlayerCount = GameInstance->GetNumLocalPlayers();
+		for (int32 PlayerIndex = 0; PlayerIndex < LocalPlayerCount; ++PlayerIndex)
+		{
+			if (UCommonLocalPlayer* LocalPlayer = Cast<UCommonLocalPlayer>(GameInstance->GetLocalPlayerByIndex(PlayerIndex)))
+			{
+				NotifyPlayerDestroyed(LocalPlayer);
+			}
+		}
+	}
+
+	OpenScreens.Reset();
+	CachedRegistry = nullptr;
+
+	Super::Deinitialize();
+}
 
 ULastFPSUIManagerSubsystem* ULastFPSUIManagerSubsystem::Get(const UObject* WorldContext)
 {

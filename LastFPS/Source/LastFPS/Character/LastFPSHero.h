@@ -12,6 +12,7 @@ class UInputMappingContext;
 class ULastFPSInputConfig;
 class UWeaponComponent;
 class ULastFPSGrapplingAnimationComponent;
+class ULastFPSGrapplingTargetingComponent;
 class UAnimMontage;
 struct FInputActionValue;
 
@@ -46,6 +47,11 @@ public:
     ULastFPSGrapplingAnimationComponent* GetGrapplingAnimationComponent() const
     {
         return GrapplingAnimationComponent;
+    }
+    UFUNCTION(BlueprintPure, Category="LastFPS|Grappling Targeting")
+    ULastFPSGrapplingTargetingComponent* GetGrapplingTargetingComponent() const
+    {
+        return GrapplingTargetingComponent;
     }
     virtual bool GetIsADS() const override { return bIsADS; }
     FORCEINLINE bool GetIsSprinting() const { return bIsSprinting; }
@@ -173,6 +179,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|Animation", meta=(AllowPrivateAccess="true"))
     TObjectPtr<ULastFPSGrapplingAnimationComponent> GrapplingAnimationComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|Grappling", meta=(AllowPrivateAccess="true"))
+    TObjectPtr<ULastFPSGrapplingTargetingComponent> GrapplingTargetingComponent;
 
     UPROPERTY(EditDefaultsOnly, Category="Input")
     TObjectPtr<UInputMappingContext> DefaultMappingContext;

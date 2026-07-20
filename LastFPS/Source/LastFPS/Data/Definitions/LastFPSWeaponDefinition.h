@@ -12,9 +12,28 @@ class AActor;
 class UAnimationAsset;
 class UAnimInstance;
 class UCameraShakeBase;
+class UecsCrosshairEditorAsset;
 class UParticleSystem;
 class USkeletalMesh;
 class USoundBase;
+
+USTRUCT(BlueprintType)
+struct LASTFPS_API FLastFPSWeaponCrosshairSettings
+{
+    GENERATED_BODY()
+
+    /** 무기별 EasyCrosshair 에셋이다. 비어 있으면 HUD의 기본 에셋을 사용한다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Crosshair")
+    TSoftObjectPtr<UecsCrosshairEditorAsset> CrosshairAsset;
+
+    /** 발사 시 실행할 EasyCrosshair 애니메이션 이름이다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Crosshair")
+    FName FireAnimationName = TEXT("Shoot");
+
+    /** 0이면 EasyCrosshair 에셋에 저장된 애니메이션 시간을 사용한다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Crosshair", meta=(ClampMin="0.0", Units="s"))
+    float FireAnimationDuration = 0.f;
+};
 
 USTRUCT(BlueprintType)
 struct LASTFPS_API FLastFPSWeaponAimRecoilSettings
@@ -89,6 +108,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
     EMMWeaponType WeaponType = EMMWeaponType::Unarmed;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Crosshair")
+    FLastFPSWeaponCrosshairSettings Crosshair;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
     TObjectPtr<USkeletalMesh> SkeletalMesh;
 
@@ -115,6 +137,18 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Sockets")
     FName LeftHandIKSocketName = TEXT("LeftHandIK");
+
+    /** 비전투 준비 자세에서 기본 왼손 IK 소켓 대신 사용할 무기 소켓이다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Sockets")
+    FName ReadyLeftHandIKSocketName = TEXT("LeftHandIK_Ready");
+
+    /** 일반 무기 왼손 Two Bone IK의 팔꿈치 목표를 계산할 기준 본이다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|IK")
+    FName LeftHandIKJointRootBoneName = TEXT("upperarm_l");
+
+    /** 기준 본 위치에 더할 메시 컴포넌트 공간 팔꿈치 목표 오프셋이다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|IK", meta=(Units="cm"))
+    FVector LeftHandIKJointTargetOffset = FVector(-15.f, -40.f, 5.f);
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Sockets")
     FName ReloadLeftHandIKTargetName = TEXT("Clip_Bone");

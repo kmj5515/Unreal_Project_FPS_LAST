@@ -12,6 +12,9 @@
 #include "LastFPSHUDWidget.generated.h"
 
 class UAbilitySystemComponent;
+class UecsCrosshairEditorAsset;
+class ULastFPSEasyCrosshairPresenter;
+class ULastFPSGrapplingTargetingComponent;
 class ULastFPSDamageDirectionIndicatorWidget;
 class ULastFPSDamageNumberWidget;
 class ULastFPSEnemyHealthBarWidget;
@@ -55,7 +58,7 @@ public:
     void ShowDamageDirection(const FVector& DamageSourceDirection);
 
     UFUNCTION(BlueprintCallable, Category="HUD|Crosshair")
-    void AddCrosshairFireSpread(float SpreadAmount = -1.f);
+    void PlayCrosshairFireAnimation();
 
     UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
     TObjectPtr<ULastFPSSkillCooldownSlotWidget> WBP_SkillCooldownSlot_Q;
@@ -80,12 +83,6 @@ protected:
     UFUNCTION(BlueprintImplementableEvent, Category="HUD")
     void OnStaminaChanged(float Current, float Max);
 
-    UFUNCTION(BlueprintImplementableEvent, Category="HUD")
-    void OnCrosshairVisibilityChanged(bool bVisible);
-
-    UFUNCTION(BlueprintImplementableEvent, Category="HUD")
-    void OnCrosshairSpreadChanged(float Spread);
-
     UPROPERTY(BlueprintReadOnly, Category="HUD|HitMarker", meta=(BindWidgetOptional))
     TObjectPtr<UImage> HitMarkerImage;
 
@@ -101,38 +98,42 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="HUD|Damage Direction", meta=(ClampMin="1", ClampMax="16"))
     int32 MaxDamageDirectionIndicators = 6;
 
+    /** 지정하면 EasyCrosshair가 이 Overlay 안에 배치된다. 비어 있으면 런타임에 HUD 루트에 생성한다. */
     UPROPERTY(BlueprintReadOnly, Category="HUD|Crosshair", meta=(BindWidgetOptional))
-    TObjectPtr<UImage> CrosshairImage;
+    TObjectPtr<UOverlay> CrosshairHost;
 
-    UPROPERTY(EditDefaultsOnly, Category="HUD|Crosshair|Material")
-    FName CrosshairSpreadParameterName = TEXT("Spread");
+    /** EasyCrosshair 아래에서 항상 표시되는 그래플링 가능 상태 점이다. 없으면 런타임에 생성한다. */
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Grappling Reticle", meta=(BindWidgetOptional))
+    TObjectPtr<UImage> GrapplingDotImage;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="-0.1"))
-    float CrosshairBaseSpread = 0.005f;
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Grappling Reticle")
+    float GrapplingDotSize = 6.f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
-    float CrosshairMoveSpread = 0.02f;
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Grappling Reticle", meta=(ClampMin="0.01"))
+    float GrapplingDotIdleScale = 1.f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
-    float CrosshairJumpSpread = 0.04f;
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Grappling Reticle", meta=(ClampMin="0.01"))
+    float GrapplingDotAvailableScale = 1.7f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
-    float CrosshairFireSpread = 0.025f;
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Grappling Reticle", meta=(ClampMin="0.0"))
+    float GrapplingDotScaleInterpSpeed = 12.f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
-    float CrosshairMaxFireSpread = 0.08f;
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Grappling Reticle")
+    FLinearColor GrapplingDotIdleColor = FLinearColor(1.f, 1.f, 1.f, 0.55f);
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0", ClampMax="1.0"))
-    float CrosshairZoomSpreadMultiplier = 0.3f;
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Grappling Reticle")
+    FLinearColor GrapplingDotAvailableColor = FLinearColor(0.15f, 0.9f, 1.f, 1.f);
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
-    float CrosshairRecoverSpeed = 12.f;
+    /** 무기 Definition에 전용 에셋이 없을 때 사용하는 기본 EasyCrosshair 에셋이다. */
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Crosshair")
+    TSoftObjectPtr<UecsCrosshairEditorAsset> DefaultCrosshairAsset;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
-    float CrosshairFireRecoverSpeed = 9.f;
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Crosshair")
+    FName DefaultCrosshairFireAnimationName = TEXT("Shoot");
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0"))
-    float CrosshairMovementSpeedThreshold = 10.f;
+    /** 0이면 EasyCrosshair 에셋에 저장된 애니메이션 시간을 사용한다. */
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Crosshair", meta=(ClampMin="0.0", Units="s"))
+    float DefaultCrosshairFireAnimationDuration = 0.f;
 
     UPROPERTY(EditDefaultsOnly, Category="HUD|HitMarker|Material")
     FName HitMarkerSpreadParameterName = TEXT("HitSpread");
@@ -222,9 +223,13 @@ private:
     void SetHitMarkerSpread(float Spread);
     void TickDamageDirectionIndicators(float DeltaTime);
     void ClearDamageDirectionIndicators();
-    void InitializeCrosshairMaterial();
-    void TickCrosshairSpread(float DeltaTime);
-    void SetCrosshairSpread(float Spread);
+    UOverlay* ResolveCrosshairHost();
+    void RefreshEasyCrosshair();
+    void RemoveEasyCrosshair();
+    void SetEasyCrosshairVisibility(bool bVisible);
+    void EnsureGrapplingDot();
+    void TickGrapplingDot(float DeltaTime);
+    void ApplyGrapplingDotAvailability(bool bTargetAvailable);
     void BroadcastHealthDisplay();
     void BroadcastStaminaDisplay();
     void SpawnDamageNumber(
@@ -249,12 +254,16 @@ private:
     UFUNCTION()
     void HandleWeaponEquippedChanged(bool bEquipped);
 
+    UFUNCTION()
+    void HandleGrapplingTargetAvailabilityChanged(bool bTargetAvailable);
+
     FTimerHandle RetryTimerHandle;
     FTimerHandle HUDRefreshTimerHandle;
     void HideHitMarker();
 
     TWeakObjectPtr<UMaterialInstanceDynamic> HitMarkerMaterial;
-    TWeakObjectPtr<UMaterialInstanceDynamic> CrosshairMaterial;
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSEasyCrosshairPresenter> CrosshairPresenter;
     
     float HitMarkerSpreadElapsed = 0.f;
     bool bHitMarkerSpreadAnimating = false;
@@ -266,15 +275,19 @@ private:
     TArray<TObjectPtr<ULastFPSEnemyHealthBarWidget>> EnemyHealthBarPool;
     
     bool bDamageDirectionConfigurationWarningLogged = false;
-    float CurrentCrosshairSpread = 0.f;
-    float FireCrosshairSpread = 0.f;
+    bool bCrosshairConfigurationWarningLogged = false;
 
     FLastFPSSmoothedGaugeDisplay HealthGauge;
     FLastFPSSmoothedGaugeDisplay StaminaGauge;
 
     TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
     TWeakObjectPtr<UWeaponComponent> BoundWeaponComponent;
+    TWeakObjectPtr<ULastFPSGrapplingTargetingComponent> BoundGrapplingTargetingComponent;
     TWeakObjectPtr<ALastFPSPlayerState> BoundPlayerState;
+
+    float GrapplingDotCurrentScale = 1.f;
+    float GrapplingDotTargetScale = 1.f;
+    bool bGrapplingDotInitialized = false;
 
     bool bAttributeDelegatesBound = false;
     bool bPawnComponentsBound = false;

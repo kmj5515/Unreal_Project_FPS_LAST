@@ -18,6 +18,10 @@ class LASTFPS_API UGA_GrapplingHook : public ULastFPSActiveGameplayAbility
 public:
 	UGA_GrapplingHook();
 
+	virtual void OnAvatarSet(
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilitySpec& Spec) override;
+
 	virtual void ActivateAbility(
 		FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
@@ -36,7 +40,6 @@ protected:
 	TObjectPtr<ULastFPSGrapplingHookData> GrapplingData;
 
 private:
-	bool ResolveGrappleTarget(const ALastFPSHero& Hero, FHitResult& OutHit) const;
 	void StartHookFlight(ALastFPSHero& Hero);
 	void StartAttachedPull(ALastFPSHero& Hero);
 	void StartGrapplePull();

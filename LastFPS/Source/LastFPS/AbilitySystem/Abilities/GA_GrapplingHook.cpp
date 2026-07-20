@@ -4,11 +4,11 @@
 #include "Abilities/Tasks/AbilityTask_WaitDelay.h"
 #include "AbilitySystemComponent.h"
 #include "Character/Components/LastFPSGrapplingAnimationComponent.h"
+#include "Character/Components/LastFPSGrapplingTargetingComponent.h"
 #include "Character/LastFPSHero.h"
 #include "Components/PrimitiveComponent.h"
 #include "Data/Abilities/LastFPSGrapplingHookData.h"
 #include "Engine/World.h"
-#include "GameFramework/Controller.h"
 #include "GameFramework/RootMotionSource.h"
 #include "Utility/LastFPSTags.h"
 
@@ -41,6 +41,24 @@ UGA_GrapplingHook::UGA_GrapplingHook()
 	SetAssetTags(Tags);
 }
 
+void UGA_GrapplingHook::OnAvatarSet(
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilitySpec& Spec)
+{
+	Super::OnAvatarSet(ActorInfo, Spec);
+
+	ALastFPSHero* Hero = ActorInfo
+		? Cast<ALastFPSHero>(ActorInfo->AvatarActor.Get())
+		: nullptr;
+	if (Hero && ensureMsgf(
+		Hero->GetGrapplingTargetingComponent(),
+		TEXT("그래플링 타기팅 컴포넌트가 없습니다. Hero=%s"),
+		*GetNameSafe(Hero)))
+	{
+		Hero->GetGrapplingTargetingComponent()->ConfigureTargeting(GrapplingData.Get());
+	}
+}
+
 void UGA_GrapplingHook::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -60,8 +78,19 @@ void UGA_GrapplingHook::ActivateAbility(
 		return;
 	}
 
+	ULastFPSGrapplingTargetingComponent* TargetingComponent =
+		Hero->GetGrapplingTargetingComponent();
+	if (!ensureMsgf(
+		TargetingComponent,
+		TEXT("그래플링 활성화에 필요한 타기팅 컴포넌트가 없습니다. Hero=%s"),
+		*GetNameSafe(Hero)))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
 	FHitResult TargetHit;
-	if (!ResolveGrappleTarget(*Hero, TargetHit))
+	if (!TargetingComponent->ResolveGrappleTarget(*GrapplingData, TargetHit))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -322,46 +351,6 @@ void UGA_GrapplingHook::StartGrapplePull()
 	CameraEffectOptions.BlendOutDuration = GrapplingData->PullCameraBlendOutDuration;
 	bCameraEffectStarted = Hero->BeginTemporaryCameraEffect(this, CameraEffectOptions);
 	GrappleMovementTask->ReadyForActivation();
-}
-
-bool UGA_GrapplingHook::ResolveGrappleTarget(const ALastFPSHero& Hero, FHitResult& OutHit) const
-{
-	if (!GrapplingData || !Hero.GetWorld())
-	{
-		return false;
-	}
-
-	FVector ViewLocation;
-	FRotator ViewRotation;
-	Hero.GetActorEyesViewPoint(ViewLocation, ViewRotation);
-	if (const AController* Controller = Hero.GetController())
-	{
-		Controller->GetPlayerViewPoint(ViewLocation, ViewRotation);
-	}
-
-	const FVector TraceEnd = ViewLocation + ViewRotation.Vector() * GrapplingData->MaximumDistance;
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(GrapplingHookTrace), false, &Hero);
-	QueryParams.AddIgnoredActor(&Hero);
-	if (!Hero.GetWorld()->LineTraceSingleByChannel(
-		OutHit,
-		ViewLocation,
-		TraceEnd,
-		GrapplingData->TraceChannel,
-		QueryParams))
-	{
-		return false;
-	}
-
-	const float TargetDistance = FVector::Distance(Hero.GetActorLocation(), OutHit.ImpactPoint);
-	if (TargetDistance < GrapplingData->MinimumDistance
-		|| TargetDistance > GrapplingData->MaximumDistance)
-	{
-		return false;
-	}
-
-	const UPrimitiveComponent* HitComponent = OutHit.GetComponent();
-	return !GrapplingData->bRequireStaticSurface
-		|| (HitComponent && HitComponent->GetMobility() == EComponentMobility::Static);
 }
 
 void UGA_GrapplingHook::StartWireGameplayCue(

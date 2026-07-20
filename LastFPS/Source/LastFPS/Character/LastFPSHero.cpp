@@ -1,5 +1,6 @@
 #include "Character/LastFPSHero.h"
 #include "Character/Components/LastFPSGrapplingAnimationComponent.h"
+#include "Character/Components/LastFPSGrapplingTargetingComponent.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Input/LastFPSInputConfig.h"
 #include "Utility/LastFPSTags.h"
@@ -67,6 +68,8 @@ ALastFPSHero::ALastFPSHero()
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComp"));
     GrapplingAnimationComponent = CreateDefaultSubobject<ULastFPSGrapplingAnimationComponent>(
         TEXT("GrapplingAnimationComponent"));
+    GrapplingTargetingComponent = CreateDefaultSubobject<ULastFPSGrapplingTargetingComponent>(
+        TEXT("GrapplingTargetingComponent"));
     if (USkeletalMeshComponent* CharacterMesh = GetMesh())
     {
         CharacterMesh->AddTickPrerequisiteComponent(GrapplingAnimationComponent);

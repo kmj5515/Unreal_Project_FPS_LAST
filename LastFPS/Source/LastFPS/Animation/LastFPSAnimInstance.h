@@ -65,6 +65,10 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category="MM|IK")
 	float LeftHandIKAlpha = 0.f;
 
+	/** 일반 무기 왼손 Two Bone IK에서 사용하는 메시 컴포넌트 공간 팔꿈치 목표다. */
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK")
+	FVector LeftHandIKJointTargetLocation = FVector::ZeroVector;
+
 	/** 게임 스레드에서 캐시해 AnimGraph의 병렬 평가가 캐릭터 컴포넌트에 접근하지 않게 한다. */
 	UPROPERTY(BlueprintReadOnly, Category="MM|IK|Grappling")
 	FVector GrapplingIKEffectorLocation = FVector::ZeroVector;

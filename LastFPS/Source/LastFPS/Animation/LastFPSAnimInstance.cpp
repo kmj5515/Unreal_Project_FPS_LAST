@@ -31,6 +31,7 @@ void ULastFPSAnimInstance::ResetAnimState()
 	bIsCasting = false;
 	LeftHandIKAlpha = 0.f;
 	LeftHandIKTransform = FTransform::Identity;
+	LeftHandIKJointTargetLocation = FVector::ZeroVector;
 	GrapplingIKEffectorLocation = FVector::ZeroVector;
 	GrapplingIKJointTargetLocation = FVector::ZeroVector;
 	GrapplingIKHandRotation = FRotator::ZeroRotator;
@@ -146,41 +147,62 @@ void ULastFPSAnimInstance::UpdateHandIK()
 {
 	LeftHandIKAlpha = 0.f;
 	LeftHandIKTransform = FTransform::Identity;
+	LeftHandIKJointTargetLocation = WeaponLeftHandIKJointTargetLocation;
 
 	if (CombatState == EMMCombatState::Casting)
 	{
 		return;
 	}
-	if (CombatState != EMMCombatState::Reloading || !bUseReloadLeftHandIKTarget)
-	{
-		LeftHandIKTransform = WeaponLeftHandIKTransform;
-		LeftHandIKAlpha = WeaponLeftHandIKAlpha;
-		return;
-	}
-
 	if (!OwnerCharacter || !OwnerCharacter->GetMesh())
 	{
 		return;
 	}
 
 	UWeaponComponent* Weapon = ResolveWeaponComponent(OwnerCharacter);
-	if (!Weapon || !Weapon->HasWeapon() || Weapon->ReloadLeftHandIKTargetName.IsNone())
+	if (CombatState == EMMCombatState::Reloading && bUseReloadLeftHandIKTarget)
 	{
+		if (!Weapon || !Weapon->HasWeapon() || Weapon->ReloadLeftHandIKTargetName.IsNone())
+		{
+			return;
+		}
+
+		FTransform ReloadIKTransform;
+		const bool bHasReloadIKTransform = Weapon->GetLeftHandIKTransformForTarget(
+			Weapon->ReloadLeftHandIKTargetName,
+			OwnerCharacter->GetMesh(),
+			RightHandBoneName,
+			ReloadIKTransform);
+
+		if (bHasReloadIKTransform)
+		{
+			LeftHandIKTransform = ReloadIKTransform;
+			LeftHandIKAlpha = 1.f;
+		}
 		return;
 	}
 
-	FTransform IKTransform;
-	const bool bHasIKTransform = Weapon->GetLeftHandIKTransformForTarget(
-		Weapon->ReloadLeftHandIKTargetName,
-		OwnerCharacter->GetMesh(),
-		RightHandBoneName,
-		IKTransform);
-
-	if (bHasIKTransform)
+	const bool bUseActiveCombatGrip = bIsInCombat || AimMode == EMMAimMode::ADS;
+	if (!bUseActiveCombatGrip && Weapon && Weapon->HasWeapon()
+		&& !Weapon->ReadyLeftHandIKSocketName.IsNone())
 	{
-		LeftHandIKTransform = IKTransform;
-		LeftHandIKAlpha = 1.f;
+		FTransform ReadyIKTransform;
+		const bool bHasReadyIKTransform = Weapon->GetLeftHandIKTransformForTarget(
+			Weapon->ReadyLeftHandIKSocketName,
+			OwnerCharacter->GetMesh(),
+			RightHandBoneName,
+			ReadyIKTransform);
+
+		if (bHasReadyIKTransform)
+		{
+			LeftHandIKTransform = ReadyIKTransform;
+			LeftHandIKAlpha = 1.f;
+			return;
+		}
 	}
+
+	// ADS 또는 전투 중에는 기존 기본 소켓을 사용한다.
+	LeftHandIKTransform = WeaponLeftHandIKTransform;
+	LeftHandIKAlpha = WeaponLeftHandIKAlpha;
 }
 
 void ULastFPSAnimInstance::UpdateGrapplingIK()

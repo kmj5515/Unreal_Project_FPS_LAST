@@ -108,6 +108,10 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category="MM|IK", meta=(DisplayName="Weapon Left Hand IK Alpha"))
 	float WeaponLeftHandIKAlpha = 0.f;
 
+	/** 일반 무기 왼손 Two Bone IK에서 사용하는 메시 컴포넌트 공간 팔꿈치 목표다. */
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK", meta=(DisplayName="Weapon Left Hand IK Joint Target Location"))
+	FVector WeaponLeftHandIKJointTargetLocation = FVector::ZeroVector;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|IK")
 	FName WeaponIKRightHandBoneName = TEXT("hand_r");
 

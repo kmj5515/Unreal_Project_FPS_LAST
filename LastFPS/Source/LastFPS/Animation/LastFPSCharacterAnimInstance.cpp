@@ -110,6 +110,7 @@ void ULastFPSCharacterAnimInstance::ResetAnimState()
 	bHasThreadSafeInputs = false;
 	WeaponLeftHandIKTransform = FTransform::Identity;
 	WeaponLeftHandIKAlpha = 0.f;
+	WeaponLeftHandIKJointTargetLocation = FVector::ZeroVector;
 	bCachedIsSprinting = false;
 	bCachedWantsToSprint = false;
 	bCachedWantsToWalk = false;
@@ -161,6 +162,7 @@ void ULastFPSCharacterAnimInstance::UpdateWeaponHandIK()
 {
 	WeaponLeftHandIKTransform = FTransform::Identity;
 	WeaponLeftHandIKAlpha = 0.f;
+	WeaponLeftHandIKJointTargetLocation = FVector::ZeroVector;
 
 	if (!OwnerCharacter || !OwnerCharacter->GetMesh())
 	{
@@ -182,6 +184,9 @@ void ULastFPSCharacterAnimInstance::UpdateWeaponHandIK()
 	{
 		WeaponLeftHandIKTransform = IKTransform;
 		WeaponLeftHandIKAlpha = 1.f;
+		Weapon->GetLeftHandIKJointTargetLocation(
+			OwnerCharacter->GetMesh(),
+			WeaponLeftHandIKJointTargetLocation);
 	}
 }
 

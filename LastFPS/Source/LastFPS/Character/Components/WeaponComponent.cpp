@@ -499,6 +499,25 @@ bool UWeaponComponent::GetLeftHandIKTransformForTarget(FName TargetName, USkelet
     return CurrentWeapon->GetSocketTransformInBoneSpace(TargetName, CharacterMesh, RelativeToBoneName, OutTransform);
 }
 
+bool UWeaponComponent::GetLeftHandIKJointTargetLocation(
+    USkeletalMeshComponent* CharacterMesh,
+    FVector& OutLocation) const
+{
+    OutLocation = FVector::ZeroVector;
+
+    if (!CharacterMesh || LeftHandIKJointRootBoneName.IsNone()
+        || !CharacterMesh->DoesSocketExist(LeftHandIKJointRootBoneName))
+    {
+        return false;
+    }
+
+    const FVector RootLocation = CharacterMesh->GetSocketTransform(
+        LeftHandIKJointRootBoneName,
+        RTS_Component).GetLocation();
+    OutLocation = RootLocation + LeftHandIKJointTargetOffset;
+    return true;
+}
+
 void UWeaponComponent::TestEquipWeapon()
 {
     Server_TestEquipWeapon();
@@ -605,6 +624,9 @@ void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
     MuzzleSocketName = NewDefinition->MuzzleSocketName;
     AttachSocketName = NewDefinition->AttachSocketName;
     LeftHandIKSocketName = NewDefinition->LeftHandIKSocketName;
+    ReadyLeftHandIKSocketName = NewDefinition->ReadyLeftHandIKSocketName;
+    LeftHandIKJointRootBoneName = NewDefinition->LeftHandIKJointRootBoneName;
+    LeftHandIKJointTargetOffset = NewDefinition->LeftHandIKJointTargetOffset;
     ReloadLeftHandIKTargetName = NewDefinition->ReloadLeftHandIKTargetName;
     FireRate = NewDefinition->FireRate;
     DamageRange = NewDefinition->DamageRange;
@@ -661,6 +683,8 @@ void UWeaponComponent::OnRep_WeaponDefinition()
     }
 
     ApplyAnimLayerClass(ResolveCurrentAnimLayerClass());
+    // 장착 여부가 같아도 무기별 UI 데이터가 바뀌었으므로 HUD 구독자에게 갱신을 알린다.
+    OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
 }
 
 void UWeaponComponent::AttachWeaponToOwner(ALastFPSWeaponActor* WeaponActor)
@@ -683,7 +707,7 @@ void UWeaponComponent::AttachWeaponToOwner(ALastFPSWeaponActor* WeaponActor)
     const bool bSocketExists = OwnerMesh->DoesSocketExist(AttachSocketName);
     WeaponActor->AttachToComponent(
         OwnerMesh,
-        FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+        FAttachmentTransformRules::SnapToTargetIncludingScale,
         bSocketExists ? AttachSocketName : NAME_None);
 
     WeaponActor->SetActorRelativeScale3D(FVector::OneVector);

@@ -1,14 +1,17 @@
 #include "UI/HUD/LastFPSHUDWidget.h"
 #include "UI/HUD/LastFPSDamageDirectionIndicatorWidget.h"
 #include "UI/HUD/LastFPSEnemyHealthBarWidget.h"
+#include "UI/HUD/LastFPSEasyCrosshairPresenter.h"
 #include "UI/LastFPSDamageNumberWidget.h"
 #include "UI/HUD/LastFPSSkillCooldownSlotWidget.h"
 #include "UI/HUD/LastFPSStatusEffectListWidget.h"
 #include "UI/HUD/LastFPSHUDStyle.h"
 #include "AbilitySystemComponent.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
+#include "Data/Definitions/LastFPSWeaponDefinition.h"
 #include "Data/Tables/LastFPSCharacterSkillData.h"
 #include "Engine/GameInstance.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "Styling/SlateBrush.h"
 #include "UI/Framework/LastFPSUITags.h"
 #include "Utility/LastFPSTags.h"
@@ -19,6 +22,10 @@
 #include "Widgets/CommonActivatableWidgetContainer.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/PanelWidget.h"
+#include "Blueprint/WidgetTree.h"
+#include "EasyCrosshairSystem/ecsCrosshairEditorAsset.h"
 
 void FLastFPSSmoothedGaugeDisplay::Initialize(float Current, float InMax)
 {
@@ -66,9 +73,9 @@ bool FLastFPSSmoothedGaugeDisplay::Tick(float DeltaTime, float FillDuration)
 #include "GameFramework/PlayerState.h"
 #include "Character/LastFPSCharacterBase.h"
 #include "Character/LastFPSHero.h"
+#include "Character/Components/LastFPSGrapplingTargetingComponent.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Engine/World.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "NativeGameplayTags.h"
@@ -92,6 +99,13 @@ void ULastFPSHUDWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
+    bGrapplingDotInitialized = false;
+
+    if (!CrosshairPresenter)
+    {
+        CrosshairPresenter = NewObject<ULastFPSEasyCrosshairPresenter>(this);
+    }
+
     ClearBossHealthBar();
 
     ApplyGaugeBarBackground(PB_Health);
@@ -104,8 +118,7 @@ void ULastFPSHUDWidget::NativeConstruct()
         HitMarkerImage->SetVisibility(ESlateVisibility::Collapsed);
     }
 
-    InitializeCrosshairMaterial();
-    SetCrosshairSpread(CrosshairBaseSpread);
+    EnsureGrapplingDot();
 
     if (UWorld* World = GetWorld())
     {
@@ -137,6 +150,16 @@ void ULastFPSHUDWidget::NativeDestruct()
         Weapon->OnWeaponEquippedChanged.RemoveDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
     }
     BoundWeaponComponent.Reset();
+
+    if (ULastFPSGrapplingTargetingComponent* Targeting =
+        BoundGrapplingTargetingComponent.Get())
+    {
+        Targeting->OnTargetAvailabilityChanged.RemoveDynamic(
+            this,
+            &ULastFPSHUDWidget::HandleGrapplingTargetAvailabilityChanged);
+    }
+    BoundGrapplingTargetingComponent.Reset();
+    bGrapplingDotInitialized = false;
     bPawnComponentsBound = false;
 
     if (UWorld* World = GetWorld())
@@ -148,6 +171,7 @@ void ULastFPSHUDWidget::NativeDestruct()
     ClearDamageDirectionIndicators();
     ClearEnemyHealthBars();
     ClearBossHealthBar();
+    RemoveEasyCrosshair();
     if (WBP_StatusEffectList)
     {
         WBP_StatusEffectList->UninitializeFromAbilitySystem();
@@ -193,6 +217,7 @@ void ULastFPSHUDWidget::HUDRefreshTick(const float DeltaTime)
 
     TickSmoothedGauges(DeltaTime);
     TickHitMarkerSpread(DeltaTime);
+    TickGrapplingDot(DeltaTime);
     TickDamageDirectionIndicators(DeltaTime);
     TickEnemyHealthBars(DeltaTime);
     TickBossHealthBar(DeltaTime);
@@ -200,7 +225,6 @@ void ULastFPSHUDWidget::HUDRefreshTick(const float DeltaTime)
     {
         WBP_StatusEffectList->UpdateRuntimeStates();
     }
-    TickCrosshairSpread(DeltaTime);
 }
 
 bool ULastFPSHUDWidget::TryInitSkillSlots()
@@ -332,11 +356,23 @@ void ULastFPSHUDWidget::TryBindPawnComponents()
         return;
     }
 
+    ULastFPSGrapplingTargetingComponent* GrapplingTargeting =
+        Hero->GetGrapplingTargetingComponent();
+    if (!GrapplingTargeting)
+    {
+        return;
+    }
+
     Weapon->OnWeaponEquippedChanged.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
-    OnCrosshairVisibilityChanged(Weapon->HasWeapon());
+    GrapplingTargeting->OnTargetAvailabilityChanged.AddUniqueDynamic(
+        this,
+        &ULastFPSHUDWidget::HandleGrapplingTargetAvailabilityChanged);
 
     BoundWeaponComponent = Weapon;
+    BoundGrapplingTargetingComponent = GrapplingTargeting;
     bPawnComponentsBound = true;
+    ApplyGrapplingDotAvailability(GrapplingTargeting->IsTargetAvailable());
+    RefreshEasyCrosshair();
 }
 
 bool ULastFPSHUDWidget::InitializeHUD()
@@ -730,85 +766,267 @@ void ULastFPSHUDWidget::ClearDamageDirectionIndicators()
     ActiveDamageDirectionIndicators.Reset();
 }
 
-void ULastFPSHUDWidget::InitializeCrosshairMaterial()
+UOverlay* ULastFPSHUDWidget::ResolveCrosshairHost()
 {
-    if (!CrosshairImage || CrosshairMaterial.IsValid())
+    if (CrosshairHost)
+    {
+        return CrosshairHost;
+    }
+
+    if (!WidgetTree)
+    {
+        return nullptr;
+    }
+
+    UPanelWidget* RootPanel = Cast<UPanelWidget>(WidgetTree->RootWidget);
+    if (!RootPanel)
+    {
+        UE_LOG(
+            LogLastFPSHUDWidget,
+            Error,
+            TEXT("HUD '%s'에 EasyCrosshair를 배치할 수 있는 루트 패널이 없습니다."),
+            *GetNameSafe(this));
+        return nullptr;
+    }
+
+    CrosshairHost = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("RuntimeCrosshairHost"));
+    if (!CrosshairHost)
+    {
+        UE_LOG(
+            LogLastFPSHUDWidget,
+            Error,
+            TEXT("HUD '%s'에서 EasyCrosshair 호스트 생성을 실패했습니다."),
+            *GetNameSafe(this));
+        return nullptr;
+    }
+
+    UPanelSlot* HostSlot = RootPanel->AddChild(CrosshairHost);
+    if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(HostSlot))
+    {
+        CanvasSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+        CanvasSlot->SetOffsets(FMargin(0.f));
+    }
+    else if (UOverlaySlot* OverlaySlot = Cast<UOverlaySlot>(HostSlot))
+    {
+        OverlaySlot->SetHorizontalAlignment(HAlign_Fill);
+        OverlaySlot->SetVerticalAlignment(VAlign_Fill);
+    }
+
+    CrosshairHost->SetVisibility(ESlateVisibility::HitTestInvisible);
+    return CrosshairHost;
+}
+
+void ULastFPSHUDWidget::EnsureGrapplingDot()
+{
+    if (!GrapplingDotImage)
+    {
+        UOverlay* Host = ResolveCrosshairHost();
+        if (!Host || !WidgetTree)
+        {
+            return;
+        }
+
+        UImage* RuntimeDot = WidgetTree->ConstructWidget<UImage>(
+            UImage::StaticClass(),
+            TEXT("RuntimeGrapplingDotImage"));
+        if (!RuntimeDot)
+        {
+            UE_LOG(
+                LogLastFPSHUDWidget,
+                Error,
+                TEXT("HUD '%s'에서 그래플링 조준점 생성을 실패했습니다."),
+                *GetNameSafe(this));
+            return;
+        }
+
+        const float DotSize = FMath::Max(GrapplingDotSize, 1.f);
+        const FSlateRoundedBoxBrush DotBrush(
+            FLinearColor::White,
+            FVector2f(DotSize, DotSize));
+        RuntimeDot->SetBrush(DotBrush);
+
+        if (UOverlaySlot* DotSlot = Host->AddChildToOverlay(RuntimeDot))
+        {
+            DotSlot->SetHorizontalAlignment(HAlign_Center);
+            DotSlot->SetVerticalAlignment(VAlign_Center);
+        }
+
+        GrapplingDotImage = RuntimeDot;
+    }
+
+    if (bGrapplingDotInitialized)
     {
         return;
     }
 
-    CrosshairMaterial = CrosshairImage->GetDynamicMaterial();
+    GrapplingDotCurrentScale = FMath::Max(GrapplingDotIdleScale, 0.01f);
+    GrapplingDotTargetScale = GrapplingDotCurrentScale;
+    GrapplingDotImage->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+    GrapplingDotImage->SetRenderScale(
+        FVector2D(GrapplingDotCurrentScale, GrapplingDotCurrentScale));
+    GrapplingDotImage->SetColorAndOpacity(GrapplingDotIdleColor);
+    GrapplingDotImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+    bGrapplingDotInitialized = true;
 }
 
-void ULastFPSHUDWidget::TickCrosshairSpread(float DeltaTime)
+void ULastFPSHUDWidget::TickGrapplingDot(const float DeltaTime)
 {
-    ALastFPSHero* Hero = nullptr;
-    if (const APlayerController* PC = GetOwningPlayer())
+    if (!GrapplingDotImage)
     {
-        Hero = Cast<ALastFPSHero>(PC->GetPawn());
+        return;
     }
 
-    float TargetSpread = CrosshairBaseSpread;
-
-    if (Hero)
+    if (GrapplingDotScaleInterpSpeed <= KINDA_SMALL_NUMBER)
     {
-        const FVector Velocity = Hero->GetVelocity();
-        const float HorizontalSpeed = FVector(Velocity.X, Velocity.Y, 0.f).Size();
-        if (HorizontalSpeed > CrosshairMovementSpeedThreshold)
-        {
-            TargetSpread += CrosshairMoveSpread;
-        }
+        GrapplingDotCurrentScale = GrapplingDotTargetScale;
+    }
+    else
+    {
+        GrapplingDotCurrentScale = FMath::FInterpTo(
+            GrapplingDotCurrentScale,
+            GrapplingDotTargetScale,
+            DeltaTime,
+            GrapplingDotScaleInterpSpeed);
+    }
 
-        if (const UCharacterMovementComponent* Movement = Hero->GetCharacterMovement())
+    if (FMath::IsNearlyEqual(
+        GrapplingDotCurrentScale,
+        GrapplingDotTargetScale,
+        0.001f))
+    {
+        GrapplingDotCurrentScale = GrapplingDotTargetScale;
+    }
+
+    GrapplingDotImage->SetRenderScale(
+        FVector2D(GrapplingDotCurrentScale, GrapplingDotCurrentScale));
+}
+
+void ULastFPSHUDWidget::ApplyGrapplingDotAvailability(
+    const bool bTargetAvailable)
+{
+    EnsureGrapplingDot();
+    GrapplingDotTargetScale = FMath::Max(
+        bTargetAvailable ? GrapplingDotAvailableScale : GrapplingDotIdleScale,
+        0.01f);
+
+    if (GrapplingDotImage)
+    {
+        GrapplingDotImage->SetColorAndOpacity(
+            bTargetAvailable ? GrapplingDotAvailableColor : GrapplingDotIdleColor);
+    }
+}
+
+void ULastFPSHUDWidget::RefreshEasyCrosshair()
+{
+    const UWeaponComponent* Weapon = BoundWeaponComponent.Get();
+    if (!Weapon || !Weapon->HasWeapon())
+    {
+        SetEasyCrosshairVisibility(false);
+        return;
+    }
+
+    TSoftObjectPtr<UecsCrosshairEditorAsset> CrosshairAssetReference = DefaultCrosshairAsset;
+    FName FireAnimationName = DefaultCrosshairFireAnimationName;
+    float FireAnimationDuration = DefaultCrosshairFireAnimationDuration;
+
+    if (const ULastFPSWeaponDefinition* WeaponDefinition = Weapon->GetWeaponDefinition())
+    {
+        const FLastFPSWeaponCrosshairSettings& CrosshairSettings = WeaponDefinition->Crosshair;
+        if (!CrosshairSettings.CrosshairAsset.IsNull())
         {
-            if (Movement->IsFalling())
+            CrosshairAssetReference = CrosshairSettings.CrosshairAsset;
+            if (!CrosshairSettings.FireAnimationName.IsNone())
             {
-                TargetSpread += CrosshairJumpSpread;
+                FireAnimationName = CrosshairSettings.FireAnimationName;
             }
-        }
-
-        if (Hero->GetIsADS())
-        {
-            TargetSpread *= CrosshairZoomSpreadMultiplier;
+            FireAnimationDuration = CrosshairSettings.FireAnimationDuration;
         }
     }
 
-    FireCrosshairSpread = FMath::FInterpTo(
-        FireCrosshairSpread,
-        0.f,
-        DeltaTime,
-        CrosshairFireRecoverSpeed);
-
-    TargetSpread += FireCrosshairSpread;
-
-    CurrentCrosshairSpread = FMath::FInterpTo(
-        CurrentCrosshairSpread,
-        TargetSpread,
-        DeltaTime,
-        CrosshairRecoverSpeed);
-
-    SetCrosshairSpread(CurrentCrosshairSpread);
-}
-
-void ULastFPSHUDWidget::SetCrosshairSpread(float Spread)
-{
-    InitializeCrosshairMaterial();
-
-    if (UMaterialInstanceDynamic* Material = CrosshairMaterial.Get())
+    if (CrosshairAssetReference.IsNull())
     {
-        Material->SetScalarParameterValue(CrosshairSpreadParameterName, Spread);
+        RemoveEasyCrosshair();
+        if (!bCrosshairConfigurationWarningLogged)
+        {
+            UE_LOG(
+                LogLastFPSHUDWidget,
+                Warning,
+                TEXT("HUD '%s'에 사용할 EasyCrosshair 에셋이 없습니다. 무기 Definition 또는 HUD 기본 설정을 확인하세요."),
+                *GetNameSafe(this));
+            bCrosshairConfigurationWarningLogged = true;
+        }
+        return;
     }
 
-    OnCrosshairSpreadChanged(Spread);
+    UecsCrosshairEditorAsset* CrosshairAsset = CrosshairAssetReference.LoadSynchronous();
+    if (!CrosshairAsset)
+    {
+        RemoveEasyCrosshair();
+        if (!bCrosshairConfigurationWarningLogged)
+        {
+            UE_LOG(
+                LogLastFPSHUDWidget,
+                Error,
+                TEXT("HUD '%s'에서 EasyCrosshair 에셋 '%s' 로드를 실패했습니다."),
+                *GetNameSafe(this),
+                *CrosshairAssetReference.ToString());
+            bCrosshairConfigurationWarningLogged = true;
+        }
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if (!World || !CrosshairPresenter)
+    {
+        UE_LOG(
+            LogLastFPSHUDWidget,
+            Error,
+            TEXT("HUD '%s'에서 EasyCrosshair Presenter를 초기화하지 못했습니다."),
+            *GetNameSafe(this));
+        return;
+    }
+
+    if (!CrosshairPresenter->ShowCrosshair(
+            *World,
+            *CrosshairAsset,
+            ResolveCrosshairHost(),
+            FireAnimationName,
+            FireAnimationDuration))
+    {
+        UE_LOG(
+            LogLastFPSHUDWidget,
+            Error,
+            TEXT("HUD '%s'에 EasyCrosshair 에셋 '%s' 적용을 실패했습니다."),
+            *GetNameSafe(this),
+            *GetNameSafe(CrosshairAsset));
+        return;
+    }
+
+    bCrosshairConfigurationWarningLogged = false;
 }
 
-void ULastFPSHUDWidget::AddCrosshairFireSpread(float SpreadAmount)
+void ULastFPSHUDWidget::RemoveEasyCrosshair()
 {
-    const float Amount = SpreadAmount >= 0.f ? SpreadAmount : CrosshairFireSpread;
-    FireCrosshairSpread = FMath::Clamp(
-        FireCrosshairSpread + Amount,
-        0.f,
-        CrosshairMaxFireSpread);
+    if (CrosshairPresenter)
+    {
+        CrosshairPresenter->Shutdown();
+    }
+}
+
+void ULastFPSHUDWidget::SetEasyCrosshairVisibility(const bool bVisible)
+{
+    if (CrosshairPresenter)
+    {
+        CrosshairPresenter->SetVisible(bVisible);
+    }
+}
+
+void ULastFPSHUDWidget::PlayCrosshairFireAnimation()
+{
+    if (CrosshairPresenter)
+    {
+        CrosshairPresenter->PlayFireAnimation();
+    }
 }
 
 bool ULastFPSHUDWidget::IsLowResource(float Current, float Max) const
@@ -932,7 +1150,20 @@ FVector2D ULastFPSHUDWidget::MakeDamageNumberRandomOffset() const
 
 void ULastFPSHUDWidget::HandleWeaponEquippedChanged(bool bEquipped)
 {
-    OnCrosshairVisibilityChanged(bEquipped);
+    if (bEquipped)
+    {
+        RefreshEasyCrosshair();
+    }
+    else
+    {
+        SetEasyCrosshairVisibility(false);
+    }
+}
+
+void ULastFPSHUDWidget::HandleGrapplingTargetAvailabilityChanged(
+    const bool bTargetAvailable)
+{
+    ApplyGrapplingDotAvailability(bTargetAvailable);
 }
 
 void ULastFPSHUDWidget::ShowHitMarker()

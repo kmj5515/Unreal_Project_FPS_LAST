@@ -39,6 +39,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Grappling Hook|Targeting")
 	bool bRequireStaticSurface = true;
 
+	/** 로컬 HUD용 타깃 미리보기 검사 간격이다. 실제 사용 시에는 서버에서 다시 검증한다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Grappling Hook|Targeting", meta=(ClampMin="0.02", Units="s"))
+	float TargetPreviewRefreshInterval = 0.05f;
+
 	/** 고정점을 표면 바깥쪽으로 이동해 와이어 끝이 지형 안에 묻히는 것을 방지한다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Grappling Hook|Targeting", meta=(ClampMin="0.0", Units="cm"))
 	float AnchorSurfaceOffset = 3.f;
