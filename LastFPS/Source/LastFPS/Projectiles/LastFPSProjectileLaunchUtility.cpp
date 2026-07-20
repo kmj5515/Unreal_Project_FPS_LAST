@@ -52,12 +52,16 @@ ALastFPSProjectile* LastFPSProjectileLaunch::SpawnProjectile(const FLastFPSProje
 		return nullptr;
 	}
 
-	FVector SpawnLocation = ResolveLaunchLocation(
-		SourceActor,
-		ProjectileData,
-		Request.FallbackMuzzleHeight,
-		Request.bUseEquippedWeapon);
-	FVector AimDirection = (Request.AimTarget - SpawnLocation).GetSafeNormal();
+	FVector SpawnLocation = Request.bOverrideSpawnLocation
+		? Request.SpawnLocationOverride
+		: ResolveLaunchLocation(
+			SourceActor,
+			ProjectileData,
+			Request.FallbackMuzzleHeight,
+			Request.bUseEquippedWeapon);
+	FVector AimDirection = Request.bOverrideLaunchVelocity
+		? Request.LaunchVelocityOverride.GetSafeNormal()
+		: (Request.AimTarget - SpawnLocation).GetSafeNormal();
 	if (AimDirection.IsNearlyZero())
 	{
 		AimDirection = Request.FallbackAimDirection.GetSafeNormal();
@@ -67,11 +71,17 @@ ALastFPSProjectile* LastFPSProjectileLaunch::SpawnProjectile(const FLastFPSProje
 		AimDirection = SourceActor->GetActorForwardVector();
 	}
 
-	SpawnLocation += AimDirection.Rotation().RotateVector(ProjectileData->SpawnLocationOffset);
-	const FVector AdjustedAimDirection = (Request.AimTarget - SpawnLocation).GetSafeNormal();
-	if (!AdjustedAimDirection.IsNearlyZero())
+	if (Request.bApplyProjectileDataSpawnOffset)
 	{
-		AimDirection = AdjustedAimDirection;
+		SpawnLocation += AimDirection.Rotation().RotateVector(ProjectileData->SpawnLocationOffset);
+		if (!Request.bOverrideLaunchVelocity)
+		{
+			const FVector AdjustedAimDirection = (Request.AimTarget - SpawnLocation).GetSafeNormal();
+			if (!AdjustedAimDirection.IsNearlyZero())
+			{
+				AimDirection = AdjustedAimDirection;
+			}
+		}
 	}
 
 	FActorSpawnParameters SpawnParams;
@@ -107,11 +117,22 @@ ALastFPSProjectile* LastFPSProjectileLaunch::SpawnProjectile(const FLastFPSProje
 		ProjectileData->ImpactRules,
 		ProjectileData->EffectsOnHit,
 		ProjectileData->VisualData,
-		Request.BaseDamageOverride);
+		Request.BaseDamageOverride,
+		&ProjectileData->CollisionSettings);
 
 	if (Projectile->ProjectileMovement)
 	{
-		Projectile->ProjectileMovement->Velocity = AimDirection * ProjectileData->ProjectileSpeed;
+		if (Request.bOverrideGravityScale)
+		{
+			Projectile->ProjectileMovement->ProjectileGravityScale = Request.GravityScaleOverride;
+		}
+		Projectile->ProjectileMovement->Velocity = Request.bOverrideLaunchVelocity
+			? Request.LaunchVelocityOverride
+			: AimDirection * ProjectileData->ProjectileSpeed;
+	}
+	if (Request.LifeSpanOverride > 0.f)
+	{
+		Projectile->SetLifeSpan(Request.LifeSpanOverride);
 	}
 
 	return Projectile;

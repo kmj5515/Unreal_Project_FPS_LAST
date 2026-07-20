@@ -14,6 +14,7 @@ class UProjectileMovementComponent;
 class UPrimitiveComponent;
 class ULastFPSProjectileImpactRule;
 class ULastFPSProjectileVisualData;
+struct FLastFPSProjectileCollisionSettings;
 
 // VFX 전용 투사체 — 데미지는 GA_BasicShoot의 LineTrace가 처리
 UCLASS()
@@ -29,7 +30,8 @@ public:
         const TArray<TObjectPtr<ULastFPSProjectileImpactRule>>& InImpactRules,
         const TArray<TSubclassOf<UGameplayEffect>>& InLegacyEffectsOnHit,
         ULastFPSProjectileVisualData* InVisualData,
-        float InBaseDamageOverride = 0.f);
+        float InBaseDamageOverride = 0.f,
+        const FLastFPSProjectileCollisionSettings* InCollisionSettings = nullptr);
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Projectile")
     TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
@@ -65,7 +67,7 @@ private:
     UFUNCTION()
     void OnProjectileStop(const FHitResult& ImpactResult);
 
-    void EnableGameplayCollision();
+    void EnableGameplayCollision(const FLastFPSProjectileCollisionSettings* CollisionSettings);
     void ExecuteImpactRules(AActor* HitActor, const FHitResult& ImpactResult);
     void ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass);
     void ApplyVisualData();

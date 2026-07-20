@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Animation/LastFPSCharacterAnimInstance.h"
+#include "Character/Animation/LastFPSGrapplingAnimationTypes.h"
 #include "LastFPSAnimInstance.generated.h"
 
 class ACharacter;
@@ -10,6 +11,28 @@ UCLASS()
 class LASTFPS_API ULastFPSAnimInstance : public ULastFPSCharacterAnimInstance
 {
 	GENERATED_BODY()
+
+public:
+	UFUNCTION(BlueprintPure, Category="MM|IK|Grappling", meta=(BlueprintThreadSafe))
+	FVector GetGrapplingIKEffectorLocation() const { return GrapplingIKEffectorLocation; }
+
+	UFUNCTION(BlueprintPure, Category="MM|IK|Grappling", meta=(BlueprintThreadSafe))
+	FVector GetGrapplingIKJointTargetLocation() const { return GrapplingIKJointTargetLocation; }
+
+	UFUNCTION(BlueprintPure, Category="MM|IK|Grappling", meta=(BlueprintThreadSafe))
+	FRotator GetGrapplingIKHandRotation() const { return GrapplingIKHandRotation; }
+
+	UFUNCTION(BlueprintPure, Category="MM|IK|Grappling", meta=(BlueprintThreadSafe))
+	float GetGrapplingIKAlpha() const { return GrapplingIKAlpha; }
+
+	UFUNCTION(BlueprintPure, Category="MM|IK|Grappling", meta=(BlueprintThreadSafe))
+	float GetGrapplingBodyPitch() const { return GrapplingBodyPitch; }
+
+	UFUNCTION(BlueprintPure, Category="MM|IK|Grappling", meta=(BlueprintThreadSafe))
+	ELastFPSGrapplingAnimationPhase GetGrapplingAnimationPhase() const { return GrapplingAnimationPhase; }
+
+	UFUNCTION(BlueprintPure, Category="MM|IK|Grappling", meta=(BlueprintThreadSafe))
+	float GetGrapplingHookFlightDuration() const { return GrapplingHookFlightDuration; }
 
 protected:
 	UPROPERTY(BlueprintReadOnly, Category="MM|Locomotion")
@@ -42,6 +65,28 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category="MM|IK")
 	float LeftHandIKAlpha = 0.f;
 
+	/** 게임 스레드에서 캐시해 AnimGraph의 병렬 평가가 캐릭터 컴포넌트에 접근하지 않게 한다. */
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK|Grappling")
+	FVector GrapplingIKEffectorLocation = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK|Grappling")
+	FVector GrapplingIKJointTargetLocation = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK|Grappling")
+	FRotator GrapplingIKHandRotation = FRotator::ZeroRotator;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK|Grappling")
+	float GrapplingIKAlpha = 0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK|Grappling")
+	float GrapplingBodyPitch = 0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK|Grappling")
+	ELastFPSGrapplingAnimationPhase GrapplingAnimationPhase = ELastFPSGrapplingAnimationPhase::None;
+
+	UPROPERTY(BlueprintReadOnly, Category="MM|IK|Grappling")
+	float GrapplingHookFlightDuration = 0.f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="MM|IK")
 	FName RightHandBoneName = TEXT("hand_r");
 
@@ -58,6 +103,7 @@ protected:
 private:
 	void UpdateJumpStartRequest(float DeltaSeconds);
 	void UpdateHandIK();
+	void UpdateGrapplingIK();
 
 	UFUNCTION()
 	void OnWeaponEquipped(bool bEquipped);

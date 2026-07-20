@@ -230,7 +230,8 @@ void ALastFPSOrbitingProjectileEmitter::FireProjectile()
 		Config.ProjectileData->ImpactRules,
 		Config.ProjectileData->EffectsOnHit,
 		Config.ProjectileData->VisualData,
-		BaseDamageOverride);
+		BaseDamageOverride,
+		&Config.ProjectileData->CollisionSettings);
 
 	if (Projectile->ProjectileMovement)
 	{

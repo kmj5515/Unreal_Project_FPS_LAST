@@ -1,4 +1,5 @@
 #include "Character/LastFPSHero.h"
+#include "Character/Components/LastFPSGrapplingAnimationComponent.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Input/LastFPSInputConfig.h"
 #include "Utility/LastFPSTags.h"
@@ -64,6 +65,12 @@ ALastFPSHero::ALastFPSHero()
     }
 
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComp"));
+    GrapplingAnimationComponent = CreateDefaultSubobject<ULastFPSGrapplingAnimationComponent>(
+        TEXT("GrapplingAnimationComponent"));
+    if (USkeletalMeshComponent* CharacterMesh = GetMesh())
+    {
+        CharacterMesh->AddTickPrerequisiteComponent(GrapplingAnimationComponent);
+    }
 
     TargetArmLength    = DefaultArmLength;
     TargetSocketOffset = DefaultSocketOffset;
@@ -228,6 +235,135 @@ void ALastFPSHero::TickCameraInterp(float DeltaTime)
 	{
 		bSpeedBoostCameraTransition = false;
 	}
+
+    TickTemporaryCameraEffect(DeltaTime);
+}
+
+bool ALastFPSHero::BeginTemporaryCameraEffect(
+    UObject* RequestOwner,
+    const FLastFPSTemporaryCameraEffectOptions& Options)
+{
+    if (!IsLocallyControlled() || !IsValid(RequestOwner) || !CameraBoom || !FollowCamera)
+    {
+        return false;
+    }
+
+    if (bTemporaryCameraEffectOverrideActive
+        && ActiveCameraEffectOwner.IsValid()
+        && ActiveCameraEffectOwner.Get() != RequestOwner)
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("Temporary camera effect rejected: Hero=%s, ActiveOwner=%s, RequestOwner=%s, reason=another effect owns the camera override."),
+            *GetNameSafe(this),
+            *GetNameSafe(ActiveCameraEffectOwner.Get()),
+            *GetNameSafe(RequestOwner));
+        return false;
+    }
+
+    if (!bTemporaryCameraEffectOverrideActive)
+    {
+        SavedCameraLagSpeed = CameraBoom->CameraLagSpeed;
+        bSavedCameraLagEnabled = CameraBoom->bEnableCameraLag;
+        SavedMotionBlurAmount = FollowCamera->PostProcessSettings.MotionBlurAmount;
+        bSavedMotionBlurOverride = FollowCamera->PostProcessSettings.bOverride_MotionBlurAmount;
+    }
+
+    bTemporaryCameraEffectOverrideActive = true;
+    bTemporaryCameraEffectBlendOutActive = false;
+    CameraEffectBlendOutDuration = FMath::Max(0.f, Options.BlendOutDuration);
+    CameraEffectBlendOutElapsed = 0.f;
+    ActiveCameraEffectOwner = RequestOwner;
+    CameraBoom->bEnableCameraLag = true;
+    CameraBoom->CameraLagSpeed = FMath::Max(0.01f, Options.CameraLagSpeed);
+    FollowCamera->PostProcessSettings.bOverride_MotionBlurAmount = true;
+    FollowCamera->PostProcessSettings.MotionBlurAmount = FMath::Clamp(
+        Options.MotionBlurAmount,
+        0.f,
+        1.f);
+    return true;
+}
+
+void ALastFPSHero::EndTemporaryCameraEffect(UObject* RequestOwner)
+{
+    if (!bTemporaryCameraEffectOverrideActive
+        || !ActiveCameraEffectOwner.IsValid()
+        || ActiveCameraEffectOwner.Get() != RequestOwner)
+    {
+        return;
+    }
+
+    ActiveCameraEffectOwner.Reset();
+    if (CameraEffectBlendOutDuration <= KINDA_SMALL_NUMBER)
+    {
+        RestoreTemporaryCameraEffect();
+        return;
+    }
+
+    CameraEffectBlendOutElapsed = 0.f;
+    CameraEffectBlendOutStartLagSpeed = CameraBoom
+        ? CameraBoom->CameraLagSpeed
+        : SavedCameraLagSpeed;
+    CameraEffectBlendOutStartMotionBlurAmount = FollowCamera
+        ? FollowCamera->PostProcessSettings.MotionBlurAmount
+        : SavedMotionBlurAmount;
+    bTemporaryCameraEffectBlendOutActive = true;
+}
+
+void ALastFPSHero::TickTemporaryCameraEffect(const float DeltaTime)
+{
+    if (!bTemporaryCameraEffectBlendOutActive)
+    {
+        return;
+    }
+
+    CameraEffectBlendOutElapsed += FMath::Max(0.f, DeltaTime);
+    const float LinearAlpha = FMath::Clamp(
+        CameraEffectBlendOutElapsed / CameraEffectBlendOutDuration,
+        0.f,
+        1.f);
+    const float SmoothAlpha = LinearAlpha * LinearAlpha * (3.f - 2.f * LinearAlpha);
+
+    if (CameraBoom)
+    {
+        CameraBoom->bEnableCameraLag = true;
+        CameraBoom->CameraLagSpeed = FMath::Lerp(
+            CameraEffectBlendOutStartLagSpeed,
+            SavedCameraLagSpeed,
+            SmoothAlpha);
+    }
+    if (FollowCamera)
+    {
+        FollowCamera->PostProcessSettings.bOverride_MotionBlurAmount = true;
+        FollowCamera->PostProcessSettings.MotionBlurAmount = FMath::Lerp(
+            CameraEffectBlendOutStartMotionBlurAmount,
+            SavedMotionBlurAmount,
+            SmoothAlpha);
+    }
+
+    if (LinearAlpha >= 1.f)
+    {
+        RestoreTemporaryCameraEffect();
+    }
+}
+
+void ALastFPSHero::RestoreTemporaryCameraEffect()
+{
+    if (CameraBoom)
+    {
+        CameraBoom->bEnableCameraLag = bSavedCameraLagEnabled;
+        CameraBoom->CameraLagSpeed = SavedCameraLagSpeed;
+    }
+    if (FollowCamera)
+    {
+        FollowCamera->PostProcessSettings.bOverride_MotionBlurAmount = bSavedMotionBlurOverride;
+        FollowCamera->PostProcessSettings.MotionBlurAmount = SavedMotionBlurAmount;
+    }
+
+    ActiveCameraEffectOwner.Reset();
+    bTemporaryCameraEffectOverrideActive = false;
+    bTemporaryCameraEffectBlendOutActive = false;
+    CameraEffectBlendOutDuration = 0.f;
+    CameraEffectBlendOutElapsed = 0.f;
 }
 
 void ALastFPSHero::BindSpeedBoostCameraTag()
@@ -633,8 +769,18 @@ void ALastFPSHero::SetADS(bool bEnabled)
 
     if (CameraBoom)
     {
-        CameraBoom->bEnableCameraLag = !bIsADS;
-        CameraBoom->CameraLagSpeed = bIsADS ? 60.f : CameraLagSpeed;
+        const bool bTargetCameraLagEnabled = !bIsADS;
+        const float TargetCameraLagSpeed = bIsADS ? 60.f : CameraLagSpeed;
+        if (bTemporaryCameraEffectOverrideActive)
+        {
+            bSavedCameraLagEnabled = bTargetCameraLagEnabled;
+            SavedCameraLagSpeed = TargetCameraLagSpeed;
+        }
+        else
+        {
+            CameraBoom->bEnableCameraLag = bTargetCameraLagEnabled;
+            CameraBoom->CameraLagSpeed = TargetCameraLagSpeed;
+        }
     }
 
 	RefreshMaxWalkSpeed();
@@ -645,7 +791,8 @@ bool ALastFPSHero::ShouldCancelFireBeforeAbilityInput(FGameplayTag InputID) cons
     return InputID == LastFPSGameplayTags::Input_Skill1
         || InputID == LastFPSGameplayTags::Input_Skill2
         || InputID == LastFPSGameplayTags::Input_Skill3
-        || InputID == LastFPSGameplayTags::Input_Ultimate;
+        || InputID == LastFPSGameplayTags::Input_Ultimate
+        || InputID == LastFPSGameplayTags::Input_GrapplingHook;
 }
 
 bool ALastFPSHero::ShouldSkipAbilityCancelOnRelease(FGameplayTag InputID) const

@@ -120,7 +120,7 @@ namespace
 
 	const FSlateBrush& GetButtonBrush()
 	{
-		static const FSlateRoundedBoxBrush Brush(FLinearColor(0.13f, 0.135f, 0.145f, 1.f), 5.f);
+		static const FSlateRoundedBoxBrush Brush(FLinearColor(0.09f, 0.093f, 0.10f, 1.f), 5.f);
 		return Brush;
 	}
 

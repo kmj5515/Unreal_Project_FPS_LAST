@@ -1,6 +1,7 @@
 #include "Animation/LastFPSAnimInstance.h"
 
 #include "Character/LastFPSHero.h"
+#include "Character/Components/LastFPSGrapplingAnimationComponent.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Character/Interfaces/LastFPSWeaponUser.h"
 
@@ -30,6 +31,13 @@ void ULastFPSAnimInstance::ResetAnimState()
 	bIsCasting = false;
 	LeftHandIKAlpha = 0.f;
 	LeftHandIKTransform = FTransform::Identity;
+	GrapplingIKEffectorLocation = FVector::ZeroVector;
+	GrapplingIKJointTargetLocation = FVector::ZeroVector;
+	GrapplingIKHandRotation = FRotator::ZeroRotator;
+	GrapplingIKAlpha = 0.f;
+	GrapplingBodyPitch = 0.f;
+	GrapplingAnimationPhase = ELastFPSGrapplingAnimationPhase::None;
+	GrapplingHookFlightDuration = 0.f;
 }
 
 void ULastFPSAnimInstance::OnOwnerCharacterChanged(ACharacter* PreviousCharacter, ACharacter* NewCharacter)
@@ -73,6 +81,7 @@ void ULastFPSAnimInstance::UpdateGameThreadCharacterState(float)
 	}
 
 	UpdateHandIK();
+	UpdateGrapplingIK();
 }
 
 void ULastFPSAnimInstance::UpdateThreadSafeCharacterState(float DeltaSeconds)
@@ -172,6 +181,34 @@ void ULastFPSAnimInstance::UpdateHandIK()
 		LeftHandIKTransform = IKTransform;
 		LeftHandIKAlpha = 1.f;
 	}
+}
+
+void ULastFPSAnimInstance::UpdateGrapplingIK()
+{
+	GrapplingIKEffectorLocation = FVector::ZeroVector;
+	GrapplingIKJointTargetLocation = FVector::ZeroVector;
+	GrapplingIKHandRotation = FRotator::ZeroRotator;
+	GrapplingIKAlpha = 0.f;
+	GrapplingBodyPitch = 0.f;
+	GrapplingAnimationPhase = ELastFPSGrapplingAnimationPhase::None;
+	GrapplingHookFlightDuration = 0.f;
+
+	const ALastFPSHero* Hero = Cast<ALastFPSHero>(OwnerCharacter);
+	const ULastFPSGrapplingAnimationComponent* AnimationComponent = Hero
+		? Hero->GetGrapplingAnimationComponent()
+		: nullptr;
+	if (!AnimationComponent)
+	{
+		return;
+	}
+
+	GrapplingIKEffectorLocation = AnimationComponent->GetGrapplingIKEffectorLocation();
+	GrapplingIKJointTargetLocation = AnimationComponent->GetGrapplingIKJointTargetLocation();
+	GrapplingIKHandRotation = AnimationComponent->GetGrapplingIKHandRotation();
+	GrapplingIKAlpha = AnimationComponent->GetGrapplingIKAlpha();
+	GrapplingBodyPitch = AnimationComponent->GetGrapplingBodyPitch();
+	GrapplingAnimationPhase = AnimationComponent->GetGrapplingAnimationPhase();
+	GrapplingHookFlightDuration = AnimationComponent->GetHookFlightDuration();
 }
 
 void ULastFPSAnimInstance::OnWeaponEquipped(bool)

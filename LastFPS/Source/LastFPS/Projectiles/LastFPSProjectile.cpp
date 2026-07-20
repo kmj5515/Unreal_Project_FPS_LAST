@@ -4,6 +4,7 @@
 #include "AbilitySystem/ProjectileRules/LastFPSProjectileImpactRule.h"
 #include "AbilitySystemInterface.h"
 #include "Components/BoxComponent.h"
+#include "Data/Projectiles/LastFPSAbilityProjectileData.h"
 #include "Data/Projectiles/LastFPSProjectileImpactTypes.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -20,6 +21,15 @@ namespace
 	bool AreFriendlyActors(const AActor* Source, const AActor* Target)
 	{
 		return LastFPSCombatAffiliation::AreFriendlyActors(Source, Target);
+	}
+
+	bool IsSourceRelatedActor(const AActor* Candidate, const AActor* Source, const AActor* ProjectileOwner)
+	{
+		return Candidate
+			&& (Candidate == Source
+				|| Candidate == ProjectileOwner
+				|| (Source && Candidate->IsOwnedBy(Source))
+				|| (ProjectileOwner && Candidate->IsOwnedBy(ProjectileOwner)));
 	}
 }
 
@@ -63,7 +73,8 @@ void ALastFPSProjectile::InitializeGameplayProjectile(
     const TArray<TObjectPtr<ULastFPSProjectileImpactRule>>& InImpactRules,
     const TArray<TSubclassOf<UGameplayEffect>>& InLegacyEffectsOnHit,
     ULastFPSProjectileVisualData* InVisualData,
-    const float InBaseDamageOverride)
+    const float InBaseDamageOverride,
+    const FLastFPSProjectileCollisionSettings* InCollisionSettings)
 {
     SourceActor = InSourceActor;
     ImpactRules = InImpactRules;
@@ -71,24 +82,62 @@ void ALastFPSProjectile::InitializeGameplayProjectile(
     VisualData = InVisualData;
     BaseDamageOverride = FMath::Max(InBaseDamageOverride, 0.f);
     ApplyVisualData();
-    EnableGameplayCollision();
+    EnableGameplayCollision(InCollisionSettings);
 }
 
-void ALastFPSProjectile::EnableGameplayCollision()
+void ALastFPSProjectile::EnableGameplayCollision(const FLastFPSProjectileCollisionSettings* CollisionSettings)
 {
     if (!CollisionComp)
     {
         return;
     }
 
-    CollisionComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-    CollisionComp->SetCollisionObjectType(ECC_WorldDynamic);
-    CollisionComp->SetCollisionResponseToAllChannels(ECR_Ignore);
-    CollisionComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-    CollisionComp->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
-    CollisionComp->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
-    CollisionComp->SetCollisionResponseToChannel(LastFPSCollision::PickupObjectChannel, ECR_Ignore);
-    CollisionComp->SetGenerateOverlapEvents(true);
+    const FVector BoxExtent = CollisionSettings
+        ? CollisionSettings->BoxExtent.ComponentMax(FVector(0.1f))
+        : FVector(2.5f, 1.f, 1.f);
+    CollisionComp->SetBoxExtent(BoxExtent, false);
+
+    const bool bUseCollisionProfile = CollisionSettings
+        && CollisionSettings->bUseCollisionProfile
+        && !CollisionSettings->CollisionProfile.Name.IsNone();
+    if (bUseCollisionProfile)
+    {
+        CollisionComp->SetCollisionProfileName(CollisionSettings->CollisionProfile.Name);
+    }
+    else
+    {
+        // 기존 데이터 에셋은 별도 마이그레이션 없이 종전 충돌 규칙을 유지한다.
+        CollisionComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        CollisionComp->SetCollisionObjectType(ECC_WorldDynamic);
+        CollisionComp->SetCollisionResponseToAllChannels(ECR_Ignore);
+        CollisionComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+        CollisionComp->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+        CollisionComp->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+        CollisionComp->SetCollisionResponseToChannel(LastFPSCollision::PickupObjectChannel, ECR_Ignore);
+    }
+
+    CollisionComp->SetGenerateOverlapEvents(
+        !CollisionSettings || CollisionSettings->bGenerateOverlapEvents);
+    CollisionComp->IgnoreActorWhenMoving(SourceActor, true);
+
+    // 무기처럼 별도 Actor로 부착된 부품도 발사자의 일부이므로 이동 충돌에서 제외한다.
+    if (SourceActor)
+    {
+        TArray<AActor*> AttachedActors;
+        SourceActor->GetAttachedActors(AttachedActors, true, true);
+        for (AActor* AttachedActor : AttachedActors)
+        {
+            if (AttachedActor)
+            {
+                CollisionComp->IgnoreActorWhenMoving(AttachedActor, true);
+            }
+        }
+    }
+
+    if (AActor* OwnerActor = GetOwner(); OwnerActor && OwnerActor != SourceActor)
+    {
+        CollisionComp->IgnoreActorWhenMoving(OwnerActor, true);
+    }
     CollisionComp->OnComponentBeginOverlap.AddUniqueDynamic(this, &ALastFPSProjectile::OnProjectileOverlap);
 
     if (ProjectileMovement)
@@ -105,7 +154,8 @@ void ALastFPSProjectile::OnProjectileOverlap(
     bool bFromSweep,
     const FHitResult& SweepResult)
 {
-    if (bHasAppliedHit || !HasAuthority() || !OtherActor || OtherActor == SourceActor || OtherActor == GetOwner())
+    if (bHasAppliedHit || !HasAuthority() || !OtherActor
+        || IsSourceRelatedActor(OtherActor, SourceActor, GetOwner()))
     {
         return;
     }
@@ -126,13 +176,15 @@ void ALastFPSProjectile::OnProjectileStop(const FHitResult& ImpactResult)
 {
     if (HasAuthority() && !bHasAppliedHit)
     {
-        if (AreFriendlyActors(SourceActor, ImpactResult.GetActor()))
+        AActor* HitActor = ImpactResult.GetActor();
+        if (IsSourceRelatedActor(HitActor, SourceActor, GetOwner())
+            || AreFriendlyActors(SourceActor, HitActor))
         {
             Destroy();
             return;
         }
 
-        ExecuteImpactRules(ImpactResult.GetActor(), ImpactResult);
+        ExecuteImpactRules(HitActor, ImpactResult);
         bHasAppliedHit = true;
         PlayImpactFeedback(ImpactResult);
         Destroy();

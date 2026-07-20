@@ -11,8 +11,16 @@ class UCameraComponent;
 class UInputMappingContext;
 class ULastFPSInputConfig;
 class UWeaponComponent;
+class ULastFPSGrapplingAnimationComponent;
 class UAnimMontage;
 struct FInputActionValue;
+
+struct FLastFPSTemporaryCameraEffectOptions
+{
+    float CameraLagSpeed = 15.f;
+    float MotionBlurAmount = 0.f;
+    float BlendOutDuration = 0.25f;
+};
 
 UCLASS()
 class LASTFPS_API ALastFPSHero : public ALastFPSCharacterBase, public ILastFPSWeaponUser
@@ -34,6 +42,11 @@ public:
 
     FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
     virtual UWeaponComponent* GetWeaponComponent() const override { return WeaponComponent; }
+    UFUNCTION(BlueprintPure, Category="LastFPS|Grappling Animation")
+    ULastFPSGrapplingAnimationComponent* GetGrapplingAnimationComponent() const
+    {
+        return GrapplingAnimationComponent;
+    }
     virtual bool GetIsADS() const override { return bIsADS; }
     FORCEINLINE bool GetIsSprinting() const { return bIsSprinting; }
     FORCEINLINE bool GetWantsToSprint() const { return bWantsToSprint; }
@@ -56,6 +69,10 @@ public:
     void SetWantsToWalk(bool bEnabled);
     void SetCombatState(EMMCombatState NewState);
     void NotifyJumpStarted();
+    bool BeginTemporaryCameraEffect(
+        UObject* RequestOwner,
+        const FLastFPSTemporaryCameraEffectOptions& Options);
+    void EndTemporaryCameraEffect(UObject* RequestOwner);
 
     /**
      * 게임플레이 입력(이동/사격/궁극기/ADS/스프린트 등)을 통째로 켜고 끈다.
@@ -87,6 +104,8 @@ protected:
     void InputReleased(FGameplayTag InputID);
 
     void TickCameraInterp(float DeltaTime);
+    void TickTemporaryCameraEffect(float DeltaTime);
+    void RestoreTemporaryCameraEffect();
     void ApplyRotationModeSettings();
     bool ShouldUseControllerYawRotationMode() const;
     bool ShouldOrientRotationToMovement() const;
@@ -152,6 +171,9 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|Weapon", meta=(AllowPrivateAccess="true"))
     TObjectPtr<UWeaponComponent> WeaponComponent;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components|Animation", meta=(AllowPrivateAccess="true"))
+    TObjectPtr<ULastFPSGrapplingAnimationComponent> GrapplingAnimationComponent;
+
     UPROPERTY(EditDefaultsOnly, Category="Input")
     TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
@@ -159,6 +181,18 @@ protected:
     TObjectPtr<ULastFPSInputConfig> InputConfig;
 
 private:
+    TWeakObjectPtr<UObject> ActiveCameraEffectOwner;
+    float SavedCameraLagSpeed = 15.f;
+    float SavedMotionBlurAmount = 0.f;
+    bool bSavedCameraLagEnabled = false;
+    bool bSavedMotionBlurOverride = false;
+    float CameraEffectBlendOutDuration = 0.f;
+    float CameraEffectBlendOutElapsed = 0.f;
+    float CameraEffectBlendOutStartLagSpeed = 15.f;
+    float CameraEffectBlendOutStartMotionBlurAmount = 0.f;
+    bool bTemporaryCameraEffectOverrideActive = false;
+    bool bTemporaryCameraEffectBlendOutActive = false;
+
     bool bIsADS = false;
     FVector2D CachedMoveInput = FVector2D::ZeroVector;
     FRotator LocomotionDirectionBaseRotation = FRotator::ZeroRotator;

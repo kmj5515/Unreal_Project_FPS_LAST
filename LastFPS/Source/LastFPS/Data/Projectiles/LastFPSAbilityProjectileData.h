@@ -3,12 +3,34 @@
 #include "CoreMinimal.h"
 #include "AbilitySystem/ProjectileRules/LastFPSProjectileImpactRule.h"
 #include "Engine/DataAsset.h"
+#include "Engine/CollisionProfile.h"
 #include "LastFPSAbilityProjectileData.generated.h"
 
 class ALastFPSProjectile;
 class UAnimMontage;
 class UGameplayEffect;
 class ULastFPSProjectileVisualData;
+
+/** 투사체 클래스에 종속되지 않고 충돌 형태와 채널 응답을 구성하는 데이터 계약이다. */
+USTRUCT(BlueprintType)
+struct LASTFPS_API FLastFPSProjectileCollisionSettings
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Collision", meta=(ClampMin="0.1", Units="cm"))
+    FVector BoxExtent = FVector(2.5f, 1.f, 1.f);
+
+    /** 활성화하면 프로젝트 설정에 등록된 Collision Profile의 채널 응답을 사용한다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Collision")
+    bool bUseCollisionProfile = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Collision", meta=(EditCondition="bUseCollisionProfile"))
+    FCollisionProfileName CollisionProfile;
+
+    /** Pawn을 Overlap으로 처리하는 프로필을 사용할 때 피격 이벤트 생성을 허용한다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Collision")
+    bool bGenerateOverlapEvents = true;
+};
 
 UCLASS(BlueprintType)
 class LASTFPS_API ULastFPSAbilityProjectileData : public UPrimaryDataAsset
@@ -30,6 +52,9 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile")
     FVector SpawnLocationOffset = FVector::ZeroVector;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Collision")
+    FLastFPSProjectileCollisionSettings CollisionSettings;
 
     UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, Category="Projectile|Impact")
     TArray<TObjectPtr<ULastFPSProjectileImpactRule>> ImpactRules;
