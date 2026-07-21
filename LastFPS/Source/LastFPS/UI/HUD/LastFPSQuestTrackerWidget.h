@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
+#include "CommonActivatableWidget.h"
 #include "LastFPSQuestTrackerWidget.generated.h"
 
 class UPanelWidget;
@@ -14,7 +14,7 @@ class ULastFPSQuestEntryWidget;
  * OnQuestStateChanged 구독으로 상태 변화 시 갱신.
  */
 UCLASS()
-class LASTFPS_API ULastFPSQuestTrackerWidget : public UUserWidget
+class LASTFPS_API ULastFPSQuestTrackerWidget : public UCommonActivatableWidget
 {
 	GENERATED_BODY()
 

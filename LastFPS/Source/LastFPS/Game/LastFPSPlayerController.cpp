@@ -7,6 +7,7 @@
 #include "Engine/GameInstance.h"
 #include "Data/Tables/LastFPSDialogueData.h"
 #include "UI/HUD/LastFPSHUDWidget.h"
+#include "UI/HUD/LastFPSQuestTrackerWidget.h"
 #include "UI/Common/LastFPSNoticeWidget.h"
 #include "UI/Dialogue/LastFPSDialogueWidget.h"
 #include "UI/Hub/LastFPSNPCInteractionWidget.h"
@@ -91,6 +92,12 @@ void ALastFPSPlayerController::BeginPlay()
     }
 
     CacheUIConfigFromGameMode();
+
+    if (bShowQuestTracker)
+    {
+        TryPushQuestTrackerToUILayout();
+    }
+
     OpenInitialScreen();
     TryBindMenuLayerInputSync();
 
@@ -112,6 +119,7 @@ void ALastFPSPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
     {
         World->GetTimerManager().ClearTimer(InitialScreenRetryTimerHandle);
         World->GetTimerManager().ClearTimer(HUDPushRetryTimerHandle);
+        World->GetTimerManager().ClearTimer(QuestTrackerPushRetryTimerHandle);
         World->GetTimerManager().ClearTimer(MenuLayerSyncBindRetryTimerHandle);
         World->GetTimerManager().ClearTimer(LocalPawnReadyRetryTimerHandle);
     }
@@ -194,6 +202,7 @@ void ALastFPSPlayerController::CacheUIConfigFromGameMode()
         {
             InitialScreenTag = GM->GetInitialScreenTag();
             EscMenuScreenTag = GM->GetEscMenuScreenTag();
+            bShowQuestTracker = GM->ShouldShowQuestTracker();
         }
     }
 }
@@ -254,6 +263,38 @@ void ALastFPSPlayerController::TryPushHUDToUILayout()
     HUDWidget = RootLayout->PushWidgetToLayerStack<ULastFPSHUDWidget>(
         LastFPSUITags::Layer_Game(), HUDWidgetClass);
     bHUDWidgetPushed = (HUDWidget != nullptr);
+}
+
+// ── 퀘스트 트래커 (상시 HUD — 전투 HUD와 독립, GameMode가 맵별 표시 결정) ──
+
+void ALastFPSPlayerController::TryPushQuestTrackerToUILayout()
+{
+    if (bQuestTrackerPushed || !QuestTrackerWidgetClass)
+    {
+        return;
+    }
+
+    UPrimaryGameLayout* RootLayout = UPrimaryGameLayout::GetPrimaryGameLayout(this);
+    if (!RootLayout)
+    {
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().SetTimer(
+                QuestTrackerPushRetryTimerHandle,
+                FTimerDelegate::CreateWeakLambda(this, [this]() { TryPushQuestTrackerToUILayout(); }),
+                0.1f, true);
+        }
+        return;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(QuestTrackerPushRetryTimerHandle);
+    }
+
+    QuestTrackerWidget = RootLayout->PushWidgetToLayerStack<ULastFPSQuestTrackerWidget>(
+        LastFPSUITags::Layer_Game(), QuestTrackerWidgetClass);
+    bQuestTrackerPushed = (QuestTrackerWidget != nullptr);
 }
 
 // ── 커서/입력 config 단일 소유 ───────────────────────────────────────
