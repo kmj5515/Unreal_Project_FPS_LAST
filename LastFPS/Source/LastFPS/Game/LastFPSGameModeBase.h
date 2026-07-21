@@ -42,6 +42,7 @@ public:
 
     FGameplayTag GetInitialScreenTag() const { return InitialScreenTag; }
     FGameplayTag GetEscMenuScreenTag() const { return EscMenuScreenTag; }
+    bool ShouldShowQuestTracker() const { return bShowQuestTracker; }
 
     /** 맵 진입 시 자동으로 열 화면. 비우면 안 연다. */
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI", meta=(Categories="UI.Screen"))
@@ -50,6 +51,10 @@ public:
     /** ESC로 열 화면 (예: 허브 메뉴). 비우면 ESC 무시. 닫기는 CommonUI Back. */
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI", meta=(Categories="UI.Screen"))
     FGameplayTag EscMenuScreenTag;
+
+    /** 이 맵에서 상시 퀘스트 트래커 HUD를 표시할지. 전투 HUD와 독립 — 맵별로 GameMode BP에서 결정. */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
+    bool bShowQuestTracker = false;
 
     /** 이 맵 진입 시 플레이어 ASC 에 적용할 제한 효과. 비우면 제한 없음(전투 맵). 허브 GameMode BP 에서 전투 금지 GE 지정. */
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Combat")
