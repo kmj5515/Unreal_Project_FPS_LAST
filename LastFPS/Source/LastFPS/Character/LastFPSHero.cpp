@@ -133,8 +133,10 @@ float ALastFPSHero::ResolveMaxWalkSpeed(const float AttributeMoveSpeed) const
 		return FMath::Max(ADSWalkSpeed, 0.f);
 	}
 
+	// 속도는 MoveSpeed 어트리뷰트(스탯 테이블 + 버프/디버프 GE)가 전담한다.
 	return Super::ResolveMaxWalkSpeed(AttributeMoveSpeed);
 }
+
 
 void ALastFPSHero::BeginPlay()
 {
@@ -235,11 +237,7 @@ bool ALastFPSHero::IsForwardSprintInputAngle() const
         return false;
     }
 
-    if (CachedMoveInput.Y <= 0.f)
-    {
-        return false; // 좌우(0) · 후진(음수) 제외
-    }
-
+    // atan2(|X|, Y) : 0 = 정면, 90 = 좌우, 180 = 후진
     const float AngleFromForward =
         FMath::RadiansToDegrees(FMath::Atan2(FMath::Abs(CachedMoveInput.X), CachedMoveInput.Y));
 
@@ -265,16 +263,29 @@ void ALastFPSHero::TickAutoSprint(float DeltaTime)
         return;
     }
 
+    // 사격 등으로 끊긴 직후에는 자동 재진입을 막는다
+    if (AutoSprintLockoutTimer > 0.f)
+    {
+        AutoSprintLockoutTimer = FMath::Max(AutoSprintLockoutTimer - DeltaTime, 0.f);
+        if (bIsSprinting)
+        {
+            SetSprinting(false);
+        }
+        return;
+    }
+
     FVector Velocity = Movement->Velocity;
     Velocity.Z = 0.f;
     const float GroundSpeed = Velocity.Size();
 
     // 진입과 해제 임계값을 다르게 두어 경계에서 모션이 떨리지 않게 한다
     const float Threshold = bIsSprinting ? AutoSprintExitSpeed : AutoSprintEnterSpeed;
-    bool bShouldSprint = GroundSpeed >= Threshold;
-
-    // 조준 중이거나 공중이면 스프린트하지 않는다
-    if (bIsADS || Movement->IsFalling())
+    bool bShouldSprint = GroundSpeed > Threshold;
+    // 조준 · 전투 · 공중에서는 스프린트하지 않는다.
+    // 전투 상태를 빼먹으면 사격 중에도 몸이 이동 방향으로 돌아가 조준이 깨진다.
+    // 어빌리티가 SetWantsToSprint(false) 를 불러도 bIsSprinting 은 여기서 꺼야 한다.
+    if (bIsADS || Movement->IsFalling()
+        || CombatState == EMMCombatState::Attacking)
     {
         bShouldSprint = false;
     }
@@ -935,6 +946,7 @@ void ALastFPSHero::SetSprinting(bool bEnabled)
 
     bIsSprinting = bEnabled;
     ApplyRotationModeSettings();
+    RefreshMaxWalkSpeed();   // 스프린트 상태에 맞춰 최대 속도 갱신
 
 	const UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	bSpeedBoostCameraActive = bIsSprinting
@@ -950,6 +962,19 @@ void ALastFPSHero::SetSprinting(bool bEnabled)
 
 void ALastFPSHero::SetWantsToSprint(bool bEnabled)
 {
+    // 자동 모드의 해제 처리는 조기 리턴보다 먼저 한다.
+    // 어빌리티는 bWantsToSprint 가 이미 false 인 상태에서도 반복 호출하는데,
+    // 값이 같다고 리턴해 버리면 bIsSprinting 이 영원히 안 내려간다.
+    if (bAutoSprintBySpeed && !bEnabled)
+    {
+        AutoSprintLockoutTimer = AutoSprintReactivationDelay;
+
+        if (bIsSprinting)
+        {
+            SetSprinting(false);
+        }
+    }
+
     if (bWantsToSprint == bEnabled)
     {
         return;

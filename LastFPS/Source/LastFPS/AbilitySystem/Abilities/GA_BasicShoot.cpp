@@ -8,6 +8,7 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
 #include "Utility/LastFPSTags.h"
@@ -48,6 +49,26 @@ void UGA_BasicShoot::ActivateAbility(
         return;
     }
 
+    // 스프린트 중이었는지 기억해둔다. 사격과 스프린트 해제가 같은 프레임에 일어나면
+    // 애니메이션이 전환될 틈이 없어 총을 내린 자세 그대로 발사된다.
+    const bool bWasSprinting = Hero->GetIsSprinting();
+
+    UE_LOG(LogTemp, Warning,
+        TEXT("[FIRE] WasSprinting=%d  Delay=%.2f  WantsToSprint=%d  Combat=%d  Speed=%.0f"),
+        bWasSprinting ? 1 : 0,
+        SprintToFireDelay,
+        Hero->GetWantsToSprint() ? 1 : 0,
+        static_cast<int32>(Hero->GetCombatState()),
+        Hero->GetVelocity().Size2D());
+
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 3.f,
+            bWasSprinting ? FColor::Green : FColor::Red,
+            FString::Printf(TEXT("FIRE  WasSprinting=%d  Delay=%.2f  Speed=%.0f"),
+                bWasSprinting ? 1 : 0, SprintToFireDelay, Hero->GetVelocity().Size2D()));
+    }
+
     Hero->SetWantsToSprint(false);
     if (UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr)
     {
@@ -75,7 +96,26 @@ void UGA_BasicShoot::ActivateAbility(
 
     Hero->SetCombatState(EMMCombatState::Attacking);
     Hero->MarkCombatEngaged();
-    Fire();
+
+    // 전투 상태는 즉시 올려서 에임 포즈가 블렌드되기 시작하게 하고,
+    // 실제 발사는 총을 다 든 뒤에 한다.
+    UWorld* FireWorld = GetWorld();
+    if (bWasSprinting && SprintToFireDelay > 0.f && FireWorld)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[FIRE] delayed by %.2fs (raise weapon)"), SprintToFireDelay);
+        FireWorld->GetTimerManager().SetTimer(
+            RaiseWeaponTimerHandle,
+            this,
+            &UGA_BasicShoot::Fire,
+            SprintToFireDelay,
+            false);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[FIRE] immediate  (WasSprinting=%d Delay=%.2f World=%d)"),
+            bWasSprinting ? 1 : 0, SprintToFireDelay, FireWorld ? 1 : 0);
+        Fire();
+    }
 
     if (!IsActive())
     {

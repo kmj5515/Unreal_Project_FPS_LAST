@@ -193,18 +193,28 @@ protected:
 
     /** 이 속도 아래로 떨어지면 해제. 진입값보다 낮게 두어 경계 진동을 막는다. */
     UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint|Auto", meta=(ClampMin="0.0", Units="cm/s"))
-    float AutoSprintExitSpeed = 600.f;
+    float AutoSprintExitSpeed = 900.f;
+
+
 
     /** 조건을 벗어나도 이 시간만큼은 스프린트를 유지한다. 경사·벽 스침 대응. */
     UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint|Auto", meta=(ClampMin="0.0", Units="s"))
     float AutoSprintExitGrace = 0.3f;
 
     /**
+     * 사격 · 스킬 등으로 스프린트가 끊긴 뒤 이 시간 동안은 자동 재진입을 막는다.
+     * 없으면 공격 상태가 풀리는 순간 바로 다시 켜져서 회전 모드가 깜빡인다.
+     */
+    UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint|Auto", meta=(ClampMin="0.0", Units="s"))
+    float AutoSprintReactivationDelay = 0.6f;
+
+    /**
      * 정면 기준 이 각도 안쪽으로 입력했을 때만 스프린트한다.
-     * 50 이면 앞·앞대각선까지 허용하고 좌우(90)·후진(180)은 제외된다.
+     * 0 = 정면, 45 = 앞대각선, 90 = 좌우, 180 = 후진.
+     * 90 이면 앞·앞대각선·좌우까지 허용하고 후진만 제외된다.
      */
     UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint|Auto", meta=(ClampMin="0.0", ClampMax="180.0"))
-    float AutoSprintForwardAngle = 50.f;
+    float AutoSprintForwardAngle = 90.f;
 
     /** 입력이 정면 허용 각도 안에 있는지 (카메라 기준) */
     UFUNCTION(BlueprintPure, Category="LastFPS|Movement")
@@ -216,6 +226,9 @@ protected:
 private:
     /** 해제 조건이 지속된 시간 */
     float AutoSprintExitTimer = 0.f;
+
+    /** 자동 재진입 차단 잔여 시간 */
+    float AutoSprintLockoutTimer = 0.f;
 
 protected:
 

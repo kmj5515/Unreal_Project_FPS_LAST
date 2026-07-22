@@ -49,6 +49,14 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Shoot|State", meta=(ClampMin="0.0"))
     float MinAttackStateDuration = 0.12f;
 
+    /**
+     * 스프린트 중 사격했을 때 총을 드는 시간.
+     * 이 시간이 없으면 스프린트 자세(총을 내린 상태) 그대로 발사되어
+     * 총구가 땅을 향한 채 총알이 나간다. 에임 포즈 블렌드 시간과 맞추면 자연스럽다.
+     */
+    UPROPERTY(EditDefaultsOnly, Category="Shoot|State", meta=(ClampMin="0.0", Units="s"))
+    float SprintToFireDelay = 0.18f;
+
 private:
     void Fire();
     void FinishAbility();
@@ -63,5 +71,6 @@ private:
 
     FTimerHandle FireTimerHandle;
     FTimerHandle FinishAbilityTimerHandle;
+    FTimerHandle RaiseWeaponTimerHandle;
     TWeakObjectPtr<UWeaponComponent> CachedWeapon;
 };
