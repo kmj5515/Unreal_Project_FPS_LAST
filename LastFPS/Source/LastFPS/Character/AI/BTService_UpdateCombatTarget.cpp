@@ -42,7 +42,7 @@ void UBTService_UpdateCombatTarget::TickNode(UBehaviorTreeComponent& OwnerComp, 
 	};
 
 	AActor* TargetActor = Cast<AActor>(BB->GetValueAsObject(LastFPSEnemyBBKeys::TargetActor));
-	if (!TargetActor)
+	if (!IsValid(TargetActor))
 	{
 		ClearTarget();
 		return;
@@ -63,8 +63,8 @@ void UBTService_UpdateCombatTarget::TickNode(UBehaviorTreeComponent& OwnerComp, 
 
 	const float Distance = FVector::Dist(Enemy->GetActorLocation(), TargetActor->GetActorLocation());
 
-	// 놓치는 거리를 벗어나면 타깃 해제(추격 종료).
-	if (Distance > LoseRange)
+	// 타깃 유지 옵션을 끈 프로파일만 거리 이탈로 추격을 종료한다.
+	if ((!Profile || !Profile->bKeepTargetUntilInvalid) && Distance > LoseRange)
 	{
 		ClearTarget();
 		return;

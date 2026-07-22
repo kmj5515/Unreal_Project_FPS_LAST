@@ -17,7 +17,7 @@ class UBehaviorTree;
  *   - 실행: 빙의 시 BehaviorTree 를 돌린다(의사결정은 전적으로 BT + 데이터 주도).
  *   - 조준: 타깃을 SetFocus 로 바라보게 한다(몸 회전은 Pawn 의 desired rotation 이 처리).
  *
- * 감지 파라미터(시야 반경/시야각 등)는 코드에 박지 않고, 빙의한 Pawn(ALastFPSEnemyCharacter)의
+ * 감지 파라미터와 타깃 유지 정책은 코드에 박지 않고, 빙의한 Pawn(ALastFPSEnemyCharacter)의
  * ULastFPSAIProfile 에서 읽어 적용한다. 프로파일만 바꿔 감지·공격 특성을 교체할 수 있다.
  *
  * 서버 권위: AIController 는 서버에서만 존재하므로 이 클래스의 로직은 자연히 서버에서만 돈다.

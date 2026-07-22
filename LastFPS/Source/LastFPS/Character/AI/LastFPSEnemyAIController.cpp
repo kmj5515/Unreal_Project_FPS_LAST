@@ -2,6 +2,7 @@
 
 #include "Character/AI/LastFPSEnemyBlackboardKeys.h"
 #include "Character/LastFPSAIProfile.h"
+#include "Character/LastFPSCharacterBase.h"
 #include "Character/LastFPSEnemyCharacter.h"
 #include "Character/LastFPSHero.h"
 
@@ -105,10 +106,23 @@ void ALastFPSEnemyAIController::OnPerceptionUpdated(AActor* Actor, FAIStimulus S
 
 	if (Stimulus.WasSuccessfullySensed())
 	{
+		const AActor* CurrentTarget = Cast<AActor>(
+			BB->GetValueAsObject(LastFPSEnemyBBKeys::TargetActor));
+		const ALastFPSEnemyCharacter* Enemy = Cast<ALastFPSEnemyCharacter>(GetPawn());
+		const ULastFPSAIProfile* Profile = Enemy ? Enemy->GetAIProfile() : nullptr;
+		const ALastFPSCharacterBase* CurrentTargetCharacter =
+			Cast<ALastFPSCharacterBase>(CurrentTarget);
+		const bool bCurrentTargetIsUsable = IsValid(CurrentTarget)
+			&& (!CurrentTargetCharacter || CurrentTargetCharacter->IsAlive());
+		if (Profile && Profile->bKeepTargetUntilInvalid && bCurrentTargetIsUsable)
+		{
+			return;
+		}
+
 		// 새로 포착: 타깃과 마지막 위치를 기록. 사거리 판정/해제는 BTService 가 매 틱 갱신.
 		BB->SetValueAsObject(LastFPSEnemyBBKeys::TargetActor, Actor);
 		BB->SetValueAsVector(LastFPSEnemyBBKeys::TargetLocation, Actor->GetActorLocation());
 	}
 	// 소실(WasSuccessfullySensed == false)은 여기서 즉시 지우지 않는다.
-	// 마지막 위치까지 추격하도록 두고, 최종 해제는 서비스가 LoseSightRange/사망 기준으로 판단한다.
+	// 마지막 위치까지 추격하도록 두고, 최종 해제는 서비스가 프로파일 정책과 사망 상태로 판단한다.
 }

@@ -6,7 +6,8 @@
 
 /**
  * 매 틱 Blackboard 의 교전 상태를 갱신하는 BT Service.
- *  - TargetActor 유효성 검사: null/사망/LoseSightRange 초과면 타깃을 해제(Clear).
+ *  - TargetActor 유효성 검사: null/사망이면 타깃을 해제(Clear).
+ *  - 프로파일이 타깃 유지를 비활성화한 경우에만 LoseSightRange 초과 시 해제한다.
  *  - 살아있는 타깃이면 TargetLocation과 TargetDistance를 갱신한다.
 	* 탐지 해제 거리와 카이팅 거리는 Pawn의 AIProfile에서 읽는다.
  *

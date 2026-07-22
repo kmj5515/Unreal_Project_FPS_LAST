@@ -87,3 +87,5 @@ Docs/UnrealSOLIDHarness/
 
 # 로컬 에디터 전용 배틀 시나리오 에셋
 LastFPS/Content/Editor/BattleScenarios/**
+LastFPS/Plugins/UnrealMCP/
+LastFPS/.mcp.json

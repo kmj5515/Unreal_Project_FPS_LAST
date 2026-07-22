@@ -26,15 +26,19 @@ public:
 
 	/** 플레이어를 감지(시야에 포착)하는 최대 거리(cm). 시야 반경으로도 사용. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin=0))
-	float DetectionRange = 1200.f;
+	float DetectionRange = 100000.f;
 
 	/**
-	 * 감지한 타깃을 놓치는 거리(cm). 이 거리를 벗어나면 타깃을 해제한다.
+	 * 타깃 유지 옵션이 꺼져 있을 때 감지한 타깃을 놓치는 거리(cm)다.
 	 * 감지/해제 거리를 다르게 둬 추격 히스테리시스를 만든다(추격이 덜 끊김).
 	 * 0 이하면 DetectionRange 를 그대로 쓴다.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI", meta=(ClampMin=0))
-	float LoseSightRange = 1600.f;
+	float LoseSightRange = 100000.f;
+
+	/** 타깃을 획득하면 거리와 시야 상태에 관계없이 타깃이 사망하거나 제거될 때까지 유지한다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI")
+	bool bKeepTargetUntilInvalid = true;
 
 	/**
 	 * 카이팅: 타깃이 이 거리보다 가까워지면 뒤로/옆으로 빠져 거리를 유지한다(cm).
