@@ -222,6 +222,92 @@ void ALastFPSHero::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
     TickCameraInterp(DeltaTime);
+    TickAutoSprint(DeltaTime);
+}
+
+bool ALastFPSHero::IsForwardSprintInputAngle() const
+{
+    // CachedMoveInput 은 카메라 기준 입력. Y = 전방, X = 우측.
+    // 캐릭터가 이동 방향으로 회전해도 카메라 기준 입력은 그대로이므로
+    // 액터 회전 대신 이 값을 써야 판정이 흔들리지 않는다.
+    if (CachedMoveInput.IsNearlyZero())
+    {
+        return false;
+    }
+
+    if (CachedMoveInput.Y <= 0.f)
+    {
+        return false; // 좌우(0) · 후진(음수) 제외
+    }
+
+    const float AngleFromForward =
+        FMath::RadiansToDegrees(FMath::Atan2(FMath::Abs(CachedMoveInput.X), CachedMoveInput.Y));
+
+    return AngleFromForward <= AutoSprintForwardAngle;
+}
+
+void ALastFPSHero::TickAutoSprint(float DeltaTime)
+{
+    if (!bAutoSprintBySpeed)
+    {
+        return;
+    }
+
+    // 권한이 있는 쪽에서만 상태를 바꾼다 (bIsSprinting 은 복제됨)
+    if (!IsLocallyControlled() && !HasAuthority())
+    {
+        return;
+    }
+
+    const UCharacterMovementComponent* Movement = GetCharacterMovement();
+    if (!Movement)
+    {
+        return;
+    }
+
+    FVector Velocity = Movement->Velocity;
+    Velocity.Z = 0.f;
+    const float GroundSpeed = Velocity.Size();
+
+    // 진입과 해제 임계값을 다르게 두어 경계에서 모션이 떨리지 않게 한다
+    const float Threshold = bIsSprinting ? AutoSprintExitSpeed : AutoSprintEnterSpeed;
+    bool bShouldSprint = GroundSpeed >= Threshold;
+
+    // 조준 중이거나 공중이면 스프린트하지 않는다
+    if (bIsADS || Movement->IsFalling())
+    {
+        bShouldSprint = false;
+    }
+
+    // 앞 · 앞대각선 입력에서만 스프린트한다. 좌우 · 후진은 제외.
+    if (!IsForwardSprintInputAngle())
+    {
+        bShouldSprint = false;
+    }
+
+    if (bShouldSprint)
+    {
+        AutoSprintExitTimer = 0.f;
+        if (!bIsSprinting)
+        {
+            SetSprinting(true);
+        }
+        return;
+    }
+
+    if (!bIsSprinting)
+    {
+        AutoSprintExitTimer = 0.f;
+        return;
+    }
+
+    // 경사나 벽 스침으로 잠깐 느려진 것은 무시하고, 유예 시간이 지나야 해제한다
+    AutoSprintExitTimer += DeltaTime;
+    if (AutoSprintExitTimer >= AutoSprintExitGrace)
+    {
+        AutoSprintExitTimer = 0.f;
+        SetSprinting(false);
+    }
 }
 
 void ALastFPSHero::TickCameraInterp(float DeltaTime)
@@ -463,12 +549,21 @@ void ALastFPSHero::ApplyRotationModeSettings()
     {
         Movement->bOrientRotationToMovement = ShouldOrientRotationToMovement();
         Movement->bUseControllerDesiredRotation = false;
-        Movement->RotationRate = FRotator(0.f, 500.f, 0.f);
+        // 스프린트 중에는 방향 전환이 굼뜨지 않도록 회전 속도를 올린다
+        Movement->RotationRate = FRotator(0.f, bIsSprinting ? SprintRotationYaw : NormalRotationYaw, 0.f);
     }
 }
 
 bool ALastFPSHero::ShouldUseControllerYawRotationMode() const
 {
+    // 스프린트 중에는 몸이 이동 방향을 향하도록 컨트롤러 Yaw 회전 모드를 해제한다.
+    // 전진 스프린트 애니메이션 하나로 대각선 이동까지 자연스럽게 처리하기 위함.
+    // (Orientation Warping 은 루트 모션이 있는 시퀀스에서만 동작하므로 그 대안)
+    if (bIsSprinting)
+    {
+        return false;
+    }
+
     return HasEquippedWeapon() || CombatState == EMMCombatState::Attacking;
 }
 
@@ -535,7 +630,10 @@ void ALastFPSHero::Move(const FInputActionValue& Value)
     CachedMoveInput = MovementVector;
     bHasMoveInputAction = true;
 
-    if ((bIsSprinting || bWantsToSprint) && !HasForwardSprintInput())
+    // 자동 모드에서는 입력 방향으로 스프린트를 끊지 않는다.
+    // 몸이 이동 방향을 향하도록 회전하므로 대각선·측면 입력도 그대로 유지한다.
+    if (!bAutoSprintBySpeed
+        && (bIsSprinting || bWantsToSprint) && !HasForwardSprintInput())
     {
         SetWantsToSprint(false);
         CancelAbilityByTag(LastFPSGameplayTags::Input_Sprint);
@@ -550,7 +648,12 @@ void ALastFPSHero::Move(const FInputActionValue& Value)
     const FVector RightDir   = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
     FVector2D EffectiveMovementVector = MovementVector;
-    if (bIsSprinting || bWantsToSprint)
+
+    // 입력 기반 스프린트에서는 전방 전용으로 제한한다.
+    // 자동(속도) 모드에서는 몸이 이동 방향으로 회전하므로 전 방향 입력을 그대로 쓴다.
+    // 여기서 좌우를 0으로 만들면 입력 크기가 줄어 감속하고, 순수 좌우 입력은
+    // 아예 정지해 버려서 스프린트가 계속 끊긴다.
+    if (!bAutoSprintBySpeed && (bIsSprinting || bWantsToSprint))
     {
         EffectiveMovementVector.X = 0.f;
         EffectiveMovementVector.Y = FMath::Max(EffectiveMovementVector.Y, 0.f);
@@ -810,6 +913,12 @@ bool ALastFPSHero::HasForwardSprintInput() const
 
 bool ALastFPSHero::CanStartSprint() const
 {
+    // 자동 모드에서는 입력 방향을 보지 않는다. 속도로만 판정한다.
+    if (bAutoSprintBySpeed)
+    {
+        return !bIsADS;
+    }
+
     return HasForwardSprintInput() && !bIsADS;
 }
 

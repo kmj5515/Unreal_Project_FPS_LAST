@@ -54,7 +54,11 @@ public:
         return GrapplingTargetingComponent;
     }
     virtual bool GetIsADS() const override { return bIsADS; }
+    /** 스프린트 중인지. 애님 BP 에서 스레드 세이프하게 읽을 수 있다. */
+    UFUNCTION(BlueprintPure, Category="LastFPS|Movement", meta=(BlueprintThreadSafe))
     FORCEINLINE bool GetIsSprinting() const { return bIsSprinting; }
+
+    UFUNCTION(BlueprintPure, Category="LastFPS|Movement", meta=(BlueprintThreadSafe))
     FORCEINLINE bool GetWantsToSprint() const { return bWantsToSprint; }
     FORCEINLINE bool GetWantsToWalk() const { return bWantsToWalk || CombatState == EMMCombatState::Attacking; }
     FORCEINLINE EMMCombatState GetCombatState() const { return CombatState; }
@@ -170,6 +174,50 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint")
     float SprintForwardInputThreshold = 0.5f;
+
+    /** 스프린트 중 몸통 회전 속도 (Yaw, deg/s). 이동 방향으로 도는 속도. */
+    UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint", meta=(ClampMin="0.0"))
+    float SprintRotationYaw = 600.f;
+
+    /** 평상시 회전 속도 (Yaw, deg/s) */
+    UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint", meta=(ClampMin="0.0"))
+    float NormalRotationYaw = 500.f;
+
+    /** 속도 기반 자동 스프린트를 사용할지. 끄면 기존 입력(어빌리티) 방식만 동작. */
+    UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint|Auto")
+    bool bAutoSprintBySpeed = true;
+
+    /** 이 속도 이상이면 스프린트 진입 */
+    UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint|Auto", meta=(ClampMin="0.0", Units="cm/s"))
+    float AutoSprintEnterSpeed = 1000.f;
+
+    /** 이 속도 아래로 떨어지면 해제. 진입값보다 낮게 두어 경계 진동을 막는다. */
+    UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint|Auto", meta=(ClampMin="0.0", Units="cm/s"))
+    float AutoSprintExitSpeed = 600.f;
+
+    /** 조건을 벗어나도 이 시간만큼은 스프린트를 유지한다. 경사·벽 스침 대응. */
+    UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint|Auto", meta=(ClampMin="0.0", Units="s"))
+    float AutoSprintExitGrace = 0.3f;
+
+    /**
+     * 정면 기준 이 각도 안쪽으로 입력했을 때만 스프린트한다.
+     * 50 이면 앞·앞대각선까지 허용하고 좌우(90)·후진(180)은 제외된다.
+     */
+    UPROPERTY(EditDefaultsOnly, Category="Movement|Sprint|Auto", meta=(ClampMin="0.0", ClampMax="180.0"))
+    float AutoSprintForwardAngle = 50.f;
+
+    /** 입력이 정면 허용 각도 안에 있는지 (카메라 기준) */
+    UFUNCTION(BlueprintPure, Category="LastFPS|Movement")
+    bool IsForwardSprintInputAngle() const;
+
+    /** 자동 스프린트 상태를 매 틱 평가한다. */
+    void TickAutoSprint(float DeltaTime);
+
+private:
+    /** 해제 조건이 지속된 시간 */
+    float AutoSprintExitTimer = 0.f;
+
+protected:
 
     UPROPERTY(EditDefaultsOnly, Category="Movement|Walk")
     float WalkMaxWalkSpeed = 250.f;

@@ -69,6 +69,14 @@ void ULastFPSSkillCooldownSlotWidget::InitializeSlotPresentation()
         CooldownText->SetText(FText::GetEmpty());
     }
 
+    if (ActiveOverlay)
+    {
+        ActiveOverlay->SetVisibility(
+            bShowActiveOverlayWhenReady
+                ? ESlateVisibility::HitTestInvisible
+                : ESlateVisibility::Collapsed);
+    }
+
     if (KeyLabel)
     {
         ApplyConfiguredKeyLabel();
@@ -262,6 +270,14 @@ void ULastFPSSkillCooldownSlotWidget::ApplyVisual(
     if (SkillIcon)
     {
         SkillIcon->SetRenderOpacity(bReady ? IconReadyOpacity : IconBlockedOpacity);
+    }
+
+    if (ActiveOverlay)
+    {
+        ActiveOverlay->SetVisibility(
+            bShowActiveOverlayWhenReady && bReady
+                ? ESlateVisibility::HitTestInvisible
+                : ESlateVisibility::Collapsed);
     }
 
     if (CooldownText)

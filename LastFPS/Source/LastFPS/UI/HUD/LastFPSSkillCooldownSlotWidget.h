@@ -65,6 +65,9 @@ protected:
     TObjectPtr<UImage> SkillIcon;
 
     UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
+    TObjectPtr<UImage> ActiveOverlay;
+
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
     TObjectPtr<UTextBlock> CooldownText;
 
     UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
@@ -96,6 +99,9 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category="HUD|Skill")
     float IconBlockedOpacity = 0.35f;
+
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Skill|Visual")
+    bool bShowActiveOverlayWhenReady = true;
 
     UPROPERTY(EditDefaultsOnly, Category="HUD|Skill|Material")
     bool bDriveCooldownMaterial = true;
