@@ -1,12 +1,13 @@
 #include "AbilitySystem/Abilities/GA_GrapplingHook.h"
 
-#include "Abilities/Tasks/AbilityTask_ApplyRootMotionMoveToForce.h"
+#include "Abilities/Tasks/AbilityTask_ApplyRootMotionMoveToActorForce.h"
 #include "Abilities/Tasks/AbilityTask_WaitDelay.h"
 #include "AbilitySystemComponent.h"
 #include "Character/Components/LastFPSGrapplingAnimationComponent.h"
 #include "Character/Components/LastFPSGrapplingTargetingComponent.h"
 #include "Character/LastFPSHero.h"
 #include "Components/PrimitiveComponent.h"
+#include "Curves/CurveFloat.h"
 #include "Data/Abilities/LastFPSGrapplingHookData.h"
 #include "Engine/World.h"
 #include "GameFramework/RootMotionSource.h"
@@ -46,6 +47,19 @@ void UGA_GrapplingHook::OnAvatarSet(
 	const FGameplayAbilitySpec& Spec)
 {
 	Super::OnAvatarSet(ActorInfo, Spec);
+	LoadedMovementProgressCurve = GrapplingData
+		? GrapplingData->MovementProgressCurve.LoadSynchronous()
+		: nullptr;
+	if (GrapplingData
+		&& !LoadedMovementProgressCurve
+		&& !GrapplingData->MovementProgressCurve.IsNull())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("그래플링 이동 진행 곡선을 미리 불러오지 못해 선형 진행으로 대체합니다. Curve=%s"),
+			*GrapplingData->MovementProgressCurve.ToString());
+	}
 
 	ALastFPSHero* Hero = ActorInfo
 		? Cast<ALastFPSHero>(ActorInfo->AvatarActor.Get())
@@ -318,18 +332,41 @@ void UGA_GrapplingHook::StartGrapplePull()
 	bPullStarted = true;
 	const ERootMotionFinishVelocityMode FinishMode = ResolveFinishVelocityMode(
 		GrapplingData->FinishVelocityMode);
-	GrappleMovementTask = UAbilityTask_ApplyRootMotionMoveToForce::ApplyRootMotionMoveToForce(
+	UPrimitiveComponent* TargetComponent = GrappleTargetComponent.Get();
+	if (!IsValid(TargetComponent))
+	{
+		EndAbility(
+			GetCurrentAbilitySpecHandle(),
+			GetCurrentActorInfo(),
+			GetCurrentActivationInfo(),
+			true,
+			true);
+		return;
+	}
+
+	const FVector TargetRelativeDestination =
+		TargetComponent->GetComponentTransform().InverseTransformPosition(GrapplePullDestination);
+	GrappleMovementTask =
+		UAbilityTask_ApplyRootMotionMoveToActorForce::ApplyRootMotionMoveToComponentForce(
 		this,
 		TEXT("GrapplingHookPull"),
-		GrapplePullDestination,
+		TargetComponent,
+		TargetRelativeDestination,
+		FVector::ZeroVector,
+		ERootMotionMoveToActorTargetOffsetType::AlignToWorldSpace,
 		PullDuration,
+		nullptr,
+		nullptr,
 		true,
 		MOVE_Flying,
 		GrapplingData->bRestrictSpeedToExpected,
 		GrapplingData->PathOffsetCurve,
+		LoadedMovementProgressCurve,
 		FinishMode,
 		FVector::ZeroVector,
-		GrapplingData->FinishVelocityClamp);
+		GrapplingData->FinishVelocityClamp,
+		true,
+		FMath::Max(GrapplingData->StopDistance, 1.0f));
 	if (!GrappleMovementTask)
 	{
 		EndAbility(
@@ -341,8 +378,7 @@ void UGA_GrapplingHook::StartGrapplePull()
 		return;
 	}
 
-	GrappleMovementTask->OnTimedOut.AddDynamic(this, &UGA_GrapplingHook::OnGrappleMovementFinished);
-	GrappleMovementTask->OnTimedOutAndDestinationReached.AddDynamic(
+	GrappleMovementTask->OnFinished.AddDynamic(
 		this,
 		&UGA_GrapplingHook::OnGrappleMovementFinished);
 	FLastFPSTemporaryCameraEffectOptions CameraEffectOptions;
@@ -374,7 +410,10 @@ void UGA_GrapplingHook::StartWireGameplayCue(
 	bWireGameplayCueActive = true;
 }
 
-void UGA_GrapplingHook::OnGrappleMovementFinished()
+void UGA_GrapplingHook::OnGrappleMovementFinished(
+	const bool /*bDestinationReached*/,
+	const bool /*bTimedOut*/,
+	const FVector /*FinalTargetLocation*/)
 {
 	GrappleMovementTask = nullptr;
 	EndAbility(

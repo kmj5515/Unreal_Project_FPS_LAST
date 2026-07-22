@@ -20,6 +20,8 @@ class USoundBase;
 class ULastFPSWeaponDefinition;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponEquippedChanged, bool, bEquipped);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWeaponAmmoChanged, int32, CurrentAmmo, int32, MagazineCapacity);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponReserveAmmoChanged, int32, ReserveAmmo);
 
 UCLASS(BlueprintType, Blueprintable, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class LASTFPS_API UWeaponComponent : public UActorComponent
@@ -33,6 +35,9 @@ public:
 
     FTransform GetMuzzleTransform() const;
     bool CanFire() const;
+    bool CanReload() const;
+    bool TryConsumePredictedRound();
+    void CompleteReload();
     float GetWeaponBaseDamage() const;
     void PlayFireEffects() const;
 	void PlayFireCameraShake() const;
@@ -67,6 +72,27 @@ public:
     // 무기 장착/해제 시 HUD에 알림
     UPROPERTY(BlueprintAssignable, Category="Weapon")
     FOnWeaponEquippedChanged OnWeaponEquippedChanged;
+
+    UPROPERTY(BlueprintAssignable, Category="Weapon|Ammo")
+    FOnWeaponAmmoChanged OnWeaponAmmoChanged;
+
+    UPROPERTY(BlueprintAssignable, Category="Weapon|Ammo")
+    FOnWeaponReserveAmmoChanged OnWeaponReserveAmmoChanged;
+
+    UFUNCTION(BlueprintPure, Category="Weapon|Ammo")
+    int32 GetCurrentMagazineAmmo() const { return CurrentMagazineAmmo; }
+
+    UFUNCTION(BlueprintPure, Category="Weapon|Ammo")
+    int32 GetMagazineCapacity() const { return MagazineCapacity; }
+
+    UFUNCTION(BlueprintPure, Category="Weapon|Ammo")
+    int32 GetCurrentReserveAmmo() const { return CurrentReserveAmmo; }
+
+    UFUNCTION(BlueprintPure, Category="Weapon|Ammo")
+    bool HasReserveAmmo() const { return CurrentReserveAmmo > 0; }
+
+    UFUNCTION(BlueprintPure, Category="Weapon|Ammo")
+    float GetReloadDuration() const { return ReloadDuration; }
 
     UFUNCTION(BlueprintCallable, Category="Weapon")
     bool HasWeapon() const { return CurrentWeapon != nullptr; }
@@ -160,6 +186,9 @@ public:
     UFUNCTION(Server, Reliable)
     void Server_FireFromClientAim(FVector_NetQuantize ClientMuzzleLocation, FVector_NetQuantize ClientCameraLocation, FVector_NetQuantizeNormal ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
 
+    UFUNCTION(Client, Reliable)
+    void ClientCorrectMagazineAmmo(int32 ServerMagazineAmmo);
+
     // 에디터에서 테스트할 픽업 BP 클래스 지정
     UPROPERTY(EditDefaultsOnly, Category="Weapon|Debug")
     TSubclassOf<AWeaponPickupActor> TestPickupClass;
@@ -182,6 +211,18 @@ private:
     UFUNCTION()
     void OnRep_WeaponDefinition();
 
+    UPROPERTY(ReplicatedUsing=OnRep_CurrentMagazineAmmo)
+    int32 CurrentMagazineAmmo = 0;
+
+    UFUNCTION()
+    void OnRep_CurrentMagazineAmmo();
+
+    UPROPERTY(ReplicatedUsing=OnRep_CurrentReserveAmmo)
+    int32 CurrentReserveAmmo = 0;
+
+    UFUNCTION()
+    void OnRep_CurrentReserveAmmo();
+
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_DetachMagazineToHand();
 
@@ -202,6 +243,9 @@ private:
     bool ValidateClientMuzzleLocation(const FVector& ClientMuzzleLocation) const;
     FVector ResolveValidatedTraceStart(const ACharacter& Character, const FVector& ClientCameraLocation) const;
     bool TryConsumeServerFirePermission();
+    void SetCurrentMagazineAmmo(int32 NewMagazineAmmo);
+    void SetCurrentReserveAmmo(int32 NewReserveAmmo);
+    void NotifyAmmoChanged();
     void ResetPendingAimRecoil();
     void ResetAimRecoilSequence();
     void ApplyDetachMagazineVisual();
@@ -222,5 +266,8 @@ private:
     float RecoverableAimRecoilYaw = 0.f;
     double LastAimRecoilTimeSeconds = 0.0;
     double NextAllowedServerFireTimeSeconds = 0.0;
+    int32 MagazineCapacity = 30;
+    int32 StartingReserveAmmo = 90;
+    float ReloadDuration = 2.f;
     bool bHasFiredAimRecoil = false;
 };

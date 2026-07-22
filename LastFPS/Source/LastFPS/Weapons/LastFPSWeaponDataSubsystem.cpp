@@ -9,6 +9,33 @@ void ULastFPSWeaponDataSubsystem::Initialize(FSubsystemCollectionBase& Collectio
 {
 	Super::Initialize(Collection);
 
+	AmmoSettingsByWeaponId.Reset();
+	for (const FLastFPSWeaponAmmoConfigEntry& Entry : WeaponAmmoConfigurations)
+	{
+		if (Entry.WeaponId.IsNone()
+			|| Entry.Settings.MagazineCapacity <= 0
+			|| Entry.Settings.StartingReserveAmmo < 0
+			|| Entry.Settings.ReloadDuration <= 0.f)
+		{
+			UE_LOG(LogLastFPSWeaponData, Error,
+				TEXT("무기 탄약 설정이 올바르지 않습니다. WeaponId='%s', MagazineCapacity=%d, StartingReserveAmmo=%d, ReloadDuration=%.2f"),
+				*Entry.WeaponId.ToString(),
+				Entry.Settings.MagazineCapacity,
+				Entry.Settings.StartingReserveAmmo,
+				Entry.Settings.ReloadDuration);
+			continue;
+		}
+
+		if (AmmoSettingsByWeaponId.Contains(Entry.WeaponId))
+		{
+			UE_LOG(LogLastFPSWeaponData, Warning,
+				TEXT("무기 '%s'의 탄약 설정이 중복되어 마지막 설정을 사용합니다."),
+				*Entry.WeaponId.ToString());
+		}
+
+		AmmoSettingsByWeaponId.Add(Entry.WeaponId, Entry.Settings);
+	}
+
 	LoadedWeaponBalanceTable = WeaponBalanceTable.LoadSynchronous();
 	if (!LoadedWeaponBalanceTable)
 	{
@@ -40,6 +67,7 @@ void ULastFPSWeaponDataSubsystem::Initialize(FSubsystemCollectionBase& Collectio
 void ULastFPSWeaponDataSubsystem::Deinitialize()
 {
 	LoadedWeaponBalanceTable = nullptr;
+	AmmoSettingsByWeaponId.Reset();
 	Super::Deinitialize();
 }
 
@@ -54,4 +82,9 @@ const FLastFPSWeaponBalanceData* ULastFPSWeaponDataSubsystem::FindBalance(const 
 		WeaponId,
 		TEXT("LastFPSWeaponDataSubsystem::FindBalance"),
 		false);
+}
+
+const FLastFPSWeaponAmmoSettings* ULastFPSWeaponDataSubsystem::FindAmmoSettings(const FName WeaponId) const
+{
+	return WeaponId.IsNone() ? nullptr : AmmoSettingsByWeaponId.Find(WeaponId);
 }

@@ -6,6 +6,7 @@
 
 class UWeaponComponent;
 class ACharacter;
+class ALastFPSHero;
 class UGameplayEffect;
 class UAnimMontage;
 
@@ -51,6 +52,7 @@ protected:
 private:
     void Fire();
     void FinishAbility();
+    void TryStartAutoReload(ALastFPSHero* Hero, UWeaponComponent* Weapon) const;
 
     // 로컬 클라이언트: 사운드 + 머즐플래시 즉시 재생 (클라이언트 예측)
     void LocalFire(UWeaponComponent* Weapon);

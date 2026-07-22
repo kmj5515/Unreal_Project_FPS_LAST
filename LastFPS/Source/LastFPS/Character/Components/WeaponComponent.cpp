@@ -42,6 +42,8 @@ void UWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
     DOREPLIFETIME(UWeaponComponent, WeaponType);
     DOREPLIFETIME(UWeaponComponent, WeaponAnimLayerClass);
     DOREPLIFETIME(UWeaponComponent, WeaponDefinition);
+    DOREPLIFETIME_CONDITION(UWeaponComponent, CurrentMagazineAmmo, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(UWeaponComponent, CurrentReserveAmmo, COND_OwnerOnly);
 }
 
 void UWeaponComponent::BeginPlay()
@@ -77,7 +79,66 @@ void UWeaponComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 bool UWeaponComponent::CanFire() const
 {
-    return CurrentWeapon != nullptr;
+    return CurrentWeapon != nullptr && CurrentMagazineAmmo > 0;
+}
+
+bool UWeaponComponent::CanReload() const
+{
+    return CurrentWeapon != nullptr
+        && MagazineCapacity > 0
+        && CurrentMagazineAmmo < MagazineCapacity
+        && CurrentReserveAmmo > 0;
+}
+
+bool UWeaponComponent::TryConsumePredictedRound()
+{
+    if (!CanFire())
+    {
+        return false;
+    }
+
+    ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+    if (!OwnerCharacter)
+    {
+        return false;
+    }
+
+    // 권한 인스턴스는 실제 발사 허용 검사에서만 탄약을 차감한다.
+    if (OwnerCharacter->HasAuthority())
+    {
+        return true;
+    }
+
+    if (!OwnerCharacter->IsLocallyControlled())
+    {
+        return false;
+    }
+
+    SetCurrentMagazineAmmo(CurrentMagazineAmmo - 1);
+    return true;
+}
+
+void UWeaponComponent::CompleteReload()
+{
+    ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+    if (!OwnerCharacter || (!OwnerCharacter->HasAuthority() && !OwnerCharacter->IsLocallyControlled()))
+    {
+        return;
+    }
+
+    if (CanReload())
+    {
+        const int32 MissingAmmo = MagazineCapacity - CurrentMagazineAmmo;
+        const int32 AmmoToLoad = FMath::Min(MissingAmmo, CurrentReserveAmmo);
+        SetCurrentMagazineAmmo(CurrentMagazineAmmo + AmmoToLoad);
+        SetCurrentReserveAmmo(CurrentReserveAmmo - AmmoToLoad);
+    }
+
+    if (OwnerCharacter->HasAuthority())
+    {
+        NextAllowedServerFireTimeSeconds = 0.0;
+        OwnerCharacter->ForceNetUpdate();
+    }
 }
 
 FTransform UWeaponComponent::GetMuzzleTransform() const
@@ -459,7 +520,8 @@ void UWeaponComponent::ApplyRestoreMagazineVisual()
 
 void UWeaponComponent::FireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration)
 {
-    if (!CanFire())
+    // 예측 차감으로 마지막 탄이 0이 된 직후에도 서버 발사 요청은 전달되어야 한다.
+    if (!HasWeapon())
     {
         return;
     }
@@ -475,12 +537,12 @@ void UWeaponComponent::FireFromClientAim(const FVector& ClientMuzzleLocation, co
 
 void UWeaponComponent::Server_FireFromClientAim_Implementation(FVector_NetQuantize ClientMuzzleLocation, FVector_NetQuantize ClientCameraLocation, FVector_NetQuantizeNormal ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration)
 {
-    if (!CanFire())
-    {
-        return;
-    }
-
     HandleFireFromClientAim(ClientMuzzleLocation, ClientCameraLocation, FVector(ClientAimDirection).GetSafeNormal(), DamageEffectClass, bDrawDebugShot, DebugShotDuration);
+}
+
+void UWeaponComponent::ClientCorrectMagazineAmmo_Implementation(const int32 ServerMagazineAmmo)
+{
+    SetCurrentMagazineAmmo(ServerMagazineAmmo);
 }
 
 bool UWeaponComponent::GetLeftHandIKTransform(USkeletalMeshComponent* CharacterMesh, FName RelativeToBoneName, FTransform& OutTransform) const
@@ -578,6 +640,8 @@ void UWeaponComponent::UnequipWeapon()
     WeaponType = EMMWeaponType::Unarmed;
     WeaponAnimLayerClass = nullptr;
     DestroyCurrentWeapon();
+    SetCurrentMagazineAmmo(0);
+    SetCurrentReserveAmmo(0);
     ApplyAnimLayerClass(UnarmedAnimLayerClass);
     OnWeaponEquippedChanged.Broadcast(false);
 }
@@ -598,12 +662,17 @@ void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefini
 
     if (!WeaponSkeletalMesh)
     {
+        SetCurrentMagazineAmmo(0);
+        SetCurrentReserveAmmo(0);
         ApplyAnimLayerClass(UnarmedAnimLayerClass);
         OnWeaponEquippedChanged.Broadcast(false);
         return;
     }
 
     CurrentWeapon = SpawnWeaponActor(WeaponSkeletalMesh, WeaponActorClass, NewDefinition);
+    SetCurrentMagazineAmmo(CurrentWeapon ? MagazineCapacity : 0);
+    SetCurrentReserveAmmo(CurrentWeapon ? StartingReserveAmmo : 0);
+    NextAllowedServerFireTimeSeconds = 0.0;
     ApplyWeaponVisibilityOverride();
     ApplyAnimLayerClass(ResolveCurrentAnimLayerClass());
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
@@ -611,6 +680,10 @@ void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefini
 
 void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinition* NewDefinition)
 {
+    MagazineCapacity = 30;
+    StartingReserveAmmo = 90;
+    ReloadDuration = 2.f;
+
     if (!NewDefinition)
     {
         return;
@@ -634,6 +707,21 @@ void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
     const UGameInstance* GameInstance = GetOwner() ? GetOwner()->GetGameInstance() : nullptr;
     const ULastFPSWeaponDataSubsystem* WeaponDataSubsystem =
         GameInstance ? GameInstance->GetSubsystem<ULastFPSWeaponDataSubsystem>() : nullptr;
+    const FLastFPSWeaponAmmoSettings* AmmoSettings =
+        WeaponDataSubsystem ? WeaponDataSubsystem->FindAmmoSettings(NewDefinition->WeaponId) : nullptr;
+    if (AmmoSettings)
+    {
+        MagazineCapacity = FMath::Max(AmmoSettings->MagazineCapacity, 1);
+        StartingReserveAmmo = FMath::Max(AmmoSettings->StartingReserveAmmo, 0);
+        ReloadDuration = FMath::Max(AmmoSettings->ReloadDuration, 0.01f);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning,
+            TEXT("무기 '%s'의 탄약 설정을 찾지 못해 기본값을 사용합니다."),
+            *NewDefinition->WeaponId.ToString());
+    }
+
     const FLastFPSWeaponBalanceData* BalanceData =
         WeaponDataSubsystem ? WeaponDataSubsystem->FindBalance(NewDefinition->WeaponId) : nullptr;
     if (!BalanceData)
@@ -661,6 +749,8 @@ void UWeaponComponent::OnRep_CurrentWeapon()
 
     ApplyAnimLayerClass(ResolveCurrentAnimLayerClass());
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
+    NotifyAmmoChanged();
+    OnWeaponReserveAmmoChanged.Broadcast(CurrentReserveAmmo);
 }
 
 void UWeaponComponent::OnRep_WeaponType()
@@ -685,6 +775,18 @@ void UWeaponComponent::OnRep_WeaponDefinition()
     ApplyAnimLayerClass(ResolveCurrentAnimLayerClass());
     // 장착 여부가 같아도 무기별 UI 데이터가 바뀌었으므로 HUD 구독자에게 갱신을 알린다.
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
+    NotifyAmmoChanged();
+    OnWeaponReserveAmmoChanged.Broadcast(CurrentReserveAmmo);
+}
+
+void UWeaponComponent::OnRep_CurrentMagazineAmmo()
+{
+    NotifyAmmoChanged();
+}
+
+void UWeaponComponent::OnRep_CurrentReserveAmmo()
+{
+    OnWeaponReserveAmmoChanged.Broadcast(CurrentReserveAmmo);
 }
 
 void UWeaponComponent::AttachWeaponToOwner(ALastFPSWeaponActor* WeaponActor)
@@ -722,6 +824,9 @@ void UWeaponComponent::ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType,
         NewWeaponActorClass ? *NewWeaponActorClass->GetName() : TEXT("None"));
 
     WeaponDefinition = nullptr;
+    MagazineCapacity = 30;
+    StartingReserveAmmo = 90;
+    ReloadDuration = 2.f;
     WeaponSkeletalMesh = NewMesh;
     WeaponType = NewType;
     WeaponAnimLayerClass = NewAnimLayer;
@@ -734,12 +839,17 @@ void UWeaponComponent::ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType,
 
     if (!NewMesh)
     {
+        SetCurrentMagazineAmmo(0);
+        SetCurrentReserveAmmo(0);
         ApplyAnimLayerClass(UnarmedAnimLayerClass);
         OnWeaponEquippedChanged.Broadcast(false);
         return;
     }
 
     CurrentWeapon = SpawnWeaponActor(NewMesh, NewWeaponActorClass);
+    SetCurrentMagazineAmmo(CurrentWeapon ? MagazineCapacity : 0);
+    SetCurrentReserveAmmo(CurrentWeapon ? StartingReserveAmmo : 0);
+    NextAllowedServerFireTimeSeconds = 0.0;
     ApplyWeaponVisibilityOverride();
     ApplyAnimLayerClass(ResolveCurrentAnimLayerClass());
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
@@ -855,15 +965,27 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
 {
     ACharacter* Character = Cast<ACharacter>(GetOwner());
     UWorld* World = GetWorld();
-    if (!World || !Character || !Character->HasAuthority() || !ProjectileClass
-        || !TryConsumeServerFirePermission())
+    if (!World || !Character || !Character->HasAuthority())
     {
+        return;
+    }
+
+    if (!ProjectileClass)
+    {
+        ClientCorrectMagazineAmmo(CurrentMagazineAmmo);
         return;
     }
 
     const FVector AimDirection = ClientAimDirection.GetSafeNormal();
     if (AimDirection.IsNearlyZero())
     {
+        ClientCorrectMagazineAmmo(CurrentMagazineAmmo);
+        return;
+    }
+
+    if (!TryConsumeServerFirePermission())
+    {
+        ClientCorrectMagazineAmmo(CurrentMagazineAmmo);
         return;
     }
 
@@ -993,6 +1115,11 @@ bool UWeaponComponent::TryConsumeServerFirePermission()
         return false;
     }
 
+    if (CurrentMagazineAmmo <= 0 || !CurrentWeapon)
+    {
+        return false;
+    }
+
     const double CurrentTimeSeconds = World->GetTimeSeconds();
     const double ToleranceSeconds = FMath::Max(ServerFireIntervalTolerance, 0.f);
     if (CurrentTimeSeconds + ToleranceSeconds < NextAllowedServerFireTimeSeconds)
@@ -1003,5 +1130,36 @@ bool UWeaponComponent::TryConsumeServerFirePermission()
     NextAllowedServerFireTimeSeconds =
         FMath::Max(CurrentTimeSeconds, NextAllowedServerFireTimeSeconds)
         + FMath::Max(FireRate, MinimumServerFireIntervalSeconds);
+    SetCurrentMagazineAmmo(CurrentMagazineAmmo - 1);
+    GetOwner()->ForceNetUpdate();
     return true;
+}
+
+void UWeaponComponent::SetCurrentMagazineAmmo(const int32 NewMagazineAmmo)
+{
+    const int32 ClampedAmmo = FMath::Clamp(NewMagazineAmmo, 0, FMath::Max(MagazineCapacity, 0));
+    if (CurrentMagazineAmmo == ClampedAmmo)
+    {
+        return;
+    }
+
+    CurrentMagazineAmmo = ClampedAmmo;
+    NotifyAmmoChanged();
+}
+
+void UWeaponComponent::SetCurrentReserveAmmo(const int32 NewReserveAmmo)
+{
+    const int32 ClampedAmmo = FMath::Max(NewReserveAmmo, 0);
+    if (CurrentReserveAmmo == ClampedAmmo)
+    {
+        return;
+    }
+
+    CurrentReserveAmmo = ClampedAmmo;
+    OnWeaponReserveAmmoChanged.Broadcast(CurrentReserveAmmo);
+}
+
+void UWeaponComponent::NotifyAmmoChanged()
+{
+    OnWeaponAmmoChanged.Broadcast(CurrentMagazineAmmo, MagazineCapacity);
 }

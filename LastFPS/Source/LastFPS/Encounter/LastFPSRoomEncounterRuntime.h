@@ -11,7 +11,9 @@ class ALastFPSCharacterBase;
 class ATargetPoint;
 class ATriggerBox;
 class ULastFPSCharacterDefinition;
+class ULastFPSRoomBarrierPresentationComponent;
 class ULastFPSRoomSpawnPresentationComponent;
+class USceneComponent;
 
 /** 이펙트 예고 후 실제 생성을 기다리는 적 한 마리의 불변 요청이다. */
 struct FLastFPSPendingRoomEnemySpawn
@@ -76,8 +78,12 @@ private:
 	void CompleteEncounter();
 	void FailEncounterOpen(const TCHAR* Reason);
 	void SetBarrierActive(bool bNewActive);
-	void ApplyBarrierCollision() const;
+	void ConfigureBarrierPresentation();
+	void ApplyBarrierState();
 	FTransform ResolveSpawnTransform(int32 SpawnIndex);
+
+	UPROPERTY(VisibleAnywhere, Category="Encounter")
+	TObjectPtr<USceneComponent> SceneRoot;
 
 	UPROPERTY(ReplicatedUsing=OnRep_BarrierVolume)
 	TObjectPtr<ATriggerBox> BarrierVolume;
@@ -102,6 +108,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category="Encounter")
 	TObjectPtr<ULastFPSRoomSpawnPresentationComponent> SpawnPresentationComponent;
+
+	UPROPERTY(VisibleAnywhere, Category="Encounter")
+	TObjectPtr<ULastFPSRoomBarrierPresentationComponent> BarrierPresentationComponent;
 
 	TArray<FLastFPSRoomEncounterWaveDefinition> Waves;
 	TSet<TWeakObjectPtr<ALastFPSCharacterBase>> AliveEnemies;

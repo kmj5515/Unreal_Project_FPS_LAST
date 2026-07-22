@@ -2,10 +2,13 @@
 
 #include "Character/LastFPSCharacterBase.h"
 #include "Components/BoxComponent.h"
+#include "Components/SceneComponent.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/TriggerBox.h"
 #include "Engine/World.h"
+#include "Encounter/LastFPSRoomBarrierPresentationComponent.h"
+#include "Encounter/LastFPSRoomEncounterSettings.h"
 #include "Encounter/LastFPSRoomSpawnPresentationComponent.h"
 #include "GameFramework/Pawn.h"
 #include "NavigationSystem.h"
@@ -20,6 +23,11 @@ ALastFPSRoomEncounterRuntime::ALastFPSRoomEncounterRuntime()
 	bReplicates = true;
 	bAlwaysRelevant = true;
 	SetReplicateMovement(false);
+	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
+	SetRootComponent(SceneRoot);
+	BarrierPresentationComponent = CreateDefaultSubobject<ULastFPSRoomBarrierPresentationComponent>(
+		TEXT("BarrierPresentationComponent"));
+	BarrierPresentationComponent->SetupAttachment(SceneRoot);
 	SpawnPresentationComponent = CreateDefaultSubobject<ULastFPSRoomSpawnPresentationComponent>(
 		TEXT("SpawnPresentationComponent"));
 }
@@ -46,6 +54,7 @@ void ALastFPSRoomEncounterRuntime::InitializeEncounter(
 		? 0.f
 		: FMath::Max(InEncounterData.SpawnVFX.DelayBeforeSpawn, 0.f);
 	SpawnPresentationComponent->Configure(InEncounterData.SpawnVFX);
+	ConfigureBarrierPresentation();
 
 	SpawnPoints.Reserve(InSpawnPoints.Num());
 	for (ATargetPoint* SpawnPoint : InSpawnPoints)
@@ -598,11 +607,35 @@ void ALastFPSRoomEncounterRuntime::FailEncounterOpen(const TCHAR* Reason)
 void ALastFPSRoomEncounterRuntime::SetBarrierActive(const bool bNewActive)
 {
 	bBarrierActive = bNewActive;
-	ApplyBarrierCollision();
+	ApplyBarrierState();
 	ForceNetUpdate();
 }
 
-void ALastFPSRoomEncounterRuntime::ApplyBarrierCollision() const
+void ALastFPSRoomEncounterRuntime::ConfigureBarrierPresentation()
+{
+	// 전용 서버는 시각 에셋을 로드하거나 짧은 소거 Tick을 실행할 필요가 없다.
+	if (GetNetMode() == NM_DedicatedServer
+		|| !IsValid(BarrierVolume)
+		|| !BarrierPresentationComponent)
+	{
+		return;
+	}
+
+	const ULastFPSRoomEncounterSettings* Settings = GetDefault<ULastFPSRoomEncounterSettings>();
+	if (!Settings)
+	{
+		UE_LOG(
+			LogLastFPSRoomEncounter,
+			Error,
+			TEXT("[%s] 배리어 표시 설정을 가져오지 못했습니다."),
+			*EncounterId.ToString());
+		return;
+	}
+
+	BarrierPresentationComponent->Configure(*BarrierVolume, Settings->BarrierPresentation);
+}
+
+void ALastFPSRoomEncounterRuntime::ApplyBarrierState()
 {
 	if (!IsValid(BarrierVolume))
 	{
@@ -610,25 +643,29 @@ void ALastFPSRoomEncounterRuntime::ApplyBarrierCollision() const
 	}
 
 	UBoxComponent* BarrierBox = BarrierVolume->FindComponentByClass<UBoxComponent>();
-	if (!BarrierBox)
+	if (BarrierBox)
 	{
-		return;
+		BarrierBox->SetGenerateOverlapEvents(false);
+		BarrierBox->SetCollisionResponseToAllChannels(ECR_Block);
+		BarrierBox->SetCollisionEnabled(
+			bBarrierActive ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 	}
 
-	BarrierBox->SetGenerateOverlapEvents(false);
-	BarrierBox->SetCollisionResponseToAllChannels(ECR_Block);
-	BarrierBox->SetCollisionEnabled(
-		bBarrierActive ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+	if (BarrierPresentationComponent)
+	{
+		BarrierPresentationComponent->SetBarrierActive(bBarrierActive);
+	}
 }
 
 void ALastFPSRoomEncounterRuntime::OnRep_BarrierState()
 {
-	ApplyBarrierCollision();
+	ApplyBarrierState();
 }
 
 void ALastFPSRoomEncounterRuntime::OnRep_BarrierVolume()
 {
-	ApplyBarrierCollision();
+	ConfigureBarrierPresentation();
+	ApplyBarrierState();
 }
 
 FTransform ALastFPSRoomEncounterRuntime::ResolveSpawnTransform(const int32 SpawnIndex)

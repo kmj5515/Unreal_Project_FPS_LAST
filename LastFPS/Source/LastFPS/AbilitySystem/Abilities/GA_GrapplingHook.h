@@ -5,8 +5,9 @@
 #include "GA_GrapplingHook.generated.h"
 
 class ALastFPSHero;
+class UCurveFloat;
 class UPrimitiveComponent;
-class UAbilityTask_ApplyRootMotionMoveToForce;
+class UAbilityTask_ApplyRootMotionMoveToActorForce;
 class UAbilityTask_WaitDelay;
 class ULastFPSGrapplingHookData;
 
@@ -52,16 +53,22 @@ private:
 	void OnAttachDelayFinished();
 
 	UFUNCTION()
-	void OnGrappleMovementFinished();
+	void OnGrappleMovementFinished(
+		bool bDestinationReached,
+		bool bTimedOut,
+		FVector FinalTargetLocation);
 
 	UPROPERTY()
-	TObjectPtr<UAbilityTask_ApplyRootMotionMoveToForce> GrappleMovementTask;
+	TObjectPtr<UAbilityTask_ApplyRootMotionMoveToActorForce> GrappleMovementTask;
 
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_WaitDelay> HookFlightTask;
 
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_WaitDelay> AttachDelayTask;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCurveFloat> LoadedMovementProgressCurve;
 
 	FVector GrappleAnchor = FVector::ZeroVector;
 	FVector GrapplePullDestination = FVector::ZeroVector;

@@ -28,8 +28,17 @@ void UGA_Reload::ActivateAbility(
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
+    bReloadCompleted = false;
+
     ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
     if (!Hero || !Hero->IsAlive() || Hero->GetCombatState() != EMMCombatState::Idle)
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return;
+    }
+
+    UWeaponComponent* Weapon = Hero->GetWeaponComponent();
+    if (!Weapon || !Weapon->CanReload())
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
@@ -43,53 +52,53 @@ void UGA_Reload::ActivateAbility(
 
     Hero->SetCombatState(EMMCombatState::Reloading);
 
-    bool bWaitingForMontageEnd = false;
+    const float ConfiguredReloadDuration = Weapon->GetReloadDuration();
+    const float ReloadDuration = ConfiguredReloadDuration > 0.f
+        ? ConfiguredReloadDuration
+        : FMath::Max(DefaultReloadDuration, 0.01f);
     if (ReloadMontage && Hero->GetMesh())
     {
         if (UAnimInstance* AnimInstance = Hero->GetMesh()->GetAnimInstance())
         {
-            const float PlayedDuration = AnimInstance->Montage_Play(ReloadMontage, MontagePlayRate);
-            if (PlayedDuration > 0.f)
-            {
-                FOnMontageEnded EndDelegate;
-                EndDelegate.BindUObject(this, &UGA_Reload::OnReloadMontageEnded);
-                AnimInstance->Montage_SetEndDelegate(EndDelegate, ReloadMontage);
-                bWaitingForMontageEnd = true;
-            }
+            const float DurationMatchedPlayRate = ReloadMontage->GetPlayLength() / ReloadDuration;
+            AnimInstance->Montage_Play(
+                ReloadMontage,
+                FMath::Max(DurationMatchedPlayRate * MontagePlayRate, 0.01f));
         }
     }
 
-    if (!bWaitingForMontageEnd)
+    if (UWorld* World = GetWorld())
     {
-        if (UWorld* World = GetWorld())
-        {
-            World->GetTimerManager().SetTimer(
-                ReloadTimerHandle,
-                this,
-                &UGA_Reload::FinishReload,
-                DefaultReloadDuration,
-                false);
-        }
-        else
-        {
-            EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-        }
+        World->GetTimerManager().SetTimer(
+            ReloadTimerHandle,
+            this,
+            &UGA_Reload::FinishReload,
+            ReloadDuration,
+            false);
+    }
+    else
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
     }
 }
 
 void UGA_Reload::FinishReload()
 {
-    EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
-}
-
-void UGA_Reload::OnReloadMontageEnded(UAnimMontage* Montage, bool bInterrupted)
-{
-    if (Montage != ReloadMontage)
+    if (bReloadCompleted)
     {
         return;
     }
 
-    EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, bInterrupted);
+    bReloadCompleted = true;
+    if (ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo()))
+    {
+        if (UWeaponComponent* Weapon = Hero->GetWeaponComponent())
+        {
+            Weapon->CompleteReload();
+        }
+    }
+
+    EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
 }
 
 void UGA_Reload::EndAbility(

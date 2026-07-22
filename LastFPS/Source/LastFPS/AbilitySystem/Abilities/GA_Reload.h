@@ -37,7 +37,7 @@ protected:
 
 private:
     void FinishReload();
-    void OnReloadMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
     FTimerHandle ReloadTimerHandle;
+    bool bReloadCompleted = false;
 };

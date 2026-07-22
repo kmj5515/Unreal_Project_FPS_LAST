@@ -69,12 +69,18 @@ void UGA_BasicShoot::ActivateAbility(
     {
         UE_LOG(LogTemp, Warning, TEXT("GA_BasicShoot: missing weapon or cannot fire"));
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        TryStartAutoReload(Hero, Weapon);
         return;
     }
 
     Hero->SetCombatState(EMMCombatState::Attacking);
     Hero->MarkCombatEngaged();
     Fire();
+
+    if (!IsActive())
+    {
+        return;
+    }
 
     if (bIsAutoFire)
     {
@@ -126,6 +132,7 @@ void UGA_BasicShoot::Fire()
     if (!Weapon || !Weapon->CanFire())
     {
         EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
+        TryStartAutoReload(Hero, Weapon);
         return;
     }
 
@@ -135,13 +142,20 @@ void UGA_BasicShoot::Fire()
         return;
     }
 
-    LocalFire(Weapon);
-
     AController* Controller = Character->GetController();
     if (!Controller)
     {
         return;
     }
+
+    if (!Weapon->TryConsumePredictedRound())
+    {
+        EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
+        TryStartAutoReload(Hero, Weapon);
+        return;
+    }
+
+    LocalFire(Weapon);
 
     FVector CameraLocation;
     FRotator AimRotation;
@@ -159,8 +173,23 @@ void UGA_BasicShoot::Fire()
 
     if (!Weapon->CanFire())
     {
-        EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
+        // 연사 입력이 유지 중이면 다음 발사 주기에서 빈 탄창을 확인한 뒤 자동 리로드한다.
+        if (!bIsAutoFire)
+        {
+            EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
+        }
     }
+}
+
+void UGA_BasicShoot::TryStartAutoReload(ALastFPSHero* Hero, UWeaponComponent* Weapon) const
+{
+    if (!Hero || !Hero->IsLocallyControlled() || !Weapon || !Weapon->CanReload())
+    {
+        return;
+    }
+
+    Hero->GetAbilitySystemComponent()->TryActivateAbilitiesByTag(
+        FGameplayTagContainer(LastFPSGameplayTags::Ability_Reload));
 }
 
 void UGA_BasicShoot::LocalFire(UWeaponComponent* Weapon)

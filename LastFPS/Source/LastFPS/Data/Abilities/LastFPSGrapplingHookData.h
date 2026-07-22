@@ -5,8 +5,10 @@
 #include "Engine/DataAsset.h"
 #include "Engine/EngineTypes.h"
 #include "GameplayTagContainer.h"
+#include "UObject/SoftObjectPtr.h"
 #include "LastFPSGrapplingHookData.generated.h"
 
+class UCurveFloat;
 class UCurveVector;
 
 UENUM(BlueprintType)
@@ -73,9 +75,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Grappling Hook|Movement")
 	bool bRestrictSpeedToExpected = true;
 
-	/** 비어 있으면 직선으로 이동하며, 지정하면 Root Motion Move To Force의 경로 오프셋으로 사용한다. */
+	/** 비어 있으면 직선 경로를 사용하며, 지정하면 진행 방향 기준의 경로 오프셋으로 사용한다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Grappling Hook|Movement")
 	TObjectPtr<UCurveVector> PathOffsetCurve;
+
+	/** 실제 시간 0~1을 이동 진행률 0~1로 변환해 가속과 감속을 제어한다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Grappling Hook|Movement")
+	TSoftObjectPtr<UCurveFloat> MovementProgressCurve = TSoftObjectPtr<UCurveFloat>(
+		FSoftObjectPath(TEXT("/Game/Data/Curves/CF_GrappleMovementProgress.CF_GrappleMovementProgress")));
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Grappling Hook|Movement")
 	ELastFPSGrappleFinishVelocityMode FinishVelocityMode = ELastFPSGrappleFinishVelocityMode::Clamp;
