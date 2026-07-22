@@ -2,6 +2,7 @@
 
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "UI/Crosshair/LastFPSCrosshairSpreadBehavior.h"
 #include "EasyCrosshairSystem/ecsCrosshairEditorAsset.h"
 #include "EasyCrosshairSystem/ecsCrosshairSubsystem.h"
 #include "EasyCrosshairSystem/ecsCrosshairWidget.h"
@@ -16,7 +17,7 @@ bool ULastFPSEasyCrosshairPresenter::ShowCrosshair(
     const FName InFireAnimationName,
     const float InFireAnimationDuration)
 {
-    if (ActiveCrosshairAsset.Get() == &CrosshairAsset && CrosshairWidget.IsValid())
+    if (SourceCrosshairAsset.Get() == &CrosshairAsset && CrosshairWidget.IsValid())
     {
         FireAnimationName = InFireAnimationName;
         FireAnimationDuration = InFireAnimationDuration;
@@ -37,7 +38,22 @@ bool ULastFPSEasyCrosshairPresenter::ShowCrosshair(
         return false;
     }
 
-    CrosshairSubsystem->SetupCrosshair(&CrosshairAsset);
+    // 공유 에셋 대신 런타임 사본을 사용 — 에셋에 인스턴스된 Behavior가 위젯 포인터 등
+    // 런타임 상태를 원본에 남기는 것을 차단한다(에디터 Undo 버퍼 경유 GC 누수 방지).
+    // 인스턴스된 하위 객체(Behavior·애니메이션 레이어)는 함께 복제되고 텍스처는 공유된다.
+    UecsCrosshairEditorAsset* RuntimeAsset =
+        DuplicateObject<UecsCrosshairEditorAsset>(&CrosshairAsset, GetTransientPackage());
+    if (!RuntimeAsset)
+    {
+        UE_LOG(
+            LogLastFPSEasyCrosshair,
+            Error,
+            TEXT("EasyCrosshair 에셋 '%s'의 런타임 사본 생성을 실패했습니다."),
+            *GetNameSafe(&CrosshairAsset));
+        return false;
+    }
+
+    CrosshairSubsystem->SetupCrosshair(RuntimeAsset);
     UecsCrosshairWidget* CreatedWidget = CrosshairSubsystem->GetCrosshairWidget();
     if (!CreatedWidget)
     {
@@ -60,7 +76,8 @@ bool ULastFPSEasyCrosshairPresenter::ShowCrosshair(
     }
 
     CrosshairWidget = CreatedWidget;
-    ActiveCrosshairAsset = &CrosshairAsset;
+    SourceCrosshairAsset = &CrosshairAsset;
+    RuntimeCrosshairAsset = RuntimeAsset;
     bMissingAnimationWarningLogged = false;
     SetVisible(true);
     return true;
@@ -77,8 +94,23 @@ void ULastFPSEasyCrosshairPresenter::SetVisible(const bool bVisible)
 void ULastFPSEasyCrosshairPresenter::PlayFireAnimation()
 {
     UecsCrosshairWidget* Widget = CrosshairWidget.Get();
-    UecsCrosshairEditorAsset* CrosshairAsset = ActiveCrosshairAsset.Get();
-    if (!Widget || !CrosshairAsset || FireAnimationName.IsNone())
+    UecsCrosshairEditorAsset* CrosshairAsset = RuntimeCrosshairAsset;
+    if (!Widget || !CrosshairAsset)
+    {
+        return;
+    }
+
+    // 연사 누적 벌어짐은 애니메이션(고정 커브)으로 표현할 수 없어 SpreadBehavior의
+    // 누적값으로 처리한다. 애니메이션 유무와 무관하게 발사마다 통지한다.
+    for (UecsCrosshairBehavior* Behavior : CrosshairAsset->Behaviors)
+    {
+        if (ULastFPSCrosshairSpreadBehavior* SpreadBehavior = Cast<ULastFPSCrosshairSpreadBehavior>(Behavior))
+        {
+            SpreadBehavior->NotifyWeaponFired();
+        }
+    }
+
+    if (FireAnimationName.IsNone())
     {
         return;
     }
@@ -118,7 +150,8 @@ void ULastFPSEasyCrosshairPresenter::Shutdown()
 
     OwningWorld.Reset();
     CrosshairWidget.Reset();
-    ActiveCrosshairAsset.Reset();
+    SourceCrosshairAsset.Reset();
+    RuntimeCrosshairAsset = nullptr;
     FireAnimationName = NAME_None;
     FireAnimationDuration = 0.f;
     bMissingAnimationWarningLogged = false;

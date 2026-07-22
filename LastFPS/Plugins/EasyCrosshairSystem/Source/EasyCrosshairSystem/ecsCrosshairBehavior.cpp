@@ -8,8 +8,8 @@
 // For more information, please contact: dodgetheory@gmail.com
 
 
-#include "ecsCrosshairBehavior.h"
-#include "ecsCrosshairWidget.h"
+#include "EasyCrosshairSystem/ecsCrosshairBehavior.h"
+#include "EasyCrosshairSystem/ecsCrosshairWidget.h"
 
 void UecsCrosshairBehavior::Tick()
 {
