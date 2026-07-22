@@ -15,6 +15,7 @@ class UCommonActivatableWidget;
 class ULastFPSCharacterDefinition;
 class ULastFPSCharacterRoster;
 class ULastFPSHUDWidget;
+class ULastFPSQuestTrackerWidget;
 class ULastFPSNoticeWidget;
 class ULastFPSDialogueWidget;
 class ULastFPSNPCInteractionWidget;
@@ -159,6 +160,10 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
     bool bPushHUDOnBeginPlay = false;
 
+    /** 상시 퀘스트 트래커 HUD (WBP_QuestTracker) — 표시 여부는 GameMode가 결정 */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
+    TSubclassOf<ULastFPSQuestTrackerWidget> QuestTrackerWidgetClass;
+
     // ── 내부 ────────────────────────────────────────────────────────
 
     /** GameMode에서 진입/ESC 화면 태그를 읽어 캐시 (BeginPlay) */
@@ -173,6 +178,9 @@ protected:
 
     /** 인게임 HUD push (휴면). 레이아웃 준비 전이면 재시도. */
     void TryPushHUDToUILayout();
+
+    /** 퀘스트 트래커 push (GameMode가 표시 요청 시). 레이아웃 준비 전이면 재시도. */
+    void TryPushQuestTrackerToUILayout();
 
     /** 로컬 Pawn의 소유 및 BeginPlay 완료를 GameInstance의 로딩 흐름에 알린다. */
     void TryNotifyLocalPawnReady();
@@ -232,15 +240,23 @@ protected:
     UPROPERTY()
     TObjectPtr<ULastFPSHUDWidget> HUDWidget;
 
+    UPROPERTY()
+    TObjectPtr<ULastFPSQuestTrackerWidget> QuestTrackerWidget;
+
     UPROPERTY(ReplicatedUsing=OnRep_SelectedCharacterIndex, BlueprintReadOnly, Category="LastFPS|Character")
     int32 SelectedCharacterIndex = 0;
 
     FTimerHandle InitialScreenRetryTimerHandle;
     FTimerHandle HUDPushRetryTimerHandle;
+    FTimerHandle QuestTrackerPushRetryTimerHandle;
     FTimerHandle MenuLayerSyncBindRetryTimerHandle;
     FTimerHandle LocalPawnReadyRetryTimerHandle;
     bool bHUDWidgetPushed = false;
+    bool bQuestTrackerPushed = false;
     bool bMenuLayerSyncBound = false;
+
+    /** GameMode에서 읽어와 캐시한 트래커 표시 여부 */
+    bool bShowQuestTracker = false;
 
     FGenericTeamId TeamId;
 

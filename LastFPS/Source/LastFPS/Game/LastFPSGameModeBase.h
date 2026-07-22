@@ -10,6 +10,8 @@ class UAbilitySystemComponent;
 class UGameplayEffect;
 class ULastFPSCharacterDefinition;
 class ULastFPSCharacterRoster;
+class ULastFPSDestinationContentComponent;
+class ULastFPSDestinationContentSet;
 
 UCLASS()
 class LASTFPS_API ALastFPSGameModeBase : public AGameModeBase
@@ -19,9 +21,18 @@ class LASTFPS_API ALastFPSGameModeBase : public AGameModeBase
 public:
     ALastFPSGameModeBase();
 
+    virtual void InitGameState() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void PostLogin(APlayerController* NewPlayer) override;
     virtual void Logout(AController* Exiting) override;
     virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
+
+    /**
+     * 콘텐츠가 준비되기 전에는 스폰하지 않는다.
+     * GetDefaultPawnClassForController 가 PawnClass 를 즉시 요구하므로,
+     * 준비 전에 스폰하면 그 자리에서 동기 로드가 발생한다.
+     */
+    virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
 
     UFUNCTION(BlueprintCallable, Category="LastFPS|Players")
     int32 GetTotalConnectedPlayers() const;
@@ -42,6 +53,7 @@ public:
 
     FGameplayTag GetInitialScreenTag() const { return InitialScreenTag; }
     FGameplayTag GetEscMenuScreenTag() const { return EscMenuScreenTag; }
+    bool ShouldShowQuestTracker() const { return bShowQuestTracker; }
 
     /** 맵 진입 시 자동으로 열 화면. 비우면 안 연다. */
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI", meta=(Categories="UI.Screen"))
@@ -51,11 +63,30 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI", meta=(Categories="UI.Screen"))
     FGameplayTag EscMenuScreenTag;
 
+    /** 이 맵에서 상시 퀘스트 트래커 HUD를 표시할지. 전투 HUD와 독립 — 맵별로 GameMode BP에서 결정. */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
+    bool bShowQuestTracker = false;
+
     /** 이 맵 진입 시 플레이어 ASC 에 적용할 제한 효과. 비우면 제한 없음(전투 맵). 허브 GameMode BP 에서 전투 금지 GE 지정. */
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Combat")
     TSubclassOf<UGameplayEffect> LevelRestrictionEffect;
 
+    /**
+     * 이 맵 진입 전에 준비할 콘텐츠. 비우면 게이트 없이 기존처럼 즉시 스폰한다.
+     * 에셋 내부가 전부 소프트 참조라 이 강한 참조는 목록 자체만 로드한다.
+     */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Loading")
+    TObjectPtr<ULastFPSDestinationContentSet> DestinationContentSet;
+
 protected:
     // 화면 디버그 + 로그를 한 번에 — 파생 GameMode들의 공용 헬퍼
     void DebugFlow(const FString& Message, FColor Color = FColor::Green) const;
+
+private:
+    /** 게이트 컴포넌트가 없는 맵(GameState BP 재지정 등)에서는 게이트 없이 진행한다. */
+    bool IsDestinationContentReady() const;
+    void HandleDestinationContentReady();
+
+    TWeakObjectPtr<ULastFPSDestinationContentComponent> DestinationContentComponent;
+    FDelegateHandle ContentReadyHandle;
 };

@@ -6,17 +6,103 @@
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
 #include "Data/Definitions/LastFPSCharacterRoster.h"
 #include "Game/LastFPSGameInstance.h"
+#include "Game/LastFPSGameStateBase.h"
 #include "Game/LastFPSPlayerController.h"
 #include "Game/LastFPSPlayerState.h"
+#include "Game/Loading/LastFPSDestinationContentComponent.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/PlayerController.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogLastFPSGameMode, Log, All);
 
 ALastFPSGameModeBase::ALastFPSGameModeBase()
 {
     // 플레이어 ASC(PlayerState 소유)·스탯·캐릭터 선택이 ALastFPSPlayerState 를 전제하므로 명시적으로 지정한다.
     // (미지정 시 AGameModeBase 기본 APlayerState 가 쓰여 GetPlayerState<ALastFPSPlayerState> 가 항상 null → ASC/스탯 소실.)
     PlayerStateClass = ALastFPSPlayerState::StaticClass();
+
+    // 로딩 게이트 컴포넌트의 부착 지점. 같은 이유로 명시 지정한다.
+    GameStateClass = ALastFPSGameStateBase::StaticClass();
+}
+
+void ALastFPSGameModeBase::InitGameState()
+{
+    Super::InitGameState();
+
+    // GameState 스폰 직후이자 BeginPlay 이전이라 첫 PostLogin 보다 확실히 앞선다.
+    DestinationContentComponent = GameState
+        ? GameState->FindComponentByClass<ULastFPSDestinationContentComponent>()
+        : nullptr;
+
+    ULastFPSDestinationContentComponent* Content = DestinationContentComponent.Get();
+    if (!Content)
+    {
+        UE_LOG(LogLastFPSGameMode, Log,
+            TEXT("게이트 컴포넌트가 없어 콘텐츠 대기 없이 진행합니다: %s"), *GetNameSafe(GameState));
+        return;
+    }
+
+    // InitGameState 는 Reset() 에서도 호출되므로 중복 구독(=중복 RestartPlayer)을 막는다.
+    if (ContentReadyHandle.IsValid())
+    {
+        return;
+    }
+
+    ContentReadyHandle = Content->OnContentReady.AddUObject(
+        this, &ALastFPSGameModeBase::HandleDestinationContentReady);
+    Content->StartContentLoad(DestinationContentSet);
+}
+
+void ALastFPSGameModeBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (ULastFPSDestinationContentComponent* Content = DestinationContentComponent.Get())
+    {
+        Content->OnContentReady.Remove(ContentReadyHandle);
+    }
+    ContentReadyHandle.Reset();
+
+    Super::EndPlay(EndPlayReason);
+}
+
+bool ALastFPSGameModeBase::IsDestinationContentReady() const
+{
+    const ULastFPSDestinationContentComponent* Content = DestinationContentComponent.Get();
+    return !Content || Content->IsContentReady();
+}
+
+void ALastFPSGameModeBase::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
+{
+    if (!IsDestinationContentReady())
+    {
+        // 스폰을 버리는 것이 아니라 미룬다. HandleDestinationContentReady 가 일괄 처리한다.
+        return;
+    }
+
+    Super::HandleStartingNewPlayer_Implementation(NewPlayer);
+}
+
+void ALastFPSGameModeBase::HandleDestinationContentReady()
+{
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    int32 RestartedPlayers = 0;
+    for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+    {
+        APlayerController* PC = It->Get();
+        if (PC && PC->GetPawn() == nullptr && PlayerCanRestart(PC))
+        {
+            RestartPlayer(PC);
+            ++RestartedPlayers;
+        }
+    }
+
+    UE_LOG(LogLastFPSGameMode, Log,
+        TEXT("콘텐츠 준비 완료 — 대기 중이던 플레이어 %d명 스폰"), RestartedPlayers);
 }
 
 void ALastFPSGameModeBase::PostLogin(APlayerController* NewPlayer)
