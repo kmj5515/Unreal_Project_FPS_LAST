@@ -152,14 +152,10 @@ protected:
 
     /** 리로드 진행을 표시하는 프로그레스 바다. C++가 진행률을 직접 채운다. */
     UPROPERTY(BlueprintReadOnly, Category="HUD|Reload", meta=(BindWidgetOptional))
-    TObjectPtr<UProgressBar> PB_Reload;
+    TObjectPtr<UImage> ReloadImage;
 
-    /** 리로드 남은 시간을 숫자로 표시하는 텍스트다. 선택적으로 바인딩하며 C++가 갱신한다. */
-    UPROPERTY(BlueprintReadOnly, Category="HUD|Reload", meta=(BindWidgetOptional))
-    TObjectPtr<UTextBlock> Text_Reload;
-
-    UPROPERTY(EditDefaultsOnly, Category="HUD|Reload|Colors")
-    FLinearColor ReloadFillColor = FLinearColor(0.15f, 0.6f, 1.f, 1.f);
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Reload")
+    FName ReloadProgressParameterName = TEXT("ReloadProgress");
 
     UPROPERTY(EditDefaultsOnly, Category="HUD|Gauges", meta=(ClampMin="0.05", ClampMax="3.0"))
     float GaugeFillDuration = 0.4f;
@@ -261,7 +257,9 @@ private:
     FLinearColor ResolveHealthFillColor() const;
     FLinearColor ResolveStaminaFillColor() const;
     bool IsLowResource(float Current, float Max) const;
-
+    
+    void UpdateReloadProgress(float Progress);
+    
     UFUNCTION()
     void HandleWeaponEquippedChanged(bool bEquipped);
 

@@ -1047,6 +1047,21 @@ bool ULastFPSHUDWidget::IsLowResource(float Current, float Max) const
     return (Current / Max) < LowResourceThreshold;
 }
 
+void ULastFPSHUDWidget::UpdateReloadProgress(float Progress)
+{
+    if (ReloadImage)
+    {
+        TWeakObjectPtr<UMaterialInstanceDynamic> ReloadMaterial = ReloadImage->GetDynamicMaterial();
+        if (ReloadMaterial.IsValid())
+        {
+            if (UMaterialInstanceDynamic* Material = ReloadMaterial.Get())
+            {
+                Material->SetScalarParameterValue(ReloadProgressParameterName, Progress);
+            }
+        }
+    }
+}
+
 FLinearColor ULastFPSHUDWidget::ResolveHealthFillColor() const
 {
     return IsLowResource(HealthGauge.Displayed, HealthGauge.Max)
@@ -1186,9 +1201,9 @@ void ULastFPSHUDWidget::HandleReloadStarted(const float ReloadDuration)
         return;
     }
 
-    if (PB_Reload)
+    if (ReloadImage)
     {
-        PB_Reload->SetFillColorAndOpacity(ReloadFillColor);
+        UpdateReloadProgress(0.0f);
     }
     SetReloadIndicatorVisible(true);
     UpdateReloadDisplay(0.f, ReloadTotalSeconds);
@@ -1229,29 +1244,15 @@ void ULastFPSHUDWidget::SetReloadIndicatorVisible(const bool bVisible)
         ? ESlateVisibility::HitTestInvisible
         : ESlateVisibility::Collapsed;
 
-    if (PB_Reload)
+    if (ReloadImage)
     {
-        PB_Reload->SetVisibility(TargetVisibility);
-    }
-    if (Text_Reload)
-    {
-        Text_Reload->SetVisibility(TargetVisibility);
+        ReloadImage->SetVisibility(TargetVisibility);
     }
 }
 
 void ULastFPSHUDWidget::UpdateReloadDisplay(const float Progress, const float RemainingSeconds)
 {
-    if (PB_Reload)
-    {
-        PB_Reload->SetPercent(FMath::Clamp(Progress, 0.f, 1.f));
-    }
-
-    if (Text_Reload)
-    {
-        // 남은 시간을 소수 첫째 자리까지 표시한다(예: 1.4s).
-        Text_Reload->SetText(FText::FromString(
-            FString::Printf(TEXT("%.1fs"), FMath::Max(RemainingSeconds, 0.f))));
-    }
+    UpdateReloadProgress(Progress);
 }
 
 void ULastFPSHUDWidget::ShowHitMarker()
