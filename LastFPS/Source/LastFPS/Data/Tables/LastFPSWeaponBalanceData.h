@@ -26,6 +26,18 @@ struct LASTFPS_API FLastFPSWeaponBalanceData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Balance")
 	ELastFPSDamageElement DamageElement = ELastFPSDamageElement::Physical;
 
+	/** 한 탄창 최대 수용량이다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Balance|Ammo", meta=(ClampMin="1"))
+	int32 MagazineCapacity = 30;
+
+	/** 시작 시 소지하는 예비 탄약 수량이다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Balance|Ammo", meta=(ClampMin="0"))
+	int32 StartingReserveAmmo = 90;
+
+	/** 재장전 소요 시간(초)이다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Balance|Ammo", meta=(ClampMin="0.01", Units="s"))
+	float ReloadDuration = 2.f;
+
 	/** 무기 고유 수치는 Gameplay Tag를 키로 추가해 공통 행 구조 변경을 줄인다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Balance")
 	TMap<FGameplayTag, float> Parameters;

@@ -1,5 +1,5 @@
----,Damage,FireInterval,AimTraceRange,DamageElement,Parameters
-Rifle,"1100.000000","0.100000","10000.000000","Physical","()"
-Sniper,"2000.000000","0.500000","10000.000000","Physical","()"
-Bazooka,"2000.000000","1.000000","10000.000000","Physical","()"
-ShotGun,"1100.000000","0.250000","10000.000000","Physical","(((TagName=""Weapon.Parameter.PelletCount""), 8.000000),((TagName=""Weapon.Parameter.SpreadHalfAngle""), 4.000000))"
+---,Damage,FireInterval,AimTraceRange,DamageElement,MagazineCapacity,StartingReserveAmmo,ReloadDuration,Parameters
+Rifle,1100,0.1,10000,Physical,40,250,2.2,()
+Sniper,2000,0.5,10000,Physical,5,70,3,()
+Bazooka,2000,1,10000,Physical,1,6,3.5,()
+ShotGun,1100,0.75,10000,Physical,10,120,2.6,"(((TagName=""Weapon.Parameter.PelletCount""), 8.000000),((TagName=""Weapon.Parameter.SpreadHalfAngle""), 4.000000))"

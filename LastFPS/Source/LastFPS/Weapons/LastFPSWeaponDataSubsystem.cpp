@@ -86,5 +86,14 @@ const FLastFPSWeaponBalanceData* ULastFPSWeaponDataSubsystem::FindBalance(const 
 
 const FLastFPSWeaponAmmoSettings* ULastFPSWeaponDataSubsystem::FindAmmoSettings(const FName WeaponId) const
 {
+	if (const FLastFPSWeaponBalanceData* Balance = FindBalance(WeaponId))
+	{
+		static thread_local FLastFPSWeaponAmmoSettings TempSettings;
+		TempSettings.MagazineCapacity    = Balance->MagazineCapacity;
+		TempSettings.StartingReserveAmmo = Balance->StartingReserveAmmo;
+		TempSettings.ReloadDuration      = Balance->ReloadDuration;
+		return &TempSettings;
+	}
+
 	return WeaponId.IsNone() ? nullptr : AmmoSettingsByWeaponId.Find(WeaponId);
 }

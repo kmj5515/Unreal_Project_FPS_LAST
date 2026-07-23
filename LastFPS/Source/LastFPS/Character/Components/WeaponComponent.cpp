@@ -727,21 +727,6 @@ bool UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
     const UGameInstance* GameInstance = GetOwner() ? GetOwner()->GetGameInstance() : nullptr;
     const ULastFPSWeaponDataSubsystem* WeaponDataSubsystem =
         GameInstance ? GameInstance->GetSubsystem<ULastFPSWeaponDataSubsystem>() : nullptr;
-    const FLastFPSWeaponAmmoSettings* AmmoSettings =
-        WeaponDataSubsystem ? WeaponDataSubsystem->FindAmmoSettings(NewDefinition->WeaponId) : nullptr;
-    if (AmmoSettings)
-    {
-        MagazineCapacity = FMath::Max(AmmoSettings->MagazineCapacity, 1);
-        StartingReserveAmmo = FMath::Max(AmmoSettings->StartingReserveAmmo, 0);
-        ReloadDuration = FMath::Max(AmmoSettings->ReloadDuration, 0.01f);
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning,
-            TEXT("무기 '%s'의 탄약 설정을 찾지 못해 기본값을 사용합니다."),
-            *NewDefinition->WeaponId.ToString());
-    }
-
     const FLastFPSWeaponBalanceData* BalanceData =
         WeaponDataSubsystem ? WeaponDataSubsystem->FindBalance(NewDefinition->WeaponId) : nullptr;
     if (!BalanceData)
@@ -752,9 +737,13 @@ bool UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
         return false;
     }
 
-    FireRate = FMath::Max(BalanceData->FireInterval, 0.01f);
+    MagazineCapacity    = FMath::Max(BalanceData->MagazineCapacity, 1);
+    StartingReserveAmmo = FMath::Max(BalanceData->StartingReserveAmmo, 0);
+    ReloadDuration      = FMath::Max(BalanceData->ReloadDuration, 0.01f);
+
+    FireRate      = FMath::Max(BalanceData->FireInterval, 0.01f);
     AimTraceRange = FMath::Max(BalanceData->AimTraceRange, 0.f);
-    DamageRange = LastFPSDamage::MakeDamageRange(BalanceData->Damage, BalanceData->DamageElement);
+    DamageRange   = LastFPSDamage::MakeDamageRange(BalanceData->Damage, BalanceData->DamageElement);
 
     // 산탄 수치는 공통 밸런스 행 구조를 바꾸지 않고 Parameters 맵(태그 키)에서 읽는다.
     // 지정하지 않은 무기는 폴백(1발, 퍼짐 0)으로 기존 단일탄 동작을 유지한다.
