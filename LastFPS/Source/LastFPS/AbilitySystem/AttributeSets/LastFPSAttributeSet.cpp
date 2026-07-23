@@ -246,7 +246,6 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
         return;
 
     const float Now = GetWorld()->GetTimeSeconds();
-    // ?ㅻ깄?? ?댄꽣?덉씠??以?ClearRecentAttackers ?몄텧濡??명븳 ?곗씠???좎떎 諛⑹?
     const TMap<TWeakObjectPtr<APlayerState>, float> AttackersCopy = TargetChar->GetRecentAttackers();
     for (const auto& Pair : AttackersCopy)
     {

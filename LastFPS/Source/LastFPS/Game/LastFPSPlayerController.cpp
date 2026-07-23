@@ -813,14 +813,6 @@ void ALastFPSPlayerController::ExecuteNPCAction(const FLastFPSNPCAction& Action)
     }
 }
 
-void ALastFPSPlayerController::ShowHitMarker()
-{
-    if (HUDWidget)
-    {
-        HUDWidget->ShowHitMarker();
-    }
-}
-
 void ALastFPSPlayerController::ShowDamageDirection(const FVector& DamageSourceDirection)
 {
     if (HUDWidget)

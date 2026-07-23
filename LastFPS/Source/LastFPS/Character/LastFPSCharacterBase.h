@@ -78,10 +78,6 @@ public:
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayHitSound();
 
-    /** 서버: 명중 처리 후 발사자 클라이언트에서만 히트마커 표시 */
-    UFUNCTION(Client, Reliable)
-    void Client_NotifyHitMarker();
-
     /** 서버가 판정한 공격자의 월드 방향을 소유 클라이언트 HUD에 전달한다. */
     UFUNCTION(Client, Reliable)
     void Client_NotifyDamageDirection(FVector_NetQuantizeNormal DamageSourceDirection);

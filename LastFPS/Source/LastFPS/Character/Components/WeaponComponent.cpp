@@ -1137,10 +1137,8 @@ void UWeaponComponent::FireSinglePelletFromServer(
         LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), DamageRange);
         TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 
-        if (ALastFPSCharacterBase* ShooterCharacter = Cast<ALastFPSCharacterBase>(&Character))
-        {
-            ShooterCharacter->Client_NotifyHitMarker();
-        }
+        // 히트마커는 데미지 적용 중앙 이벤트(LastFPSAttributeSet → PlayerState::OnDamageDealt → HUD)에서
+        // 모든 데미지 GA에 대해 일괄 처리한다. 무기 전용 호출은 중복이므로 제거했다.
     }
 }
 

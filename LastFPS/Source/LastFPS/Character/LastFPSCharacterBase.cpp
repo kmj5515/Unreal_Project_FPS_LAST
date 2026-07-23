@@ -241,16 +241,6 @@ void ALastFPSCharacterBase::Multicast_PlayHitSound_Implementation()
         UGameplayStatics::PlaySoundAtLocation(this, HitSound, GetActorLocation());
 }
 
-void ALastFPSCharacterBase::Client_NotifyHitMarker_Implementation()
-{
-    APlayerController* PC = GetController<APlayerController>();
-    if (!PC) return;
-    if (ALastFPSPlayerController* LastPC = Cast<ALastFPSPlayerController>(PC))
-    {
-        LastPC->ShowHitMarker();
-    }
-}
-
 void ALastFPSCharacterBase::Client_NotifyDamageDirection_Implementation(
     const FVector_NetQuantizeNormal DamageSourceDirection)
 {

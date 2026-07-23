@@ -4,9 +4,7 @@
 #include "CommonActivatableWidget.h"
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
-#include "Components/TextBlock.h"
 #include "Math/Color.h"
-#include "GameplayEffectTypes.h"
 #include "UI/HUD/LastFPSEnemyHealthBarWidget.h"
 #include "UI/HUD/LastFPSHUDStyle.h"
 #include "LastFPSHUDWidget.generated.h"
@@ -14,31 +12,38 @@
 class UAbilitySystemComponent;
 class UecsCrosshairEditorAsset;
 class ULastFPSEasyCrosshairPresenter;
+class ULastFPSCombatFeedbackPresenter;
+class ULastFPSEnemyHealthPresenter;
+class ULastFPSGrapplingReticlePresenter;
+class ULastFPSVitalsGaugePresenter;
+class ULastFPSReloadPresenter;
+class ULastFPSSkillCooldownPresenter;
+class ULastFPSAmmoPresenter;
+class UTextBlock;
 class ULastFPSGrapplingTargetingComponent;
 class ULastFPSDamageDirectionIndicatorWidget;
 class ULastFPSDamageNumberWidget;
 class ULastFPSEnemyHealthBarWidget;
 class ULastFPSSkillCooldownSlotWidget;
 class ULastFPSStatusEffectListWidget;
-class UMaterialInstanceDynamic;
 class UOverlay;
 class UWeaponComponent;
 class AActor;
 class ALastFPSCharacterBase;
 class ALastFPSPlayerState;
 
-struct FLastFPSSmoothedGaugeDisplay
-{
-    float Target = 0.f;
-    float Displayed = 0.f;
-    float Max = 1.f;
-    bool bInterpActive = false;
-
-    void Initialize(float Current, float InMax);
-    void SetTarget(float NewTarget);
-    bool Tick(float DeltaTime, float FillDuration);
-};
-
+/**
+ * 플레이어 HUD의 View(MVP).
+ * 바인딩 위젯·디자이너 설정을 소유하고, 표시 로직은 전용 Presenter에 위임한다.
+ * - 전투 피드백(히트마커/데미지 넘버/피격 방향): ULastFPSCombatFeedbackPresenter
+ * - 적/보스 체력바: ULastFPSEnemyHealthPresenter
+ * - 그래플링 조준점: ULastFPSGrapplingReticlePresenter
+ * - 체력/스태미나 게이지: ULastFPSVitalsGaugePresenter
+ * - 리로드 진행: ULastFPSReloadPresenter
+ * - 스킬 쿨다운 슬롯: ULastFPSSkillCooldownPresenter
+ * - EasyCrosshair: ULastFPSEasyCrosshairPresenter
+ * View 자신은 Presenter 조립·수명 관리·틱 위임과 폰/ASC 바인딩만 담당한다.
+ */
 UCLASS()
 class LASTFPS_API ULastFPSHUDWidget : public UCommonActivatableWidget
 {
@@ -49,6 +54,7 @@ public:
 
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
+    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
     virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
 
     UFUNCTION(BlueprintCallable, Category="HUD|HitMarker")
@@ -65,10 +71,10 @@ public:
 
     UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
     TObjectPtr<ULastFPSSkillCooldownSlotWidget> WBP_SkillCooldownSlot_E;
-    
+
     UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
     TObjectPtr<ULastFPSSkillCooldownSlotWidget> WBP_SkillCooldownSlot_Z;
-    
+
     UPROPERTY(BlueprintReadOnly, Category="HUD|Skill", meta=(BindWidgetOptional))
     TObjectPtr<ULastFPSSkillCooldownSlotWidget> WBP_SkillCooldownSlot_F;
 
@@ -77,12 +83,6 @@ public:
     TObjectPtr<ULastFPSStatusEffectListWidget> WBP_StatusEffectList;
 
 protected:
-    UFUNCTION(BlueprintImplementableEvent, Category="HUD")
-    void OnHealthChanged(float Current, float Max);
-
-    UFUNCTION(BlueprintImplementableEvent, Category="HUD")
-    void OnStaminaChanged(float Current, float Max);
-
     UPROPERTY(BlueprintReadOnly, Category="HUD|HitMarker", meta=(BindWidgetOptional))
     TObjectPtr<UImage> HitMarkerImage;
 
@@ -150,9 +150,27 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="HUD|Gauges", meta=(BindWidgetOptional))
     TObjectPtr<UProgressBar> PB_Stamina;
 
-    /** 리로드 진행을 표시하는 프로그레스 바다. C++가 진행률을 직접 채운다. */
+    /** 리로드 진행을 머티리얼 파라미터로 채우는 이미지다. C++가 진행률(0~1)을 직접 반영한다. */
     UPROPERTY(BlueprintReadOnly, Category="HUD|Reload", meta=(BindWidgetOptional))
     TObjectPtr<UImage> ReloadImage;
+    
+    UPROPERTY(BlueprintReadOnly,Category="HUD|Reload", meta=(BindWidgetOptional))
+    TObjectPtr<UOverlay> ReloadOverlay;
+    
+    UPROPERTY(BlueprintReadOnly, Transient, Category="HUD|Reload", meta=(BindWidgetAnimOptional))
+    TObjectPtr<UWidgetAnimation> AmmoTwinkleAnim;
+
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Ammo", meta=(BindWidgetOptional))
+    TObjectPtr<UTextBlock> TB_CurrentAmmo;
+
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Ammo", meta=(BindWidgetOptional))
+    TObjectPtr<UTextBlock> TB_ReserveAmmo;
+
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Ammo", meta=(BindWidgetOptional))
+    TObjectPtr<UOverlay> AmmoInfoLayer;
+
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Ammo", meta=(BindWidgetOptional))
+    TObjectPtr<UOverlay> AmmonInfoLayer;
 
     UPROPERTY(EditDefaultsOnly, Category="HUD|Reload")
     FName ReloadProgressParameterName = TEXT("ReloadProgress");
@@ -200,15 +218,12 @@ protected:
     /** 화면에 고정되어 보스가 죽을 때까지 유지되는 전용 체력바다. */
     UPROPERTY(BlueprintReadOnly, Category="HUD|Boss Health", meta=(BindWidgetOptional))
     TObjectPtr<ULastFPSEnemyHealthBarWidget> WBP_BossHealthBar;
-    
+
 private:
     bool InitializeHUD();
 
     UFUNCTION()
     void RetryInitialize();
-
-    void HandleHealthChanged(const FOnAttributeChangeData& Data);
-    void HandleStaminaChanged(const FOnAttributeChangeData& Data);
 
     UFUNCTION()
     void HandleDamageDealt(
@@ -218,103 +233,63 @@ private:
         AActor* DamageTargetActor,
         bool bCriticalHit);
 
-    bool TryInitSkillSlots();
-    void TickSkillSlots();
-    void HUDRefreshTick(float DeltaTime);
-    void HUDRefreshTickFromTimer();
-
     void TryBindPawnComponents();
-    void TickSmoothedGauges(float DeltaTime);
-    void InitializeHitMarkerMaterial();
-    void TickHitMarkerSpread(float DeltaTime);
-    void SetHitMarkerSpread(float Spread);
-    void TickDamageDirectionIndicators(float DeltaTime);
-    void ClearDamageDirectionIndicators();
     UOverlay* ResolveCrosshairHost();
     void RefreshEasyCrosshair();
     void RemoveEasyCrosshair();
     void SetEasyCrosshairVisibility(bool bVisible);
-    void EnsureGrapplingDot();
-    void TickGrapplingDot(float DeltaTime);
-    void ApplyGrapplingDotAvailability(bool bTargetAvailable);
-    void BroadcastHealthDisplay();
-    void BroadcastStaminaDisplay();
-    void SpawnDamageNumber(
-        float DamageAmount,
-        float TotalDamageDealt,
-        const FVector& DamageWorldLocation,
-        AActor* DamageTargetActor,
-        bool bCriticalHit);
-    void ShowEnemyHealthBar(AActor* DamageTargetActor, float DamageAmount);
-    void ReleaseEnemyHealthBarFor(const ALastFPSCharacterBase* Enemy);
-    void TickEnemyHealthBars(float DeltaTime);
-    void ClearEnemyHealthBars();
-    void TickBossHealthBar(float DeltaTime);
-    void ClearBossHealthBar();
-    FVector2D MakeDamageNumberRandomOffset() const;
-    void ApplyGaugeBarBackground(UProgressBar* Bar) const;
-    void ApplyGaugeBar(UProgressBar* Bar, float Current, float Max, const FLinearColor& FillColor) const;
-    FLinearColor ResolveHealthFillColor() const;
-    FLinearColor ResolveStaminaFillColor() const;
-    bool IsLowResource(float Current, float Max) const;
-    
-    void UpdateReloadProgress(float Progress);
-    
+
     UFUNCTION()
     void HandleWeaponEquippedChanged(bool bEquipped);
-
+    
+    /*Reload */
     UFUNCTION()
     void HandleReloadStarted(float ReloadDuration);
-
+    
     UFUNCTION()
     void HandleReloadFinished(bool bCompleted);
-
-    void TickReloadIndicator(float DeltaTime);
-    void SetReloadIndicatorVisible(bool bVisible);
-    // 리로드 진행률(0~1)과 남은 시간(초)을 프로그레스 바·텍스트에 직접 반영한다.
-    void UpdateReloadDisplay(float Progress, float RemainingSeconds);
-
+    
     UFUNCTION()
     void HandleGrapplingTargetAvailabilityChanged(bool bTargetAvailable);
 
-    FTimerHandle RetryTimerHandle;
-    FTimerHandle HUDRefreshTimerHandle;
-    void HideHitMarker();
+    /** 바인딩 위젯·설정을 Presenter들에 전달해 초기화한다. NativeConstruct에서 1회 호출한다. */
+    void InitializePresenters();
 
-    TWeakObjectPtr<UMaterialInstanceDynamic> HitMarkerMaterial;
+    // 폰/PlayerState가 아직 준비되지 않았을 때 InitializeHUD를 재시도하는 타이머.
+    // 매 프레임 갱신은 NativeTick이 담당하므로 별도 갱신 타이머는 두지 않는다.
+    FTimerHandle RetryTimerHandle;
+
+    // ── 표시 로직 Presenter (View가 소유하고 조립·틱을 위임한다) ──
     UPROPERTY(Transient)
     TObjectPtr<ULastFPSEasyCrosshairPresenter> CrosshairPresenter;
-    
-    float HitMarkerSpreadElapsed = 0.f;
-    bool bHitMarkerSpreadAnimating = false;
-    
-    UPROPERTY(Transient)
-    TArray<TObjectPtr<ULastFPSDamageDirectionIndicatorWidget>> ActiveDamageDirectionIndicators;
 
     UPROPERTY(Transient)
-    TArray<TObjectPtr<ULastFPSEnemyHealthBarWidget>> EnemyHealthBarPool;
-    
-    bool bDamageDirectionConfigurationWarningLogged = false;
+    TObjectPtr<ULastFPSCombatFeedbackPresenter> CombatFeedbackPresenter;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSEnemyHealthPresenter> EnemyHealthPresenter;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSGrapplingReticlePresenter> GrapplingReticlePresenter;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSVitalsGaugePresenter> VitalsGaugePresenter;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSReloadPresenter> ReloadPresenter;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSSkillCooldownPresenter> SkillCooldownPresenter;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSAmmoPresenter> AmmoPresenter;
+
     bool bCrosshairConfigurationWarningLogged = false;
-
-    FLastFPSSmoothedGaugeDisplay HealthGauge;
-    FLastFPSSmoothedGaugeDisplay StaminaGauge;
 
     TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
     TWeakObjectPtr<UWeaponComponent> BoundWeaponComponent;
     TWeakObjectPtr<ULastFPSGrapplingTargetingComponent> BoundGrapplingTargetingComponent;
     TWeakObjectPtr<ALastFPSPlayerState> BoundPlayerState;
 
-    float GrapplingDotCurrentScale = 1.f;
-    float GrapplingDotTargetScale = 1.f;
-    bool bGrapplingDotInitialized = false;
-
-    bool bAttributeDelegatesBound = false;
     bool bPawnComponentsBound = false;
-    bool bSkillSlotsInitialized = false;
-
-    // 리로드 표시 상태. 진행 시간은 시작 알림의 소요 시간을 기준으로 HUD 틱에서 자체 누적한다.
-    bool bReloadInProgress = false;
-    float ReloadElapsedSeconds = 0.f;
-    float ReloadTotalSeconds = 0.f;
 };
