@@ -28,6 +28,8 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(SetByCaller_CriticalHit, "SetByCaller.CriticalHit
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Parameter_AreaDuration, "Skill.Parameter.AreaDuration", "개별 피해 영역의 유지 시간")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Parameter_DamageInterval, "Skill.Parameter.DamageInterval", "반복 피해 적용 간격")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Parameter_ConeAngle, "Skill.Parameter.ConeAngle", "부채꼴 스킬의 전체 각도")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Weapon_Parameter_PelletCount, "Weapon.Parameter.PelletCount", "한 번 발사에 생성되는 산탄(펠릿) 개수. 1이면 단일탄, 2 이상이면 샷건")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Weapon_Parameter_SpreadHalfAngle, "Weapon.Parameter.SpreadHalfAngle", "산탄 퍼짐 원뿔의 반각(도). 0이면 퍼짐 없음")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_AbilityCommit, "Event.Montage.Ability.Commit", "Commit an ability from an ability montage")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_AbilityEnd, "Event.Montage.Ability.End", "End an ability from an ability montage")

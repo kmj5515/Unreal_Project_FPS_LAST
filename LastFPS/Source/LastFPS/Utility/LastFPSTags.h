@@ -33,6 +33,10 @@ namespace LastFPSGameplayTags
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Parameter_DamageInterval);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Parameter_ConeAngle);
 
+	// 무기 밸런스 행의 Parameters 맵에서 사용하는 키. 공통 행 구조를 바꾸지 않고 무기 고유 수치를 표현한다.
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Weapon_Parameter_PelletCount);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Weapon_Parameter_SpreadHalfAngle);
+
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_AbilityCommit);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_AbilityEnd);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_ProjectileSpawn);

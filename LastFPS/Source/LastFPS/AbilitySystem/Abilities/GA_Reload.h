@@ -40,4 +40,6 @@ private:
 
     FTimerHandle ReloadTimerHandle;
     bool bReloadCompleted = false;
+    // 리로드 UI 시작/종료 알림을 정확히 한 쌍으로 맞추기 위한 플래그다. 시작 알림을 보낸 경우에만 종료 알림을 보낸다.
+    bool bReloadUINotified = false;
 };

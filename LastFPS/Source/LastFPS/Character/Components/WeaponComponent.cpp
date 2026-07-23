@@ -20,6 +20,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Utility/LastFPSCombatAffiliation.h"
+#include "Utility/LastFPSTags.h"
 
 namespace
 {
@@ -139,6 +140,18 @@ void UWeaponComponent::CompleteReload()
         NextAllowedServerFireTimeSeconds = 0.0;
         OwnerCharacter->ForceNetUpdate();
     }
+}
+
+void UWeaponComponent::NotifyReloadStarted()
+{
+    // 소요 시간은 이 컴포넌트가 데이터로부터 이미 보유한 값이다. 외부에서 받아오지 않고 그대로 알린다.
+    // 실제 리로드 진행·완료는 GA_Reload가 타이머로 관리한다.
+    OnWeaponReloadStarted.Broadcast(FMath::Max(ReloadDuration, 0.f));
+}
+
+void UWeaponComponent::NotifyReloadFinished(bool bCompleted)
+{
+    OnWeaponReloadFinished.Broadcast(bCompleted);
 }
 
 FTransform UWeaponComponent::GetMuzzleTransform() const
@@ -656,11 +669,11 @@ void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefini
     ResetPendingAimRecoil();
     ResetAimRecoilSequence();
     WeaponDefinition = NewDefinition;
-    ApplyWeaponDefinitionValues(NewDefinition);
+    const bool bHasRequiredWeaponData = ApplyWeaponDefinitionValues(NewDefinition);
 
     DestroyCurrentWeapon();
 
-    if (!WeaponSkeletalMesh)
+    if (!bHasRequiredWeaponData || !WeaponSkeletalMesh)
     {
         SetCurrentMagazineAmmo(0);
         SetCurrentReserveAmmo(0);
@@ -678,15 +691,24 @@ void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefini
     OnWeaponEquippedChanged.Broadcast(CurrentWeapon != nullptr);
 }
 
-void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinition* NewDefinition)
+bool UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinition* NewDefinition)
 {
     MagazineCapacity = 30;
     StartingReserveAmmo = 90;
     ReloadDuration = 2.f;
+    // 밸런스 조회 실패 시 직전에 장착했던 무기의 수치가 남지 않도록 비활성 상태로 초기화한다.
+    FireRate = MinimumServerFireIntervalSeconds;
+    AimTraceRange = 0.f;
+    DamageRange.MinDamage = 0.f;
+    DamageRange.MaxDamage = 0.f;
+    DamageRange.DamageElement = ELastFPSDamageElement::Physical;
+    // 밸런스 행이 없으면 단일탄으로 되돌려, 데이터를 지정하지 않은 무기가 샷건 설정을 물려받지 않게 한다.
+    PelletsPerShot = 1;
+    SpreadHalfAngleDegrees = 0.f;
 
     if (!NewDefinition)
     {
-        return;
+        return false;
     }
 
     WeaponSkeletalMesh = NewDefinition->SkeletalMesh;
@@ -701,8 +723,6 @@ void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
     LeftHandIKJointRootBoneName = NewDefinition->LeftHandIKJointRootBoneName;
     LeftHandIKJointTargetOffset = NewDefinition->LeftHandIKJointTargetOffset;
     ReloadLeftHandIKTargetName = NewDefinition->ReloadLeftHandIKTargetName;
-    FireRate = NewDefinition->FireRate;
-    DamageRange = NewDefinition->DamageRange;
 
     const UGameInstance* GameInstance = GetOwner() ? GetOwner()->GetGameInstance() : nullptr;
     const ULastFPSWeaponDataSubsystem* WeaponDataSubsystem =
@@ -726,15 +746,25 @@ void UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
         WeaponDataSubsystem ? WeaponDataSubsystem->FindBalance(NewDefinition->WeaponId) : nullptr;
     if (!BalanceData)
     {
-        UE_LOG(LogTemp, Warning,
-            TEXT("무기 '%s'의 WeaponBalance 행을 찾지 못해 WeaponDefinition 수치를 사용합니다."),
+        UE_LOG(LogTemp, Error,
+            TEXT("무기 '%s'의 WeaponBalance 행을 찾지 못해 장착을 중단합니다. WeaponDefinition에는 밸런스 fallback이 없습니다."),
             *NewDefinition->WeaponId.ToString());
-        return;
+        return false;
     }
 
     FireRate = FMath::Max(BalanceData->FireInterval, 0.01f);
     AimTraceRange = FMath::Max(BalanceData->AimTraceRange, 0.f);
     DamageRange = LastFPSDamage::MakeDamageRange(BalanceData->Damage, BalanceData->DamageElement);
+
+    // 산탄 수치는 공통 밸런스 행 구조를 바꾸지 않고 Parameters 맵(태그 키)에서 읽는다.
+    // 지정하지 않은 무기는 폴백(1발, 퍼짐 0)으로 기존 단일탄 동작을 유지한다.
+    PelletsPerShot = FMath::Max(
+        FMath::RoundToInt(BalanceData->GetParameter(LastFPSGameplayTags::Weapon_Parameter_PelletCount, 1.f)),
+        1);
+    SpreadHalfAngleDegrees = FMath::Max(
+        BalanceData->GetParameter(LastFPSGameplayTags::Weapon_Parameter_SpreadHalfAngle, 0.f),
+        0.f);
+    return true;
 }
 
 void UWeaponComponent::OnRep_CurrentWeapon()
@@ -995,11 +1025,50 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
 
     const FVector TraceStart = ResolveValidatedTraceStart(*Character, ClientCameraLocation);
 
-    const FVector TraceEnd = TraceStart + AimDirection * AimTraceRange;
+    // 방아쇠 1회 = 탄약 1발 소비(위에서 TryConsumeServerFirePermission으로 이미 처리).
+    // 그 1발 안에서 PelletsPerShot개의 산탄을 각각 원뿔 퍼짐 방향으로 발사한다.
+    const int32 PelletCount = FMath::Max(PelletsPerShot, 1);
+    const float SpreadHalfAngleRad = FMath::DegreesToRadians(FMath::Max(SpreadHalfAngleDegrees, 0.f));
+
+    for (int32 PelletIndex = 0; PelletIndex < PelletCount; ++PelletIndex)
+    {
+        // 첫 펠릿은 조준 중심으로 곧게 보내 조준 신뢰도를 확보하고, 나머지는 원뿔 안에서 무작위로 퍼뜨린다.
+        // 단일탄(PelletCount==1)이거나 퍼짐이 0이면 항상 중심 방향이라 기존 단일탄 동작과 동일하다.
+        const FVector PelletDirection = (PelletIndex == 0 || SpreadHalfAngleRad <= 0.f)
+            ? AimDirection
+            : FMath::VRandCone(AimDirection, SpreadHalfAngleRad);
+
+        FireSinglePelletFromServer(
+            *Character,
+            TraceStart,
+            MuzzleLocation,
+            PelletDirection,
+            DamageEffectClass,
+            bDrawDebugShot,
+            DebugShotDuration);
+    }
+}
+
+void UWeaponComponent::FireSinglePelletFromServer(
+    ACharacter& Character,
+    const FVector& TraceStart,
+    const FVector& MuzzleLocation,
+    const FVector& PelletDirection,
+    TSubclassOf<UGameplayEffect> DamageEffectClass,
+    bool bDrawDebugShot,
+    float DebugShotDuration)
+{
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    const FVector TraceEnd = TraceStart + PelletDirection * AimTraceRange;
 
     FHitResult HitResult;
-    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WeaponTrace), false, Character);
-    QueryParams.AddIgnoredActor(Character);
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WeaponTrace), false, &Character);
+    QueryParams.AddIgnoredActor(&Character);
     QueryParams.AddIgnoredActor(CurrentWeapon);
 
     FCollisionObjectQueryParams ObjectParams;
@@ -1028,8 +1097,8 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
     }
 
     FActorSpawnParameters SpawnParams;
-    SpawnParams.Instigator = Character;
-    SpawnParams.Owner = Character;
+    SpawnParams.Instigator = &Character;
+    SpawnParams.Owner = &Character;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
     World->SpawnActor<ALastFPSProjectile>(ProjectileClass, MuzzleLocation, ProjectileRotation, SpawnParams);
@@ -1037,12 +1106,12 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
     AActor* HitActor = HitResult.GetActor();
     if (!bHit || !HitActor || !DamageEffectClass
         || !LastFPSDamage::IsDamageGameplayEffect(DamageEffectClass)
-        || LastFPSCombatAffiliation::AreFriendlyActors(Character, HitActor))
+        || LastFPSCombatAffiliation::AreFriendlyActors(&Character, HitActor))
     {
         return;
     }
 
-    IAbilitySystemInterface* SourceASI = Cast<IAbilitySystemInterface>(Character);
+    IAbilitySystemInterface* SourceASI = Cast<IAbilitySystemInterface>(&Character);
     IAbilitySystemInterface* TargetASI = Cast<IAbilitySystemInterface>(HitActor);
     if (!SourceASI || !TargetASI)
     {
@@ -1057,16 +1126,18 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
     }
 
     FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
-    Context.AddSourceObject(Character);
-    Context.AddInstigator(Character, Character);
+    Context.AddSourceObject(&Character);
+    Context.AddInstigator(&Character, &Character);
 
+    // 데미지는 펠릿 단위로 적용된다. 즉 밸런스 행의 Damage는 "펠릿 1발당" 피해이며,
+    // 명중한 펠릿 수에 비례해 총 피해가 누적되는 것이 샷건의 의도된 계약이다.
     FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.f, Context);
     if (Spec.IsValid())
     {
         LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), DamageRange);
         TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 
-        if (ALastFPSCharacterBase* ShooterCharacter = Cast<ALastFPSCharacterBase>(Character))
+        if (ALastFPSCharacterBase* ShooterCharacter = Cast<ALastFPSCharacterBase>(&Character))
         {
             ShooterCharacter->Client_NotifyHitMarker();
         }

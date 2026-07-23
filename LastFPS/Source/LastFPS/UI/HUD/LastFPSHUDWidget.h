@@ -150,6 +150,17 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="HUD|Gauges", meta=(BindWidgetOptional))
     TObjectPtr<UProgressBar> PB_Stamina;
 
+    /** 리로드 진행을 표시하는 프로그레스 바다. C++가 진행률을 직접 채운다. */
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Reload", meta=(BindWidgetOptional))
+    TObjectPtr<UProgressBar> PB_Reload;
+
+    /** 리로드 남은 시간을 숫자로 표시하는 텍스트다. 선택적으로 바인딩하며 C++가 갱신한다. */
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Reload", meta=(BindWidgetOptional))
+    TObjectPtr<UTextBlock> Text_Reload;
+
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Reload|Colors")
+    FLinearColor ReloadFillColor = FLinearColor(0.15f, 0.6f, 1.f, 1.f);
+
     UPROPERTY(EditDefaultsOnly, Category="HUD|Gauges", meta=(ClampMin="0.05", ClampMax="3.0"))
     float GaugeFillDuration = 0.4f;
 
@@ -193,7 +204,7 @@ protected:
     /** 화면에 고정되어 보스가 죽을 때까지 유지되는 전용 체력바다. */
     UPROPERTY(BlueprintReadOnly, Category="HUD|Boss Health", meta=(BindWidgetOptional))
     TObjectPtr<ULastFPSEnemyHealthBarWidget> WBP_BossHealthBar;
-
+    
 private:
     bool InitializeHUD();
 
@@ -255,6 +266,17 @@ private:
     void HandleWeaponEquippedChanged(bool bEquipped);
 
     UFUNCTION()
+    void HandleReloadStarted(float ReloadDuration);
+
+    UFUNCTION()
+    void HandleReloadFinished(bool bCompleted);
+
+    void TickReloadIndicator(float DeltaTime);
+    void SetReloadIndicatorVisible(bool bVisible);
+    // 리로드 진행률(0~1)과 남은 시간(초)을 프로그레스 바·텍스트에 직접 반영한다.
+    void UpdateReloadDisplay(float Progress, float RemainingSeconds);
+
+    UFUNCTION()
     void HandleGrapplingTargetAvailabilityChanged(bool bTargetAvailable);
 
     FTimerHandle RetryTimerHandle;
@@ -292,4 +314,9 @@ private:
     bool bAttributeDelegatesBound = false;
     bool bPawnComponentsBound = false;
     bool bSkillSlotsInitialized = false;
+
+    // 리로드 표시 상태. 진행 시간은 시작 알림의 소요 시간을 기준으로 HUD 틱에서 자체 누적한다.
+    bool bReloadInProgress = false;
+    float ReloadElapsedSeconds = 0.f;
+    float ReloadTotalSeconds = 0.f;
 };

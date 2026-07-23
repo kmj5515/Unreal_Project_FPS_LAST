@@ -148,6 +148,8 @@ void ULastFPSHUDWidget::NativeDestruct()
     if (UWeaponComponent* Weapon = BoundWeaponComponent.Get())
     {
         Weapon->OnWeaponEquippedChanged.RemoveDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
+        Weapon->OnWeaponReloadStarted.RemoveDynamic(this, &ULastFPSHUDWidget::HandleReloadStarted);
+        Weapon->OnWeaponReloadFinished.RemoveDynamic(this, &ULastFPSHUDWidget::HandleReloadFinished);
     }
     BoundWeaponComponent.Reset();
 
@@ -216,6 +218,7 @@ void ULastFPSHUDWidget::HUDRefreshTick(const float DeltaTime)
     }
 
     TickSmoothedGauges(DeltaTime);
+    TickReloadIndicator(DeltaTime);
     TickHitMarkerSpread(DeltaTime);
     TickGrapplingDot(DeltaTime);
     TickDamageDirectionIndicators(DeltaTime);
@@ -364,9 +367,14 @@ void ULastFPSHUDWidget::TryBindPawnComponents()
     }
 
     Weapon->OnWeaponEquippedChanged.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
+    Weapon->OnWeaponReloadStarted.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleReloadStarted);
+    Weapon->OnWeaponReloadFinished.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleReloadFinished);
     GrapplingTargeting->OnTargetAvailabilityChanged.AddUniqueDynamic(
         this,
         &ULastFPSHUDWidget::HandleGrapplingTargetAvailabilityChanged);
+
+    // 최초 바인딩 시에는 리로드 중이 아니므로 표시 요소를 숨겨 초기 상태를 정리한다.
+    SetReloadIndicatorVisible(false);
 
     BoundWeaponComponent = Weapon;
     BoundGrapplingTargetingComponent = GrapplingTargeting;
@@ -1164,6 +1172,86 @@ void ULastFPSHUDWidget::HandleGrapplingTargetAvailabilityChanged(
     const bool bTargetAvailable)
 {
     ApplyGrapplingDotAvailability(bTargetAvailable);
+}
+
+void ULastFPSHUDWidget::HandleReloadStarted(const float ReloadDuration)
+{
+    // 소요 시간이 유효하지 않으면 즉시 완료로 간주해 진행 표시를 띄우지 않는다.
+    ReloadTotalSeconds = FMath::Max(ReloadDuration, 0.f);
+    ReloadElapsedSeconds = 0.f;
+    bReloadInProgress = ReloadTotalSeconds > KINDA_SMALL_NUMBER;
+
+    if (!bReloadInProgress)
+    {
+        return;
+    }
+
+    if (PB_Reload)
+    {
+        PB_Reload->SetFillColorAndOpacity(ReloadFillColor);
+    }
+    SetReloadIndicatorVisible(true);
+    UpdateReloadDisplay(0.f, ReloadTotalSeconds);
+}
+
+void ULastFPSHUDWidget::HandleReloadFinished(const bool bCompleted)
+{
+    bReloadInProgress = false;
+    ReloadElapsedSeconds = 0.f;
+
+    // 정상 완료는 가득 찬 상태로, 취소는 빈 상태로 마감한 뒤 숨긴다.
+    UpdateReloadDisplay(bCompleted ? 1.f : 0.f, 0.f);
+    SetReloadIndicatorVisible(false);
+}
+
+void ULastFPSHUDWidget::TickReloadIndicator(const float DeltaTime)
+{
+    if (!bReloadInProgress)
+    {
+        return;
+    }
+
+    ReloadElapsedSeconds += DeltaTime;
+    const float Progress = ReloadTotalSeconds > KINDA_SMALL_NUMBER
+        ? FMath::Clamp(ReloadElapsedSeconds / ReloadTotalSeconds, 0.f, 1.f)
+        : 1.f;
+    const float RemainingSeconds = FMath::Max(ReloadTotalSeconds - ReloadElapsedSeconds, 0.f);
+
+    UpdateReloadDisplay(Progress, RemainingSeconds);
+
+    // 실제 표시 종료는 어빌리티의 완료/취소 알림(HandleReloadFinished)에서 처리한다.
+    // 여기서는 종료 알림이 도착하기 전까지 시각적으로 100%에서 멈춰 대기한다.
+}
+
+void ULastFPSHUDWidget::SetReloadIndicatorVisible(const bool bVisible)
+{
+    const ESlateVisibility TargetVisibility = bVisible
+        ? ESlateVisibility::HitTestInvisible
+        : ESlateVisibility::Collapsed;
+
+    if (PB_Reload)
+    {
+        PB_Reload->SetVisibility(TargetVisibility);
+    }
+    if (Text_Reload)
+    {
+        Text_Reload->SetVisibility(TargetVisibility);
+    }
+}
+
+void ULastFPSHUDWidget::UpdateReloadDisplay(const float Progress, const float RemainingSeconds)
+{
+    if (PB_Reload)
+    {
+        PB_Reload->SetPercent(FMath::Clamp(Progress, 0.f, 1.f));
+    }
+
+    if (Text_Reload)
+    {
+        // 남은 시간을 소수 첫째 자리까지 표시한다(예: 1.4s).
+        Text_Reload->SetText(FText::FromString(
+            FString::Printf(TEXT("%.1fs"), FMath::Max(RemainingSeconds, 0.f))));
+    }
 }
 
 void ULastFPSHUDWidget::ShowHitMarker()

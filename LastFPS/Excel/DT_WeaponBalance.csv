@@ -1,4 +1,5 @@
 ---,Damage,FireInterval,AimTraceRange,DamageElement,Parameters
 Rifle,"1100.000000","0.100000","10000.000000","Physical","()"
-Sniper,"15.000000","5.000000","10000.000000","Physical","()"
-Bazooka,"15.000000","5.000000","10000.000000","Physical","()"
+Sniper,"2000.000000","0.500000","10000.000000","Physical","()"
+Bazooka,"2000.000000","1.000000","10000.000000","Physical","()"
+ShotGun,"1100.000000","0.250000","10000.000000","Physical","(((TagName=""Weapon.Parameter.PelletCount""), 8.000000),((TagName=""Weapon.Parameter.SpreadHalfAngle""), 4.000000))"

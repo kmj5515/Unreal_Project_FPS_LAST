@@ -22,6 +22,9 @@ class ULastFPSWeaponDefinition;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponEquippedChanged, bool, bEquipped);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWeaponAmmoChanged, int32, CurrentAmmo, int32, MagazineCapacity);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponReserveAmmoChanged, int32, ReserveAmmo);
+// 리로드 표시용 신호. Duration은 리로드 총 소요 시간(초)이다.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponReloadStarted, float, ReloadDuration);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponReloadFinished, bool, bCompleted);
 
 UCLASS(BlueprintType, Blueprintable, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class LASTFPS_API UWeaponComponent : public UActorComponent
@@ -38,6 +41,11 @@ public:
     bool CanReload() const;
     bool TryConsumePredictedRound();
     void CompleteReload();
+
+    // 리로드 UI 알림. 소요 시간은 컴포넌트가 소유한 ReloadDuration을 그대로 알리고,
+    // 실제 리로드 진행·완료 타이밍은 GA_Reload가 타이머로 관리한다.
+    void NotifyReloadStarted();
+    void NotifyReloadFinished(bool bCompleted);
     float GetWeaponBaseDamage() const;
     void PlayFireEffects() const;
 	void PlayFireCameraShake() const;
@@ -78,6 +86,12 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category="Weapon|Ammo")
     FOnWeaponReserveAmmoChanged OnWeaponReserveAmmoChanged;
+
+    UPROPERTY(BlueprintAssignable, Category="Weapon|Reload")
+    FOnWeaponReloadStarted OnWeaponReloadStarted;
+
+    UPROPERTY(BlueprintAssignable, Category="Weapon|Reload")
+    FOnWeaponReloadFinished OnWeaponReloadFinished;
 
     UFUNCTION(BlueprintPure, Category="Weapon|Ammo")
     int32 GetCurrentMagazineAmmo() const { return CurrentMagazineAmmo; }
@@ -142,11 +156,12 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|IK")
     FName ReloadLeftHandIKTargetName = TEXT("Clip_Bone");
 
-    // 최소 연사 간격 (초)
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
+    /** WeaponBalance의 FireInterval에서 계산한 런타임 캐시이며 직접 설정하지 않는다. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category="Weapon|Runtime")
     float FireRate = 0.1f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon", meta=(ClampMin="0.0", Units="cm"))
+    /** WeaponBalance의 AimTraceRange에서 계산한 런타임 캐시이며 직접 설정하지 않는다. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category="Weapon|Runtime", meta=(Units="cm"))
     float AimTraceRange = 10000.f;
 
     /** 클라이언트 카메라 위치와 서버 시점 위치 사이에 허용할 최대 오차이다. */
@@ -161,7 +176,8 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="Weapon|Network", meta=(ClampMin="0.0", Units="s"))
     float ServerFireIntervalTolerance = 0.02f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Damage")
+    /** WeaponBalance의 Damage와 DamageElement에서 계산한 런타임 캐시이며 직접 설정하지 않는다. */
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category="Weapon|Runtime")
     FLastFPSDamageRange DamageRange;
 
     // ── 애니메이션 레이어 ──────────────────────────────────────────
@@ -231,7 +247,7 @@ private:
 
     void ApplyEquip(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass);
     void ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefinition);
-    void ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinition* NewDefinition);
+    bool ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinition* NewDefinition);
     void ApplyAnimLayerClass(TSubclassOf<UAnimInstance> AnimLayerClass) const;
     TSubclassOf<UAnimInstance> ResolveCurrentAnimLayerClass() const;
 
@@ -240,6 +256,8 @@ private:
     ALastFPSWeaponActor* SpawnWeaponActor(USkeletalMesh* NewMesh, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass, ULastFPSWeaponDefinition* Definition = nullptr);
     void DestroyCurrentWeapon();
     void HandleFireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
+    // 서버 권한에서 산탄 한 발(펠릿 하나)의 히트 판정·투사체 스폰·데미지 적용을 수행한다. 방향만 다를 뿐 나머지 맥락은 발사 1회 내에서 공유한다.
+    void FireSinglePelletFromServer(ACharacter& Character, const FVector& TraceStart, const FVector& MuzzleLocation, const FVector& PelletDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
     bool ValidateClientMuzzleLocation(const FVector& ClientMuzzleLocation) const;
     FVector ResolveValidatedTraceStart(const ACharacter& Character, const FVector& ClientCameraLocation) const;
     bool TryConsumeServerFirePermission();
@@ -269,5 +287,10 @@ private:
     int32 MagazineCapacity = 30;
     int32 StartingReserveAmmo = 90;
     float ReloadDuration = 2.f;
+
+    // 한 번의 발사(방아쇠 1회)에서 생성할 산탄 개수. 1이면 단일탄, 2 이상이면 샷건처럼 동시에 여러 발이 나간다.
+    int32 PelletsPerShot = 1;
+    // 산탄 퍼짐 원뿔의 반각(도). 0이면 퍼짐 없이 조준 방향으로 곧게 나간다.
+    float SpreadHalfAngleDegrees = 0.f;
     bool bHasFiredAimRecoil = false;
 };
