@@ -39,14 +39,25 @@ namespace
 		virtual bool RecomputeProgress(const FLastFPSQuestObjective& Obj, int32 Baseline, const FLastFPSObjectiveEvalContext& Ctx, int32& OutProgress) const override
 		{
 			OutProgress = 0;
-			FVector Target;
-			if (Ctx.bHasPlayerLocation && Ctx.Subsystem && Ctx.Subsystem->GetTrackedLocation(Obj.TargetTag, Target))
+			if (!Ctx.Subsystem)
 			{
-				const float RadiusCm = Obj.AcceptRadius * 100.f; // m → cm
-				if (FVector::DistSquared(Ctx.PlayerLocation, Target) <= FMath::Square(RadiusCm))
+				return true;
+			}
+
+			// 볼륨 트리거 안이거나(정확), 반경 마커의 AcceptRadius 이내면 도달으로 본다.
+			bool bReached = Ctx.Subsystem->IsLocationTriggerActive(Obj.TargetTag);
+			if (!bReached && Ctx.bHasPlayerLocation)
+			{
+				FVector Target;
+				if (Ctx.Subsystem->GetTrackedLocation(Obj.TargetTag, Target))
 				{
-					OutProgress = Obj.RequiredCount;
+					const float RadiusCm = Obj.AcceptRadius * 100.f; // m → cm
+					bReached = FVector::DistSquared(Ctx.PlayerLocation, Target) <= FMath::Square(RadiusCm);
 				}
+			}
+			if (bReached)
+			{
+				OutProgress = Obj.RequiredCount;
 			}
 			return true;
 		}
@@ -503,6 +514,42 @@ bool ULastFPSQuestSubsystem::GetTrackedLocation(FGameplayTag LocationTag, FVecto
 		}
 	}
 	return false;
+}
+
+void ULastFPSQuestSubsystem::NotifyLocationTriggerChanged(FGameplayTag LocationTag, bool bPlayerInside)
+{
+	if (!LocationTag.IsValid())
+	{
+		return;
+	}
+
+	int32& Count = LocationTriggerOverlaps.FindOrAdd(LocationTag);
+	if (bPlayerInside)
+	{
+		++Count;
+	}
+	else
+	{
+		Count = FMath::Max(0, Count - 1);
+		if (Count == 0)
+		{
+			LocationTriggerOverlaps.Remove(LocationTag);
+		}
+	}
+
+	// 진입 즉시 반영 — 폴 주기를 기다리지 않는다. (퇴장은 완료 전이가 단조라 무해)
+	bool bChanged = RecomputeAllActive();
+	bChanged |= ProcessQuestTransitions();
+	if (bChanged)
+	{
+		BroadcastStateChanged();
+	}
+}
+
+bool ULastFPSQuestSubsystem::IsLocationTriggerActive(FGameplayTag LocationTag) const
+{
+	const int32* Count = LocationTriggerOverlaps.Find(LocationTag);
+	return Count && *Count > 0;
 }
 
 void ULastFPSQuestSubsystem::GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint>& OutWaypoints) const

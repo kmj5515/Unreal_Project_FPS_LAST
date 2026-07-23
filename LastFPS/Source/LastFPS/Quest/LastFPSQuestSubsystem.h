@@ -116,6 +116,12 @@ public:
 	/** 태그에 등록된 월드 위치 조회. 없거나 파괴됐으면 false. */
 	bool GetTrackedLocation(FGameplayTag LocationTag, FVector& OutLocation) const;
 
+	/** 볼륨 트리거 도달 통지 (ULastFPSObjectiveTriggerComponent 오버랩 변화 시). 즉시 재계산+브로드캐스트. */
+	void NotifyLocationTriggerChanged(FGameplayTag LocationTag, bool bPlayerInside);
+
+	/** 해당 위치 태그의 볼륨 트리거에 로컬 플레이어가 현재 들어와 있는가 (ReachLocation 판정 보조). */
+	bool IsLocationTriggerActive(FGameplayTag LocationTag) const;
+
 	/** 진행중 퀘스트의 미완료 위치 목표(ReachLocation) 중 위치가 등록된 것들. HUD 마커용. */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	void GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint>& OutWaypoints) const;
@@ -209,6 +215,9 @@ private:
 
 	/** 위치 태그 → 마커 컴포넌트 (레벨 액터 수명이라 약참조). */
 	TMap<FGameplayTag, TWeakObjectPtr<USceneComponent>> LocationMarkers;
+
+	/** 위치 태그 → 현재 겹친 볼륨 트리거 수 (0 초과면 도달 판정 충족). */
+	TMap<FGameplayTag, int32> LocationTriggerOverlaps;
 
 	/** 전이 처리 재진입 가드 (보상 지급→인벤토리 브로드캐스트 재귀 차단). */
 	bool bProcessingTransitions = false;
