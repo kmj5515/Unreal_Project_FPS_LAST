@@ -8,6 +8,7 @@
 #include "Data/Tables/LastFPSDialogueData.h"
 #include "UI/HUD/LastFPSHUDWidget.h"
 #include "UI/HUD/LastFPSQuestTrackerWidget.h"
+#include "UI/HUD/LastFPSObjectiveMarkerWidget.h"
 #include "UI/Common/LastFPSNoticeWidget.h"
 #include "UI/Dialogue/LastFPSDialogueWidget.h"
 #include "UI/Hub/LastFPSNPCInteractionWidget.h"
@@ -96,6 +97,7 @@ void ALastFPSPlayerController::BeginPlay()
     if (bShowQuestTracker)
     {
         TryPushQuestTrackerToUILayout();
+        TryAddQuestMarkerToViewport();
     }
 
     OpenInitialScreen();
@@ -122,6 +124,13 @@ void ALastFPSPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
         World->GetTimerManager().ClearTimer(QuestTrackerPushRetryTimerHandle);
         World->GetTimerManager().ClearTimer(MenuLayerSyncBindRetryTimerHandle);
         World->GetTimerManager().ClearTimer(LocalPawnReadyRetryTimerHandle);
+    }
+
+    // 뷰포트에 직접 붙인 마커 오버레이는 레이아웃이 관리하지 않으므로 명시적으로 제거한다.
+    if (QuestMarkerWidget)
+    {
+        QuestMarkerWidget->RemoveFromParent();
+        QuestMarkerWidget = nullptr;
     }
 
     Super::EndPlay(EndPlayReason);
@@ -295,6 +304,31 @@ void ALastFPSPlayerController::TryPushQuestTrackerToUILayout()
     QuestTrackerWidget = RootLayout->PushWidgetToLayerStack<ULastFPSQuestTrackerWidget>(
         LastFPSUITags::Layer_Game(), QuestTrackerWidgetClass);
     bQuestTrackerPushed = (QuestTrackerWidget != nullptr);
+}
+
+void ALastFPSPlayerController::TryAddQuestMarkerToViewport()
+{
+    if (QuestMarkerWidget)
+    {
+        return;
+    }
+
+    if (!QuestMarkerWidgetClass)
+    {
+        // 표시하기로 했는데 클래스가 비어 있으면 조용히 넘어가지 않고 원인을 남긴다. (다른 push 실패들과 동일한 규약)
+        UE_LOG(LogLastFPSPlayerController, Warning,
+            TEXT("TryAddQuestMarkerToViewport: 목표 마커를 띄우지 못했습니다. PlayerController BP의 QuestMarkerWidgetClass에 WBP_ObjectiveMarkers 가 지정됐는지 확인하세요."));
+        return;
+    }
+
+    // 마커는 월드 좌표를 화면에 투영하는 전체화면 오버레이라 CommonUI 레이어 스택(맨 위 1개만 표시)에 맞지 않는다.
+    // 뷰포트에 직접 얹되, 루트 레이아웃(GameUIPolicy 가 ZOrder 1000 으로 추가)보다 낮은 값으로 둬서
+    // "게임뷰 위 · 메뉴/모달 아래"에 놓이게 한다.
+    QuestMarkerWidget = CreateWidget<ULastFPSObjectiveMarkerWidget>(this, QuestMarkerWidgetClass);
+    if (QuestMarkerWidget)
+    {
+        QuestMarkerWidget->AddToViewport(10);
+    }
 }
 
 // ── 커서/입력 config 단일 소유 ───────────────────────────────────────
