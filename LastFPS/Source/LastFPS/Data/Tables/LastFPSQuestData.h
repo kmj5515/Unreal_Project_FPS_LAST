@@ -75,7 +75,9 @@ enum class ELastFPSObjectiveType : uint8
 	ReachLocation	UMETA(DisplayName="위치 도달"),		// TargetTag = 위치 마커, TargetId(선택) = 연결할 EncounterId
 	KillTarget		UMETA(DisplayName="대상 처치"),		// TargetTag = 적 종류, 서버 사망 이벤트로 카운트
 	TalkToNPC		UMETA(DisplayName="NPC 대화"),		// TargetId = NPCRowName, 상호작용 완료로 카운트
-	ClearEncounter	UMETA(DisplayName="인카운터 완료")	// TargetId = EncounterId (DT_Encounter 행)
+	ClearEncounter	UMETA(DisplayName="인카운터 완료"),	// TargetId = EncounterId (DT_Encounter 행)
+	CaptureZone		UMETA(DisplayName="구역 점령"),		// TargetTag = 점령 구역, 점령 완료 통지로 카운트
+	DefendZone		UMETA(DisplayName="구역 방어")		// TargetTag = 방어 구역, 방어 성공 통지로 카운트
 };
 
 /**
@@ -87,6 +89,8 @@ enum class ELastFPSObjectiveType : uint8
  * - KillTarget: TargetTag 종류의 적을 RequiredCount 기 처치(서버 사망 이벤트가 오너 클라로 통지).
  * - TalkToNPC: TargetId(NPCRowName) NPC 와 상호작용.
  * - ClearEncounter: TargetId(EncounterId) 방 인카운터 클리어.
+ * - CaptureZone: TargetTag 구역을 RequiredCount 곳 점령(월드 점령존이 완료 시 오너 클라로 통지).
+ * - DefendZone: TargetTag 구역을 RequiredCount 곳 방어 성공(월드 방어존이 성공 시 오너 클라로 통지).
  * TargetId(행 참조형)와 TargetTag(분류형)는 유형에 따라 각각 사용한다.
  */
 USTRUCT(BlueprintType)
@@ -101,7 +105,7 @@ struct FLastFPSQuestObjective
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	FName TargetId;
 
-	/** 분류형 대상 — KillTarget=적 종류 태그, ReachLocation=위치 마커 태그 */
+	/** 분류형 대상 — KillTarget=적 종류 태그, ReachLocation=위치 마커 태그, CaptureZone/DefendZone=구역 태그 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	FGameplayTag TargetTag;
 
