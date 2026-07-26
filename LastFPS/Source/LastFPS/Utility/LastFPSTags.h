@@ -20,6 +20,12 @@ namespace LastFPSGameplayTags
 	// 레벨 규칙으로 부여되는 전투 금지 상태. 전투 어빌리티의 ActivationBlockedTags 가 참조한다.
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Disabled);
 
+	// 퀘스트 목표 구역 태그 (도달/수호/점령). 코드가 값을 직접 참조하진 않지만 프로젝트 방침대로 네이티브로 관리.
+	// 새 구역 추가 = 여기 한 줄 + .cpp 정의 (재컴파일 필요). 배치·DataTable 은 이 태그를 태그 피커로 선택한다.
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Location_Quest_Depot);		// 위치 도달(ReachLocation) - 보급창고
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Location_Quest_Reactor);		// 수호(DefendZone) - 리액터
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Location_Quest_Outpost);		// 점령(CaptureZone) - 전초기지
+
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill_Dash);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill1);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill2);

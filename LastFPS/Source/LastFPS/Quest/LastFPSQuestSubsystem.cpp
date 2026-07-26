@@ -86,6 +86,25 @@ namespace
 				&& Event.Id == Obj.TargetId;
 		}
 	};
+
+	/**
+	 * 태그형 완료 이벤트 — 지정 유형의 push 통지를 목표 태그 계층 매칭으로 누적(push형).
+	 * 점령/방어처럼 "분류 태그가 일치하는 외부 완료 통지"는 판정이 동일하고 유형만 다르므로,
+	 * 유형별 중복 트래커 대신 이 하나를 유형 인자로 재사용한다.
+	 */
+	class FTagEventTracker : public ILastFPSObjectiveTracker
+	{
+	public:
+		explicit FTagEventTracker(ELastFPSObjectiveType InEventType) : EventType(InEventType) {}
+		virtual bool MatchesEvent(const FLastFPSObjectiveEvent& Event, const FLastFPSQuestObjective& Obj) const override
+		{
+			return Event.Type == EventType
+				&& Obj.TargetTag.IsValid()
+				&& Event.Tag.MatchesTag(Obj.TargetTag);
+		}
+	private:
+		ELastFPSObjectiveType EventType;
+	};
 }
 
 void ULastFPSQuestSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -139,6 +158,8 @@ void ULastFPSQuestSubsystem::BuildTrackers()
 	Trackers.Add(ELastFPSObjectiveType::ReachLocation, MakeUnique<FReachLocationTracker>());
 	Trackers.Add(ELastFPSObjectiveType::KillTarget, MakeUnique<FKillTargetTracker>());
 	Trackers.Add(ELastFPSObjectiveType::TalkToNPC, MakeUnique<FTalkToNPCTracker>());
+	Trackers.Add(ELastFPSObjectiveType::CaptureZone, MakeUnique<FTagEventTracker>(ELastFPSObjectiveType::CaptureZone));
+	Trackers.Add(ELastFPSObjectiveType::DefendZone, MakeUnique<FTagEventTracker>(ELastFPSObjectiveType::DefendZone));
 }
 
 const ILastFPSObjectiveTracker* ULastFPSQuestSubsystem::GetTracker(ELastFPSObjectiveType Type) const
@@ -445,6 +466,34 @@ void ULastFPSQuestSubsystem::NotifyObjectiveKill(FGameplayTag EnemyTag)
 	{
 		BroadcastStateChanged();
 	}
+}
+
+void ULastFPSQuestSubsystem::NotifyTaggedObjective(ELastFPSObjectiveType Type, FGameplayTag Tag)
+{
+	if (!Tag.IsValid())
+	{
+		return;
+	}
+	FLastFPSObjectiveEvent Event;
+	Event.Type = Type;
+	Event.Tag = Tag;
+
+	bool bChanged = ApplyObjectiveEventToActive(Event);
+	bChanged |= ProcessQuestTransitions();
+	if (bChanged)
+	{
+		BroadcastStateChanged();
+	}
+}
+
+void ULastFPSQuestSubsystem::NotifyObjectiveCaptured(FGameplayTag ZoneTag)
+{
+	NotifyTaggedObjective(ELastFPSObjectiveType::CaptureZone, ZoneTag);
+}
+
+void ULastFPSQuestSubsystem::NotifyObjectiveDefended(FGameplayTag ZoneTag)
+{
+	NotifyTaggedObjective(ELastFPSObjectiveType::DefendZone, ZoneTag);
 }
 
 void ULastFPSQuestSubsystem::NotifyTalkedToNPC(FName NPCRowName)

@@ -16,6 +16,10 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Movement_SpeedBoost, "Status.Movement.Spee
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Combat_Disabled, "State.Combat.Disabled", "전투(무기/스킬) 어빌리티 사용이 금지된 상태")
 
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Location_Quest_Depot, "Location.Quest.Depot", "퀘스트 위치 목표 - 보급창고(도달)")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Location_Quest_Reactor, "Location.Quest.Reactor", "퀘스트 수호 대상 구역 - 리액터")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Location_Quest_Outpost, "Location.Quest.Outpost", "퀘스트 점령 대상 구역 - 전초기지")
+
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_Dash, "Cooldown.Skill.Dash", "Dash cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill1, "Cooldown.Skill1", "Skill 1 cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill2, "Cooldown.Skill2", "Skill 2 cooldown")

@@ -103,6 +103,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	void NotifyObjectiveKill(FGameplayTag EnemyTag);
 
+	/** 점령 완료 통지 — 월드 점령존이 오너 클라에서 호출. CaptureZone 목표를 누적. */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
+	void NotifyObjectiveCaptured(FGameplayTag ZoneTag);
+
+	/** 방어 성공 통지 — 월드 방어존이 오너 클라에서 호출. DefendZone 목표를 누적. */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
+	void NotifyObjectiveDefended(FGameplayTag ZoneTag);
+
 	/** 대화 통지 — NPC 상호작용 시작 시 호출. TalkToNPC 목표를 누적. */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	void NotifyTalkedToNPC(FName NPCRowName);
@@ -169,6 +177,9 @@ private:
 
 	/** 한 퀘스트의 pull형 진행을 절대상태에서 재계산. 완료 도달 시 Completed 로 단조 승격. 변경 시 true. */
 	bool RecomputeProgress(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def);
+
+	/** 태그형 완료 통지 공통 처리 — 이벤트 적용 + 전이 + 브로드캐스트. 점령/방어 진입점이 공유. */
+	void NotifyTaggedObjective(ELastFPSObjectiveType Type, FGameplayTag Tag);
 
 	/** 외부 이벤트를 진행중 퀘스트들에 적용(push형 목표 누적). 변경 시 true(브로드캐스트/연쇄는 호출부). */
 	bool ApplyObjectiveEventToActive(const FLastFPSObjectiveEvent& Event);
