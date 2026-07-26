@@ -2,6 +2,9 @@
 
 #include "Net/UnrealNetwork.h"
 #include "Character/LastFPSCharacterBase.h"
+#include "Character/Components/LastFPSWeakpointComponent.h"
+#include "GameFramework/Character.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Weapons/LastFPSWeaponActor.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
 #include "Data/Tables/LastFPSWeaponBalanceData.h"
@@ -1125,6 +1128,19 @@ void UWeaponComponent::FireSinglePelletFromServer(
     {
         LastFPSDamage::RollAndApplySetByCallerDamage(*Spec.Data.Get(), DamageRange);
         TargetASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+
+        // 약점(예: 머리) 본에 맞았으면 약점 컴포넌트에 알려 발광·약점 체력 단계를 갱신한다(서버 권한).
+        ULastFPSWeakpointComponent* Weakpoint = HitActor->FindComponentByClass<ULastFPSWeakpointComponent>();
+        // [진단] 임시 로그 — 무기 히트가 약점 컴포넌트/본을 제대로 잡는지 확인. 문제 해결 후 제거.
+        UE_LOG(LogTemp, Warning, TEXT("[Weakpoint] 무기히트 Actor=%s Bone=%s HitComp=%s WeakpointComp=%s"),
+            *GetNameSafe(HitActor),
+            *HitResult.BoneName.ToString(),
+            *GetNameSafe(HitResult.GetComponent()),
+            Weakpoint ? TEXT("있음") : TEXT("없음"));
+        if (Weakpoint)
+        {
+            Weakpoint->HandleHitOnBone(HitResult.BoneName, GetWeaponBaseDamage());
+        }
 
         // 히트마커는 데미지 적용 중앙 이벤트(LastFPSAttributeSet → PlayerState::OnDamageDealt → HUD)에서
         // 모든 데미지 GA에 대해 일괄 처리한다. 무기 전용 호출은 중복이므로 제거했다.

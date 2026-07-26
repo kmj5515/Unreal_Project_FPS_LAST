@@ -6,6 +6,7 @@
 #include "Character/Components/LastFPSGrapplingAnimationComponent.h"
 #include "Character/Components/LastFPSGrapplingTargetingComponent.h"
 #include "Character/LastFPSHero.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Curves/CurveFloat.h"
 #include "Data/Abilities/LastFPSGrapplingHookData.h"
@@ -112,17 +113,21 @@ void UGA_GrapplingHook::ActivateAbility(
 
 	GrappleAnchor = TargetHit.ImpactPoint + TargetHit.ImpactNormal * GrapplingData->AnchorSurfaceOffset;
 	const FVector ToAnchor = GrappleAnchor - Hero->GetActorLocation();
-	const float AnchorApproachDistance = ToAnchor.Size() - GrapplingData->StopDistance;
-	if (AnchorApproachDistance <= KINDA_SMALL_NUMBER || GrapplingData->PullSpeed <= KINDA_SMALL_NUMBER)
+	if (ToAnchor.SizeSquared() <= KINDA_SMALL_NUMBER || GrapplingData->PullSpeed <= KINDA_SMALL_NUMBER)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	const FVector AnchorApproachLocation = Hero->GetActorLocation()
-		+ ToAnchor.GetSafeNormal() * AnchorApproachDistance;
-	const FVector PullDestination = AnchorApproachLocation
-		+ FVector::UpVector * GrapplingData->ArrivalHeightOffset
+	float CapsuleHalfHeight = 0.f;
+	if (const UCapsuleComponent* CapsuleComp = Hero->GetCapsuleComponent())
+	{
+		CapsuleHalfHeight = CapsuleComp->GetScaledCapsuleHalfHeight();
+	}
+
+	// 훅 건 위치(GrappleAnchor)에 캐릭터의 발바닥이 안착하도록 캡슐 반높이를 Z 오프셋으로 반영합니다.
+	const FVector PullDestination = GrappleAnchor
+		+ FVector::UpVector * (CapsuleHalfHeight + GrapplingData->ArrivalHeightOffset)
 		+ TargetHit.ImpactNormal * GrapplingData->ArrivalSurfaceClearance;
 	const float PullDistance = FVector::Distance(Hero->GetActorLocation(), PullDestination);
 	if (PullDistance <= KINDA_SMALL_NUMBER)
@@ -366,7 +371,7 @@ void UGA_GrapplingHook::StartGrapplePull()
 		FVector::ZeroVector,
 		GrapplingData->FinishVelocityClamp,
 		true,
-		FMath::Max(GrapplingData->StopDistance, 1.0f));
+		FMath::Max(GrapplingData->StopDistance, 0.0f));
 	if (!GrappleMovementTask)
 	{
 		EndAbility(

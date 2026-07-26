@@ -3,28 +3,29 @@
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 
-void ULastFPSObjectiveMarkerEntryWidget::UpdateMarker(float DistanceMeters, bool bOffScreen, float ArrowAngleDeg, const FText& Label)
+void ULastFPSObjectiveMarkerEntryWidget::UpdateMarker(const FLastFPSObjectiveMarkerDisplay& Display)
 {
+	// 경유 지점도 도달 목표와 동일하게 거리/라벨을 표시한다(안내 지점은 항상 한 번에 하나).
 	if (Text_Distance)
 	{
 		// "45m" 형태 — 정수 미터.
 		const FText MetersText = FText::Format(
 			NSLOCTEXT("LastFPS", "Quest_MarkerDistance", "{0}m"),
-			FText::AsNumber(FMath::RoundToInt(DistanceMeters)));
+			FText::AsNumber(FMath::RoundToInt(Display.DistanceMeters)));
 		Text_Distance->SetText(MetersText);
 	}
 
 	if (Text_Label)
 	{
-		Text_Label->SetText(Label);
+		Text_Label->SetText(Display.Label);
 	}
 
 	if (Arrow)
 	{
-		if (bOffScreen)
+		if (Display.bOffScreen)
 		{
 			Arrow->SetVisibility(ESlateVisibility::HitTestInvisible);
-			Arrow->SetRenderTransformAngle(ArrowAngleDeg);
+			Arrow->SetRenderTransformAngle(Display.ArrowAngleDeg);
 		}
 		else
 		{
@@ -32,5 +33,17 @@ void ULastFPSObjectiveMarkerEntryWidget::UpdateMarker(float DistanceMeters, bool
 		}
 	}
 
-	OnMarkerUpdated(DistanceMeters, bOffScreen, ArrowAngleDeg);
+	if (Icon_Destination)
+	{
+		Icon_Destination->SetVisibility(
+			Display.bIsRoutePoint ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+	}
+
+	if (Icon_Route)
+	{
+		Icon_Route->SetVisibility(
+			Display.bIsRoutePoint ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+
+	OnMarkerUpdated(Display.DistanceMeters, Display.bOffScreen, Display.ArrowAngleDeg);
 }

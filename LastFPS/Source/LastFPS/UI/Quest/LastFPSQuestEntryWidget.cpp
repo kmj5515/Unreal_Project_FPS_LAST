@@ -34,7 +34,8 @@ void ULastFPSQuestEntryWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, F
 		TB_Reward->SetText(InQuest.RewardText);
 	}
 
-	// 진행도 — 목표별 "cur/req" 를 이어붙인다. 목표가 없으면 숨김.
+	// 진행도 — 데이터의 목표 문구와 실제 요구량을 줄별로 표시한다.
+	// ClearEncounter 요구량은 QuestTable의 중복 숫자가 아니라 EncounterTable의 적 수 합계다.
 	if (TB_Progress)
 	{
 		if (InQuest.Objectives.Num() > 0)
@@ -43,12 +44,32 @@ void ULastFPSQuestEntryWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, F
 			for (int32 i = 0; i < InQuest.Objectives.Num(); ++i)
 			{
 				const int32 Cur = InSubsystem ? InSubsystem->GetObjectiveProgress(InQuestId, i) : 0;
-				const int32 Req = InQuest.Objectives[i].RequiredCount;
-				if (i > 0)
+				const int32 Req = InSubsystem
+					? InSubsystem->GetObjectiveRequiredCount(InQuestId, i)
+					: InQuest.Objectives[i].RequiredCount;
+
+				if (InQuest.bSequentialObjectives && Cur >= Req)
 				{
-					Progress += TEXT("  ·  ");
+					continue;
+				}
+
+				if (!Progress.IsEmpty())
+				{
+					Progress += LINE_TERMINATOR;
+				}
+
+				const FString Label = InQuest.Objectives[i].Label.ToString();
+				if (!Label.IsEmpty())
+				{
+					Progress += Label;
+					Progress += TEXT("  ");
 				}
 				Progress += FString::Printf(TEXT("%d/%d"), Cur, Req);
+
+				if (InQuest.bSequentialObjectives)
+				{
+					break;
+				}
 			}
 			TB_Progress->SetText(FText::FromString(Progress));
 			TB_Progress->SetVisibility(ESlateVisibility::SelfHitTestInvisible);

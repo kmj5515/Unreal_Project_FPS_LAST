@@ -1,5 +1,7 @@
 #include "Encounter/LastFPSRoomSpawnPresentationComponent.h"
 
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraFunctionLibrary.h"
@@ -28,6 +30,7 @@ void ULastFPSRoomSpawnPresentationComponent::Configure(
 	}
 
 	SpawnVFX = InSpawnVFX;
+	PendingSpawnVFXTransforms.Reset();
 	RefreshLoadedSystem();
 	Owner->ForceNetUpdate();
 }
@@ -51,6 +54,15 @@ void ULastFPSRoomSpawnPresentationComponent::GetLifetimeReplicatedProps(
 	DOREPLIFETIME(ULastFPSRoomSpawnPresentationComponent, SpawnVFX);
 }
 
+void ULastFPSRoomSpawnPresentationComponent::EndPlay(
+	const EEndPlayReason::Type EndPlayReason)
+{
+	CancelNiagaraSystemLoad();
+	PendingSpawnVFXTransforms.Reset();
+	LoadedNiagaraSystem = nullptr;
+	Super::EndPlay(EndPlayReason);
+}
+
 void ULastFPSRoomSpawnPresentationComponent::OnRep_SpawnVFX()
 {
 	RefreshLoadedSystem();
@@ -66,17 +78,26 @@ void ULastFPSRoomSpawnPresentationComponent::MulticastPlaySpawnVFX_Implementatio
 
 	if (!LoadedNiagaraSystem)
 	{
-		RefreshLoadedSystem();
+		constexpr int32 MaxPendingVFXCount = 32;
+		if (PendingSpawnVFXTransforms.Num() < MaxPendingVFXCount)
+		{
+			PendingSpawnVFXTransforms.Add(SpawnTransform);
+		}
+		if (!NiagaraSystemLoadHandle.IsValid())
+		{
+			RefreshLoadedSystem();
+		}
+		return;
 	}
 
+	PlayLoadedSpawnVFX(SpawnTransform);
+}
+
+void ULastFPSRoomSpawnPresentationComponent::PlayLoadedSpawnVFX(
+	const FTransform& SpawnTransform)
+{
 	if (!LoadedNiagaraSystem)
 	{
-		UE_LOG(
-			LogLastFPSRoomSpawnPresentation,
-			Warning,
-			TEXT("[%s] 생성 Niagara System을 불러오지 못해 연출을 재생하지 않습니다: %s"),
-			*GetNameSafe(GetOwner()),
-			*SpawnVFX.NiagaraSystem.ToString());
 		return;
 	}
 
@@ -95,10 +116,74 @@ void ULastFPSRoomSpawnPresentationComponent::MulticastPlaySpawnVFX_Implementatio
 
 void ULastFPSRoomSpawnPresentationComponent::RefreshLoadedSystem()
 {
+	CancelNiagaraSystemLoad();
 	LoadedNiagaraSystem = nullptr;
-	if (GetNetMode() != NM_DedicatedServer && !SpawnVFX.NiagaraSystem.IsNull())
+	if (GetNetMode() == NM_DedicatedServer)
 	{
-		LoadedNiagaraSystem = SpawnVFX.NiagaraSystem.LoadSynchronous();
+		PendingSpawnVFXTransforms.Reset();
+		return;
+	}
+	if (SpawnVFX.NiagaraSystem.IsNull())
+	{
+		// 초기 프로퍼티 복제보다 RPC가 먼저 처리된 경우 OnRep에서 다시 로드를 시도한다.
+		return;
+	}
+
+	LoadedNiagaraSystem = SpawnVFX.NiagaraSystem.Get();
+	if (LoadedNiagaraSystem)
+	{
+		HandleNiagaraSystemLoaded();
+		return;
+	}
+
+	const FSoftObjectPath NiagaraSystemPath = SpawnVFX.NiagaraSystem.ToSoftObjectPath();
+	NiagaraSystemLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+		NiagaraSystemPath,
+		FStreamableDelegate::CreateUObject(
+			this,
+			&ULastFPSRoomSpawnPresentationComponent::HandleNiagaraSystemLoaded),
+		FStreamableManager::AsyncLoadHighPriority);
+	if (!NiagaraSystemLoadHandle.IsValid())
+	{
+		UE_LOG(
+			LogLastFPSRoomSpawnPresentation,
+			Error,
+			TEXT("[%s] 생성 Niagara System 비동기 로드를 시작하지 못했습니다: %s"),
+			*GetNameSafe(GetOwner()),
+			*NiagaraSystemPath.ToString());
+		PendingSpawnVFXTransforms.Reset();
+	}
+}
+
+void ULastFPSRoomSpawnPresentationComponent::HandleNiagaraSystemLoaded()
+{
+	LoadedNiagaraSystem = SpawnVFX.NiagaraSystem.Get();
+	NiagaraSystemLoadHandle.Reset();
+	if (!LoadedNiagaraSystem)
+	{
+		UE_LOG(
+			LogLastFPSRoomSpawnPresentation,
+			Error,
+			TEXT("[%s] 생성 Niagara System 비동기 로드 결과가 유효하지 않습니다: %s"),
+			*GetNameSafe(GetOwner()),
+			*SpawnVFX.NiagaraSystem.ToString());
+		PendingSpawnVFXTransforms.Reset();
+		return;
+	}
+
+	TArray<FTransform> PendingTransforms = MoveTemp(PendingSpawnVFXTransforms);
+	for (const FTransform& PendingTransform : PendingTransforms)
+	{
+		PlayLoadedSpawnVFX(PendingTransform);
+	}
+}
+
+void ULastFPSRoomSpawnPresentationComponent::CancelNiagaraSystemLoad()
+{
+	if (NiagaraSystemLoadHandle.IsValid())
+	{
+		NiagaraSystemLoadHandle->CancelHandle();
+		NiagaraSystemLoadHandle.Reset();
 	}
 }
 

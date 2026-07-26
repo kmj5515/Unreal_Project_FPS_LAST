@@ -5,7 +5,39 @@
 #include "GameplayTagContainer.h"
 #include "LastFPSQuestData.generated.h"
 
+class USoundBase;
 class UTexture2D;
+
+/** 무전 자막/사운드 팝업 연출 데이터 */
+USTRUCT(BlueprintType)
+struct FLastFPSRadioTransmissionData : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	/** 화자 이름 (예: "안내자", "HQ 사령관") */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Radio")
+	FText SpeakerName;
+
+	/** 화자 하이라이트 컬러 (기본값: 노란색/골드) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Radio")
+	FLinearColor SpeakerColor = FLinearColor(1.0f, 0.78f, 0.0f, 1.0f);
+
+	/** 무전 대사 자막 내용 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Radio", meta=(MultiLine=true))
+	FText DialogueText;
+
+	/** 함께 재생할 무전 음성 사운드 에셋 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Radio")
+	TSoftObjectPtr<USoundBase> VoiceAudio;
+
+	/** 자막 노출 유지 시간 (0 이면 기본 4.0초 적용) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Radio", meta=(ClampMin=0.0, Units="s"))
+	float DisplayDuration = 4.0f;
+
+	/** 글자당 타이핑 속도(초) (0 이면 즉시 출력) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Radio", meta=(ClampMin=0.0, Units="s"))
+	float TypingSpeed = 0.03f;
+};
 
 /** 퀘스트 분류 — 목록에서 메인/서브 구분 표시용 */
 UENUM(BlueprintType)
@@ -40,9 +72,10 @@ UENUM(BlueprintType)
 enum class ELastFPSObjectiveType : uint8
 {
 	AcquireItem		UMETA(DisplayName="아이템 획득"),	// TargetId = DT_ItemData 행, 기준선 이후 증가분
-	ReachLocation	UMETA(DisplayName="위치 도달"),		// TargetTag = 위치 마커, AcceptRadius 이내 도달
+	ReachLocation	UMETA(DisplayName="위치 도달"),		// TargetTag = 위치 마커, TargetId(선택) = 연결할 EncounterId
 	KillTarget		UMETA(DisplayName="대상 처치"),		// TargetTag = 적 종류, 서버 사망 이벤트로 카운트
-	TalkToNPC		UMETA(DisplayName="NPC 대화")		// TargetId = NPCRowName, 상호작용 완료로 카운트
+	TalkToNPC		UMETA(DisplayName="NPC 대화"),		// TargetId = NPCRowName, 상호작용 완료로 카운트
+	ClearEncounter	UMETA(DisplayName="인카운터 완료")	// TargetId = EncounterId (DT_Encounter 행)
 };
 
 /**
@@ -50,8 +83,10 @@ enum class ELastFPSObjectiveType : uint8
  * - AcquireItem: TargetId(DT_ItemData 행)를 RequiredCount 개 획득 — 수락 시점 보유량을 기준선으로
  *   잡고 이후 증가분을 센다. 이미 갖고 있던 재고는 카운트하지 않음.
  * - ReachLocation: TargetTag 로 등록된 위치 마커에 AcceptRadius(m) 이내로 도달.
+ *   던전 자동 트리거는 TargetId에 EncounterId를 지정해 해당 방의 트리거와 연결한다.
  * - KillTarget: TargetTag 종류의 적을 RequiredCount 기 처치(서버 사망 이벤트가 오너 클라로 통지).
  * - TalkToNPC: TargetId(NPCRowName) NPC 와 상호작용.
+ * - ClearEncounter: TargetId(EncounterId) 방 인카운터 클리어.
  * TargetId(행 참조형)와 TargetTag(분류형)는 유형에 따라 각각 사용한다.
  */
 USTRUCT(BlueprintType)
@@ -62,7 +97,7 @@ struct FLastFPSQuestObjective
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	ELastFPSObjectiveType Type = ELastFPSObjectiveType::AcquireItem;
 
-	/** 행 참조형 대상 — AcquireItem=DT_ItemData 행, TalkToNPC=NPCRowName */
+	/** 행 참조형 대상 — AcquireItem=DT_ItemData 행, ReachLocation(선택)/ClearEncounter=EncounterId, TalkToNPC=NPCRowName */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	FName TargetId;
 
@@ -74,13 +109,21 @@ struct FLastFPSQuestObjective
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(ClampMin=0.1, EditCondition="Type==ELastFPSObjectiveType::ReachLocation"))
 	float AcceptRadius = 3.f;
 
-	/** 필요 수량 (ReachLocation/TalkToNPC 는 1) */
+	/** 필요 수량. ClearEncounter는 EncounterTable의 모든 웨이브 적 수 합계를 런타임 요구량으로 사용한다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(ClampMin=1))
 	int32 RequiredCount = 1;
 
 	/** 목록에 표시할 목표 문구 (예: "코어 3개 수집") */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	FText Label;
+
+	/** 목표 시작 시 재생할 무전 대사 행 참조 (DT_RadioTransmission) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Radio")
+	TArray<FName> RadioOnStart;
+
+	/** 목표 완료 시 재생할 무전 대사 행 참조 (DT_RadioTransmission) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Radio")
+	TArray<FName> RadioOnComplete;
 };
 
 /** 보상으로 지급할 아이템 1건 (DT_ItemData 행 + 수량). */
@@ -146,6 +189,18 @@ struct FLastFPSQuestData : public FTableRowBase
 	/** 달성 목표 목록 (AcquireItem 등). 비면 즉시 완료 가능한 퀘스트로 취급. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	TArray<FLastFPSQuestObjective> Objectives;
+
+	/** true면 배열 순서대로 목표 하나씩만 활성화한다. 던전의 이동→전투 단계처럼 순서가 있는 임무에 사용한다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
+	bool bSequentialObjectives = false;
+
+	/** 퀘스트 시작 시 재생할 무전 대사 행 참조 (DT_RadioTransmission) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Radio")
+	TArray<FName> RadioOnStart;
+
+	/** 퀘스트 완료 시 재생할 무전 대사 행 참조 (DT_RadioTransmission) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Radio")
+	TArray<FName> RadioOnComplete;
 
 	/** 완료 보상 (크레딧 + 아이템) — 수령 시 1회 지급 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")

@@ -27,16 +27,89 @@
 #include "Engine/World.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
 #include "Data/Definitions/LastFPSCharacterRoster.h"
+#include "Encounter/LastFPSRoomEncounterSubsystem.h"
 #include "Game/Loading/LastFPSLoadingProcessSubsystem.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSGameModeBase.h"
 #include "Game/LastFPSPlayerState.h"
+#include "HAL/IConsoleManager.h"
 #include "InputCoreTypes.h"
 #include "Net/UnrealNetwork.h"
 #include "PrimaryGameLayout.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPlayerController, Log, All);
+
+#if !UE_BUILD_SHIPPING
+namespace
+{
+	FName ResolveDebugEncounterId(const FString& RawArgument)
+	{
+		FString EncounterId = RawArgument;
+		EncounterId.TrimStartAndEndInline();
+		if (EncounterId.IsEmpty())
+		{
+			return NAME_None;
+		}
+
+		if (!EncounterId.Contains(TEXT(".")))
+		{
+			EncounterId = FString::Printf(TEXT("Room.%s"), *EncounterId);
+		}
+		return FName(*EncounterId);
+	}
+
+	void HandleClearEncounterCommand(const TArray<FString>& Args, UWorld* World)
+	{
+		if (!World || Args.Num() != 1)
+		{
+			UE_LOG(
+				LogLastFPSPlayerController,
+				Warning,
+				TEXT("사용법: LastFPS.Encounter.Clear <Zone3|Zone2|Boss|EncounterId>"));
+			return;
+		}
+
+		const FName EncounterId = ResolveDebugEncounterId(Args[0]);
+		if (EncounterId.IsNone())
+		{
+			UE_LOG(
+				LogLastFPSPlayerController,
+				Warning,
+				TEXT("인카운터 ID가 비어 있습니다."));
+			return;
+		}
+
+		if (ALastFPSPlayerController* Controller =
+			Cast<ALastFPSPlayerController>(World->GetFirstPlayerController()))
+		{
+			Controller->RequestDebugClearEncounter(EncounterId);
+			return;
+		}
+
+		if (World->GetNetMode() != NM_Client)
+		{
+			if (ULastFPSRoomEncounterSubsystem* EncounterSubsystem =
+				World->GetSubsystem<ULastFPSRoomEncounterSubsystem>())
+			{
+				EncounterSubsystem->DebugClearEncounter(EncounterId);
+				return;
+			}
+		}
+
+		UE_LOG(
+			LogLastFPSPlayerController,
+			Warning,
+			TEXT("[%s] 인카운터 클리어 요청을 전달할 서버 경로를 찾지 못했습니다."),
+			*EncounterId.ToString());
+	}
+
+	FAutoConsoleCommandWithWorldAndArgs ClearEncounterCommand(
+		TEXT("LastFPS.Encounter.Clear"),
+		TEXT("개발용 활성 인카운터 즉시 클리어. 예: LastFPS.Encounter.Clear Zone3"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&HandleClearEncounterCommand));
+}
+#endif
 
 ALastFPSPlayerController::ALastFPSPlayerController()
     : TeamId(FGenericTeamId::NoTeam)
@@ -882,6 +955,54 @@ const ULastFPSCharacterDefinition* ALastFPSPlayerController::GetSelectedCharacte
 {
     const ULastFPSCharacterRoster* Roster = GetCharacterRoster();
     return Roster ? Roster->GetDefinition(SelectedCharacterIndex) : nullptr;
+}
+
+void ALastFPSPlayerController::RequestDebugClearEncounter(const FName EncounterId)
+{
+#if UE_BUILD_SHIPPING
+    UE_LOG(
+        LogLastFPSPlayerController,
+        Warning,
+        TEXT("Shipping 빌드에서는 인카운터 클리어 치트를 사용할 수 없습니다."));
+#else
+    if (EncounterId.IsNone())
+    {
+        UE_LOG(
+            LogLastFPSPlayerController,
+            Warning,
+            TEXT("인카운터 클리어 치트에 유효한 EncounterId가 필요합니다."));
+        return;
+    }
+
+    if (!HasAuthority())
+    {
+        ServerDebugClearEncounter(EncounterId);
+        return;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        if (ULastFPSRoomEncounterSubsystem* EncounterSubsystem =
+            World->GetSubsystem<ULastFPSRoomEncounterSubsystem>())
+        {
+            EncounterSubsystem->DebugClearEncounter(EncounterId);
+        }
+    }
+#endif
+}
+
+void ALastFPSPlayerController::ServerDebugClearEncounter_Implementation(const FName EncounterId)
+{
+#if !UE_BUILD_SHIPPING
+    if (UWorld* World = GetWorld())
+    {
+        if (ULastFPSRoomEncounterSubsystem* EncounterSubsystem =
+            World->GetSubsystem<ULastFPSRoomEncounterSubsystem>())
+        {
+            EncounterSubsystem->DebugClearEncounter(EncounterId);
+        }
+    }
+#endif
 }
 
 void ALastFPSPlayerController::ServerSetSelectedCharacterIndex_Implementation(const int32 NewIndex)

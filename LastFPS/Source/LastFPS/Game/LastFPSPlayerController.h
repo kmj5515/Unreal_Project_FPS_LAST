@@ -122,6 +122,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
     ULastFPSHUDWidget* GetHUDWidget() const { return HUDWidget; }
 
+    /** 개발용 콘솔 명령을 서버 권한의 인카운터 처리로 전달한다. Shipping 빌드에서는 동작하지 않는다. */
+    void RequestDebugClearEncounter(FName EncounterId);
+
 protected:
     // 진입/ESC 화면 태그는 GameMode가 소유 → BeginPlay에 읽어와 캐시한다.
     // (맵별 차이를 GameMode가 가지므로 PlayerController는 1개로 공유 가능)
@@ -212,6 +215,9 @@ protected:
 
     UFUNCTION(Server, Reliable)
     void ServerSetSelectedCharacterIndex(int32 NewIndex);
+
+    UFUNCTION(Server, Reliable)
+    void ServerDebugClearEncounter(FName EncounterId);
 
     UFUNCTION()
     void OnRep_SelectedCharacterIndex();

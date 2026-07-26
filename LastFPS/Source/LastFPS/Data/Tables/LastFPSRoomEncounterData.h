@@ -103,5 +103,8 @@ struct FLastFPSRoomEncounterData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter")
 	FLastFPSRoomEncounterSpawnVFXDefinition SpawnVFX;
 
+	/** 모든 웨이브에 정의된 적 수의 합을 반환한다. 퀘스트 진행 표시도 이 값을 단일 기준으로 사용한다. */
+	int32 GetTotalEnemyCount() const;
+
 	bool IsValid(FString& OutFailureReason) const;
 };

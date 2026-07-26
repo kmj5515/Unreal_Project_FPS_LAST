@@ -62,7 +62,7 @@ public:
 
 	/** 캐릭터 캡슐이 지형에 충돌하기 전에 멈추도록 고정점 앞에 남기는 거리다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Grappling Hook|Movement", meta=(ClampMin="0.0", Units="cm"))
-	float StopDistance = 100.f;
+	float StopDistance = 0.f;
 
 	/** 고정점보다 위로 올라가도록 최종 도착 위치에 더하는 월드 Z 높이다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Grappling Hook|Movement", meta=(ClampMin="0.0", Units="cm"))

@@ -16,13 +16,14 @@ struct FLastFPSObjectiveEvalContext
 	bool bHasPlayerLocation = false;
 };
 
-/** 외부 이벤트 1건 — push형 트래커가 목표와 매칭해 진행을 누적한다. */
+/** 외부 이벤트 1건 — push형 트래커가 목표와 매칭해 진행을 누적하거나 절대 진행값으로 갱신한다. */
 struct FLastFPSObjectiveEvent
 {
 	ELastFPSObjectiveType Type = ELastFPSObjectiveType::AcquireItem;
 	FGameplayTag Tag;	// KillTarget: 처치된 적 종류
-	FName Id;			// TalkToNPC: 대화한 NPC 행 이름
+	FName Id;			// TalkToNPC: NPC 행, ClearEncounter: EncounterId
 	int32 Count = 1;
+	bool bSetAbsoluteProgress = false;
 };
 
 /**
@@ -41,6 +42,13 @@ public:
 
 	/** 절대 상태에서 진행 재계산. true=OutProgress 를 채움(pull형), false=이벤트 누적형이라 저장값 유지. */
 	virtual bool RecomputeProgress(const FLastFPSQuestObjective& Objective, int32 Baseline, const FLastFPSObjectiveEvalContext& Context, int32& OutProgress) const { return false; }
+
+	/**
+	 * 재계산 결과가 이전 진행보다 낮아져도 되는가.
+	 * true 면 "한 번 충족되면 되돌아가지 않는" 사실형 목표(도달 등)라 서브시스템이 최댓값을 유지한다.
+	 * 보유량처럼 현재 상태를 그대로 반영해야 하는 목표는 false 로 둔다.
+	 */
+	virtual bool IsProgressMonotonic() const { return false; }
 
 	/** 외부 이벤트가 이 목표와 일치하는가(push형). 일치 시 서브시스템이 진행을 누적. */
 	virtual bool MatchesEvent(const FLastFPSObjectiveEvent& Event, const FLastFPSQuestObjective& Objective) const { return false; }

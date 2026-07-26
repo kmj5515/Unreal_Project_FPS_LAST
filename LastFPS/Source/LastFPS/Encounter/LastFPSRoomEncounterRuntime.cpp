@@ -1,16 +1,22 @@
 #include "Encounter/LastFPSRoomEncounterRuntime.h"
 
+#include "Algo/AllOf.h"
 #include "Character/LastFPSCharacterBase.h"
 #include "Components/BoxComponent.h"
 #include "Components/SceneComponent.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/TriggerBox.h"
 #include "Engine/World.h"
 #include "Encounter/LastFPSRoomBarrierPresentationComponent.h"
 #include "Encounter/LastFPSRoomEncounterSettings.h"
 #include "Encounter/LastFPSRoomSpawnPresentationComponent.h"
+#include "Encounter/LastFPSRoomEncounterSubsystem.h"
 #include "GameFramework/Pawn.h"
+#include "Materials/MaterialInterface.h"
 #include "NavigationSystem.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
@@ -25,9 +31,6 @@ ALastFPSRoomEncounterRuntime::ALastFPSRoomEncounterRuntime()
 	SetReplicateMovement(false);
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
-	BarrierPresentationComponent = CreateDefaultSubobject<ULastFPSRoomBarrierPresentationComponent>(
-		TEXT("BarrierPresentationComponent"));
-	BarrierPresentationComponent->SetupAttachment(SceneRoot);
 	SpawnPresentationComponent = CreateDefaultSubobject<ULastFPSRoomSpawnPresentationComponent>(
 		TEXT("SpawnPresentationComponent"));
 }
@@ -35,7 +38,7 @@ ALastFPSRoomEncounterRuntime::ALastFPSRoomEncounterRuntime()
 void ALastFPSRoomEncounterRuntime::InitializeEncounter(
 	const FName InEncounterId,
 	ATriggerBox& InTriggerVolume,
-	ATriggerBox& InBarrierVolume,
+	const TArray<ATriggerBox*>& InBarrierVolumes,
 	const TArray<ATargetPoint*>& InSpawnPoints,
 	const FLastFPSRoomEncounterData& InEncounterData)
 {
@@ -46,13 +49,48 @@ void ALastFPSRoomEncounterRuntime::InitializeEncounter(
 
 	EncounterId = InEncounterId;
 	TriggerVolume = &InTriggerVolume;
-	BarrierVolume = &InBarrierVolume;
+	BarrierVolumes.Reserve(InBarrierVolumes.Num());
+	for (ATriggerBox* BarrierVolume : InBarrierVolumes)
+	{
+		if (IsValid(BarrierVolume))
+		{
+			BarrierVolumes.AddUnique(BarrierVolume);
+		}
+	}
+	if (BarrierVolumes.IsEmpty())
+	{
+		UE_LOG(
+			LogLastFPSRoomEncounter,
+			Error,
+			TEXT("[%s] 유효한 배리어 볼륨이 없어 인카운터를 초기화할 수 없습니다."),
+			*EncounterId.ToString());
+		return;
+	}
+
 	Waves = InEncounterData.Waves;
+	EnemyDefinitionAssets.Reset();
+	for (const FLastFPSRoomEncounterWaveDefinition& Wave : Waves)
+	{
+		for (const FLastFPSRoomEncounterUnitEntry& Unit : Wave.Units)
+		{
+			if (!Unit.EnemyDefinition.IsNull())
+			{
+				EnemyDefinitionAssets.AddUnique(Unit.EnemyDefinition);
+			}
+		}
+	}
+	TotalEnemyCount = InEncounterData.GetTotalEnemyCount();
+	DefeatedEnemyCount = 0;
 	ReusedSpawnPointSpacing = FMath::Max(InEncounterData.ReusedSpawnPointSpacing, 0.f);
 	SpawnPointRandomRadius = FMath::Max(InEncounterData.SpawnPointRandomRadius, 0.f);
 	SpawnDelayAfterVFX = InEncounterData.SpawnVFX.NiagaraSystem.IsNull()
 		? 0.f
 		: FMath::Max(InEncounterData.SpawnVFX.DelayBeforeSpawn, 0.f);
+	if (const ULastFPSRoomEncounterSettings* Settings =
+		GetDefault<ULastFPSRoomEncounterSettings>())
+	{
+		MaxSpawnedActorsPerFrame = FMath::Max(Settings->MaxSpawnedActorsPerFrame, 1);
+	}
 	SpawnPresentationComponent->Configure(InEncounterData.SpawnVFX);
 	ConfigureBarrierPresentation();
 
@@ -70,6 +108,22 @@ void ALastFPSRoomEncounterRuntime::InitializeEncounter(
 		&ALastFPSRoomEncounterRuntime::HandleTriggerOverlap);
 	SetBarrierActive(false);
 	bInitialized = true;
+	BeginEnemyDefinitionPreload();
+
+	// Data Table 비동기 로드 중 이미 진입한 플레이어도 시작 요청을 잃지 않게 한다.
+	TArray<AActor*> OverlappingActors;
+	TriggerVolume->GetOverlappingActors(OverlappingActors, APawn::StaticClass());
+	for (AActor* OverlappingActor : OverlappingActors)
+	{
+		const APawn* OverlappingPawn = Cast<APawn>(OverlappingActor);
+		if (OverlappingPawn && OverlappingPawn->IsPlayerControlled())
+		{
+			StartEncounter();
+			break;
+		}
+	}
+
+	BroadcastEncounterProgress();
 	ForceNetUpdate();
 }
 
@@ -77,10 +131,14 @@ void ALastFPSRoomEncounterRuntime::GetLifetimeReplicatedProps(
 	TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, BarrierVolume);
+	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, BarrierVolumes);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, bBarrierActive);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, bEncounterCleared);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, CurrentWave);
+	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, EncounterId);
+	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, TotalEnemyCount);
+	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, DefeatedEnemyCount);
+	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, EnemyDefinitionAssets);
 }
 
 void ALastFPSRoomEncounterRuntime::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -107,8 +165,11 @@ void ALastFPSRoomEncounterRuntime::EndPlay(const EEndPlayReason::Type EndPlayRea
 		}
 	}
 	AliveEnemies.Reset();
+	CancelEnemyDefinitionPreload();
+	CancelBarrierPresentationLoad();
 	LoadedEnemyDefinitions.Reset();
 	PendingEnemySpawns.Reset();
+	ResetBarrierPresentations();
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -138,6 +199,26 @@ void ALastFPSRoomEncounterRuntime::StartEncounter()
 		return;
 	}
 
+	if (!bEnemyDefinitionsReady)
+	{
+		bStartRequested = true;
+		if (bEnemyDefinitionsFailed)
+		{
+			bStartRequested = false;
+			FailEncounterOpen(TEXT("적 Character Definition 비동기 로드가 실패했습니다."));
+		}
+		else
+		{
+			UE_LOG(
+				LogLastFPSRoomEncounter,
+				Verbose,
+				TEXT("[%s] 적 에셋 비동기 로드가 끝날 때까지 인카운터 시작을 보류합니다."),
+				*EncounterId.ToString());
+		}
+		return;
+	}
+
+	bStartRequested = false;
 	bEncounterStarted = true;
 	if (IsValid(TriggerVolume))
 	{
@@ -156,39 +237,140 @@ void ALastFPSRoomEncounterRuntime::StartEncounter()
 		return;
 	}
 
-	if (!LoadEnemyDefinitions())
-	{
-		FailEncounterOpen(TEXT("적 Character Definition을 준비하지 못했습니다."));
-		return;
-	}
-
 	SetBarrierActive(true);
 	ScheduleNextWave();
 }
 
-bool ALastFPSRoomEncounterRuntime::LoadEnemyDefinitions()
+void ALastFPSRoomEncounterRuntime::BeginEnemyDefinitionPreload()
 {
+	CancelEnemyDefinitionPreload();
 	LoadedEnemyDefinitions.Reset();
-	for (const FLastFPSRoomEncounterWaveDefinition& Wave : Waves)
-	{
-		for (const FLastFPSRoomEncounterUnitEntry& Unit : Wave.Units)
-		{
-			ULastFPSCharacterDefinition* Definition = Unit.EnemyDefinition.LoadSynchronous();
-			if (!Definition || !Definition->PawnClass)
-			{
-				UE_LOG(
-					LogLastFPSRoomEncounter,
-					Error,
-					TEXT("[%s] 적 Character Definition 또는 PawnClass가 유효하지 않습니다: %s"),
-					*EncounterId.ToString(),
-					*Unit.EnemyDefinition.ToString());
-				return false;
-			}
+	bEnemyDefinitionsReady = false;
+	bEnemyDefinitionsFailed = false;
 
-			LoadedEnemyDefinitions.AddUnique(Definition);
+	TArray<FSoftObjectPath> DefinitionPaths;
+	DefinitionPaths.Reserve(EnemyDefinitionAssets.Num());
+	for (const TSoftObjectPtr<ULastFPSCharacterDefinition>& DefinitionAsset
+		: EnemyDefinitionAssets)
+	{
+		const FSoftObjectPath DefinitionPath = DefinitionAsset.ToSoftObjectPath();
+		if (DefinitionPath.IsValid())
+		{
+			DefinitionPaths.AddUnique(DefinitionPath);
 		}
 	}
+
+	if (DefinitionPaths.IsEmpty())
+	{
+		bEnemyDefinitionsFailed = true;
+		UE_LOG(
+			LogLastFPSRoomEncounter,
+			Error,
+			TEXT("[%s] 비동기로 준비할 적 Character Definition 경로가 없습니다."),
+			*EncounterId.ToString());
+		return;
+	}
+
+	const bool bAllDefinitionsLoaded = Algo::AllOf(
+		EnemyDefinitionAssets,
+		[](const TSoftObjectPtr<ULastFPSCharacterDefinition>& DefinitionAsset)
+		{
+			return DefinitionAsset.Get() != nullptr;
+		});
+	if (bAllDefinitionsLoaded)
+	{
+		HandleEnemyDefinitionPreloadCompleted();
+		return;
+	}
+
+	EnemyDefinitionLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+		DefinitionPaths,
+		FStreamableDelegate::CreateUObject(
+			this,
+			&ALastFPSRoomEncounterRuntime::HandleEnemyDefinitionPreloadCompleted),
+		FStreamableManager::AsyncLoadHighPriority);
+	if (!EnemyDefinitionLoadHandle.IsValid())
+	{
+		bEnemyDefinitionsFailed = true;
+		UE_LOG(
+			LogLastFPSRoomEncounter,
+			Error,
+			TEXT("[%s] 적 Character Definition 비동기 로드 요청을 시작하지 못했습니다."),
+			*EncounterId.ToString());
+	}
+}
+
+void ALastFPSRoomEncounterRuntime::HandleEnemyDefinitionPreloadCompleted()
+{
+	bEnemyDefinitionsReady = ResolveLoadedEnemyDefinitions();
+	bEnemyDefinitionsFailed = !bEnemyDefinitionsReady;
+
+	if (!bEnemyDefinitionsReady)
+	{
+		UE_LOG(
+			LogLastFPSRoomEncounter,
+			Error,
+			TEXT("[%s] 적 Character Definition 비동기 로드 결과가 유효하지 않습니다."),
+			*EncounterId.ToString());
+		if (HasAuthority() && bStartRequested)
+		{
+			bStartRequested = false;
+			FailEncounterOpen(TEXT("적 Character Definition 비동기 로드 결과가 유효하지 않습니다."));
+		}
+		return;
+	}
+
+	UE_LOG(
+		LogLastFPSRoomEncounter,
+		Verbose,
+		TEXT("[%s] 적 Character Definition %d개를 비동기로 준비했습니다."),
+		*EncounterId.ToString(),
+		LoadedEnemyDefinitions.Num());
+
+	if (HasAuthority() && bStartRequested)
+	{
+		StartEncounter();
+	}
+}
+
+void ALastFPSRoomEncounterRuntime::CancelEnemyDefinitionPreload()
+{
+	if (EnemyDefinitionLoadHandle.IsValid())
+	{
+		EnemyDefinitionLoadHandle->CancelHandle();
+		EnemyDefinitionLoadHandle.Reset();
+	}
+}
+
+bool ALastFPSRoomEncounterRuntime::ResolveLoadedEnemyDefinitions()
+{
+	LoadedEnemyDefinitions.Reset();
+	for (const TSoftObjectPtr<ULastFPSCharacterDefinition>& DefinitionAsset
+		: EnemyDefinitionAssets)
+	{
+		ULastFPSCharacterDefinition* Definition = DefinitionAsset.Get();
+		if (!Definition || !Definition->PawnClass)
+		{
+			UE_LOG(
+				LogLastFPSRoomEncounter,
+				Error,
+				TEXT("[%s] 적 Character Definition 또는 PawnClass가 유효하지 않습니다: %s"),
+				*EncounterId.ToString(),
+				*DefinitionAsset.ToString());
+			return false;
+		}
+
+		LoadedEnemyDefinitions.AddUnique(Definition);
+	}
 	return !LoadedEnemyDefinitions.IsEmpty();
+}
+
+void ALastFPSRoomEncounterRuntime::OnRep_EnemyDefinitionAssets()
+{
+	if (!HasAuthority())
+	{
+		BeginEnemyDefinitionPreload();
+	}
 }
 
 void ALastFPSRoomEncounterRuntime::ScheduleNextWave()
@@ -327,8 +509,15 @@ void ALastFPSRoomEncounterRuntime::CommitPendingEnemySpawns()
 		return;
 	}
 
-	for (const FLastFPSPendingRoomEnemySpawn& PendingSpawn : PendingEnemySpawns)
+	const int32 SpawnCountThisFrame = FMath::Min(
+		PendingEnemySpawns.Num(),
+		MaxSpawnedActorsPerFrame);
+	for (int32 SpawnIndexInFrame = 0;
+		SpawnIndexInFrame < SpawnCountThisFrame;
+		++SpawnIndexInFrame)
 	{
+		const FLastFPSPendingRoomEnemySpawn PendingSpawn = PendingEnemySpawns[0];
+		PendingEnemySpawns.RemoveAt(0, 1, EAllowShrinking::No);
 		ULastFPSCharacterDefinition* Definition = PendingSpawn.Definition.Get();
 		if (!Definition)
 		{
@@ -350,7 +539,14 @@ void ALastFPSRoomEncounterRuntime::CommitPendingEnemySpawns()
 			++CurrentWaveSpawnedCount;
 		}
 	}
-	PendingEnemySpawns.Reset();
+
+	if (!PendingEnemySpawns.IsEmpty())
+	{
+		SpawnPresentationDelayTimerHandle = GetWorldTimerManager().SetTimerForNextTick(
+			this,
+			&ALastFPSRoomEncounterRuntime::CommitPendingEnemySpawns);
+		return;
+	}
 
 	if (!NormalizeSpawnCursor())
 	{
@@ -372,7 +568,9 @@ void ALastFPSRoomEncounterRuntime::ScheduleNextSpawnBatch()
 	const float SpawnInterval = FMath::Max(Waves[ActiveWaveIndex].SpawnInterval, 0.f);
 	if (SpawnInterval <= KINDA_SMALL_NUMBER)
 	{
-		SpawnNextQueuedEnemy();
+		SequentialSpawnTimerHandle = GetWorldTimerManager().SetTimerForNextTick(
+			this,
+			&ALastFPSRoomEncounterRuntime::SpawnNextQueuedEnemy);
 		return;
 	}
 
@@ -545,7 +743,33 @@ void ALastFPSRoomEncounterRuntime::RemoveTrackedEnemy(ALastFPSCharacterBase& Ene
 	Enemy.OnDestroyed.RemoveDynamic(
 		this,
 		&ALastFPSRoomEncounterRuntime::HandleEnemyDestroyed);
-	AliveEnemies.Remove(TWeakObjectPtr<ALastFPSCharacterBase>(&Enemy));
+	const int32 RemovedCount = AliveEnemies.Remove(TWeakObjectPtr<ALastFPSCharacterBase>(&Enemy));
+	if (RemovedCount > 0)
+	{
+		DefeatedEnemyCount = FMath::Min(DefeatedEnemyCount + 1, TotalEnemyCount);
+		BroadcastEncounterProgress();
+		ForceNetUpdate();
+	}
+}
+
+void ALastFPSRoomEncounterRuntime::BroadcastEncounterProgress() const
+{
+	if (const UWorld* World = GetWorld())
+	{
+		if (ULastFPSRoomEncounterSubsystem* EncounterSubsystem =
+			World->GetSubsystem<ULastFPSRoomEncounterSubsystem>())
+		{
+			EncounterSubsystem->NotifyEncounterProgress(
+				EncounterId,
+				DefeatedEnemyCount,
+				TotalEnemyCount);
+		}
+	}
+}
+
+void ALastFPSRoomEncounterRuntime::OnRep_EncounterProgress()
+{
+	BroadcastEncounterProgress();
 }
 
 void ALastFPSRoomEncounterRuntime::EvaluateWaveCompletion()
@@ -563,6 +787,54 @@ void ALastFPSRoomEncounterRuntime::EvaluateWaveCompletion()
 
 	CompleteEncounter();
 }
+
+#if !UE_BUILD_SHIPPING
+bool ALastFPSRoomEncounterRuntime::DebugForceCompleteEncounter()
+{
+	// 미진입 구역을 완료하면 순차 퀘스트의 도달 목표보다 클리어 이벤트가 먼저 소모될 수 있다.
+	if (!HasAuthority() || !bInitialized || !bEncounterStarted)
+	{
+		return false;
+	}
+
+	if (bEncounterCleared)
+	{
+		return true;
+	}
+
+	GetWorldTimerManager().ClearTimer(NextWaveTimerHandle);
+	GetWorldTimerManager().ClearTimer(SequentialSpawnTimerHandle);
+	GetWorldTimerManager().ClearTimer(SpawnPresentationDelayTimerHandle);
+	PendingEnemySpawns.Reset();
+	bWaveSpawning = false;
+
+	// 파괴 콜백이 실제 처치로 중복 집계되지 않도록 추적을 먼저 해제한다.
+	for (const TWeakObjectPtr<ALastFPSCharacterBase>& EnemyPtr : AliveEnemies)
+	{
+		if (ALastFPSCharacterBase* Enemy = EnemyPtr.Get())
+		{
+			Enemy->OnDeath.RemoveAll(this);
+			Enemy->OnDestroyed.RemoveDynamic(
+				this,
+				&ALastFPSRoomEncounterRuntime::HandleEnemyDestroyed);
+			Enemy->Destroy();
+		}
+	}
+	AliveEnemies.Reset();
+
+	if (IsValid(TriggerVolume))
+	{
+		TriggerVolume->SetActorEnableCollision(false);
+	}
+
+	bEncounterStarted = true;
+	CurrentWave = Waves.Num();
+	DefeatedEnemyCount = TotalEnemyCount;
+	BroadcastEncounterProgress();
+	CompleteEncounter();
+	return bEncounterCleared;
+}
+#endif
 
 void ALastFPSRoomEncounterRuntime::CompleteEncounter()
 {
@@ -584,6 +856,14 @@ void ALastFPSRoomEncounterRuntime::CompleteEncounter()
 		Log,
 		TEXT("[%s] 모든 웨이브를 완료했습니다."),
 		*EncounterId.ToString());
+
+	if (const UWorld* World = GetWorld())
+	{
+		if (ULastFPSRoomEncounterSubsystem* EncounterSubsystem = World->GetSubsystem<ULastFPSRoomEncounterSubsystem>())
+		{
+			EncounterSubsystem->NotifyEncounterCleared(EncounterId);
+		}
+	}
 }
 
 void ALastFPSRoomEncounterRuntime::FailEncounterOpen(const TCHAR* Reason)
@@ -614,9 +894,10 @@ void ALastFPSRoomEncounterRuntime::SetBarrierActive(const bool bNewActive)
 void ALastFPSRoomEncounterRuntime::ConfigureBarrierPresentation()
 {
 	// 전용 서버는 시각 에셋을 로드하거나 짧은 소거 Tick을 실행할 필요가 없다.
+	ResetBarrierPresentations();
+	CancelBarrierPresentationLoad();
 	if (GetNetMode() == NM_DedicatedServer
-		|| !IsValid(BarrierVolume)
-		|| !BarrierPresentationComponent)
+		|| BarrierVolumes.IsEmpty())
 	{
 		return;
 	}
@@ -632,28 +913,177 @@ void ALastFPSRoomEncounterRuntime::ConfigureBarrierPresentation()
 		return;
 	}
 
-	BarrierPresentationComponent->Configure(*BarrierVolume, Settings->BarrierPresentation);
+	LoadedBarrierMesh = Settings->BarrierPresentation.Mesh.Get();
+	LoadedBarrierMaterial = Settings->BarrierPresentation.Material.Get();
+	if (!LoadedBarrierMesh || !LoadedBarrierMaterial)
+	{
+		BeginBarrierPresentationLoad();
+		return;
+	}
+
+	for (ATriggerBox* BarrierVolume : BarrierVolumes)
+	{
+		if (!IsValid(BarrierVolume))
+		{
+			continue;
+		}
+
+		const FName ComponentName = MakeUniqueObjectName(
+			this,
+			ULastFPSRoomBarrierPresentationComponent::StaticClass(),
+			TEXT("BarrierPresentationComponent"));
+		ULastFPSRoomBarrierPresentationComponent* PresentationComponent =
+			NewObject<ULastFPSRoomBarrierPresentationComponent>(this, ComponentName);
+		if (!PresentationComponent)
+		{
+			UE_LOG(
+				LogLastFPSRoomEncounter,
+				Error,
+				TEXT("[%s] 배리어 '%s'의 시각 컴포넌트를 생성하지 못했습니다."),
+				*EncounterId.ToString(),
+				*BarrierVolume->GetPathName());
+			continue;
+		}
+
+		AddInstanceComponent(PresentationComponent);
+		PresentationComponent->SetupAttachment(SceneRoot);
+		PresentationComponent->RegisterComponent();
+		PresentationComponent->Configure(
+			*BarrierVolume,
+			Settings->BarrierPresentation,
+			*LoadedBarrierMesh,
+			*LoadedBarrierMaterial);
+		BarrierPresentationComponents.Add(PresentationComponent);
+	}
 }
 
-void ALastFPSRoomEncounterRuntime::ApplyBarrierState()
+void ALastFPSRoomEncounterRuntime::BeginBarrierPresentationLoad()
 {
-	if (!IsValid(BarrierVolume))
+	const ULastFPSRoomEncounterSettings* Settings = GetDefault<ULastFPSRoomEncounterSettings>();
+	if (!Settings)
 	{
 		return;
 	}
 
-	UBoxComponent* BarrierBox = BarrierVolume->FindComponentByClass<UBoxComponent>();
-	if (BarrierBox)
+	TArray<FSoftObjectPath> PresentationPaths;
+	const FSoftObjectPath MeshPath = Settings->BarrierPresentation.Mesh.ToSoftObjectPath();
+	const FSoftObjectPath MaterialPath =
+		Settings->BarrierPresentation.Material.ToSoftObjectPath();
+	if (MeshPath.IsValid())
 	{
+		PresentationPaths.Add(MeshPath);
+	}
+	if (MaterialPath.IsValid())
+	{
+		PresentationPaths.AddUnique(MaterialPath);
+	}
+
+	if (PresentationPaths.Num() != 2)
+	{
+		UE_LOG(
+			LogLastFPSRoomEncounter,
+			Error,
+			TEXT("[%s] 배리어 Mesh 또는 Material 경로가 유효하지 않습니다. Mesh=%s, Material=%s"),
+			*EncounterId.ToString(),
+			*MeshPath.ToString(),
+			*MaterialPath.ToString());
+		return;
+	}
+
+	BarrierPresentationLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+		PresentationPaths,
+		FStreamableDelegate::CreateUObject(
+			this,
+			&ALastFPSRoomEncounterRuntime::HandleBarrierPresentationAssetsLoaded),
+		FStreamableManager::AsyncLoadHighPriority);
+	if (!BarrierPresentationLoadHandle.IsValid())
+	{
+		UE_LOG(
+			LogLastFPSRoomEncounter,
+			Error,
+			TEXT("[%s] 배리어 시각 에셋의 비동기 로드를 시작하지 못했습니다."),
+			*EncounterId.ToString());
+	}
+}
+
+void ALastFPSRoomEncounterRuntime::HandleBarrierPresentationAssetsLoaded()
+{
+	const ULastFPSRoomEncounterSettings* Settings = GetDefault<ULastFPSRoomEncounterSettings>();
+	if (!Settings)
+	{
+		BarrierPresentationLoadHandle.Reset();
+		return;
+	}
+
+	LoadedBarrierMesh = Settings->BarrierPresentation.Mesh.Get();
+	LoadedBarrierMaterial = Settings->BarrierPresentation.Material.Get();
+	BarrierPresentationLoadHandle.Reset();
+	if (!LoadedBarrierMesh || !LoadedBarrierMaterial)
+	{
+		UE_LOG(
+			LogLastFPSRoomEncounter,
+			Error,
+			TEXT("[%s] 배리어 시각 에셋의 비동기 로드 결과가 유효하지 않습니다."),
+			*EncounterId.ToString());
+		return;
+	}
+
+	ConfigureBarrierPresentation();
+	ApplyBarrierState();
+}
+
+void ALastFPSRoomEncounterRuntime::CancelBarrierPresentationLoad()
+{
+	if (BarrierPresentationLoadHandle.IsValid())
+	{
+		BarrierPresentationLoadHandle->CancelHandle();
+		BarrierPresentationLoadHandle.Reset();
+	}
+}
+
+void ALastFPSRoomEncounterRuntime::ResetBarrierPresentations()
+{
+	for (ULastFPSRoomBarrierPresentationComponent* PresentationComponent
+		: BarrierPresentationComponents)
+	{
+		if (IsValid(PresentationComponent))
+		{
+			PresentationComponent->DestroyComponent();
+		}
+	}
+	BarrierPresentationComponents.Reset();
+}
+
+void ALastFPSRoomEncounterRuntime::ApplyBarrierState()
+{
+	for (ATriggerBox* BarrierVolume : BarrierVolumes)
+	{
+		if (!IsValid(BarrierVolume))
+		{
+			continue;
+		}
+
+		UBoxComponent* BarrierBox = BarrierVolume->FindComponentByClass<UBoxComponent>();
+		if (!BarrierBox)
+		{
+			continue;
+		}
+
 		BarrierBox->SetGenerateOverlapEvents(false);
 		BarrierBox->SetCollisionResponseToAllChannels(ECR_Block);
 		BarrierBox->SetCollisionEnabled(
-			bBarrierActive ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+			bBarrierActive
+				? ECollisionEnabled::QueryAndPhysics
+				: ECollisionEnabled::NoCollision);
 	}
 
-	if (BarrierPresentationComponent)
+	for (ULastFPSRoomBarrierPresentationComponent* PresentationComponent
+		: BarrierPresentationComponents)
 	{
-		BarrierPresentationComponent->SetBarrierActive(bBarrierActive);
+		if (IsValid(PresentationComponent))
+		{
+			PresentationComponent->SetBarrierActive(bBarrierActive);
+		}
 	}
 }
 
@@ -662,7 +1092,7 @@ void ALastFPSRoomEncounterRuntime::OnRep_BarrierState()
 	ApplyBarrierState();
 }
 
-void ALastFPSRoomEncounterRuntime::OnRep_BarrierVolume()
+void ALastFPSRoomEncounterRuntime::OnRep_BarrierVolumes()
 {
 	ConfigureBarrierPresentation();
 	ApplyBarrierState();

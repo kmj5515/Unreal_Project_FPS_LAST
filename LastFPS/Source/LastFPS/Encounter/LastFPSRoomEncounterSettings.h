@@ -85,4 +85,8 @@ public:
 	/** 모든 룸이 공유하는 출구 홀로그램 표시 설정이다. */
 	UPROPERTY(Config, EditAnywhere, Category="Barrier Presentation")
 	FLastFPSRoomBarrierPresentationSettings BarrierPresentation;
+
+	/** 무거운 Pawn 초기화가 한 프레임에 몰리지 않도록 실제 생성 수를 제한한다. */
+	UPROPERTY(Config, EditAnywhere, Category="Performance", meta=(ClampMin="1", UIMin="1", UIMax="8"))
+	int32 MaxSpawnedActorsPerFrame = 1;
 };

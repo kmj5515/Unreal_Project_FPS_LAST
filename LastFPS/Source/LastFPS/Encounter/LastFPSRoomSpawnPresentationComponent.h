@@ -6,6 +6,7 @@
 #include "LastFPSRoomSpawnPresentationComponent.generated.h"
 
 class UNiagaraSystem;
+struct FStreamableHandle;
 
 /** 룸 인카운터의 일시적인 생성 연출과 네트워크 전달만 담당한다. */
 UCLASS()
@@ -22,6 +23,9 @@ public:
 	virtual void GetLifetimeReplicatedProps(
 		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+protected:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 private:
 	UFUNCTION()
 	void OnRep_SpawnVFX();
@@ -30,6 +34,9 @@ private:
 	void MulticastPlaySpawnVFX(const FTransform& SpawnTransform);
 
 	void RefreshLoadedSystem();
+	void HandleNiagaraSystemLoaded();
+	void CancelNiagaraSystemLoad();
+	void PlayLoadedSpawnVFX(const FTransform& SpawnTransform);
 	FTransform MakeVFXTransform(const FTransform& SpawnTransform) const;
 
 	UPROPERTY(ReplicatedUsing=OnRep_SpawnVFX)
@@ -37,4 +44,7 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UNiagaraSystem> LoadedNiagaraSystem;
+
+	TArray<FTransform> PendingSpawnVFXTransforms;
+	TSharedPtr<FStreamableHandle> NiagaraSystemLoadHandle;
 };

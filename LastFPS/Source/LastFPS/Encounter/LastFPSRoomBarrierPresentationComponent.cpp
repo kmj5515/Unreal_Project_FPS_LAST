@@ -27,7 +27,9 @@ ULastFPSRoomBarrierPresentationComponent::ULastFPSRoomBarrierPresentationCompone
 
 void ULastFPSRoomBarrierPresentationComponent::Configure(
 	ATriggerBox& BarrierVolume,
-	const FLastFPSRoomBarrierPresentationSettings& Settings)
+	const FLastFPSRoomBarrierPresentationSettings& Settings,
+	UStaticMesh& Mesh,
+	UMaterialInterface& Material)
 {
 	UBoxComponent* BarrierBox = BarrierVolume.FindComponentByClass<UBoxComponent>();
 	if (!BarrierBox)
@@ -40,26 +42,12 @@ void ULastFPSRoomBarrierPresentationComponent::Configure(
 		return;
 	}
 
-	UStaticMesh* Mesh = Settings.Mesh.LoadSynchronous();
-	UMaterialInterface* Material = Settings.Material.LoadSynchronous();
-	if (!Mesh || !Material)
-	{
-		UE_LOG(
-			LogLastFPSRoomBarrierPresentation,
-			Error,
-			TEXT("배리어 '%s'의 시각 에셋을 불러오지 못했습니다. Mesh=%s, Material=%s"),
-			*BarrierVolume.GetPathName(),
-			*Settings.Mesh.ToString(),
-			*Settings.Material.ToString());
-		return;
-	}
-
 	BaseWorldLocation = BarrierBox->GetComponentLocation();
 	BarrierUpDirection = BarrierBox->GetUpVector();
 	SetWorldLocationAndRotation(BaseWorldLocation, BarrierBox->GetComponentQuat());
-	SetStaticMesh(Mesh);
+	SetStaticMesh(&Mesh);
 
-	const FVector MeshSize = Mesh->GetBounds().BoxExtent * 2.0f;
+	const FVector MeshSize = Mesh.GetBounds().BoxExtent * 2.0f;
 	const FVector BarrierSize = BarrierBox->GetScaledBoxExtent() * 2.0f;
 	BaseMeshScale = FVector(
 		BarrierSize.X / FMath::Max(MeshSize.X, 1.0f),
@@ -68,7 +56,7 @@ void ULastFPSRoomBarrierPresentationComponent::Configure(
 	BarrierHalfHeight = BarrierBox->GetScaledBoxExtent().Z;
 	SetWorldScale3D(BaseMeshScale);
 
-	SetMaterial(0, Material);
+	SetMaterial(0, &Material);
 	DynamicMaterial = CreateAndSetMaterialInstanceDynamic(0);
 	if (!DynamicMaterial)
 	{

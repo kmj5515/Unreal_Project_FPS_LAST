@@ -6,6 +6,7 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
+#include "CollisionQueryParams.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/GameInstance.h"
@@ -44,6 +45,7 @@ void ULastFPSObjectiveMarkerWidget::RefreshMarkers()
 	{
 		Quest->GetActiveWaypoints(Waypoints);
 	}
+	PruneGroundLocationCache(Waypoints);
 
 	// 거리 기준 위치(플레이어 폰, 없으면 카메라).
 	FVector ViewerLocation = FVector::ZeroVector;
@@ -96,11 +98,12 @@ void ULastFPSObjectiveMarkerWidget::RefreshMarkers()
 		}
 
 		const FLastFPSObjectiveWaypoint& Waypoint = Waypoints[i];
+		const FVector MarkerWorldLocation = ResolveGroundLocation(Waypoint, PC);
 
 		FVector2D ScreenPos = FVector2D::ZeroVector;
 		bool bOffScreen = false;
 		float AngleDeg = 0.f;
-		ComputeScreenPosition(PC, Waypoint.WorldLocation, ViewportSize, EdgeMargin, ScreenPos, bOffScreen, AngleDeg);
+		ComputeScreenPosition(PC, MarkerWorldLocation, ViewportSize, EdgeMargin, ScreenPos, bOffScreen, AngleDeg);
 
 		if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Entry->Slot))
 		{
@@ -109,9 +112,113 @@ void ULastFPSObjectiveMarkerWidget::RefreshMarkers()
 			CanvasSlot->SetPosition(ScreenPos / SafeDPI); // 픽셀 → 캔버스(슬레이트) 단위
 		}
 
-		const float DistanceMeters = FVector::Dist(ViewerLocation, Waypoint.WorldLocation) / 100.f;
+		FLastFPSObjectiveMarkerDisplay Display;
+		Display.DistanceMeters = FVector::Dist(ViewerLocation, MarkerWorldLocation) / 100.f;
+		Display.ArrowAngleDeg = AngleDeg;
+		Display.bOffScreen = bOffScreen;
+		Display.bIsRoutePoint = Waypoint.bIsRoutePoint;
+		Display.Label = Waypoint.Label;
+
 		Entry->SetVisibility(ESlateVisibility::HitTestInvisible);
-		Entry->UpdateMarker(DistanceMeters, bOffScreen, AngleDeg, Waypoint.Label);
+		Entry->UpdateMarker(Display);
+	}
+}
+
+FVector ULastFPSObjectiveMarkerWidget::ResolveGroundLocation(
+	const FLastFPSObjectiveWaypoint& Waypoint,
+	APlayerController* PlayerController)
+{
+	// 동선 지점은 레벨에 이미 바닥으로 배치돼 있어 재투영이 필요 없다(매 프레임 트레이스 회피).
+	if (Waypoint.bIsRoutePoint)
+	{
+		return Waypoint.WorldLocation;
+	}
+
+	UWorld* World = GetWorld();
+	const FName CacheKey = Waypoint.LocationTag.IsValid()
+		? Waypoint.LocationTag.GetTagName()
+		: Waypoint.QuestId;
+	if (!World || CacheKey.IsNone())
+	{
+		return Waypoint.WorldLocation;
+	}
+
+	const double CurrentTime = World->GetTimeSeconds();
+	if (const FLastFPSGroundedMarkerCacheEntry* Cached = GroundLocationCache.Find(CacheKey))
+	{
+		if (Cached->SourceLocation.Equals(Waypoint.WorldLocation, 1.f)
+			&& (Cached->bHasGroundHit || CurrentTime < Cached->NextTraceTime))
+		{
+			return Cached->bHasGroundHit
+				? Cached->GroundLocation
+				: Waypoint.WorldLocation;
+		}
+	}
+
+	FLastFPSGroundedMarkerCacheEntry& Cache = GroundLocationCache.FindOrAdd(CacheKey);
+	Cache.SourceLocation = Waypoint.WorldLocation;
+	Cache.GroundLocation = Waypoint.WorldLocation;
+	Cache.NextTraceTime = CurrentTime + FMath::Max(GroundTraceRetryInterval, 0.1f);
+	Cache.bHasGroundHit = false;
+
+	const FVector TraceStart = Waypoint.WorldLocation
+		+ FVector::UpVector * FMath::Max(GroundTraceHeight, 0.f);
+	const FVector TraceEnd = Waypoint.WorldLocation
+		- FVector::UpVector * FMath::Max(GroundTraceDepth, 0.f);
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(LastFPSObjectiveMarkerGround), false);
+	if (PlayerController)
+	{
+		if (const APawn* PlayerPawn = PlayerController->GetPawn())
+		{
+			QueryParams.AddIgnoredActor(PlayerPawn);
+		}
+	}
+
+	FHitResult HitResult;
+	if (World->LineTraceSingleByChannel(
+		HitResult,
+		TraceStart,
+		TraceEnd,
+		GroundTraceChannel.GetValue(),
+		QueryParams))
+	{
+		Cache.GroundLocation = HitResult.ImpactPoint
+			+ FVector::UpVector * GroundMarkerOffset;
+		Cache.bHasGroundHit = true;
+	}
+
+	return Cache.bHasGroundHit
+		? Cache.GroundLocation
+		: Waypoint.WorldLocation;
+}
+
+void ULastFPSObjectiveMarkerWidget::PruneGroundLocationCache(
+	const TArray<FLastFPSObjectiveWaypoint>& Waypoints)
+{
+	TSet<FName> ActiveKeys;
+	for (const FLastFPSObjectiveWaypoint& Waypoint : Waypoints)
+	{
+		if (Waypoint.bIsRoutePoint)
+		{
+			continue; // 동선 지점은 캐시를 쓰지 않는다.
+		}
+
+		const FName CacheKey = Waypoint.LocationTag.IsValid()
+			? Waypoint.LocationTag.GetTagName()
+			: Waypoint.QuestId;
+		if (!CacheKey.IsNone())
+		{
+			ActiveKeys.Add(CacheKey);
+		}
+	}
+
+	for (auto CacheIt = GroundLocationCache.CreateIterator(); CacheIt; ++CacheIt)
+	{
+		if (!ActiveKeys.Contains(CacheIt.Key()))
+		{
+			CacheIt.RemoveCurrent();
+		}
 	}
 }
 

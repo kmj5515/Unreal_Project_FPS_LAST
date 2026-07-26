@@ -62,6 +62,19 @@ bool FLastFPSRoomEncounterWaveDefinition::IsValid(FString& OutFailureReason) con
 	return true;
 }
 
+int32 FLastFPSRoomEncounterData::GetTotalEnemyCount() const
+{
+	int32 TotalEnemyCount = 0;
+	for (const FLastFPSRoomEncounterWaveDefinition& Wave : Waves)
+	{
+		for (const FLastFPSRoomEncounterUnitEntry& Unit : Wave.Units)
+		{
+			TotalEnemyCount += FMath::Max(Unit.Count, 0);
+		}
+	}
+	return TotalEnemyCount;
+}
+
 bool FLastFPSRoomEncounterData::IsValid(FString& OutFailureReason) const
 {
 	if (Waves.IsEmpty())

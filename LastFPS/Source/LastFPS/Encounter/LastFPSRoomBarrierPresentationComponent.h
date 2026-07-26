@@ -7,6 +7,8 @@
 
 class ATriggerBox;
 class UMaterialInstanceDynamic;
+class UMaterialInterface;
+class UStaticMesh;
 struct FLastFPSRoomBarrierPresentationSettings;
 
 /**
@@ -28,7 +30,9 @@ public:
 
 	void Configure(
 		ATriggerBox& BarrierVolume,
-		const FLastFPSRoomBarrierPresentationSettings& Settings);
+		const FLastFPSRoomBarrierPresentationSettings& Settings,
+		UStaticMesh& Mesh,
+		UMaterialInterface& Material);
 	void SetBarrierActive(bool bActive);
 
 private:

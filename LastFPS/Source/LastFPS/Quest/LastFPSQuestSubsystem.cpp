@@ -2,12 +2,16 @@
 
 #include "Economy/LastFPSEconomySubsystem.h"
 #include "Game/LastFPSPlayerController.h"
+#include "Data/Tables/LastFPSRoomEncounterData.h"
+#include "Encounter/LastFPSRoomEncounterSubsystem.h"
 
 #include "Engine/DataTable.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "Components/SceneComponent.h"
+#include "EngineUtils.h"
+#include "GameFramework/Actor.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSQuest, Log, All);
@@ -32,10 +36,15 @@ namespace
 		}
 	};
 
-	/** 위치 도달 — 로컬 폰이 마커의 AcceptRadius(m) 이내면 완료(pull형, 이진). */
+	/**
+	 * 위치 도달 — 로컬 폰이 도달 지점의 AcceptRadius(m) 이내면 완료(pull형, 이진).
+	 * "도달했다"는 사실은 되돌아가지 않으므로 진행은 단조로 유지한다(지점을 벗어나도 재활성 금지).
+	 */
 	class FReachLocationTracker : public ILastFPSObjectiveTracker
 	{
 	public:
+		virtual bool IsProgressMonotonic() const override { return true; }
+
 		virtual bool RecomputeProgress(const FLastFPSQuestObjective& Obj, int32 Baseline, const FLastFPSObjectiveEvalContext& Ctx, int32& OutProgress) const override
 		{
 			OutProgress = 0;
@@ -44,12 +53,12 @@ namespace
 				return true;
 			}
 
-			// 볼륨 트리거 안이거나(정확), 반경 마커의 AcceptRadius 이내면 도달으로 본다.
+			// 볼륨 트리거 안이거나(정확), 도달 지점의 AcceptRadius 이내면 도달으로 본다.
 			bool bReached = Ctx.Subsystem->IsLocationTriggerActive(Obj.TargetTag);
 			if (!bReached && Ctx.bHasPlayerLocation)
 			{
 				FVector Target;
-				if (Ctx.Subsystem->GetTrackedLocation(Obj.TargetTag, Target))
+				if (Ctx.Subsystem->ResolveObjectiveLocation(Obj, Target))
 				{
 					const float RadiusCm = Obj.AcceptRadius * 100.f; // m → cm
 					bReached = FVector::DistSquared(Ctx.PlayerLocation, Target) <= FMath::Square(RadiusCm);
@@ -86,6 +95,18 @@ namespace
 				&& Event.Id == Obj.TargetId;
 		}
 	};
+
+	/** 인카운터 클리어 — ClearEncounter (push형). */
+	class FClearEncounterTracker : public ILastFPSObjectiveTracker
+	{
+	public:
+		virtual bool MatchesEvent(const FLastFPSObjectiveEvent& Event, const FLastFPSQuestObjective& Obj) const override
+		{
+			return Event.Type == ELastFPSObjectiveType::ClearEncounter
+				&& !Obj.TargetId.IsNone()
+				&& Event.Id == Obj.TargetId;
+		}
+	};
 }
 
 void ULastFPSQuestSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -107,10 +128,17 @@ void ULastFPSQuestSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 		Economy->OnInventoryChanged.AddDynamic(this, &ULastFPSQuestSubsystem::HandleInventoryChanged);
 		bInventorySubscribed = true;
 	}
+
+	OnWorldInitHandle = FWorldDelegates::OnWorldInitializedActors.AddUObject(
+	this, &ULastFPSQuestSubsystem::HandlePostWorldInitialization);
 }
 
 void ULastFPSQuestSubsystem::Deinitialize()
 {
+	// 등록한 델리게이트 리스트에서 정확히 해제한다 (Initialize 는 OnWorldInitializedActors 에 등록).
+	FWorldDelegates::OnWorldInitializedActors.Remove(OnWorldInitHandle);
+	UnbindEncounterEvents();
+
 	if (bInventorySubscribed)
 	{
 		if (ULastFPSEconomySubsystem* Economy = GetEconomy())
@@ -133,12 +161,91 @@ ULastFPSEconomySubsystem* ULastFPSQuestSubsystem::GetEconomy() const
 	return GetGameInstance() ? GetGameInstance()->GetSubsystem<ULastFPSEconomySubsystem>() : nullptr;
 }
 
+const UDataTable* ULastFPSQuestSubsystem::GetEncounterTable() const
+{
+	if (const UDataTable* LoadedTable = EncounterTable.Get())
+	{
+		return LoadedTable;
+	}
+	return EncounterTable.LoadSynchronous();
+}
+
+int32 ULastFPSQuestSubsystem::ResolveObjectiveRequiredCount(
+	const FLastFPSQuestObjective& Objective) const
+{
+	if (Objective.Type != ELastFPSObjectiveType::ClearEncounter || Objective.TargetId.IsNone())
+	{
+		return FMath::Max(Objective.RequiredCount, 1);
+	}
+
+	const UDataTable* Table = GetEncounterTable();
+	if (!Table || Table->GetRowStruct() != FLastFPSRoomEncounterData::StaticStruct())
+	{
+		return FMath::Max(Objective.RequiredCount, 1);
+	}
+
+	static const FString Context(TEXT("ULastFPSQuestSubsystem::ResolveObjectiveRequiredCount"));
+	if (const FLastFPSRoomEncounterData* Encounter =
+		Table->FindRow<FLastFPSRoomEncounterData>(Objective.TargetId, Context, false))
+	{
+		return FMath::Max(Encounter->GetTotalEnemyCount(), 1);
+	}
+
+	return FMath::Max(Objective.RequiredCount, 1);
+}
+
+void ULastFPSQuestSubsystem::BindEncounterEvents(UWorld& World)
+{
+	ULastFPSRoomEncounterSubsystem* EncounterSubsystem =
+		World.GetSubsystem<ULastFPSRoomEncounterSubsystem>();
+	if (BoundEncounterSubsystem.Get() == EncounterSubsystem)
+	{
+		return;
+	}
+
+	UnbindEncounterEvents();
+	if (!EncounterSubsystem)
+	{
+		UE_LOG(
+			LogLastFPSQuest,
+			Warning,
+			TEXT("[Quest] 월드의 RoomEncounterSubsystem을 찾지 못해 인카운터 목표를 연결하지 못했습니다: %s"),
+			*World.GetName());
+		return;
+	}
+
+	EncounterSubsystem->OnEncounterProgressChanged.AddUniqueDynamic(
+		this,
+		&ULastFPSQuestSubsystem::NotifyEncounterProgress);
+	EncounterSubsystem->OnEncounterCleared.AddUniqueDynamic(
+		this,
+		&ULastFPSQuestSubsystem::NotifyEncounterCleared);
+	BoundEncounterSubsystem = EncounterSubsystem;
+}
+
+void ULastFPSQuestSubsystem::UnbindEncounterEvents()
+{
+	if (ULastFPSRoomEncounterSubsystem* EncounterSubsystem = BoundEncounterSubsystem.Get())
+	{
+		EncounterSubsystem->OnEncounterProgressChanged.RemoveDynamic(
+			this,
+			&ULastFPSQuestSubsystem::NotifyEncounterProgress);
+		EncounterSubsystem->OnEncounterCleared.RemoveDynamic(
+			this,
+			&ULastFPSQuestSubsystem::NotifyEncounterCleared);
+	}
+	BoundEncounterSubsystem.Reset();
+}
+
+
+
 void ULastFPSQuestSubsystem::BuildTrackers()
 {
 	Trackers.Add(ELastFPSObjectiveType::AcquireItem, MakeUnique<FAcquireItemTracker>());
 	Trackers.Add(ELastFPSObjectiveType::ReachLocation, MakeUnique<FReachLocationTracker>());
 	Trackers.Add(ELastFPSObjectiveType::KillTarget, MakeUnique<FKillTargetTracker>());
 	Trackers.Add(ELastFPSObjectiveType::TalkToNPC, MakeUnique<FTalkToNPCTracker>());
+	Trackers.Add(ELastFPSObjectiveType::ClearEncounter, MakeUnique<FClearEncounterTracker>());
 }
 
 const ILastFPSObjectiveTracker* ULastFPSQuestSubsystem::GetTracker(ELastFPSObjectiveType Type) const
@@ -169,6 +276,10 @@ FLastFPSObjectiveEvalContext ULastFPSQuestSubsystem::MakeEvalContext() const
 
 const UDataTable* ULastFPSQuestSubsystem::GetQuestTable() const
 {
+	if (const UDataTable* LoadedTable = QuestTable.Get())
+	{
+		return LoadedTable;
+	}
 	return QuestTable.LoadSynchronous();
 }
 
@@ -193,6 +304,9 @@ void ULastFPSQuestSubsystem::SeedRuntimeStates()
 		return;
 	}
 
+	// 시드 재계산으로 이미 충족된 목표가 완료 무전을 소급 재생하지 않도록 막는다.
+	bSuppressObjectiveRadio = true;
+
 	static const FString Ctx(TEXT("ULastFPSQuestSubsystem::SeedRuntimeStates"));
 	Table->ForeachRow<FLastFPSQuestData>(Ctx,
 		[this](const FName& RowName, const FLastFPSQuestData& Row)
@@ -211,6 +325,8 @@ void ULastFPSQuestSubsystem::SeedRuntimeStates()
 
 			RuntimeStates.Add(RowName, MoveTemp(State));
 		});
+
+	bSuppressObjectiveRadio = false;
 
 	// 선행 게이팅 — 시드가 끝나 모든 상태가 존재하는 뒤에 적용.
 	// 선행 퀘스트가 아직 Claimed 가 아니면, 시작 전(NotStarted)인 후속을 Locked 로 잠근다.
@@ -232,27 +348,38 @@ void ULastFPSQuestSubsystem::SeedRuntimeStates()
 void ULastFPSQuestSubsystem::ValidateReferences() const
 {
 #if !UE_BUILD_SHIPPING
-	const UDataTable* Table = GetQuestTable();
-	if (!Table)
+	const UDataTable* QuestDefinitions = GetQuestTable();
+	if (!QuestDefinitions)
 	{
 		return; // SeedRuntimeStates 에서 이미 경고
 	}
 
 	const ULastFPSEconomySubsystem* Economy = GetEconomy();
-	if (!Economy || !Economy->IsItemTableConfigured())
+	const bool bCanValidateItems = Economy && Economy->IsItemTableConfigured();
+
+	const UDataTable* EncounterDefinitions = GetEncounterTable();
+	const bool bCanValidateEncounters =
+		EncounterDefinitions
+		&& EncounterDefinitions->GetRowStruct() == FLastFPSRoomEncounterData::StaticStruct();
+	if (!bCanValidateEncounters)
 	{
-		// ItemTable 미설정 시 HasItemDefinition 이 전부 false → 오탐이 되므로 검증을 건너뛴다.
-		return;
+		UE_LOG(
+			LogLastFPSQuest,
+			Error,
+			TEXT("[Quest] EncounterTable이 없거나 Row Structure가 FLastFPSRoomEncounterData가 아닙니다."));
 	}
 
 	int32 Broken = 0;
 	static const FString Ctx(TEXT("ULastFPSQuestSubsystem::ValidateReferences"));
-	Table->ForeachRow<FLastFPSQuestData>(Ctx,
-		[Economy, &Broken](const FName& RowName, const FLastFPSQuestData& Row)
+	QuestDefinitions->ForeachRow<FLastFPSQuestData>(Ctx,
+		[Economy, bCanValidateItems, EncounterDefinitions, bCanValidateEncounters, &Broken](
+			const FName& RowName,
+			const FLastFPSQuestData& Row)
 		{
 			for (const FLastFPSQuestObjective& Obj : Row.Objectives)
 			{
 				if (Obj.Type == ELastFPSObjectiveType::AcquireItem
+					&& bCanValidateItems
 					&& !Obj.TargetId.IsNone()
 					&& !Economy->HasItemDefinition(Obj.TargetId))
 				{
@@ -261,11 +388,29 @@ void ULastFPSQuestSubsystem::ValidateReferences() const
 						TEXT("[Quest] '%s' 의 목표 아이템 '%s' 가 DT_ItemData 에 없음 — 영원히 진행 불가."),
 						*RowName.ToString(), *Obj.TargetId.ToString());
 				}
+
+				const bool bReferencesEncounter =
+					Obj.Type == ELastFPSObjectiveType::ClearEncounter
+					|| (Obj.Type == ELastFPSObjectiveType::ReachLocation && !Obj.TargetId.IsNone());
+				if (bReferencesEncounter
+					&& (!bCanValidateEncounters
+						|| !EncounterDefinitions->GetRowMap().Contains(Obj.TargetId)))
+				{
+					++Broken;
+					UE_LOG(
+						LogLastFPSQuest,
+						Error,
+						TEXT("[Quest] '%s'의 목표 인카운터 '%s'가 EncounterTable에 없습니다."),
+						*RowName.ToString(),
+						*Obj.TargetId.ToString());
+				}
 			}
 
 			for (const FLastFPSItemGrant& Grant : Row.Reward.Items)
 			{
-				if (!Grant.RowId.IsNone() && !Economy->HasItemDefinition(Grant.RowId))
+				if (bCanValidateItems
+					&& !Grant.RowId.IsNone()
+					&& !Economy->HasItemDefinition(Grant.RowId))
 				{
 					++Broken;
 					UE_LOG(LogLastFPSQuest, Error,
@@ -305,7 +450,7 @@ bool ULastFPSQuestSubsystem::CheckCompletion(FLastFPSQuestRuntimeState& State, c
 	for (int32 i = 0; i < Def.Objectives.Num(); ++i)
 	{
 		const int32 Prog = State.Progress.IsValidIndex(i) ? State.Progress[i] : 0;
-		if (Prog < Def.Objectives[i].RequiredCount)
+		if (Prog < ResolveObjectiveRequiredCount(Def.Objectives[i]))
 		{
 			return false;
 		}
@@ -338,12 +483,27 @@ bool ULastFPSQuestSubsystem::RecomputeProgress(FName QuestId, FLastFPSQuestRunti
 		int32 NewProgress = 0;
 		if (Tracker && Tracker->RecomputeProgress(Obj, State.Baseline[i], Ctx, NewProgress))
 		{
-			NewProgress = FMath::Clamp(NewProgress, 0, Obj.RequiredCount);
-			if (State.Progress[i] != NewProgress)
+			const int32 RequiredCount = ResolveObjectiveRequiredCount(Obj);
+			NewProgress = FMath::Clamp(NewProgress, 0, RequiredCount);
+
+			const int32 PreviousProgress = State.Progress[i];
+			// 사실형 목표(도달 등)는 재계산으로 낮아지지 않는다 — 지점을 벗어나도 목표가 되살아나지 않게.
+			if (Tracker->IsProgressMonotonic())
+			{
+				NewProgress = FMath::Max(NewProgress, PreviousProgress);
+			}
+			if (PreviousProgress != NewProgress)
 			{
 				State.Progress[i] = NewProgress;
 				bChanged = true;
+				NotifyObjectiveCompleted(Obj, PreviousProgress, NewProgress, RequiredCount);
 			}
+		}
+
+		if (Def.bSequentialObjectives
+			&& State.Progress[i] < ResolveObjectiveRequiredCount(Obj))
+		{
+			break;
 		}
 	}
 
@@ -378,8 +538,53 @@ void ULastFPSQuestSubsystem::HandleInventoryChanged()
 	}
 }
 
+void ULastFPSQuestSubsystem::UpdateRouteProgress(const FLastFPSObjectiveEvalContext& Context)
+{
+	if (!Context.bHasPlayerLocation || ObjectiveRoutes.IsEmpty())
+	{
+		return;
+	}
+
+	// 지금 안내 중인(= 미완료) 위치 목표의 경로만 전진시킨다.
+	for (const TPair<FName, FLastFPSQuestRuntimeState>& Pair : RuntimeStates)
+	{
+		if (Pair.Value.Status != ELastFPSQuestStatus::InProgress)
+		{
+			continue;
+		}
+		const FLastFPSQuestData* Def = FindQuest(Pair.Key);
+		if (!Def)
+		{
+			continue;
+		}
+
+		for (int32 i = 0; i < Def->Objectives.Num(); ++i)
+		{
+			const FLastFPSQuestObjective& Obj = Def->Objectives[i];
+			const int32 Progress = Pair.Value.Progress.IsValidIndex(i) ? Pair.Value.Progress[i] : 0;
+			const int32 RequiredCount = ResolveObjectiveRequiredCount(Obj);
+			if (Progress >= RequiredCount)
+			{
+				continue;
+			}
+
+			if (Obj.Type == ELastFPSObjectiveType::ReachLocation)
+			{
+				AdvanceRouteProgress(Obj.TargetTag, Context.PlayerLocation);
+			}
+
+			if (Def->bSequentialObjectives)
+			{
+				break; // 순차 퀘스트는 첫 미완료 목표까지만 안내한다.
+			}
+		}
+	}
+}
+
 void ULastFPSQuestSubsystem::HandleLocationPoll()
 {
+	UpdateRouteProgress(MakeEvalContext());
+
 	bool bChanged = RecomputeAllActive();
 	bChanged |= ProcessQuestTransitions();
 	if (bChanged)
@@ -413,15 +618,34 @@ bool ULastFPSQuestSubsystem::ApplyEventToQuest(FLastFPSQuestRuntimeState& State,
 	for (int32 i = 0; i < Def.Objectives.Num(); ++i)
 	{
 		const FLastFPSQuestObjective& Obj = Def.Objectives[i];
+		const int32 RequiredCount = ResolveObjectiveRequiredCount(Obj);
+		if (Def.bSequentialObjectives && State.Progress[i] >= RequiredCount)
+		{
+			continue;
+		}
+
 		const ILastFPSObjectiveTracker* Tracker = GetTracker(Obj.Type);
 		if (Tracker && Tracker->MatchesEvent(Event, Obj))
 		{
-			const int32 NewProgress = FMath::Clamp(State.Progress[i] + Event.Count, 0, Obj.RequiredCount);
-			if (NewProgress != State.Progress[i])
+			const int32 CurrentProgress = State.Progress[i];
+			const int32 CandidateProgress = Event.bSetAbsoluteProgress
+				? Event.Count
+				: CurrentProgress + Event.Count;
+			const int32 NewProgress = FMath::Clamp(
+				CandidateProgress,
+				0,
+				RequiredCount);
+			if (NewProgress != CurrentProgress)
 			{
 				State.Progress[i] = NewProgress;
 				bChanged = true;
+				NotifyObjectiveCompleted(Obj, CurrentProgress, NewProgress, RequiredCount);
 			}
+		}
+
+		if (Def.bSequentialObjectives)
+		{
+			break;
 		}
 	}
 
@@ -445,6 +669,108 @@ void ULastFPSQuestSubsystem::NotifyObjectiveKill(FGameplayTag EnemyTag)
 	{
 		BroadcastStateChanged();
 	}
+}
+
+void ULastFPSQuestSubsystem::NotifyEncounterCleared(FName EncounterId)
+{
+	if (EncounterId.IsNone())
+	{
+		return;
+	}
+
+	FLastFPSObjectiveEvent Event;
+	Event.Type = ELastFPSObjectiveType::ClearEncounter;
+	Event.Id = EncounterId;
+	Event.Count = MAX_int32;
+	Event.bSetAbsoluteProgress = true;
+
+	bool bChanged = ApplyObjectiveEventToActive(Event);
+	bChanged |= ProcessQuestTransitions();
+	if (bChanged)
+	{
+		BroadcastStateChanged();
+	}
+}
+
+void ULastFPSQuestSubsystem::NotifyEncounterProgress(
+	const FName EncounterId,
+	const int32 DefeatedEnemyCount,
+	const int32 TotalEnemyCount)
+{
+	if (EncounterId.IsNone() || TotalEnemyCount < 1 || DefeatedEnemyCount < 0)
+	{
+		return;
+	}
+
+	FLastFPSObjectiveEvent Event;
+	Event.Type = ELastFPSObjectiveType::ClearEncounter;
+	Event.Id = EncounterId;
+	Event.Count = FMath::Min(DefeatedEnemyCount, TotalEnemyCount);
+	Event.bSetAbsoluteProgress = true;
+
+	bool bChanged = ApplyObjectiveEventToActive(Event);
+	bChanged |= ProcessQuestTransitions();
+	if (bChanged)
+	{
+		BroadcastStateChanged();
+	}
+}
+
+void ULastFPSQuestSubsystem::TriggerRadioTransmission(const FLastFPSRadioTransmissionData& RadioData)
+{
+	if (OnRadioTransmission.IsBound())
+	{
+		OnRadioTransmission.Broadcast(RadioData);
+	}
+}
+
+void ULastFPSQuestSubsystem::TriggerRadioTransmissions(const TArray<FLastFPSRadioTransmissionData>& RadioDataArray)
+{
+	for (const FLastFPSRadioTransmissionData& RadioData : RadioDataArray)
+	{
+		TriggerRadioTransmission(RadioData);
+	}
+}
+
+void ULastFPSQuestSubsystem::TriggerRadioByIds(const TArray<FName>& RadioIds)
+{
+	for (const FName& RadioId : RadioIds)
+	{
+		if (const FLastFPSRadioTransmissionData* Data = FindRadioTransmission(RadioId))
+		{
+			TriggerRadioTransmission(*Data);
+		}
+		else
+		{
+			UE_LOG(LogLastFPSQuest, Warning, TEXT("RadioTransmission 행 '%s' 을 찾을 수 없습니다."), *RadioId.ToString());
+		}
+	}
+}
+
+void ULastFPSQuestSubsystem::HandlePostWorldInitialization(const FActorsInitializedParams& Params)
+{
+	if (Params.World && Params.World->IsGameWorld())
+	{
+		BindEncounterEvents(*Params.World);
+		ScanObjectivePaths(*Params.World);
+		AcceptDungeonQuestForMap(*Params.World);
+	}
+}
+
+const UDataTable* ULastFPSQuestSubsystem::GetRadioTable() const
+{
+	return RadioTable.LoadSynchronous();
+}
+
+const FLastFPSRadioTransmissionData* ULastFPSQuestSubsystem::FindRadioTransmission(FName RadioId) const
+{
+	const UDataTable* Table = GetRadioTable();
+	if (!Table || RadioId.IsNone())
+	{
+		return nullptr;
+	}
+	static const FString Ctx(TEXT("ULastFPSQuestSubsystem::FindRadioTransmission"));
+	return Table->FindRow<FLastFPSRadioTransmissionData>(RadioId, Ctx, /*bWarnIfMissing=*/false);
 }
 
 void ULastFPSQuestSubsystem::NotifyTalkedToNPC(FName NPCRowName)
@@ -516,6 +842,20 @@ bool ULastFPSQuestSubsystem::GetTrackedLocation(FGameplayTag LocationTag, FVecto
 	return false;
 }
 
+bool ULastFPSQuestSubsystem::ResolveObjectiveLocation(
+	const FLastFPSQuestObjective& Objective,
+	FVector& OutLocation) const
+{
+	// 레벨에 마커 컴포넌트를 붙인 대상(이동하는 NPC 등)이 우선한다.
+	if (Objective.TargetTag.IsValid() && GetTrackedLocation(Objective.TargetTag, OutLocation))
+	{
+		return true;
+	}
+
+	// 그 외에는 같은 태그로 배치된 이동 동선의 마지막 지점이 도달 지점이다.
+	return GetRouteDestination(Objective.TargetTag, OutLocation);
+}
+
 void ULastFPSQuestSubsystem::NotifyLocationTriggerChanged(FGameplayTag LocationTag, bool bPlayerInside)
 {
 	if (!LocationTag.IsValid())
@@ -556,6 +896,7 @@ void ULastFPSQuestSubsystem::GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint
 {
 	OutWaypoints.Reset();
 
+	// 안내 지점의 전진은 위치 폴이 담당하고, 여기서는 현재 지점을 읽기만 한다.
 	for (const TPair<FName, FLastFPSQuestRuntimeState>& Pair : RuntimeStates)
 	{
 		if (Pair.Value.Status != ELastFPSQuestStatus::InProgress)
@@ -571,28 +912,50 @@ void ULastFPSQuestSubsystem::GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint
 		for (int32 i = 0; i < Def->Objectives.Num(); ++i)
 		{
 			const FLastFPSQuestObjective& Obj = Def->Objectives[i];
+			const int32 Progress = Pair.Value.Progress.IsValidIndex(i) ? Pair.Value.Progress[i] : 0;
+			const int32 RequiredCount = ResolveObjectiveRequiredCount(Obj);
+			if (Def->bSequentialObjectives && Progress >= RequiredCount)
+			{
+				continue;
+			}
+
 			if (Obj.Type != ELastFPSObjectiveType::ReachLocation)
 			{
+				if (Def->bSequentialObjectives)
+				{
+					break;
+				}
 				continue;
 			}
 			// 이미 도달한 목표는 마커를 띄우지 않는다.
-			const int32 Prog = Pair.Value.Progress.IsValidIndex(i) ? Pair.Value.Progress[i] : 0;
-			if (Prog >= Obj.RequiredCount)
+			if (Progress >= RequiredCount)
 			{
 				continue;
 			}
 
-			FVector Location;
-			if (!GetTrackedLocation(Obj.TargetTag, Location))
+			// 안내는 항상 지점 1개 — 경로가 있으면 현재 안내 지점, 없으면 도달 지점 자체.
+			FVector MarkerLocation = FVector::ZeroVector;
+			bool bIsDestination = true;
+			if (!GetCurrentRoutePoint(Obj.TargetTag, MarkerLocation, bIsDestination))
 			{
-				continue; // 레벨에 마커가 아직 없으면 건너뜀
+				if (!ResolveObjectiveLocation(Obj, MarkerLocation))
+				{
+					continue; // 레벨에 마커도 경로도 없으면 건너뜀
+				}
+				bIsDestination = true;
 			}
 
 			FLastFPSObjectiveWaypoint Waypoint;
-			Waypoint.WorldLocation = Location;
+			Waypoint.WorldLocation = MarkerLocation;
 			Waypoint.Label = Obj.Label.IsEmpty() ? Def->Title : Obj.Label;
 			Waypoint.QuestId = Pair.Key;
+			Waypoint.LocationTag = Obj.TargetTag;
+			Waypoint.bIsRoutePoint = !bIsDestination;
 			OutWaypoints.Add(Waypoint);
+			if (Def->bSequentialObjectives)
+			{
+				break;
+			}
 		}
 	}
 }
@@ -623,11 +986,24 @@ void ULastFPSQuestSubsystem::UpdateLocationPollTimer()
 		{
 			continue;
 		}
-		for (const FLastFPSQuestObjective& Obj : Def->Objectives)
+		for (int32 ObjectiveIndex = 0; ObjectiveIndex < Def->Objectives.Num(); ++ObjectiveIndex)
 		{
+			const FLastFPSQuestObjective& Obj = Def->Objectives[ObjectiveIndex];
+			const int32 Progress = Pair.Value.Progress.IsValidIndex(ObjectiveIndex)
+				? Pair.Value.Progress[ObjectiveIndex]
+				: 0;
+			if (Progress >= ResolveObjectiveRequiredCount(Obj))
+			{
+				continue;
+			}
+
 			if (Obj.Type == ELastFPSObjectiveType::ReachLocation)
 			{
 				bNeedPoll = true;
+				break;
+			}
+			if (Def->bSequentialObjectives)
+			{
 				break;
 			}
 		}
@@ -659,6 +1035,19 @@ int32 ULastFPSQuestSubsystem::GetObjectiveProgress(FName QuestId, int32 Objectiv
 {
 	const FLastFPSQuestRuntimeState* State = RuntimeStates.Find(QuestId);
 	return (State && State->Progress.IsValidIndex(ObjectiveIndex)) ? State->Progress[ObjectiveIndex] : 0;
+}
+
+int32 ULastFPSQuestSubsystem::GetObjectiveRequiredCount(
+	const FName QuestId,
+	const int32 ObjectiveIndex) const
+{
+	const FLastFPSQuestData* Definition = FindQuest(QuestId);
+	if (!Definition || !Definition->Objectives.IsValidIndex(ObjectiveIndex))
+	{
+		return 0;
+	}
+
+	return ResolveObjectiveRequiredCount(Definition->Objectives[ObjectiveIndex]);
 }
 
 bool ULastFPSQuestSubsystem::IsComplete(FName QuestId) const
@@ -694,6 +1083,12 @@ bool ULastFPSQuestSubsystem::AcceptQuestInternal(FName QuestId, FLastFPSQuestRun
 	State.Progress.Init(0, Def.Objectives.Num());
 	CaptureBaseline(Def, State);
 	RecomputeProgress(QuestId, State, Def); // 수락 즉시 충족되는 경우(목표 0개 등) 반영
+
+	if (!Def.RadioOnStart.IsEmpty())
+	{
+		TriggerRadioByIds(Def.RadioOnStart);
+	}
+
 	return true;
 }
 
@@ -839,12 +1234,261 @@ FText ULastFPSQuestSubsystem::BuildRewardMessage(const FLastFPSQuestData& Def) c
 	FString RewardBlock = FString::Join(Lines, TEXT("\n"));
 	if (RewardBlock.IsEmpty() && !Def.RewardText.IsEmpty())
 	{
-		RewardBlock = Def.RewardText.ToString(); // 구조화 보상 없음 → 수기 표기 폴백
+		RewardBlock = Def.RewardText.ToString();
 	}
 
 	if (RewardBlock.IsEmpty())
 	{
-		return Def.Title; // 보상 정보 자체가 없으면 기존 동작(제목만)
+		return Def.Title;
 	}
 	return FText::FromString(FString::Printf(TEXT("%s\n\n%s"), *Def.Title.ToString(), *RewardBlock));
+}
+
+void ULastFPSQuestSubsystem::AcceptDungeonQuestForMap(UWorld& World)
+{
+	// 같은 월드에서 델리게이트가 여러 번 발사될 수 있어 1회만 처리한다(재입장 시엔 다시 수행).
+	if (DungeonQuestAcceptedWorld.Get() == &World)
+	{
+		return;
+	}
+
+	// 진행할 퀘스트는 맵 키워드 매핑이 단일 소스다 — 코드에 맵 이름을 하드코딩하지 않는다.
+	const FString MapName = World.GetMapName();
+	const FLastFPSDungeonQuestMapping* Mapping = DungeonMapQuestMap.FindByPredicate(
+		[&MapName](const FLastFPSDungeonQuestMapping& Candidate)
+		{
+			return !Candidate.MapKeyword.IsEmpty() && MapName.Contains(Candidate.MapKeyword);
+		});
+
+	if (!Mapping)
+	{
+		return; // 던전 진행 대상 맵이 아니다.
+	}
+
+	DungeonQuestAcceptedWorld = &World;
+
+	const FName TargetQuestId = Mapping->QuestId.IsNone() ? DefaultDungeonQuestId : Mapping->QuestId;
+	if (TargetQuestId.IsNone() || GetStatus(TargetQuestId) != ELastFPSQuestStatus::NotStarted)
+	{
+		return;
+	}
+
+	UE_LOG(
+		LogLastFPSQuest,
+		Log,
+		TEXT("[Quest] 던전 맵 진입 — 퀘스트 '%s' 자동 수락: %s"),
+		*TargetQuestId.ToString(),
+		*MapName);
+	AcceptQuest(TargetQuestId);
+}
+
+void ULastFPSQuestSubsystem::NotifyObjectiveCompleted(
+	const FLastFPSQuestObjective& Objective,
+	const int32 PreviousProgress,
+	const int32 NewProgress,
+	const int32 RequiredCount)
+{
+	// 부팅 시드나 이미 충족돼 있던 목표는 무전을 다시 재생하지 않는다(경계: 재진입/재계산).
+	if (bSuppressObjectiveRadio
+		|| Objective.RadioOnComplete.IsEmpty()
+		|| PreviousProgress >= RequiredCount
+		|| NewProgress < RequiredCount)
+	{
+		return;
+	}
+
+	TriggerRadioByIds(Objective.RadioOnComplete);
+}
+
+// ── 이동 동선 (레벨 배치 지점) ──────────────────────────────────────────────
+
+void ULastFPSQuestSubsystem::ScanObjectivePaths(UWorld& World)
+{
+	// 월드가 바뀌면 좌표도 진행 인덱스도 의미를 잃는다(퀘스트 상태는 GameInstance 수명이라 별도 유지).
+	ObjectiveRoutes.Reset();
+	RouteCursors.Reset();
+
+	// 순서 태그로 임시 정렬한 뒤 좌표 배열만 남긴다.
+	struct FScannedPoint
+	{
+		int32 Order = 0;
+		FVector Location = FVector::ZeroVector;
+	};
+	TMap<FGameplayTag, TArray<FScannedPoint>> Collected;
+
+	for (TActorIterator<AActor> It(&World); It; ++It)
+	{
+		const AActor* Actor = *It;
+		if (!Actor)
+		{
+			continue;
+		}
+
+		FGameplayTag RouteTag;
+		int32 Order = 0;
+		if (!ParsePathPointTags(*Actor, RouteTag, Order))
+		{
+			continue;
+		}
+
+		Collected.FindOrAdd(RouteTag).Add(FScannedPoint{ Order, Actor->GetActorLocation() });
+	}
+
+	for (TPair<FGameplayTag, TArray<FScannedPoint>>& Pair : Collected)
+	{
+		Pair.Value.Sort([](const FScannedPoint& A, const FScannedPoint& B) { return A.Order < B.Order; });
+
+		TArray<FVector>& Points = ObjectiveRoutes.Add(Pair.Key);
+		Points.Reserve(Pair.Value.Num());
+		for (const FScannedPoint& Point : Pair.Value)
+		{
+			Points.Add(Point.Location);
+		}
+	}
+
+	UE_LOG(
+		LogLastFPSQuest,
+		Log,
+		TEXT("[Quest] 이동 동선 %d개를 구성했습니다: %s"),
+		ObjectiveRoutes.Num(),
+		*World.GetName());
+}
+
+bool ULastFPSQuestSubsystem::ParsePathPointTags(
+	const AActor& Actor,
+	FGameplayTag& OutRouteTag,
+	int32& OutOrder) const
+{
+	FGameplayTag RouteTag;
+	int32 Order = 0;
+	bool bHasOrder = false;
+
+	for (const FName& Tag : Actor.Tags)
+	{
+		const FString TagString = Tag.ToString();
+		if (!PathOrderTagPrefix.IsEmpty() && TagString.StartsWith(PathOrderTagPrefix))
+		{
+			// 순서 태그가 비정상이어도 0으로 두고 나머지 지점 순서를 살린다(배치 실수 허용).
+			Order = FCString::Atoi(*TagString.RightChop(PathOrderTagPrefix.Len()));
+			bHasOrder = true;
+			continue;
+		}
+
+		if (RouteTag.IsValid())
+		{
+			continue;
+		}
+
+		// 등록된 Gameplay Tag 만 경로 식별자로 인정한다 — 일반 액터 태그와 섞이지 않게.
+		const FGameplayTag Candidate = FGameplayTag::RequestGameplayTag(Tag, /*ErrorIfNotFound=*/false);
+		if (Candidate.IsValid()
+			&& (!PathRouteTagRoot.IsValid() || Candidate.MatchesTag(PathRouteTagRoot)))
+		{
+			RouteTag = Candidate;
+		}
+	}
+
+	if (!RouteTag.IsValid())
+	{
+		return false; // 위치 목표와 무관한 액터
+	}
+
+	if (!bHasOrder)
+	{
+		UE_LOG(
+			LogLastFPSQuest,
+			Warning,
+			TEXT("[Quest] 동선 지점 '%s'(%s) 에 순서 태그(%s+숫자)가 없어 무시합니다."),
+			*Actor.GetName(),
+			*RouteTag.ToString(),
+			*PathOrderTagPrefix);
+		return false;
+	}
+
+	OutRouteTag = RouteTag;
+	OutOrder = Order;
+	return true;
+}
+
+void ULastFPSQuestSubsystem::AdvanceRouteProgress(FGameplayTag RouteTag, const FVector& From)
+{
+	const TArray<FVector>* Points = ObjectiveRoutes.Find(RouteTag);
+	if (!Points || Points->Num() == 0)
+	{
+		return;
+	}
+
+	const int32 LastIndex = Points->Num() - 1;
+	int32* ExistingCursor = RouteCursors.Find(RouteTag);
+	if (!ExistingCursor)
+	{
+		// 동선을 처음 시작하는 순간에만 현재 위치에 맞춰 시작 지점을 고른다.
+		// (앞 목표를 끝낸 뒤 동선 중간에서 이어받는 경우, 지나온 구간으로 되돌리지 않기 위함)
+		int32 NearestIndex = 0;
+		double NearestDistSq = TNumericLimits<double>::Max();
+		for (int32 Index = 0; Index <= LastIndex; ++Index)
+		{
+			const double DistSq = FVector::DistSquared(From, (*Points)[Index]);
+			if (DistSq < NearestDistSq)
+			{
+				NearestDistSq = DistSq;
+				NearestIndex = Index;
+			}
+		}
+		ExistingCursor = &RouteCursors.Add(RouteTag, NearestIndex);
+	}
+
+	int32& Cursor = *ExistingCursor;
+	const double ReachDistSq = FMath::Square(static_cast<double>(FMath::Max(ReachedPointDistance, 0.f)));
+
+	// 한 번 넘긴 지점으로는 돌아가지 않는다(단조 진행).
+	while (Cursor < LastIndex)
+	{
+		const double DistToCurrentSq = FVector::DistSquared(From, (*Points)[Cursor]);
+		if (DistToCurrentSq <= ReachDistSq)
+		{
+			++Cursor; // 지점에 닿음 → 다음 지점 안내
+			continue;
+		}
+
+		// 빠르게 지나쳐 반경 밖으로 벗어난 경우도 다음 지점이 더 가까우면 진행으로 본다.
+		if (FVector::DistSquared(From, (*Points)[Cursor + 1]) < DistToCurrentSq)
+		{
+			++Cursor;
+			continue;
+		}
+		break;
+	}
+}
+
+bool ULastFPSQuestSubsystem::GetCurrentRoutePoint(
+	FGameplayTag RouteTag,
+	FVector& OutLocation,
+	bool& bOutIsDestination) const
+{
+	const TArray<FVector>* Points = ObjectiveRoutes.Find(RouteTag);
+	if (!Points || Points->Num() == 0)
+	{
+		return false;
+	}
+
+	const int32 LastIndex = Points->Num() - 1;
+	const int32* Cursor = RouteCursors.Find(RouteTag);
+	const int32 Index = Cursor ? FMath::Clamp(*Cursor, 0, LastIndex) : LastIndex;
+
+	OutLocation = (*Points)[Index];
+	bOutIsDestination = (Index == LastIndex);
+	return true;
+}
+
+bool ULastFPSQuestSubsystem::GetRouteDestination(FGameplayTag RouteTag, FVector& OutLocation) const
+{
+	const TArray<FVector>* Points = ObjectiveRoutes.Find(RouteTag);
+	if (!Points || Points->Num() == 0)
+	{
+		return false;
+	}
+
+	OutLocation = Points->Last();
+	return true;
 }
