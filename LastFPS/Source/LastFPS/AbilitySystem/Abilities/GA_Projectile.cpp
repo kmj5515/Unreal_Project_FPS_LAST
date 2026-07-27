@@ -1,6 +1,7 @@
 #include "AbilitySystem/Abilities/GA_Projectile.h"
 
 #include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbilityTargetTypes.h"
 #include "Data/Projectiles/LastFPSAbilityProjectileData.h"
 #include "AbilitySystem/Effects/GE_Skill1Cooldown.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
@@ -9,6 +10,8 @@
 #include "Data/Tables/LastFPSSkillBalanceData.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "GameFramework/Controller.h"
+#include "GameplayPrediction.h"
 #include "Projectiles/LastFPSProjectile.h"
 #include "Projectiles/LastFPSProjectileAimUtility.h"
 #include "Projectiles/LastFPSProjectileLaunchUtility.h"
@@ -63,6 +66,11 @@ void UGA_Projectile::ActivateAbility(
 
     Hero->SetCombatState(EMMCombatState::Casting);
     bProjectileSpawned = false;
+    bProjectileSpawnEventReceived = false;
+    bAimDataSubmitted = false;
+    bHasCachedAimTarget = false;
+    CachedAimTarget = FVector::ZeroVector;
+    RegisterReplicatedAimCallback();
     
     ProjectileSpawnEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
         this,
@@ -106,7 +114,7 @@ void UGA_Projectile::ActivateAbility(
 
 void UGA_Projectile::SpawnProjectile()
 {
-    UE_LOG(LogTemp, Warning, TEXT("GA_Projectile SpawnProjectile entered"));
+    UE_LOG(LogTemp, VeryVerbose, TEXT("GA_Projectile SpawnProjectile entered"));
 
     if (bProjectileSpawned)
     {
@@ -117,33 +125,27 @@ void UGA_Projectile::SpawnProjectile()
     ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
     UWorld* World = GetWorld();
 
-    if (!ProjectileData || !Hero || !World || !Hero->HasAuthority() || !ProjectileData->ProjectileClass)
+    if (!ProjectileData || !Hero || !World || !Hero->HasAuthority()
+        || !ProjectileData->ProjectileClass || !bHasCachedAimTarget)
     {
-        UE_LOG(LogTemp, Warning, TEXT("GA_Projectile spawn skipped: Hero=%s World=%s Authority=%s ProjectileClass=%s"),
+        UE_LOG(LogTemp, Warning,
+            TEXT("GA_Projectile spawn skipped: Hero=%s World=%s Authority=%s ProjectileClass=%s Aim=%s"),
             *GetNameSafe(Hero),
             World ? TEXT("valid") : TEXT("null"),
             Hero && Hero->HasAuthority() ? TEXT("true") : TEXT("false"),
-            ProjectileData ? *GetNameSafe(ProjectileData->ProjectileClass) : TEXT("null"));
+            ProjectileData ? *GetNameSafe(ProjectileData->ProjectileClass) : TEXT("null"),
+            bHasCachedAimTarget ? TEXT("valid") : TEXT("pending"));
         return;
     }
     bProjectileSpawned = true;
 
-    const FVector CameraAimDirection = LastFPSProjectileAim::GetAimDirection(Hero);
-    const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
-    const float AimTraceRange = BalanceData && BalanceData->Range > 0.f
-        ? BalanceData->Range
-        : ProjectileData->AimTraceRange;
-    const FVector AimTarget = LastFPSProjectileAim::GetAimTarget(
-        World,
-        Hero,
-        CameraAimDirection,
-        AimTraceRange);
-
     FLastFPSProjectileLaunchRequest LaunchRequest;
     LaunchRequest.SourceActor = Hero;
     LaunchRequest.ProjectileData = ProjectileData;
-    LaunchRequest.AimTarget = AimTarget;
-    LaunchRequest.FallbackAimDirection = CameraAimDirection;
+    LaunchRequest.AimTarget = CachedAimTarget;
+    LaunchRequest.FallbackAimDirection =
+        (CachedAimTarget - Hero->GetActorLocation()).GetSafeNormal();
+    const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
     LaunchRequest.BaseDamageOverride = BalanceData && BalanceData->Damage > 0.f
         ? BalanceData->Damage + GetEquippedWeaponBaseDamage()
         : 0.f;
@@ -152,14 +154,245 @@ void UGA_Projectile::SpawnProjectile()
 
 void UGA_Projectile::OnProjectileSpawnEvent(FGameplayEventData Payload)
 {
-    UE_LOG(LogTemp, Warning, TEXT("GA_Projectile received projectile spawn event: Tag=%s"),
+    UE_LOG(LogTemp, VeryVerbose, TEXT("GA_Projectile received projectile spawn event: Tag=%s"),
         *Payload.EventTag.ToString());
-    SpawnProjectile();
+    CaptureAndSubmitLocalAim();
+
+    const ALastFPSHero* Hero =
+        Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+    if (Hero && Hero->HasAuthority())
+    {
+        bProjectileSpawnEventReceived = true;
+        TrySpawnProjectile();
+    }
+}
+
+void UGA_Projectile::CaptureAndSubmitLocalAim()
+{
+    if (bAimDataSubmitted)
+    {
+        return;
+    }
+
+    ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+    const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+    if (!Hero || !ActorInfo || !ActorInfo->IsLocallyControlled())
+    {
+        return;
+    }
+
+    FVector ViewLocation;
+    FRotator ViewRotation;
+    if (!LastFPSProjectileAim::GetAimViewPoint(
+        Hero,
+        ViewLocation,
+        ViewRotation))
+    {
+        return;
+    }
+
+    const FVector AimDirection = ViewRotation.Vector().GetSafeNormal();
+    CacheAimFromView(*Hero, ViewLocation, AimDirection);
+    bAimDataSubmitted = true;
+
+    if (Hero->HasAuthority())
+    {
+        return;
+    }
+
+    UAbilitySystemComponent* ASC =
+        ActorInfo->AbilitySystemComponent.Get();
+    if (!ASC)
+    {
+        bHasCachedAimTarget = false;
+        return;
+    }
+
+    FGameplayAbilityTargetData_LocationInfo* AimData =
+        new FGameplayAbilityTargetData_LocationInfo();
+    AimData->SourceLocation.LocationType =
+        EGameplayAbilityTargetingLocationType::LiteralTransform;
+    AimData->SourceLocation.LiteralTransform =
+        FTransform(ViewRotation, ViewLocation);
+    AimData->TargetLocation.LocationType =
+        EGameplayAbilityTargetingLocationType::LiteralTransform;
+    AimData->TargetLocation.LiteralTransform =
+        FTransform(AimDirection.Rotation(), CachedAimTarget);
+
+    FGameplayAbilityTargetDataHandle TargetData(AimData);
+    FScopedPredictionWindow PredictionWindow(ASC, true);
+    ASC->CallServerSetReplicatedTargetData(
+        GetCurrentAbilitySpecHandle(),
+        GetCurrentActivationInfo().GetActivationPredictionKey(),
+        TargetData,
+        FGameplayTag(),
+        ASC->ScopedPredictionKey);
+}
+
+void UGA_Projectile::RegisterReplicatedAimCallback()
+{
+    ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+    const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+    UAbilitySystemComponent* ASC = ActorInfo
+        ? ActorInfo->AbilitySystemComponent.Get()
+        : nullptr;
+    if (!Hero || !Hero->HasAuthority() || !ActorInfo
+        || ActorInfo->IsLocallyControlled() || !ASC)
+    {
+        return;
+    }
+
+    const FPredictionKey PredictionKey =
+        GetCurrentActivationInfo().GetActivationPredictionKey();
+    ReplicatedAimDataHandle = ASC->AbilityTargetDataSetDelegate(
+        GetCurrentAbilitySpecHandle(),
+        PredictionKey).AddUObject(
+            this,
+            &ThisClass::HandleReplicatedAimData);
+    ASC->CallReplicatedTargetDataDelegatesIfSet(
+        GetCurrentAbilitySpecHandle(),
+        PredictionKey);
+}
+
+void UGA_Projectile::UnregisterReplicatedAimCallback()
+{
+    if (!ReplicatedAimDataHandle.IsValid())
+    {
+        return;
+    }
+
+    if (const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo())
+    {
+        if (UAbilitySystemComponent* ASC =
+            ActorInfo->AbilitySystemComponent.Get())
+        {
+            ASC->AbilityTargetDataSetDelegate(
+                GetCurrentAbilitySpecHandle(),
+                GetCurrentActivationInfo().GetActivationPredictionKey())
+                .Remove(ReplicatedAimDataHandle);
+        }
+    }
+    ReplicatedAimDataHandle.Reset();
+}
+
+void UGA_Projectile::CacheAimFromView(
+    ALastFPSHero& Hero,
+    const FVector& ViewLocation,
+    const FVector& AimDirection)
+{
+    const FVector NormalizedAimDirection = AimDirection.GetSafeNormal();
+    const float TraceRange = GetEffectiveAimTraceRange();
+    if (NormalizedAimDirection.IsNearlyZero()
+        || TraceRange <= KINDA_SMALL_NUMBER)
+    {
+        bHasCachedAimTarget = false;
+        CachedAimTarget = FVector::ZeroVector;
+        return;
+    }
+
+    CachedAimTarget = LastFPSProjectileAim::GetAimTargetFromView(
+        GetWorld(),
+        &Hero,
+        ViewLocation,
+        NormalizedAimDirection,
+        TraceRange);
+    bHasCachedAimTarget = !CachedAimTarget.ContainsNaN();
+}
+
+float UGA_Projectile::GetEffectiveAimTraceRange() const
+{
+    const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
+    return BalanceData && BalanceData->Range > 0.f
+        ? BalanceData->Range
+        : ProjectileData
+            ? FMath::Max(ProjectileData->AimTraceRange, 0.f)
+            : 0.f;
+}
+
+void UGA_Projectile::TrySpawnProjectile()
+{
+    if (bProjectileSpawnEventReceived
+        && bHasCachedAimTarget
+        && !bProjectileSpawned)
+    {
+        SpawnProjectile();
+    }
+}
+
+void UGA_Projectile::HandleReplicatedAimData(
+    const FGameplayAbilityTargetDataHandle& Data,
+    FGameplayTag /*ActivationTag*/)
+{
+    // ConsumeClientReplicatedTargetData가 ASC 내부 저장소를 비우므로 먼저 공유 핸들을 보존한다.
+    const FGameplayAbilityTargetDataHandle AimDataCopy = Data;
+    const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+    UAbilitySystemComponent* ASC = ActorInfo
+        ? ActorInfo->AbilitySystemComponent.Get()
+        : nullptr;
+    if (ASC)
+    {
+        ASC->ConsumeClientReplicatedTargetData(
+            GetCurrentAbilitySpecHandle(),
+            GetCurrentActivationInfo().GetActivationPredictionKey());
+    }
+
+    ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
+    const FGameplayAbilityTargetData* AimData = AimDataCopy.Get(0);
+    if (!Hero || !Hero->HasAuthority() || !AimData
+        || !AimData->HasOrigin() || !AimData->HasEndPoint())
+    {
+        return;
+    }
+
+    const FVector ClientViewLocation = AimData->GetOrigin().GetLocation();
+    const FVector ClientTargetLocation = AimData->GetEndPoint();
+    FVector ClientAimDirection =
+        (ClientTargetLocation - ClientViewLocation).GetSafeNormal();
+    if (ClientAimDirection.IsNearlyZero())
+    {
+        return;
+    }
+
+    FVector ServerViewLocation;
+    FRotator ServerViewRotation;
+    if (!LastFPSProjectileAim::GetAimViewPoint(
+        Hero,
+        ServerViewLocation,
+        ServerViewRotation))
+    {
+        return;
+    }
+
+    const float CameraLocationTolerance =
+        FMath::Max(MaxClientCameraLocationError, 0.f);
+    const FVector ValidatedViewLocation =
+        FVector::DistSquared(ClientViewLocation, ServerViewLocation)
+            <= FMath::Square(CameraLocationTolerance)
+        ? ClientViewLocation
+        : ServerViewLocation;
+
+    const FVector ServerAimDirection =
+        ServerViewRotation.Vector().GetSafeNormal();
+    const float AimDot = FVector::DotProduct(
+        ClientAimDirection,
+        ServerAimDirection);
+    const float MinimumAimDot = FMath::Cos(FMath::DegreesToRadians(
+        FMath::Clamp(MaxClientAimAngleErrorDegrees, 0.f, 180.f)));
+    if (AimDot < MinimumAimDot)
+    {
+        ClientAimDirection = ServerAimDirection;
+    }
+
+    CacheAimFromView(
+        *Hero,
+        ValidatedViewLocation,
+        ClientAimDirection);
+    TrySpawnProjectile();
 }
 
 void UGA_Projectile::OnAbilityEndEvent(FGameplayEventData Payload)
 {
-    UE_LOG(LogTemp, Warning, TEXT("GA_Projectile received ability end event: Tag=%s"),
+    UE_LOG(LogTemp, VeryVerbose, TEXT("GA_Projectile received ability end event: Tag=%s"),
         *Payload.EventTag.ToString());
     EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
 }
@@ -171,6 +404,8 @@ void UGA_Projectile::EndAbility(
     bool bReplicateEndAbility,
     bool bWasCancelled)
 {
+    UnregisterReplicatedAimCallback();
+
     if (ProjectileSpawnEventTask)
     {
         ProjectileSpawnEventTask->EndTask();
@@ -190,6 +425,11 @@ void UGA_Projectile::EndAbility(
             Hero->SetCombatState(EMMCombatState::Idle);
         }
     }
+
+    bProjectileSpawnEventReceived = false;
+    bAimDataSubmitted = false;
+    bHasCachedAimTarget = false;
+    CachedAimTarget = FVector::ZeroVector;
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

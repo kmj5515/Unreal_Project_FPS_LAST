@@ -3,19 +3,24 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Data/Tables/LastFPSItemData.h"
+#include "Pooling/LastFPSPoolableActor.h"
 #include "LastFPSItemPickupActor.generated.h"
 
 class USphereComponent;
 class UStaticMeshComponent;
 class URotatingMovementComponent;
 class UNiagaraComponent;
+class UMaterialInstanceDynamic;
 
 /**
- * 월드에 떨어지는 아이템 드랍. Hero 가 밟으면 그 플레이어 PlayerState 로 지급을 위임하고 파괴된다.
+ * 월드에 떨어지는 아이템 드랍. Hero가 밟으면 PlayerState로 지급을 위임하고 풀로 반환한다.
+ * 등록된 풀이 없거나 소진된 경우에만 기존처럼 파괴한다.
  * (PlayerState 가 소유 클라의 로컬 Economy 에 넣어주므로 리슨서버 원격 클라도 올바른 대상에 지급.)
  */
 UCLASS()
-class LASTFPS_API ALastFPSItemPickupActor : public AActor
+class LASTFPS_API ALastFPSItemPickupActor
+    : public AActor
+    , public ILastFPSPoolableActor
 {
     GENERATED_BODY()
 
@@ -35,6 +40,12 @@ public:
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void Tick(float DeltaSeconds) override;
+
+    void InitializePickup(FName InItemRowId, int32 InCount, FVector InLaunchStartOffset);
+
+    virtual void OnAcquiredFromPool_Implementation() override;
+    virtual void OnReleasedToPool_Implementation() override;
+    virtual void OnPrepareForPoolRenderWarmup_Implementation() override;
 
 protected:
     virtual void BeginPlay() override;
@@ -99,6 +110,8 @@ private:
     void HandleLanded();
 
     void PlaySpawnFX();
+    void ActivatePickup();
+    void FinishPickup();
 
     UFUNCTION()
     void OnRep_LaunchOffset();
@@ -112,4 +125,8 @@ private:
     bool bLaunching = false;
     bool bLaunchResolved = false; // 연출 시작을 이미 처리했는지(중복 방지).
     bool bLanded = false;         // 착지 완료(서버 기준) — 이전엔 못 줍는다.
+    bool bMeshRestTransformCaptured = false;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UMaterialInstanceDynamic>> CachedMaterialInstances;
 };

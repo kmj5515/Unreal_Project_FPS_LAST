@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "GameplayTagContainer.h"
+#include "Pooling/LastFPSPoolableActor.h"
 #include "Utility/LastFPSDamageCalculation.h"
 #include "LastFPSAreaEffectActor.generated.h"
 
@@ -87,7 +88,9 @@ struct LASTFPS_API FLastFPSAreaEffectConfig
 };
 
 UCLASS()
-class LASTFPS_API ALastFPSAreaEffectActor : public AActor
+class LASTFPS_API ALastFPSAreaEffectActor
+	: public AActor
+	, public ILastFPSPoolableActor
 {
 	GENERATED_BODY()
 
@@ -101,6 +104,10 @@ public:
 		AActor* InSourceActor,
 		UAbilitySystemComponent* InSourceASC,
 		const FLastFPSAreaEffectConfig& InAreaConfig);
+
+	virtual void OnAcquiredFromPool_Implementation() override;
+	virtual void OnReleasedToPool_Implementation() override;
+	virtual void OnPrepareForPoolRenderWarmup_Implementation() override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Area Effect")
@@ -117,6 +124,7 @@ private:
 	void OnRep_AreaConfig();
 
 	void ConfigureArea();
+	void StartAreaEffect();
 	void ApplyAreaEffects();
 	bool ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass, bool bApplyDamage);
 	void FinishArea();

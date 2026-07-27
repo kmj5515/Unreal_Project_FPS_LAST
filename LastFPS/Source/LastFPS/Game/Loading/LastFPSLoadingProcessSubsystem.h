@@ -45,11 +45,27 @@ public:
     virtual void Deinitialize() override;
 
     void BeginTravelLoading(ELastFPSTravelDestination Destination);
+
+    /**
+     * 직접 PIE 실행처럼 맵 전환 요청 없이 외부 로딩 게이트가 먼저 활성화된 경우
+     * 기존 세션을 건드리지 않고 진행률 추적 세션만 보장한다.
+     */
+    void EnsureLoadingTrackingActive();
+
     void CancelLoading(const FString& FailureReason);
 
     FLastFPSLoadingProcessHandle RegisterLoadingProcess(
         FGameplayTag ProcessTag,
         float Weight,
+        bool bRequired = true);
+
+    /**
+     * 현재 등록된 프로세스 합계에 대해 목표 점유율을 갖도록 상대 가중치를 계산해 등록한다.
+     * 목적지별 동적 프로세스가 기존 프로세스의 구체 가중치를 알 필요가 없게 한다.
+     */
+    FLastFPSLoadingProcessHandle RegisterLoadingProcessForTargetShare(
+        FGameplayTag ProcessTag,
+        float TargetShare,
         bool bRequired = true);
 
     bool SetLoadingProcessProgress(const FLastFPSLoadingProcessHandle& Handle, float Progress);

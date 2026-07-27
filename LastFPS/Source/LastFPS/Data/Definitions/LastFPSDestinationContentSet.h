@@ -5,6 +5,35 @@
 #include "Engine/DataAsset.h"
 #include "LastFPSDestinationContentSet.generated.h"
 
+/** 목적지 콘텐츠 준비 과정이 전체 로딩 바에서 차지할 비율과 내부 단계 가중치다. */
+USTRUCT(BlueprintType)
+struct LASTFPS_API FLastFPSDestinationLoadingProgressSettings
+{
+    GENERATED_BODY()
+
+    /** 기존 레벨·컨트롤러·Pawn 준비를 제외한 목적지 콘텐츠의 전체 점유율이다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Loading Progress",
+        meta=(ClampMin="0.05", ClampMax="0.95"))
+    float OverallProgressShare = 0.70f;
+
+    /** Gameplay Cue와 해당 Niagara 의존성은 콘텐츠 에셋 단계에 포함한다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Loading Progress",
+        meta=(ClampMin="0.0"))
+    float AssetAndGameplayCueWeight = 0.40f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Loading Progress",
+        meta=(ClampMin="0.0"))
+    float ActorPoolWeight = 0.20f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Loading Progress",
+        meta=(ClampMin="0.0"))
+    float RenderComponentWeight = 0.15f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Loading Progress",
+        meta=(ClampMin="0.0"))
+    float ShaderAndPSOWeight = 0.25f;
+};
+
 USTRUCT(BlueprintType)
 struct LASTFPS_API FLastFPSRenderWarmupSettings
 {
@@ -61,6 +90,10 @@ public:
     /** 에셋 로드 다음 단계에서 수행할 렌더 준비 정책. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Loading")
     FLastFPSRenderWarmupSettings RenderWarmup;
+
+    /** 로딩 화면의 실제 진행률에 적용할 단계별 가중치다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Loading")
+    FLastFPSDestinationLoadingProgressSettings LoadingProgress;
 
     /** 직접 목록과 기능 계약의 유효한 경로를 모은다. 비어 있으면 게이트가 걸리지 않는다. */
     void CollectRequiredPaths(TArray<FSoftObjectPath>& OutPaths) const;

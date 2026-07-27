@@ -13,6 +13,7 @@
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "Net/UnrealNetwork.h"
+#include "Pooling/LastFPSActorPoolSubsystem.h"
 #include "Utility/LastFPSCollisionChannels.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPickup, Log, All);
@@ -51,6 +52,7 @@ void ALastFPSItemPickupActor::GetLifetimeReplicatedProps(TArray<FLifetimePropert
 
 void ALastFPSItemPickupActor::OnRep_ItemRowId()
 {
+    bSpawnFXPlayed = false;
     ApplyRarityVisual();
 }
 
@@ -82,7 +84,19 @@ void ALastFPSItemPickupActor::ApplyRarityVisual()
     bool bParamFoundAnySlot = false;
     for (int32 SlotIndex = 0; SlotIndex < NumMaterials; ++SlotIndex)
     {
-        if (UMaterialInstanceDynamic* MID = PickupMesh->CreateAndSetMaterialInstanceDynamic(SlotIndex))
+        UMaterialInstanceDynamic* MID = CachedMaterialInstances.IsValidIndex(SlotIndex)
+            ? CachedMaterialInstances[SlotIndex].Get()
+            : nullptr;
+        if (!MID)
+        {
+            MID = PickupMesh->CreateAndSetMaterialInstanceDynamic(SlotIndex);
+            if (CachedMaterialInstances.Num() < NumMaterials)
+            {
+                CachedMaterialInstances.SetNum(NumMaterials);
+            }
+            CachedMaterialInstances[SlotIndex] = MID;
+        }
+        if (MID)
         {
             FLinearColor ExistingValue;
             if (MID->GetVectorParameterValue(FMaterialParameterInfo(EmissiveParameterName), ExistingValue))
@@ -110,7 +124,16 @@ void ALastFPSItemPickupActor::ApplyRarityVisual()
 void ALastFPSItemPickupActor::BeginPlay()
 {
     Super::BeginPlay();
+    if (PickupMesh && !bMeshRestTransformCaptured)
+    {
+        MeshRestRelativeLocation = PickupMesh->GetRelativeLocation();
+        bMeshRestTransformCaptured = true;
+    }
+    ActivatePickup();
+}
 
+void ALastFPSItemPickupActor::ActivatePickup()
+{
     if (OverlapSphere)
     {
         LastFPSCollision::ConfigurePickupTriggerCollision(*OverlapSphere);
@@ -140,6 +163,32 @@ void ALastFPSItemPickupActor::BeginPlay()
     }
 }
 
+void ALastFPSItemPickupActor::InitializePickup(
+    const FName InItemRowId,
+    const int32 InCount,
+    const FVector InLaunchStartOffset)
+{
+    ItemRowId = InItemRowId;
+    Count = FMath::Max(InCount, 1);
+    LaunchStartOffset = InLaunchStartOffset;
+    bSpawnFXPlayed = false;
+    LaunchElapsed = 0.f;
+    bLaunching = false;
+    bLaunchResolved = false;
+    bLanded = false;
+
+    if (PickupMesh)
+    {
+        PickupMesh->SetRelativeLocation(MeshRestRelativeLocation);
+    }
+
+    if (HasActorBegunPlay())
+    {
+        ActivatePickup();
+    }
+    ForceNetUpdate();
+}
+
 void ALastFPSItemPickupActor::TryStartLaunch()
 {
     if (bLaunchResolved)
@@ -156,7 +205,11 @@ void ALastFPSItemPickupActor::TryStartLaunch()
     bLaunchResolved = true;
     bLaunching = true;
     LaunchElapsed = 0.f;
-    MeshRestRelativeLocation = PickupMesh->GetRelativeLocation(); // 변위 전 원래 위치 캐시.
+    if (!bMeshRestTransformCaptured)
+    {
+        MeshRestRelativeLocation = PickupMesh->GetRelativeLocation();
+        bMeshRestTransformCaptured = true;
+    }
     PickupMesh->SetRelativeLocation(MeshRestRelativeLocation + LaunchStartOffset);
     SetActorTickEnabled(true);
 }
@@ -213,7 +266,7 @@ void ALastFPSItemPickupActor::HandleLanded()
     for (AActor* Actor : Overlapping)
     {
         TryGrant(Actor);
-        if (IsActorBeingDestroyed())
+        if (IsActorBeingDestroyed() || !bLanded)
         {
             break;
         }
@@ -248,6 +301,10 @@ void ALastFPSItemPickupActor::PlaySpawnFX()
 void ALastFPSItemPickupActor::OnRep_LaunchOffset()
 {
     // 순수 클라: 오프셋이 늦게 도착하면 여기서 연출 시작(메시 기준 위치는 BeginPlay 에서 이미 캐시).
+    bLaunching = false;
+    bLaunchResolved = false;
+    bLanded = false;
+    LaunchElapsed = 0.f;
     TryStartLaunch();
 }
 
@@ -272,7 +329,7 @@ void ALastFPSItemPickupActor::TryGrant(AActor* OtherActor)
     }
 
     ALastFPSHero* Hero = Cast<ALastFPSHero>(OtherActor);
-    if (!Hero)
+    if (!Hero || ItemRowId.IsNone() || Count <= 0)
     {
         return;
     }
@@ -283,5 +340,72 @@ void ALastFPSItemPickupActor::TryGrant(AActor* OtherActor)
         PS->Auth_GrantItem(ItemRowId, Count);
     }
 
+    FinishPickup();
+}
+
+void ALastFPSItemPickupActor::FinishPickup()
+{
+    if (ULastFPSActorPoolSubsystem* Pool =
+        GetWorld() ? GetWorld()->GetSubsystem<ULastFPSActorPoolSubsystem>() : nullptr)
+    {
+        if (Pool->ReleaseActor(this))
+        {
+            return;
+        }
+    }
     Destroy();
+}
+
+void ALastFPSItemPickupActor::OnAcquiredFromPool_Implementation()
+{
+    ItemRowId = NAME_None;
+    Count = 1;
+    LaunchStartOffset = FVector::ZeroVector;
+    bSpawnFXPlayed = false;
+    LaunchElapsed = 0.f;
+    bLaunching = false;
+    bLaunchResolved = false;
+    bLanded = false;
+    SetActorTickEnabled(false);
+    SetActorEnableCollision(true);
+
+    if (SpawnVFX)
+    {
+        SpawnVFX->DeactivateImmediate();
+    }
+}
+
+void ALastFPSItemPickupActor::OnReleasedToPool_Implementation()
+{
+    ItemRowId = NAME_None;
+    Count = 1;
+    LaunchStartOffset = FVector::ZeroVector;
+    bSpawnFXPlayed = false;
+    LaunchElapsed = 0.f;
+    bLaunching = false;
+    bLaunchResolved = false;
+    bLanded = false;
+    SetActorTickEnabled(false);
+
+    if (OverlapSphere)
+    {
+        OverlapSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        OverlapSphere->SetGenerateOverlapEvents(false);
+    }
+    if (PickupMesh)
+    {
+        PickupMesh->SetRelativeLocation(MeshRestRelativeLocation);
+    }
+    if (SpawnVFX)
+    {
+        SpawnVFX->DeactivateImmediate();
+    }
+}
+
+void ALastFPSItemPickupActor::OnPrepareForPoolRenderWarmup_Implementation()
+{
+    if (PickupMesh)
+    {
+        PickupMesh->SetVisibility(true, true);
+    }
 }

@@ -11,6 +11,7 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Particles/ParticleSystemComponent.h"
+#include "Pooling/LastFPSActorPoolSubsystem.h"
 #include "Data/Projectiles/LastFPSProjectileVisualData.h"
 #include "Utility/LastFPSCombatAffiliation.h"
 #include "Utility/LastFPSCollisionChannels.h"
@@ -58,7 +59,7 @@ ALastFPSProjectile::ALastFPSProjectile()
     ProjectileMovement->ProjectileGravityScale = 0.f;
     ProjectileMovement->bShouldBounce = false;
 
-    InitialLifeSpan = 1.5f;
+    InitialLifeSpan = 0.f;
 }
 
 void ALastFPSProjectile::BeginPlay()
@@ -66,6 +67,7 @@ void ALastFPSProjectile::BeginPlay()
     Super::BeginPlay();
 
     ApplyVisualData();
+    SetGameplayLifeSpan(DefaultGameplayLifeSpan);
 }
 
 void ALastFPSProjectile::InitializeGameplayProjectile(
@@ -83,6 +85,21 @@ void ALastFPSProjectile::InitializeGameplayProjectile(
     BaseDamageOverride = FMath::Max(InBaseDamageOverride, 0.f);
     ApplyVisualData();
     EnableGameplayCollision(InCollisionSettings);
+    SetGameplayLifeSpan(DefaultGameplayLifeSpan);
+}
+
+void ALastFPSProjectile::SetGameplayLifeSpan(const float LifeSeconds)
+{
+    GetWorldTimerManager().ClearTimer(GameplayLifeTimerHandle);
+    if (LifeSeconds > 0.f)
+    {
+        GetWorldTimerManager().SetTimer(
+            GameplayLifeTimerHandle,
+            this,
+            &ThisClass::FinishProjectile,
+            LifeSeconds,
+            false);
+    }
 }
 
 void ALastFPSProjectile::EnableGameplayCollision(const FLastFPSProjectileCollisionSettings* CollisionSettings)
@@ -169,7 +186,7 @@ void ALastFPSProjectile::OnProjectileOverlap(
     ExecuteImpactRules(OtherActor, SweepResult);
     bHasAppliedHit = true;
     PlayImpactFeedback(SweepResult);
-    Destroy();
+    FinishProjectile();
 }
 
 void ALastFPSProjectile::OnProjectileStop(const FHitResult& ImpactResult)
@@ -180,14 +197,14 @@ void ALastFPSProjectile::OnProjectileStop(const FHitResult& ImpactResult)
         if (IsSourceRelatedActor(HitActor, SourceActor, GetOwner())
             || AreFriendlyActors(SourceActor, HitActor))
         {
-            Destroy();
+            FinishProjectile();
             return;
         }
 
         ExecuteImpactRules(HitActor, ImpactResult);
         bHasAppliedHit = true;
         PlayImpactFeedback(ImpactResult);
-        Destroy();
+        FinishProjectile();
     }
 }
 
@@ -332,7 +349,11 @@ void ALastFPSProjectile::PlayImpactFeedback(const FHitResult& ImpactResult)
             VisualData->ImpactNiagaraSystem,
             ImpactLocation,
             ImpactRotation,
-            VisualData->ImpactEffectScale);
+            VisualData->ImpactEffectScale,
+            true,
+            true,
+            ENCPoolMethod::AutoRelease,
+            true);
     }
     else if (VisualData && VisualData->ImpactEffect)
     {
@@ -348,4 +369,79 @@ void ALastFPSProjectile::PlayImpactFeedback(const FHitResult& ImpactResult)
     {
         UGameplayStatics::PlaySoundAtLocation(this, VisualData->ImpactSound, ImpactLocation);
     }
+}
+
+void ALastFPSProjectile::FinishProjectile()
+{
+    if (ULastFPSActorPoolSubsystem* Pool =
+        GetWorld() ? GetWorld()->GetSubsystem<ULastFPSActorPoolSubsystem>() : nullptr)
+    {
+        if (Pool->ReleaseActor(this))
+        {
+            return;
+        }
+    }
+    Destroy();
+}
+
+void ALastFPSProjectile::OnAcquiredFromPool_Implementation()
+{
+    bHasAppliedHit = false;
+    SourceActor = nullptr;
+    ImpactRules.Reset();
+    LegacyEffectsOnHit.Reset();
+    VisualData = nullptr;
+    BaseDamageOverride = 0.f;
+    SetActorEnableCollision(true);
+
+    if (CollisionComp)
+    {
+        CollisionComp->ClearMoveIgnoreActors();
+        CollisionComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        CollisionComp->SetGenerateOverlapEvents(false);
+    }
+    if (ProjectileMovement)
+    {
+        ProjectileMovement->StopMovementImmediately();
+        ProjectileMovement->Activate(true);
+    }
+    ApplyVisualData();
+    SetGameplayLifeSpan(DefaultGameplayLifeSpan);
+}
+
+void ALastFPSProjectile::OnReleasedToPool_Implementation()
+{
+    GetWorldTimerManager().ClearTimer(GameplayLifeTimerHandle);
+    // 이동 컴포넌트 정지 과정에서 충돌 콜백이 들어와도 반환을 중복 실행하지 않게 잠근다.
+    bHasAppliedHit = true;
+    SourceActor = nullptr;
+    ImpactRules.Reset();
+    LegacyEffectsOnHit.Reset();
+    VisualData = nullptr;
+    BaseDamageOverride = 0.f;
+
+    if (CollisionComp)
+    {
+        CollisionComp->SetGenerateOverlapEvents(false);
+        CollisionComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        CollisionComp->ClearMoveIgnoreActors();
+    }
+    if (ProjectileMovement)
+    {
+        ProjectileMovement->StopMovementImmediately();
+        ProjectileMovement->Deactivate();
+    }
+    if (TrailNiagara)
+    {
+        TrailNiagara->DeactivateImmediate();
+    }
+    if (TrailParticle)
+    {
+        TrailParticle->DeactivateSystem();
+    }
+}
+
+void ALastFPSProjectile::OnPrepareForPoolRenderWarmup_Implementation()
+{
+    ApplyVisualData();
 }

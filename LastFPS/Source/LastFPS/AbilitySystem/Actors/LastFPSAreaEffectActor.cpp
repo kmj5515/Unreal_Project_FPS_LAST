@@ -9,6 +9,7 @@
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraComponent.h"
+#include "Pooling/LastFPSActorPoolSubsystem.h"
 #include "Utility/LastFPSDamageCalculation.h"
 
 ALastFPSAreaEffectActor::ALastFPSAreaEffectActor()
@@ -34,34 +35,7 @@ void ALastFPSAreaEffectActor::BeginPlay()
 {
 	Super::BeginPlay();
 
-	ConfigureArea();
-
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	ApplyAreaEffects();
-
-	if (AreaConfig.DamageInterval > 0.f && (AreaConfig.DamageEffect || !AreaConfig.TargetEffects.IsEmpty()))
-	{
-		GetWorldTimerManager().SetTimer(
-			DamageTimerHandle,
-			this,
-			&ALastFPSAreaEffectActor::ApplyAreaEffects,
-			AreaConfig.DamageInterval,
-			true);
-	}
-
-	if (AreaConfig.Duration > 0.f)
-	{
-		GetWorldTimerManager().SetTimer(
-			DurationTimerHandle,
-			this,
-			&ALastFPSAreaEffectActor::FinishArea,
-			AreaConfig.Duration,
-			false);
-	}
+	StartAreaEffect();
 }
 
 void ALastFPSAreaEffectActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -79,7 +53,15 @@ void ALastFPSAreaEffectActor::InitializeAreaEffect(
 	SourceActor = InSourceActor;
 	SourceASC = InSourceASC;
 	AreaConfig = InAreaConfig;
-	ConfigureArea();
+	if (HasActorBegunPlay())
+	{
+		StartAreaEffect();
+	}
+	else
+	{
+		ConfigureArea();
+	}
+	ForceNetUpdate();
 }
 
 void ALastFPSAreaEffectActor::OnRep_AreaConfig()
@@ -129,6 +111,41 @@ void ALastFPSAreaEffectActor::ConfigureArea()
 	}
 
 	DrawAreaDebug();
+}
+
+void ALastFPSAreaEffectActor::StartAreaEffect()
+{
+	GetWorldTimerManager().ClearTimer(DamageTimerHandle);
+	GetWorldTimerManager().ClearTimer(DurationTimerHandle);
+	ConfigureArea();
+
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	ApplyAreaEffects();
+
+	if (AreaConfig.DamageInterval > 0.f
+		&& (AreaConfig.DamageEffect || !AreaConfig.TargetEffects.IsEmpty()))
+	{
+		GetWorldTimerManager().SetTimer(
+			DamageTimerHandle,
+			this,
+			&ThisClass::ApplyAreaEffects,
+			AreaConfig.DamageInterval,
+			true);
+	}
+
+	if (AreaConfig.Duration > 0.f)
+	{
+		GetWorldTimerManager().SetTimer(
+			DurationTimerHandle,
+			this,
+			&ThisClass::FinishArea,
+			AreaConfig.Duration,
+			false);
+	}
 }
 
 void ALastFPSAreaEffectActor::ApplyAreaEffects()
@@ -217,7 +234,49 @@ bool ALastFPSAreaEffectActor::ApplyEffectToTarget(
 
 void ALastFPSAreaEffectActor::FinishArea()
 {
+	if (ULastFPSActorPoolSubsystem* Pool =
+		GetWorld() ? GetWorld()->GetSubsystem<ULastFPSActorPoolSubsystem>() : nullptr)
+	{
+		if (Pool->ReleaseActor(this))
+		{
+			return;
+		}
+	}
 	Destroy();
+}
+
+void ALastFPSAreaEffectActor::OnAcquiredFromPool_Implementation()
+{
+	GetWorldTimerManager().ClearTimer(DamageTimerHandle);
+	GetWorldTimerManager().ClearTimer(DurationTimerHandle);
+	SourceActor.Reset();
+	SourceASC.Reset();
+	AreaConfig = FLastFPSAreaEffectConfig();
+	SetActorEnableCollision(true);
+}
+
+void ALastFPSAreaEffectActor::OnReleasedToPool_Implementation()
+{
+	GetWorldTimerManager().ClearTimer(DamageTimerHandle);
+	GetWorldTimerManager().ClearTimer(DurationTimerHandle);
+	SourceActor.Reset();
+	SourceASC.Reset();
+	AreaConfig = FLastFPSAreaEffectConfig();
+
+	if (AreaSphere)
+	{
+		AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+	if (EffectNiagaraComponent)
+	{
+		EffectNiagaraComponent->DeactivateImmediate();
+		EffectNiagaraComponent->SetAsset(nullptr);
+	}
+}
+
+void ALastFPSAreaEffectActor::OnPrepareForPoolRenderWarmup_Implementation()
+{
+	ConfigureArea();
 }
 
 void ALastFPSAreaEffectActor::CollectTargets(TArray<AActor*>& OutTargets) const

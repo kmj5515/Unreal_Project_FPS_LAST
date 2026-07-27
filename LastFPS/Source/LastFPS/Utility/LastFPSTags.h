@@ -19,6 +19,7 @@ namespace LastFPSGameplayTags
 
 	// 레벨 규칙으로 부여되는 전투 금지 상태. 전투 어빌리티의 ActivationBlockedTags 가 참조한다.
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Combat_Disabled);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Enemy_KnockedDown);
 
 	// 퀘스트 목표 구역 태그 (도달/수호/점령). 코드가 값을 직접 참조하진 않지만 프로젝트 방침대로 네이티브로 관리.
 	// 새 구역 추가 = 여기 한 줄 + .cpp 정의 (재컴파일 필요). 배치·DataTable 은 이 태그를 태그 피커로 선택한다.
@@ -56,6 +57,7 @@ namespace LastFPSGameplayTags
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_ViolaFrostStormEffect);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_IceStormSpawn);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Montage_GrapplingHookPull);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Enemy_WeakpointBroken);
 
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(UI_HUD_Visible);
 
@@ -89,16 +91,19 @@ namespace LastFPSGameplayTags
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Trigger_SpawnProbe);
 
 	// 적 AI 공격 어빌리티
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Shoot);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Melee);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Boss_BurstShoot);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Boss_GroundSlam);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Boss_Laser);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Boss_SphereScatter);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Enemy_Boss_WeakpointKnockdown);
 
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Enemy_Boss_BurstCharge);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Enemy_Boss_LaserCharge);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Enemy_Boss_LaserPreview);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Enemy_Boss_LaserFire);
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Enemy_Boss_SpawnDissolve);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Player_GrapplingHook);
 }

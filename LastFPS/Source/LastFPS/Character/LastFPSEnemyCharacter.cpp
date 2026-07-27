@@ -1,4 +1,5 @@
 #include "Character/LastFPSEnemyCharacter.h"
+#include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Character/AI/LastFPSEnemyAIController.h"
 #include "Character/LastFPSAIProfile.h"
@@ -11,7 +12,10 @@
 #include "Economy/LastFPSItemPickupActor.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameplayEffect.h"
 #include "Perception/AIPerceptionComponent.h"
+#include "Pooling/LastFPSActorPoolSpawn.h"
+#include "Pooling/LastFPSActorPoolSubsystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSEnemyCharacter, Log, All);
 
@@ -70,6 +74,13 @@ void ALastFPSEnemyCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
+    if (USkeletalMeshComponent* MeshComp = GetMesh();
+        MeshComp && !bMeshRelativeTransformCaptured)
+    {
+        InitialMeshRelativeTransform = MeshComp->GetRelativeTransform();
+        bMeshRelativeTransformCaptured = true;
+    }
+
     if (HasAuthority())
     {
         OnDeath.AddUObject(this, &ALastFPSEnemyCharacter::HandleOwnDeath);
@@ -86,7 +97,13 @@ void ALastFPSEnemyCharacter::BeginPlay()
 void ALastFPSEnemyCharacter::HandleOwnDeath(ALastFPSCharacterBase* /*DeadChar*/)
 {
     Multicast_ApplyDeathRagdollImpulse(GetLastDamageImpulseDirection());
-    SetLifeSpan(DeathRemovalDelay);
+    GetWorldTimerManager().ClearTimer(DeathRemovalTimerHandle);
+    GetWorldTimerManager().SetTimer(
+        DeathRemovalTimerHandle,
+        this,
+        &ThisClass::FinishDeathRemoval,
+        FMath::Max(DeathRemovalDelay, 0.1f),
+        false);
 
     UWorld* World = GetWorld();
     if (!DropPickupClass || !World)
@@ -144,17 +161,18 @@ void ALastFPSEnemyCharacter::HandleOwnDeath(ALastFPSCharacterBase* /*DeadChar*/)
                              FMath::Sin(AngleRad) * DropSpreadRadius, 0.f);
         const FTransform SpawnTransform(FRotator::ZeroRotator, Center + Offset);
 
-        ALastFPSItemPickupActor* Pickup = World->SpawnActorDeferred<ALastFPSItemPickupActor>(
-            DropPickupClass, SpawnTransform, this, nullptr,
-            ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-        if (Pickup)
-        {
-            Pickup->ItemRowId = SpawnRowIds[i];
-            Pickup->Count = 1;
-            // 착지 지점(링)에서 적 중심으로의 오프셋 = 발사 시작점. 중심에서 튀어나와 포물선으로 링에 안착.
-            Pickup->LaunchStartOffset = Center - SpawnTransform.GetLocation();
-            Pickup->FinishSpawning(SpawnTransform);
-        }
+        // 착지 지점(링)에서 적 중심으로의 오프셋 = 발사 시작점. 중심에서 튀어나와 포물선으로 링에 안착.
+        const FVector LaunchOffset = Center - SpawnTransform.GetLocation();
+        LastFPSActorPool::AcquireOrSpawnDeferred<ALastFPSItemPickupActor>(
+            *World,
+            DropPickupClass,
+            SpawnTransform,
+            this,
+            nullptr,
+            [RowId = SpawnRowIds[i], LaunchOffset](ALastFPSItemPickupActor& Pickup)
+            {
+                Pickup.InitializePickup(RowId, 1, LaunchOffset);
+            });
     }
 }
 
@@ -166,11 +184,127 @@ void ALastFPSEnemyCharacter::UpdateAliveCollisionState(bool bAlive)
         WeaponComponent->UnequipWeapon();
     }
 
+    if (bAlive)
+    {
+        ResetDeathRagdoll();
+    }
+
     Super::UpdateAliveCollisionState(bAlive);
 
     if (!bAlive)
     {
         StartDeathRagdoll();
+    }
+}
+
+void ALastFPSEnemyCharacter::ResetDeathRagdoll()
+{
+    USkeletalMeshComponent* MeshComp = GetMesh();
+    if (!MeshComp)
+    {
+        return;
+    }
+
+    MeshComp->SetAllBodiesPhysicsBlendWeight(0.f, false);
+    MeshComp->SetAllBodiesSimulatePhysics(false);
+    MeshComp->SetSimulatePhysics(false);
+    MeshComp->SetEnableGravity(false);
+    MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    MeshComp->bPauseAnims = false;
+
+    if (bMeshRelativeTransformCaptured)
+    {
+        MeshComp->SetRelativeTransform(
+            InitialMeshRelativeTransform,
+            false,
+            nullptr,
+            ETeleportType::TeleportPhysics);
+    }
+    bDeathRagdollStarted = false;
+}
+
+void ALastFPSEnemyCharacter::FinishDeathRemoval()
+{
+    if (ULastFPSActorPoolSubsystem* Pool =
+        GetWorld() ? GetWorld()->GetSubsystem<ULastFPSActorPoolSubsystem>() : nullptr)
+    {
+        if (Pool->ReleaseActor(this))
+        {
+            return;
+        }
+    }
+    Destroy();
+}
+
+void ALastFPSEnemyCharacter::ResetForPoolReuse(
+    ULastFPSCharacterDefinition* InDefinition)
+{
+    GetWorldTimerManager().ClearTimer(DeathRemovalTimerHandle);
+    ResetDeathRagdoll();
+    Super::ResetForPoolReuse(InDefinition);
+
+    if (!HasActorBegunPlay())
+    {
+        return;
+    }
+
+    ApplyAIControllerClassFromProfile();
+    if (AIPerceptionComponent)
+    {
+        AIPerceptionComponent->Activate(true);
+    }
+
+    const ULastFPSEnemyDefinition* EnemyDefinition =
+        Cast<ULastFPSEnemyDefinition>(ResolveCharacterDefinition());
+    if (HasAuthority()
+        && WeaponComponent
+        && EnemyDefinition
+        && EnemyDefinition->InitialWeaponDefinition
+        && !WeaponComponent->HasWeapon())
+    {
+        WeaponComponent->EquipWeaponDefinition(
+            EnemyDefinition->InitialWeaponDefinition);
+    }
+}
+
+void ALastFPSEnemyCharacter::OnAcquiredFromPool_Implementation()
+{
+    GetWorldTimerManager().ClearTimer(DeathRemovalTimerHandle);
+    ResetDeathRagdoll();
+    SetActorEnableCollision(true);
+}
+
+void ALastFPSEnemyCharacter::OnReleasedToPool_Implementation()
+{
+    GetWorldTimerManager().ClearTimer(DeathRemovalTimerHandle);
+    ResetDeathRagdoll();
+    ClearRecentAttackers();
+
+    if (HasAuthority())
+    {
+        if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+        {
+            ASC->CancelAllAbilities();
+            ASC->RemoveActiveEffects(FGameplayEffectQuery());
+        }
+    }
+
+    if (AIPerceptionComponent)
+    {
+        AIPerceptionComponent->Deactivate();
+    }
+    if (HasAuthority() && WeaponComponent && WeaponComponent->HasWeapon())
+    {
+        WeaponComponent->UnequipWeapon();
+    }
+}
+
+void ALastFPSEnemyCharacter::OnPrepareForPoolRenderWarmup_Implementation()
+{
+    ResetDeathRagdoll();
+    if (USkeletalMeshComponent* MeshComp = GetMesh())
+    {
+        MeshComp->SetVisibility(true, true);
     }
 }
 

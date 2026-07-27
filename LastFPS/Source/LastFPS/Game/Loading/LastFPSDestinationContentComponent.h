@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Game/Loading/LastFPSLoadingProcessSubsystem.h"
 #include "LoadingProcessInterface.h"
 #include "RenderCommandFence.h"
 #include "LastFPSDestinationContentComponent.generated.h"
@@ -43,7 +44,13 @@ public:
      * 에셋 준비 콜백에서 실제로 생성한 Actor를 전달한다.
      * 등록된 렌더 컴포넌트의 PSO와 렌더 스레드 반영을 기다린 뒤 최종 Ready로 전환한다.
      */
-    void BeginRenderWarmup(const TArray<AActor*>& Actors);
+    void BeginRenderWarmup(
+        const TArray<AActor*>& Actors,
+        FSimpleDelegate OnWarmupCompleted = FSimpleDelegate());
+
+    /** GameMode의 풀 준비 구간을 목적지 콘텐츠 진행률에 반영한다. */
+    void BeginActorPoolPreparation();
+    void CompleteActorPoolPreparation();
 
     bool IsContentReady() const { return LoadState == EContentLoadState::Ready; }
 
@@ -64,12 +71,17 @@ private:
     };
 
     void BeginNextLoadPhase();
+    void PollAssetLoadProgress();
     void HandleLoadPhaseCompleted();
     void HandleAssetsLoaded();
     void PollRenderWarmup();
+    void CompleteRenderWarmup();
     bool IsRenderWarmupBusy(int32& OutCompilingComponents, int32& OutShaderJobs,
         uint32& OutPSORequests) const;
     void FinishLoad();
+    void RegisterLoadingProgress();
+    void UpdateLoadingProgress();
+    void CompleteLoadingProgress();
 
     /** 단계가 바뀌어도 앞 단계의 에셋을 목적지를 떠날 때까지 상주시킨다. */
     TArray<TSharedPtr<FStreamableHandle>> LoadHandles;
@@ -88,5 +100,13 @@ private:
     double WarmupStartSeconds = 0.0;
     int32 LoadPhase = 0;
     int32 StableRenderFrames = 0;
+    int32 MaxObservedShaderWork = 0;
+    float AssetStageProgress = 0.0f;
+    float PoolStageProgress = 0.0f;
+    float RenderStageProgress = 0.0f;
+    float ShaderStageProgress = 0.0f;
     FRenderCommandFence RenderRegistrationFence;
+    FSimpleDelegate RenderWarmupCompletedDelegate;
+    FLastFPSLoadingProcessHandle LoadingProcessHandle;
+    FTimerHandle AssetProgressTimerHandle;
 };

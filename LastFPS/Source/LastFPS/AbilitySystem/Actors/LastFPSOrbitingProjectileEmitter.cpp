@@ -9,6 +9,7 @@
 #include "Engine/World.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Projectiles/LastFPSProjectile.h"
+#include "Pooling/LastFPSActorPoolSubsystem.h"
 #include "Projectiles/LastFPSProjectileAimUtility.h"
 #include "TimerManager.h"
 #include "Engine/OverlapResult.h"
@@ -209,16 +210,29 @@ void ALastFPSOrbitingProjectileEmitter::FireProjectile()
 
 	const FRotator SpawnRotation = AimDirection.Rotation();
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = SourceCharacter;
-	SpawnParams.Instigator = SourceCharacter;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	ALastFPSProjectile* Projectile = World->SpawnActor<ALastFPSProjectile>(
-		Config.ProjectileData->ProjectileClass,
-		SpawnLocation,
-		SpawnRotation,
-		SpawnParams);
+	const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
+	ALastFPSProjectile* Projectile = nullptr;
+	if (ULastFPSActorPoolSubsystem* Pool =
+		World->GetSubsystem<ULastFPSActorPoolSubsystem>())
+	{
+		Projectile = Cast<ALastFPSProjectile>(Pool->AcquireActorByClass(
+			Config.ProjectileData->ProjectileClass,
+			SpawnTransform,
+			SourceCharacter,
+			SourceCharacter));
+	}
+	if (!Projectile)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Owner = SourceCharacter;
+		SpawnParams.Instigator = SourceCharacter;
+		SpawnParams.SpawnCollisionHandlingOverride =
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Projectile = World->SpawnActor<ALastFPSProjectile>(
+			Config.ProjectileData->ProjectileClass,
+			SpawnTransform,
+			SpawnParams);
+	}
 
 	if (!Projectile)
 	{

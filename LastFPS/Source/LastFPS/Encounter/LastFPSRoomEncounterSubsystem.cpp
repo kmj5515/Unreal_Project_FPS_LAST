@@ -10,6 +10,7 @@
 #include "Encounter/LastFPSRoomEncounterRuntime.h"
 #include "Game/LastFPSGameModeBase.h"
 #include "Game/Loading/LastFPSDestinationContentComponent.h"
+#include "Game/Streaming/LastFPSStreamingLevelTransitionSettings.h"
 #include "GameFramework/GameStateBase.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -188,11 +189,23 @@ void ULastFPSRoomEncounterSubsystem::InitializeRuntimeEncounters(
 		ATargetPoint::StaticClass(),
 		SpawnActors);
 
+	const ULastFPSStreamingLevelTransitionSettings* TransitionSettings =
+		GetDefault<ULastFPSStreamingLevelTransitionSettings>();
+
 	for (AActor* TriggerActor : TriggerActors)
 	{
 		ATriggerBox* TriggerVolume = Cast<ATriggerBox>(TriggerActor);
 		if (!TriggerVolume
 			|| !TriggerVolume->ActorHasTag(Profile.TriggerMarkerTag))
+		{
+			continue;
+		}
+
+		// 스트리밍 전환이 소유한 트리거는 Encounter와 중복 실행하지 않는다.
+		if (TransitionSettings
+			&& TransitionSettings->FindRouteForTrigger(
+				InWorld,
+				*TriggerVolume))
 		{
 			continue;
 		}

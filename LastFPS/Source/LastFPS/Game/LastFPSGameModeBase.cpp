@@ -1,6 +1,8 @@
 #include "Game/LastFPSGameModeBase.h"
 #include "AbilitySystemComponent.h"
 #include "Data/Characters/LastFPSCharacterStatData.h"
+#include "Data/Definitions/LastFPSActorPoolProfile.h"
+#include "Data/Definitions/LastFPSDestinationContentSet.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
@@ -13,6 +15,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/PlayerController.h"
+#include "Pooling/LastFPSActorPoolSubsystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSGameMode, Log, All);
 
@@ -102,6 +105,8 @@ void ALastFPSGameModeBase::HandleDestinationAssetsLoaded()
     }
 
     TArray<AActor*> WarmupActors;
+    FTransform PoolWarmupTransform = FTransform::Identity;
+    bool bHasPoolWarmupTransform = false;
     int32 RestartedPlayers = 0;
     for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
     {
@@ -115,18 +120,64 @@ void ALastFPSGameModeBase::HandleDestinationAssetsLoaded()
         if (PC && PC->GetPawn())
         {
             WarmupActors.Add(PC->GetPawn());
+            if (!bHasPoolWarmupTransform)
+            {
+                PoolWarmupTransform = PC->GetPawn()->GetActorTransform();
+                bHasPoolWarmupTransform = true;
+            }
             SetLocalWarmupInputBlocked(PC, true);
         }
     }
 
+    TArray<AActor*> PoolWarmupActors;
+    if (ULastFPSDestinationContentComponent* Content =
+        DestinationContentComponent.Get())
+    {
+        Content->BeginActorPoolPreparation();
+    }
+    if (ULastFPSActorPoolSubsystem* ActorPool =
+        World->GetSubsystem<ULastFPSActorPoolSubsystem>())
+    {
+        const ULastFPSActorPoolProfile* PoolProfile = DestinationContentSet
+            ? DestinationContentSet->FindFeature<ULastFPSActorPoolProfile>()
+            : nullptr;
+        ActorPool->PreparePools(
+            PoolProfile,
+            PoolWarmupTransform,
+            PoolWarmupActors);
+        WarmupActors.Append(PoolWarmupActors);
+    }
+    if (ULastFPSDestinationContentComponent* Content =
+        DestinationContentComponent.Get())
+    {
+        Content->CompleteActorPoolPreparation();
+    }
+
     UE_LOG(LogLastFPSGameMode, Log,
-        TEXT("에셋 준비 완료 — 대기 중이던 플레이어 %d명 스폰, 렌더 준비 Actor %d개"),
+        TEXT("에셋 준비 완료 — 플레이어 %d명 스폰, 렌더 준비 Actor %d개(풀 %d개)"),
         RestartedPlayers,
-        WarmupActors.Num());
+        WarmupActors.Num(),
+        PoolWarmupActors.Num());
 
     if (ULastFPSDestinationContentComponent* Content = DestinationContentComponent.Get())
     {
-        Content->BeginRenderWarmup(WarmupActors);
+        Content->BeginRenderWarmup(
+            WarmupActors,
+            FSimpleDelegate::CreateUObject(
+                this,
+                &ThisClass::HandleRenderWarmupCompleted));
+    }
+}
+
+void ALastFPSGameModeBase::HandleRenderWarmupCompleted()
+{
+    if (UWorld* World = GetWorld())
+    {
+        if (ULastFPSActorPoolSubsystem* ActorPool =
+            World->GetSubsystem<ULastFPSActorPoolSubsystem>())
+        {
+            ActorPool->FinalizePrewarm();
+        }
     }
 }
 

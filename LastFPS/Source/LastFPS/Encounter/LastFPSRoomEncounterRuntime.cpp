@@ -18,6 +18,7 @@
 #include "Materials/MaterialInterface.h"
 #include "NavigationSystem.h"
 #include "Net/UnrealNetwork.h"
+#include "Pooling/LastFPSActorPoolSubsystem.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSRoomEncounter, Log, All);
@@ -669,19 +670,39 @@ ALastFPSCharacterBase* ALastFPSRoomEncounterRuntime::SpawnEnemy(
 		return nullptr;
 	}
 
-	APawn* SpawnedPawn = World->SpawnActorDeferred<APawn>(
-		Definition.PawnClass,
-		SpawnTransform,
-		this,
-		nullptr,
-		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+	APawn* SpawnedPawn = nullptr;
+	bool bAcquiredFromPool = false;
+	if (ULastFPSActorPoolSubsystem* Pool =
+		World->GetSubsystem<ULastFPSActorPoolSubsystem>())
+	{
+		SpawnedPawn = Cast<APawn>(Pool->AcquireActorByClass(
+			Definition.PawnClass,
+			SpawnTransform,
+			this,
+			nullptr));
+		bAcquiredFromPool = SpawnedPawn != nullptr;
+	}
+	if (!SpawnedPawn)
+	{
+		SpawnedPawn = World->SpawnActorDeferred<APawn>(
+			Definition.PawnClass,
+			SpawnTransform,
+			this,
+			nullptr,
+			ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+	}
 
 	ALastFPSCharacterBase* SpawnedEnemy = Cast<ALastFPSCharacterBase>(SpawnedPawn);
 	if (!SpawnedPawn || !SpawnedEnemy)
 	{
 		if (SpawnedPawn)
 		{
-			SpawnedPawn->Destroy();
+			if (ULastFPSActorPoolSubsystem* Pool =
+				World->GetSubsystem<ULastFPSActorPoolSubsystem>();
+				!Pool || !Pool->ReleaseActor(SpawnedPawn))
+			{
+				SpawnedPawn->Destroy();
+			}
 		}
 		UE_LOG(
 			LogLastFPSRoomEncounter,
@@ -694,8 +715,32 @@ ALastFPSCharacterBase* ALastFPSRoomEncounterRuntime::SpawnEnemy(
 		return nullptr;
 	}
 
-	SpawnedEnemy->SetCharacterDefinitionForSpawn(&Definition);
-	SpawnedPawn->FinishSpawning(SpawnTransform);
+	if (bAcquiredFromPool)
+	{
+		SpawnedEnemy->ResetForPoolReuse(&Definition);
+
+		// 일반 Spawn의 AdjustIfPossibleButAlwaysSpawn은 컴포넌트 초기화 뒤 Capsule 겹침을 보정한다.
+		// 풀 Actor는 이미 BeginPlay를 마쳤으므로 상태 복구로 충돌을 켠 다음 같은 보정을 명시적으로 수행한다.
+		FVector AdjustedLocation = SpawnTransform.GetLocation();
+		const FRotator AdjustedRotation = SpawnTransform.Rotator();
+		if (World->FindTeleportSpot(
+			SpawnedPawn,
+			AdjustedLocation,
+			AdjustedRotation))
+		{
+			SpawnedPawn->SetActorLocationAndRotation(
+				AdjustedLocation,
+				AdjustedRotation,
+				false,
+				nullptr,
+				ETeleportType::TeleportPhysics);
+		}
+	}
+	else
+	{
+		SpawnedEnemy->SetCharacterDefinitionForSpawn(&Definition);
+		SpawnedPawn->FinishSpawning(SpawnTransform);
+	}
 	SpawnedPawn->SpawnDefaultController();
 	SpawnedEnemy->OnDeath.AddUObject(
 		this,
@@ -815,7 +860,12 @@ bool ALastFPSRoomEncounterRuntime::DebugForceCompleteEncounter()
 			Enemy->OnDestroyed.RemoveDynamic(
 				this,
 				&ALastFPSRoomEncounterRuntime::HandleEnemyDestroyed);
-			Enemy->Destroy();
+			if (ULastFPSActorPoolSubsystem* Pool =
+				GetWorld()->GetSubsystem<ULastFPSActorPoolSubsystem>();
+				!Pool || !Pool->ReleaseActor(Enemy))
+			{
+				Enemy->Destroy();
+			}
 		}
 	}
 	AliveEnemies.Reset();

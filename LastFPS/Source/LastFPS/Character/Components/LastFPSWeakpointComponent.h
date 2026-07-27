@@ -115,6 +115,8 @@ private:
     void EnsureGlowMID();
     /** 현재 단계 색(피격 시 흰색 블렌드 포함)과 강도를 MID에 함께 반영한다. */
     void ApplyGlow();
+    /** 약점 파괴 후 기본 표면은 유지하고 약점 발광 파라미터와 플래시 갱신만 비활성화한다. */
+    void DisableGlow();
     void StartFlash();
 
     /** 0(체력 만땅)~1(파괴 직전). */

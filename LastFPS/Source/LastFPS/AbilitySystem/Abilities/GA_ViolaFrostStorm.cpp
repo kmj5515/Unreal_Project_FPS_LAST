@@ -11,6 +11,7 @@
 #include "Data/Tables/LastFPSSkillBalanceData.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
+#include "Pooling/LastFPSActorPoolSpawn.h"
 #include "Utility/LastFPSTags.h"
 
 UGA_ViolaFrostStorm::UGA_ViolaFrostStorm()
@@ -262,21 +263,24 @@ void UGA_ViolaFrostStorm::SpawnFrostStorm(ALastFPSHero* Hero)
 	}
 
 	const FTransform SpawnTransform = BuildSpawnTransform(Hero);
-	ALastFPSAreaEffectActor* AreaActor = World->SpawnActorDeferred<ALastFPSAreaEffectActor>(
-		AreaClass,
-		SpawnTransform,
-		Hero,
-		Hero,
-		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	const FLastFPSAreaEffectConfig EffectiveAreaConfig = BuildAreaConfig();
+	ALastFPSAreaEffectActor* AreaActor =
+		LastFPSActorPool::AcquireOrSpawnDeferred<ALastFPSAreaEffectActor>(
+			*World,
+			AreaClass,
+			SpawnTransform,
+			Hero,
+			Hero,
+			[Hero, SourceASC, EffectiveAreaConfig](ALastFPSAreaEffectActor& Actor)
+			{
+				Actor.InitializeAreaEffect(Hero, SourceASC, EffectiveAreaConfig);
+			});
 	if (!AreaActor)
 	{
 		return;
 	}
 
 	bFrostStormSpawned = true;
-	const FLastFPSAreaEffectConfig EffectiveAreaConfig = BuildAreaConfig();
-	AreaActor->InitializeAreaEffect(Hero, SourceASC, EffectiveAreaConfig);
-	AreaActor->FinishSpawning(SpawnTransform);
 
 	DrawDebugLine(
 		GetCurrentActorInfo(),

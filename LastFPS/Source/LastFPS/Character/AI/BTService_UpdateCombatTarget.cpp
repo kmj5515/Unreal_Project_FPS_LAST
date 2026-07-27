@@ -19,6 +19,8 @@ UBTService_UpdateCombatTarget::UBTService_UpdateCombatTarget()
 	Interval = 0.15f;
 	RandomDeviation = 0.05f;
 	bNotifyTick = true;
+	
+	bCallTickOnSearchStart = true;
 }
 
 void UBTService_UpdateCombatTarget::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)

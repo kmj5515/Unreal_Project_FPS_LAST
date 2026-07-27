@@ -94,6 +94,7 @@ private:
     /** 게이트 컴포넌트가 없는 맵(GameState BP 재지정 등)에서는 게이트 없이 진행한다. */
     bool IsDestinationContentReady() const;
     void HandleDestinationAssetsLoaded();
+    void HandleRenderWarmupCompleted();
     void HandleDestinationContentReady();
     void SetLocalWarmupInputBlocked(APlayerController* PlayerController, bool bBlocked);
 

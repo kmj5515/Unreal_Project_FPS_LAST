@@ -67,6 +67,22 @@ void ULastFPSLoadingProcessSubsystem::BeginTravelLoading(const ELastFPSTravelDes
     BroadcastProgress(FGameplayTag());
 }
 
+void ULastFPSLoadingProcessSubsystem::EnsureLoadingTrackingActive()
+{
+    if (bLoadingActive)
+    {
+        return;
+    }
+
+    ResetSessionState();
+    bLoadingActive = true;
+    LoadingStartSeconds = FPlatformTime::Seconds();
+
+    UE_LOG(LogLastFPSLoadingProcess, Log,
+        TEXT("외부 로딩 게이트의 진행률 추적 세션을 시작합니다."));
+    BroadcastProgress(FGameplayTag());
+}
+
 void ULastFPSLoadingProcessSubsystem::CancelLoading(const FString& FailureReason)
 {
     if (!bLoadingActive)
@@ -110,6 +126,36 @@ FLastFPSLoadingProcessHandle ULastFPSLoadingProcessSubsystem::RegisterLoadingPro
 
     BroadcastProgress(ProcessTag);
     return Handle;
+}
+
+FLastFPSLoadingProcessHandle
+ULastFPSLoadingProcessSubsystem::RegisterLoadingProcessForTargetShare(
+    const FGameplayTag ProcessTag,
+    const float TargetShare,
+    const bool bRequired)
+{
+    if (TargetShare <= 0.0f || TargetShare >= 1.0f)
+    {
+        UE_LOG(LogLastFPSLoadingProcess, Warning,
+            TEXT("목표 점유율 기반 로딩 프로세스 등록 실패: Tag=%s, TargetShare=%.3f"),
+            *ProcessTag.ToString(),
+            TargetShare);
+        return FLastFPSLoadingProcessHandle();
+    }
+
+    float ExistingTotalWeight = 0.0f;
+    for (const TPair<FGuid, FLoadingProcessEntry>& Pair : Processes)
+    {
+        ExistingTotalWeight += FMath::Max(Pair.Value.Weight, 0.0f);
+    }
+
+    const float RelativeWeight = ExistingTotalWeight > KINDA_SMALL_NUMBER
+        ? ExistingTotalWeight * TargetShare / (1.0f - TargetShare)
+        : 1.0f;
+    return RegisterLoadingProcess(
+        ProcessTag,
+        RelativeWeight,
+        bRequired);
 }
 
 bool ULastFPSLoadingProcessSubsystem::SetLoadingProcessProgress(

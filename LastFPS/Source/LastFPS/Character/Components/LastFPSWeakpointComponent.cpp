@@ -1,9 +1,13 @@
 #include "Character/Components/LastFPSWeakpointComponent.h"
 
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbilityTypes.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Character.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
+#include "Utility/LastFPSTags.h"
 
 ULastFPSWeakpointComponent::ULastFPSWeakpointComponent()
 {
@@ -89,18 +93,47 @@ void ULastFPSWeakpointComponent::ApplyWeakpointDamage(float Damage)
     }
 
     WeakpointHealth = FMath::Max(WeakpointHealth - Damage, 0.f);
-    if (WeakpointHealth <= 0.f)
+    const bool bJustBroken = WeakpointHealth <= 0.f;
+    if (bJustBroken)
     {
         bBroken = true;
     }
 
-    // [진단] 임시 로그 — 약점 피해 적용 확인. 문제 해결 후 제거.
-    UE_LOG(LogTemp, Warning, TEXT("[Weakpoint] 약점피해 %.1f -> 체력 %.1f/%.1f, MID=%s"),
-        Damage, WeakpointHealth, WeakpointMaxHealth, GlowMID ? TEXT("있음") : TEXT("없음"));
+    if (bJustBroken)
+    {
+        DisableGlow();
+    }
+    else
+    {
+        // 파괴 전 피격만 반짝임을 전파한다. 파괴 시에는 복제된 체력이 각 클라이언트의 발광을 끈다.
+        ApplyGlow();
+        Multicast_PlayHitFlash();
+    }
 
-    // 서버 로컬 표시 갱신 + 모든 클라에 피격 반짝임 전파. 색 단계는 체력 복제(OnRep)로 반영된다.
-    ApplyGlow();
-    Multicast_PlayHitFlash();
+    if (bJustBroken)
+    {
+        FGameplayEventData EventData;
+        EventData.EventTag = LastFPSGameplayTags::Event_Enemy_WeakpointBroken;
+        EventData.Instigator = GetOwner();
+        EventData.Target = GetOwner();
+        EventData.OptionalObject = this;
+        EventData.EventMagnitude = Damage;
+
+        UAbilitySystemComponent* AbilitySystem =
+            UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+        const int32 ActivatedAbilityCount = AbilitySystem
+            ? AbilitySystem->HandleGameplayEvent(EventData.EventTag, &EventData)
+            : 0;
+        if (ActivatedAbilityCount <= 0)
+        {
+            UE_LOG(
+                LogTemp,
+                Warning,
+                TEXT("[Weakpoint] 파괴 이벤트를 처리할 Gameplay Ability가 없습니다. Owner=%s, Event=%s"),
+                *GetNameSafe(GetOwner()),
+                *EventData.EventTag.ToString());
+        }
+    }
 }
 
 void ULastFPSWeakpointComponent::Multicast_PlayHitFlash_Implementation()
@@ -115,6 +148,12 @@ void ULastFPSWeakpointComponent::OnRep_WeakpointHealth()
 
 void ULastFPSWeakpointComponent::StartFlash()
 {
+    if (WeakpointHealth <= 0.f)
+    {
+        DisableGlow();
+        return;
+    }
+
     CurrentGlowIntensity = HitFlashIntensity;
     ApplyGlow();
     SetComponentTickEnabled(true);
@@ -139,6 +178,12 @@ void ULastFPSWeakpointComponent::EnsureGlowMID()
 
 void ULastFPSWeakpointComponent::ApplyGlow()
 {
+    if (WeakpointHealth <= 0.f)
+    {
+        DisableGlow();
+        return;
+    }
+
     EnsureGlowMID();
     if (!GlowMID)
     {
@@ -151,6 +196,18 @@ void ULastFPSWeakpointComponent::ApplyGlow()
 
     GlowMID->SetVectorParameterValue(GlowColorParameterName, DisplayColor);
     GlowMID->SetScalarParameterValue(GlowIntensityParameterName, CurrentGlowIntensity);
+}
+
+void ULastFPSWeakpointComponent::DisableGlow()
+{
+    CurrentGlowIntensity = 0.f;
+    SetComponentTickEnabled(false);
+
+    EnsureGlowMID();
+    if (GlowMID)
+    {
+        GlowMID->SetScalarParameterValue(GlowIntensityParameterName, 0.f);
+    }
 }
 
 float ULastFPSWeakpointComponent::GetFlashAlpha() const

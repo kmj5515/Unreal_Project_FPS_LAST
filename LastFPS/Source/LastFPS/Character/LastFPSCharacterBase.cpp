@@ -52,6 +52,18 @@ UAbilitySystemComponent* ALastFPSCharacterBase::GetAbilitySystemComponent() cons
     return OwnedAbilitySystemComponent;
 }
 
+void ALastFPSCharacterBase::GetOwnedGameplayTags(
+    FGameplayTagContainer& TagContainer) const
+{
+    TagContainer = ReplicatedClassificationTags;
+    if (const UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+    {
+        FGameplayTagContainer AbilitySystemTags;
+        ASC->GetOwnedGameplayTags(AbilitySystemTags);
+        TagContainer.AppendTags(AbilitySystemTags);
+    }
+}
+
 bool ALastFPSCharacterBase::IsAlive() const
 {
     return AttributeSet && AttributeSet->GetHealth() > 0.f;
@@ -99,6 +111,51 @@ void ALastFPSCharacterBase::SetCharacterDefinitionForSpawn(ULastFPSCharacterDefi
     ReplicatedClassificationTags = InDefinition
         ? InDefinition->ClassificationTags
         : FGameplayTagContainer();
+}
+
+void ALastFPSCharacterBase::ResetForPoolReuse(
+    ULastFPSCharacterDefinition* InDefinition)
+{
+    SetCharacterDefinitionForSpawn(InDefinition);
+    if (!HasActorBegunPlay())
+    {
+        return;
+    }
+
+    bHasDied = false;
+    LastDamageImpulseDirection = FVector::ZeroVector;
+    ClearRecentAttackers();
+    ClearCombatEngaged();
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(CombatEngagedTimerHandle);
+    }
+
+    InitAbilitySystem();
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (HasAuthority() && ASC)
+    {
+        ASC->CancelAllAbilities();
+        ASC->ClearAllAbilities();
+        ASC->RemoveActiveEffects(FGameplayEffectQuery());
+
+        if (InDefinition)
+        {
+            InDefinition->GiveToAbilitySystem(ASC);
+        }
+        GiveDefaultAbilities();
+        ApplyDefaultEffects();
+    }
+
+    if (AttributeSet && GetCharacterMovement())
+    {
+        GetCharacterMovement()->MaxWalkSpeed =
+            ResolveMaxWalkSpeed(AttributeSet->GetMoveSpeed());
+    }
+
+    ApplyCharacterVisuals(InDefinition);
+    UpdateAliveCollisionState(IsAlive());
+    ForceNetUpdate();
 }
 
 const ULastFPSCharacterDefinition* ALastFPSCharacterBase::ResolveCharacterDefinition() const

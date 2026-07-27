@@ -6,6 +6,7 @@
 #include "Data/Projectiles/LastFPSAbilityProjectileData.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "Pooling/LastFPSActorPoolSubsystem.h"
 #include "Projectiles/LastFPSProjectile.h"
 
 namespace
@@ -84,11 +85,6 @@ ALastFPSProjectile* LastFPSProjectileLaunch::SpawnProjectile(const FLastFPSProje
 		}
 	}
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = SourceActor;
-	SpawnParams.Instigator = Cast<APawn>(SourceActor);
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
 	TSubclassOf<ALastFPSProjectile> ProjectileClass = ProjectileData->ProjectileClass;
 	if (Request.bUseEquippedWeapon)
 	{
@@ -102,11 +98,29 @@ ALastFPSProjectile* LastFPSProjectileLaunch::SpawnProjectile(const FLastFPSProje
 		}
 	}
 
-	ALastFPSProjectile* Projectile = World->SpawnActor<ALastFPSProjectile>(
-		ProjectileClass,
-		SpawnLocation,
-		AimDirection.Rotation(),
-		SpawnParams);
+	const FTransform SpawnTransform(AimDirection.Rotation(), SpawnLocation);
+	ALastFPSProjectile* Projectile = nullptr;
+	if (ULastFPSActorPoolSubsystem* Pool =
+		World->GetSubsystem<ULastFPSActorPoolSubsystem>())
+	{
+		Projectile = Cast<ALastFPSProjectile>(Pool->AcquireActorByClass(
+			ProjectileClass,
+			SpawnTransform,
+			SourceActor,
+			Cast<APawn>(SourceActor)));
+	}
+	if (!Projectile)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Owner = SourceActor;
+		SpawnParams.Instigator = Cast<APawn>(SourceActor);
+		SpawnParams.SpawnCollisionHandlingOverride =
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Projectile = World->SpawnActor<ALastFPSProjectile>(
+			ProjectileClass,
+			SpawnTransform,
+			SpawnParams);
+	}
 	if (!Projectile)
 	{
 		return nullptr;
@@ -132,7 +146,7 @@ ALastFPSProjectile* LastFPSProjectileLaunch::SpawnProjectile(const FLastFPSProje
 	}
 	if (Request.LifeSpanOverride > 0.f)
 	{
-		Projectile->SetLifeSpan(Request.LifeSpanOverride);
+		Projectile->SetGameplayLifeSpan(Request.LifeSpanOverride);
 	}
 
 	return Projectile;

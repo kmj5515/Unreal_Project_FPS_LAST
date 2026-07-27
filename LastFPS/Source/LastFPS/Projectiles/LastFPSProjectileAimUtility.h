@@ -10,4 +10,10 @@ namespace LastFPSProjectileAim
 	bool GetAimViewPoint(const AActor* SourceActor, FVector& OutLocation, FRotator& OutRotation);
 	FVector GetAimDirection(const AActor* SourceActor);
 	FVector GetAimTarget(UWorld* World, const AActor* SourceActor, const FVector& AimDirection, float TraceRange);
+	FVector GetAimTargetFromView(
+		UWorld* World,
+		const AActor* SourceActor,
+		const FVector& ViewLocation,
+		const FVector& AimDirection,
+		float TraceRange);
 }

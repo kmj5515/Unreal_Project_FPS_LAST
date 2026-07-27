@@ -15,6 +15,7 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Movement_Slow, "Status.Movement.Slow", "�
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Status_Movement_SpeedBoost, "Status.Movement.SpeedBoost", "이동속도 증가 효과가 활성화된 상태")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Combat_Disabled, "State.Combat.Disabled", "전투(무기/스킬) 어빌리티 사용이 금지된 상태")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(State_Enemy_KnockedDown, "State.Enemy.KnockedDown", "적이 약점 파괴 등으로 넉다운된 상태")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Location_Quest_Depot, "Location.Quest.Depot", "퀘스트 위치 목표 - 보급창고(도달)")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Location_Quest_Reactor, "Location.Quest.Reactor", "퀘스트 수호 대상 구역 - 리액터")
@@ -49,6 +50,8 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_ViolaFrostStormEffect, "Event.Monta
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_IceStormSpawn, "Event.Montage.IceStorm.Spawn", "Spawn an ice storm area from an ability montage")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Montage_GrapplingHookPull, "Event.Montage.GrapplingHook.Pull", "그래플링 훅 당김 시작")
 
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Event_Enemy_WeakpointBroken, "Event.Enemy.Weakpoint.Broken", "적 약점이 파괴된 순간 발생하는 이벤트")
+
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(UI_HUD_Visible, "UI.HUD.Visible", "HUD visibility status")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Move, "InputTag.Move", "Move input")
@@ -76,6 +79,8 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Skill1, "Ability.Skill1", "Skill 1 abilit
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Skill2, "Ability.Skill2", "Skill 2 ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Skill3, "Ability.Skill3", "Skill 3 ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Ultimate, "Ability.Ultimate", "Ultimate ability")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Enemy, "Ability.Enemy", "적 AI가 사용하는 모든 행동 어빌리티의 공통 부모")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Enemy_Boss_WeakpointKnockdown, "Ability.Enemy.Boss.WeakpointKnockdown", "보스 약점 파괴 넉다운")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_GrapplingHook, "Ability.GrapplingHook", "지형 그래플링 훅 어빌리티")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_ProbePassive, "Ability.Passive.Probe", "프로브 패시브 어빌리티")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Trigger_SpawnProbe, "Ability.Trigger.SpawnProbe", "프로브 생성 트리거 어빌리티")
@@ -89,5 +94,6 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Enemy_Boss_BurstCharge, "GameplayCue.
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Enemy_Boss_LaserCharge, "GameplayCue.Enemy.Boss.LaserCharge", "보스 레이저 예고 및 충전 연출")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Enemy_Boss_LaserPreview, "GameplayCue.Enemy.Boss.LaserPreview", "보스 레이저 고정 경로 예고 연출")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Enemy_Boss_LaserFire, "GameplayCue.Enemy.Boss.LaserFire", "보스 레이저 발사 연출")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Enemy_Boss_SpawnDissolve, "GameplayCue.Enemy.Boss.SpawnDissolve", "보스 스폰 디졸브 연출")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(GameplayCue_Player_GrapplingHook, "GameplayCue.Player.GrapplingHook", "플레이어 그래플링 와이어 연출")
 }

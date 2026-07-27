@@ -11,6 +11,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "GameplayEffect.h"
 #include "NiagaraCommon.h"
+#include "Pooling/LastFPSActorPoolSubsystem.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraComponent.h"
 #include "NiagaraCommon.h"
@@ -42,15 +43,7 @@ void ALastFPSExpandingMeshAttackActor::BeginPlay()
 {
 	Super::BeginPlay();
 
-	ConfigureAttack();
-	if (HasAuthority())
-	{
-		PreviousOuterRadius = FMath::Max(AttackConfig.StartOuterRadius, 0.01f);
-		ProcessRingHits(PreviousOuterRadius, PreviousOuterRadius);
-		SetLifeSpan(
-			FMath::Max(AttackConfig.ExpansionDuration, 0.01f)
-			+ FMath::Max(AttackConfig.LifeAfterExpansion, 0.f));
-	}
+	StartAttack();
 }
 
 void ALastFPSExpandingMeshAttackActor::Tick(const float DeltaSeconds)
@@ -94,11 +87,89 @@ void ALastFPSExpandingMeshAttackActor::InitializeAttack(
 	ExpansionStartServerTime = GetSynchronizedWorldTime();
 	PreviousOuterRadius = FMath::Max(InAttackConfig.StartOuterRadius, 0.01f);
 	AffectedActors.Reset();
-	ConfigureAttack();
+	if (HasActorBegunPlay())
+	{
+		StartAttack();
+	}
+	else
+	{
+		ConfigureAttack();
+	}
 	ForceNetUpdate();
 }
 
 void ALastFPSExpandingMeshAttackActor::OnRep_AttackState()
+{
+	SetActorTickEnabled(true);
+	ConfigureAttack();
+}
+
+void ALastFPSExpandingMeshAttackActor::StartAttack()
+{
+	GetWorldTimerManager().ClearTimer(AttackLifetimeTimerHandle);
+	SetActorTickEnabled(true);
+	ConfigureAttack();
+
+	if (HasAuthority())
+	{
+		PreviousOuterRadius = FMath::Max(AttackConfig.StartOuterRadius, 0.01f);
+		ProcessRingHits(PreviousOuterRadius, PreviousOuterRadius);
+		GetWorldTimerManager().SetTimer(
+			AttackLifetimeTimerHandle,
+			this,
+			&ThisClass::FinishAttack,
+			FMath::Max(AttackConfig.ExpansionDuration, 0.01f)
+				+ FMath::Max(AttackConfig.LifeAfterExpansion, 0.f),
+			false);
+	}
+}
+
+void ALastFPSExpandingMeshAttackActor::FinishAttack()
+{
+	if (ULastFPSActorPoolSubsystem* Pool =
+		GetWorld() ? GetWorld()->GetSubsystem<ULastFPSActorPoolSubsystem>() : nullptr)
+	{
+		if (Pool->ReleaseActor(this))
+		{
+			return;
+		}
+	}
+	Destroy();
+}
+
+void ALastFPSExpandingMeshAttackActor::OnAcquiredFromPool_Implementation()
+{
+	GetWorldTimerManager().ClearTimer(AttackLifetimeTimerHandle);
+	SourceActor.Reset();
+	SourceASC.Reset();
+	AttackConfig = FLastFPSExpandingMeshAttackConfig();
+	VisualState = FLastFPSExpandingMeshVisualState();
+	ExpansionStartServerTime = 0.f;
+	PreviousOuterRadius = 0.f;
+	AffectedActors.Reset();
+	SetActorTickEnabled(true);
+}
+
+void ALastFPSExpandingMeshAttackActor::OnReleasedToPool_Implementation()
+{
+	GetWorldTimerManager().ClearTimer(AttackLifetimeTimerHandle);
+	SourceActor.Reset();
+	SourceASC.Reset();
+	AttackConfig = FLastFPSExpandingMeshAttackConfig();
+	VisualState = FLastFPSExpandingMeshVisualState();
+	ExpansionStartServerTime = 0.f;
+	PreviousOuterRadius = 0.f;
+	AffectedActors.Reset();
+	SetActorTickEnabled(false);
+
+	if (EffectNiagaraComponent)
+	{
+		EffectNiagaraComponent->DeactivateImmediate();
+		EffectNiagaraComponent->SetAsset(nullptr);
+	}
+}
+
+void ALastFPSExpandingMeshAttackActor::OnPrepareForPoolRenderWarmup_Implementation()
 {
 	ConfigureAttack();
 }

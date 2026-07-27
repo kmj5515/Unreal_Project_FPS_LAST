@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Pooling/LastFPSPoolableActor.h"
+#include "TimerManager.h"
 #include "Utility/LastFPSDamageCalculation.h"
 #include "LastFPSProjectile.generated.h"
 
@@ -18,7 +20,9 @@ struct FLastFPSProjectileCollisionSettings;
 
 // VFX 전용 투사체 — 데미지는 GA_BasicShoot의 LineTrace가 처리
 UCLASS()
-class LASTFPS_API ALastFPSProjectile : public AActor
+class LASTFPS_API ALastFPSProjectile
+    : public AActor
+    , public ILastFPSPoolableActor
 {
     GENERATED_BODY()
 
@@ -32,6 +36,13 @@ public:
         ULastFPSProjectileVisualData* InVisualData,
         float InBaseDamageOverride = 0.f,
         const FLastFPSProjectileCollisionSettings* InCollisionSettings = nullptr);
+
+    /** 풀링 Actor의 Destroy를 대신하는 수명 타이머를 설정한다. */
+    void SetGameplayLifeSpan(float LifeSeconds);
+
+    virtual void OnAcquiredFromPool_Implementation() override;
+    virtual void OnReleasedToPool_Implementation() override;
+    virtual void OnPrepareForPoolRenderWarmup_Implementation() override;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Projectile")
     TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
@@ -72,6 +83,7 @@ private:
     void ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass);
     void ApplyVisualData();
     void PlayImpactFeedback(const FHitResult& ImpactResult);
+    void FinishProjectile();
 
     UPROPERTY()
     TObjectPtr<AActor> SourceActor;
@@ -88,4 +100,8 @@ private:
     float BaseDamageOverride = 0.f;
 
     bool bHasAppliedHit = false;
+    FTimerHandle GameplayLifeTimerHandle;
+
+    UPROPERTY(EditDefaultsOnly, Category="Projectile", meta=(ClampMin="0.0", Units="s"))
+    float DefaultGameplayLifeSpan = 1.5f;
 };

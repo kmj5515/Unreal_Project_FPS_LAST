@@ -8,6 +8,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Data/Enemies/LastFPSBossGroundSlamData.h"
 #include "Engine/World.h"
+#include "Pooling/LastFPSActorPoolSpawn.h"
 #include "Utility/LastFPSTags.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSBossGroundSlam, Log, All);
@@ -194,19 +195,23 @@ bool UGA_BossGroundSlam::SpawnExpandingMeshAttack()
 
 	const FTransform SpawnTransform = ResolveGroundTransform();
 	ALastFPSExpandingMeshAttackActor* AttackActor =
-		World->SpawnActorDeferred<ALastFPSExpandingMeshAttackActor>(
-		AttackActorClass,
-		SpawnTransform,
-		SourceEnemy,
-		SourceEnemy,
-		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		LastFPSActorPool::AcquireOrSpawnDeferred<ALastFPSExpandingMeshAttackActor>(
+			*World,
+			AttackActorClass,
+			SpawnTransform,
+			SourceEnemy,
+			SourceEnemy,
+			[this, SourceASC](ALastFPSExpandingMeshAttackActor& Actor)
+			{
+				Actor.InitializeAttack(
+					SourceEnemy,
+					SourceASC,
+					AttackData->AttackConfig);
+			});
 	if (!AttackActor)
 	{
 		return false;
 	}
-
-	AttackActor->InitializeAttack(SourceEnemy, SourceASC, AttackData->AttackConfig);
-	AttackActor->FinishSpawning(SpawnTransform);
 	return true;
 }
 

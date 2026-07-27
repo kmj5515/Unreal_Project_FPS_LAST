@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "GameplayTagContainer.h"
+#include "Pooling/LastFPSPoolableActor.h"
+#include "TimerManager.h"
 #include "Utility/LastFPSDamageCalculation.h"
 #include "LastFPSExpandingMeshAttackActor.generated.h"
 
@@ -137,7 +139,9 @@ struct LASTFPS_API FLastFPSExpandingMeshVisualState
 };
 
 UCLASS()
-class LASTFPS_API ALastFPSExpandingMeshAttackActor : public AActor
+class LASTFPS_API ALastFPSExpandingMeshAttackActor
+	: public AActor
+	, public ILastFPSPoolableActor
 {
 	GENERATED_BODY()
 
@@ -153,6 +157,10 @@ public:
 		UAbilitySystemComponent* InSourceASC,
 		const FLastFPSExpandingMeshAttackConfig& InAttackConfig);
 
+	virtual void OnAcquiredFromPool_Implementation() override;
+	virtual void OnReleasedToPool_Implementation() override;
+	virtual void OnPrepareForPoolRenderWarmup_Implementation() override;
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Expanding Mesh")
 	TObjectPtr<USceneComponent> SceneRoot;
@@ -165,6 +173,8 @@ private:
 	void OnRep_AttackState();
 
 	void ConfigureAttack();
+	void StartAttack();
+	void FinishAttack();
 	void UpdateExpansion();
 	void ProcessRingHits(float PreviousOuterRadius, float CurrentOuterRadius);
 	void DrawCollisionDebug(float CurrentOuterRadius) const;
@@ -194,4 +204,5 @@ private:
 
 	TSet<TWeakObjectPtr<AActor>> AffectedActors;
 	float PreviousOuterRadius = 0.f;
+	FTimerHandle AttackLifetimeTimerHandle;
 };

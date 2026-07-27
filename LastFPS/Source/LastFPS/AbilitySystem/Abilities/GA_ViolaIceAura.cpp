@@ -11,6 +11,7 @@
 #include "Engine/World.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
+#include "Pooling/LastFPSActorPoolSpawn.h"
 #include "Utility/LastFPSTags.h"
 
 UGA_ViolaIceAura::UGA_ViolaIceAura()
@@ -201,19 +202,22 @@ void UGA_ViolaIceAura::SpawnAuraAreaEffect()
 	}
 
 	const FTransform SpawnTransform = BuildAuraAreaSpawnTransform(Hero);
-	ALastFPSAreaEffectActor* AreaActor = World->SpawnActorDeferred<ALastFPSAreaEffectActor>(
-		AreaClass,
-		SpawnTransform,
-		Hero,
-		Hero,
-		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	const FLastFPSAreaEffectConfig AuraConfig = BuildAuraAreaConfig();
+	ALastFPSAreaEffectActor* AreaActor =
+		LastFPSActorPool::AcquireOrSpawnDeferred<ALastFPSAreaEffectActor>(
+			*World,
+			AreaClass,
+			SpawnTransform,
+			Hero,
+			Hero,
+			[Hero, SourceASC, AuraConfig](ALastFPSAreaEffectActor& Actor)
+			{
+				Actor.InitializeAreaEffect(Hero, SourceASC, AuraConfig);
+			});
 	if (!AreaActor)
 	{
 		return;
 	}
-
-	AreaActor->InitializeAreaEffect(Hero, SourceASC, BuildAuraAreaConfig());
-	AreaActor->FinishSpawning(SpawnTransform);
 }
 
 bool UGA_ViolaIceAura::ShouldSpawnAuraAreaEffect() const

@@ -53,9 +53,26 @@ FVector LastFPSProjectileAim::GetAimTarget(
 	const FVector TraceDirection = AimDirection.IsNearlyZero()
 		? ViewRotation.Vector().GetSafeNormal()
 		: AimDirection.GetSafeNormal();
-	const FVector TraceEnd = ViewLocation + TraceDirection * TraceRange;
 
-	if (!World || !SourceActor)
+	return GetAimTargetFromView(
+		World,
+		SourceActor,
+		ViewLocation,
+		TraceDirection,
+		TraceRange);
+}
+
+FVector LastFPSProjectileAim::GetAimTargetFromView(
+	UWorld* World,
+	const AActor* SourceActor,
+	const FVector& ViewLocation,
+	const FVector& AimDirection,
+	const float TraceRange)
+{
+	const FVector TraceDirection = AimDirection.GetSafeNormal();
+	const FVector TraceEnd = ViewLocation + TraceDirection * FMath::Max(TraceRange, 0.f);
+
+	if (!World || !SourceActor || TraceDirection.IsNearlyZero())
 	{
 		return TraceEnd;
 	}

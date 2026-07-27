@@ -38,7 +38,7 @@ void ULastFPSLoadingScreenWidget::NativeConstruct()
     if (PB_Loading)
     {
         PB_Loading->SetPercent(0.0f);
-        PB_Loading->SetIsMarquee(true);
+        PB_Loading->SetIsMarquee(false);
     }
     else
     {

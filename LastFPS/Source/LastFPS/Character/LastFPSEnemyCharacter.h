@@ -4,6 +4,7 @@
 #include "Character/LastFPSCharacterBase.h"
 #include "Character/Interfaces/LastFPSWeaponUser.h"
 #include "Perception/AIPerceptionTypes.h"
+#include "Pooling/LastFPSPoolableActor.h"
 #include "LastFPSEnemyCharacter.generated.h"
 
 class ALastFPSItemPickupActor;
@@ -26,7 +27,10 @@ struct FLastFPSEnemyDropEntry
 };
 
 UCLASS()
-class LASTFPS_API ALastFPSEnemyCharacter : public ALastFPSCharacterBase, public ILastFPSWeaponUser
+class LASTFPS_API ALastFPSEnemyCharacter
+    : public ALastFPSCharacterBase
+    , public ILastFPSWeaponUser
+    , public ILastFPSPoolableActor
 {
     GENERATED_BODY()
 
@@ -46,6 +50,11 @@ public:
     UFUNCTION(BlueprintPure, Category="Enemy|AI")
     const ULastFPSAIProfile* GetAIProfile() const;
 
+    virtual void ResetForPoolReuse(ULastFPSCharacterDefinition* InDefinition) override;
+    virtual void OnAcquiredFromPool_Implementation() override;
+    virtual void OnReleasedToPool_Implementation() override;
+    virtual void OnPrepareForPoolRenderWarmup_Implementation() override;
+
 protected:
     virtual void PostInitializeComponents() override;
     virtual void BeginPlay() override;
@@ -61,7 +70,7 @@ protected:
     /** GA가 생산한 조준 상태를 AnimBP와 원격 클라이언트에 전달한다. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Enemy|Combat Aim")
     TObjectPtr<ULastFPSCombatAimComponent> CombatAimComponent;
-    
+
     // 사망 시 드랍할 픽업 (비우면 드랍 없음).
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Drop")
     TSubclassOf<ALastFPSItemPickupActor> DropPickupClass;
@@ -102,6 +111,8 @@ private:
     void ApplyAIControllerClassFromProfile();
     void HandleOwnDeath(ALastFPSCharacterBase* DeadChar);
     void StartDeathRagdoll();
+    void ResetDeathRagdoll();
+    void FinishDeathRemoval();
 
     UFUNCTION(NetMulticast, Unreliable)
     void Multicast_ApplyDeathRagdollImpulse(FVector_NetQuantizeNormal ImpulseDirection);
@@ -110,4 +121,7 @@ private:
     FName PickWeightedDropRowId(float TotalWeight) const;
 
     bool bDeathRagdollStarted = false;
+    bool bMeshRelativeTransformCaptured = false;
+    FTransform InitialMeshRelativeTransform = FTransform::Identity;
+    FTimerHandle DeathRemovalTimerHandle;
 };

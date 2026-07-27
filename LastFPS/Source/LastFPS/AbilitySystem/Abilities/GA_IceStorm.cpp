@@ -12,6 +12,7 @@
 #include "GameFramework/Controller.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
+#include "Pooling/LastFPSActorPoolSpawn.h"
 #include "TimerManager.h"
 #include "Utility/LastFPSTags.h"
 
@@ -597,20 +598,23 @@ void UGA_IceStorm::SpawnAreaEffect()
 	const FTransform SpawnTransform = bHasCachedTargetTransform
 		? CachedTargetTransform
 		: FTransform(FRotator::ZeroRotator, CachedTargetLocation);
-	ALastFPSAreaEffectActor* AreaActor = World->SpawnActorDeferred<ALastFPSAreaEffectActor>(
-		AreaClass,
-		SpawnTransform,
-		Hero,
-		Hero,
-		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	ALastFPSAreaEffectActor* AreaActor =
+		LastFPSActorPool::AcquireOrSpawnDeferred<ALastFPSAreaEffectActor>(
+			*World,
+			AreaClass,
+			SpawnTransform,
+			Hero,
+			Hero,
+			[Hero, SourceASC, this](ALastFPSAreaEffectActor& Actor)
+			{
+				Actor.InitializeAreaEffect(Hero, SourceASC, BuildAreaConfig());
+			});
 	if (!AreaActor)
 	{
 		return;
 	}
 
 	bAreaSpawned = true;
-	AreaActor->InitializeAreaEffect(Hero, SourceASC, BuildAreaConfig());
-	AreaActor->FinishSpawning(SpawnTransform);
 }
 
 void UGA_IceStorm::ReleaseCastingState()

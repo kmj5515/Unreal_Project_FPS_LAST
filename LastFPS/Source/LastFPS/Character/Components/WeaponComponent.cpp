@@ -11,6 +11,7 @@
 #include "Weapons/WeaponPickupActor.h"
 #include "Weapons/LastFPSWeaponDataSubsystem.h"
 #include "Projectiles/LastFPSProjectile.h"
+#include "Pooling/LastFPSActorPoolSubsystem.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -474,16 +475,29 @@ void UWeaponComponent::ApplyDetachMagazineVisual()
         return;
     }
 
-    FActorSpawnParameters SpawnParameters;
-    SpawnParameters.Owner = OwnerCharacter;
-    SpawnParameters.Instigator = OwnerCharacter;
-    SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
     const FTransform SocketTransform = CharacterMesh->GetSocketTransform(Settings.HandSocketName, RTS_World);
-    AActor* MagazineVisual = World->SpawnActor<AActor>(
-        Settings.DetachedMagazineActorClass,
-        SocketTransform,
-        SpawnParameters);
+    AActor* MagazineVisual = nullptr;
+    if (ULastFPSActorPoolSubsystem* Pool =
+        World->GetSubsystem<ULastFPSActorPoolSubsystem>())
+    {
+        MagazineVisual = Pool->AcquireActorByClass(
+            Settings.DetachedMagazineActorClass,
+            SocketTransform,
+            OwnerCharacter,
+            OwnerCharacter);
+    }
+    if (!MagazineVisual)
+    {
+        FActorSpawnParameters SpawnParameters;
+        SpawnParameters.Owner = OwnerCharacter;
+        SpawnParameters.Instigator = OwnerCharacter;
+        SpawnParameters.SpawnCollisionHandlingOverride =
+            ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        MagazineVisual = World->SpawnActor<AActor>(
+            Settings.DetachedMagazineActorClass,
+            SocketTransform,
+            SpawnParameters);
+    }
     if (!MagazineVisual)
     {
         UE_LOG(LogTemp, Warning,
@@ -502,7 +516,12 @@ void UWeaponComponent::ApplyDetachMagazineVisual()
             TEXT("탄창 분리 실패: 생성한 탄창 '%s'을 손 소켓 '%s'에 부착하지 못했습니다."),
             *MagazineVisual->GetName(),
             *Settings.HandSocketName.ToString());
-        MagazineVisual->Destroy();
+        if (ULastFPSActorPoolSubsystem* Pool =
+            World->GetSubsystem<ULastFPSActorPoolSubsystem>();
+            !Pool || !Pool->ReleaseActor(MagazineVisual))
+        {
+            MagazineVisual->Destroy();
+        }
         return;
     }
 
@@ -518,7 +537,12 @@ void UWeaponComponent::ApplyRestoreMagazineVisual()
 {
     if (IsValid(DetachedMagazineVisual))
     {
-        DetachedMagazineVisual->Destroy();
+        if (ULastFPSActorPoolSubsystem* Pool =
+            GetWorld() ? GetWorld()->GetSubsystem<ULastFPSActorPoolSubsystem>() : nullptr;
+            !Pool || !Pool->ReleaseActor(DetachedMagazineVisual))
+        {
+            DetachedMagazineVisual->Destroy();
+        }
     }
     DetachedMagazineVisual = nullptr;
 
@@ -1088,13 +1112,29 @@ void UWeaponComponent::FireSinglePelletFromServer(
         DrawDebugSphere(World, AimTarget, 8.f, 12, FColor::Red, false, SafeDebugDuration);
     }
 
-    FActorSpawnParameters SpawnParams;
-    SpawnParams.Instigator = &Character;
-    SpawnParams.Owner = &Character;
-    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-    World->SpawnActor<ALastFPSProjectile>(ProjectileClass, MuzzleLocation, ProjectileRotation, SpawnParams);
-
+    const FTransform ProjectileTransform(ProjectileRotation, MuzzleLocation);
+    ALastFPSProjectile* VisualProjectile = nullptr;
+    if (ULastFPSActorPoolSubsystem* Pool =
+        World->GetSubsystem<ULastFPSActorPoolSubsystem>())
+    {
+        VisualProjectile = Cast<ALastFPSProjectile>(Pool->AcquireActorByClass(
+            ProjectileClass,
+            ProjectileTransform,
+            &Character,
+            &Character));
+    }
+    if (!VisualProjectile)
+    {
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.Instigator = &Character;
+        SpawnParams.Owner = &Character;
+        SpawnParams.SpawnCollisionHandlingOverride =
+            ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        VisualProjectile = World->SpawnActor<ALastFPSProjectile>(
+            ProjectileClass,
+            ProjectileTransform,
+            SpawnParams);
+    }
     AActor* HitActor = HitResult.GetActor();
     if (!bHit || !HitActor || !DamageEffectClass
         || !LastFPSDamage::IsDamageGameplayEffect(DamageEffectClass)

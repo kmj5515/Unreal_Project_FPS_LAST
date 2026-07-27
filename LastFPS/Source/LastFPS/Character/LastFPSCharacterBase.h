@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
 #include "GameplayEffectTypes.h"
+#include "GameplayTagAssetInterface.h"
 #include "GameplayTagContainer.h"
 #include "TimerManager.h"
 #include "LastFPSCharacterBase.generated.h"
@@ -23,7 +24,10 @@ class ALastFPSCharacterBase;
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnLastFPSCharacterDeath, ALastFPSCharacterBase* /*DeadChar*/);
 
 UCLASS(Abstract)
-class LASTFPS_API ALastFPSCharacterBase : public ACharacter, public IAbilitySystemInterface
+class LASTFPS_API ALastFPSCharacterBase
+    : public ACharacter
+    , public IAbilitySystemInterface
+    , public IGameplayTagAssetInterface
 {
     GENERATED_BODY()
 
@@ -34,6 +38,9 @@ public:
 
     // IAbilitySystemInterface — PlayerState의 ASC를 반환
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+
+    /** 캐릭터 분류 태그와 ASC 상태 태그를 표준 Gameplay Tag 인터페이스로 노출한다. */
+    virtual void GetOwnedGameplayTags(FGameplayTagContainer& TagContainer) const override;
 
     bool IsAlive() const;
 
@@ -74,6 +81,12 @@ public:
     FGameplayTag GetQuestKillTag() const { return QuestKillTag; }
 
     void SetCharacterDefinitionForSpawn(ULastFPSCharacterDefinition* InDefinition);
+
+    /**
+     * BeginPlay가 끝난 풀 Actor에 새 정의와 초기 상태를 다시 적용한다.
+     * 아직 BeginPlay 전인 Deferred Spawn에서는 정의만 저장하고 기존 초기화 흐름에 맡긴다.
+     */
+    virtual void ResetForPoolReuse(ULastFPSCharacterDefinition* InDefinition);
 
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayHitSound();

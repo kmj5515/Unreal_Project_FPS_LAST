@@ -4,16 +4,53 @@
 #include "Components/PrimitiveComponent.h"
 #include "Engine/AssetManager.h"
 #include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
 #include "Engine/StreamableManager.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/App.h"
+#include "NativeGameplayTags.h"
 #include "PipelineStateCache.h"
 #include "ShaderCompiler.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSDestinationContent, Log, All);
+
+namespace LastFPSDestinationContentProgress
+{
+    UE_DEFINE_GAMEPLAY_TAG_STATIC(Content, "Loading.Process.Destination.Content");
+
+    static FLastFPSDestinationLoadingProgressSettings ResolveSettings(
+        const ULastFPSDestinationContentSet* ContentSet)
+    {
+        FLastFPSDestinationLoadingProgressSettings Settings = ContentSet
+            ? ContentSet->LoadingProgress
+            : FLastFPSDestinationLoadingProgressSettings();
+
+        Settings.OverallProgressShare =
+            FMath::Clamp(Settings.OverallProgressShare, 0.05f, 0.95f);
+        Settings.AssetAndGameplayCueWeight =
+            FMath::Max(Settings.AssetAndGameplayCueWeight, 0.0f);
+        Settings.ActorPoolWeight =
+            FMath::Max(Settings.ActorPoolWeight, 0.0f);
+        Settings.RenderComponentWeight =
+            FMath::Max(Settings.RenderComponentWeight, 0.0f);
+        Settings.ShaderAndPSOWeight =
+            FMath::Max(Settings.ShaderAndPSOWeight, 0.0f);
+
+        const float TotalStageWeight =
+            Settings.AssetAndGameplayCueWeight
+            + Settings.ActorPoolWeight
+            + Settings.RenderComponentWeight
+            + Settings.ShaderAndPSOWeight;
+        if (TotalStageWeight <= KINDA_SMALL_NUMBER)
+        {
+            Settings = FLastFPSDestinationLoadingProgressSettings();
+        }
+        return Settings;
+    }
+}
 
 namespace LastFPSDestinationContentDebug
 {
@@ -120,6 +157,7 @@ void ULastFPSDestinationContentComponent::StartContentLoad(
 
     ActiveContentSet = ContentSet;
     LoadStartSeconds = FPlatformTime::Seconds();
+    RegisterLoadingProgress();
     BeginNextLoadPhase();
 }
 
@@ -171,6 +209,50 @@ void ULastFPSDestinationContentComponent::BeginNextLoadPhase()
     }
 
     LoadHandles.Add(MoveTemp(PhaseHandle));
+    if (UWorld* World = GetWorld();
+        World && !World->GetTimerManager().IsTimerActive(AssetProgressTimerHandle))
+    {
+        AssetProgressTimerHandle = World->GetTimerManager().SetTimerForNextTick(
+            this,
+            &ThisClass::PollAssetLoadProgress);
+    }
+}
+
+void ULastFPSDestinationContentComponent::PollAssetLoadProgress()
+{
+    if (LoadState != EContentLoadState::LoadingAssets)
+    {
+        return;
+    }
+
+    int32 LoadedPathCount = 0;
+    for (const FSoftObjectPath& Path : RequestedPaths)
+    {
+        LoadedPathCount += Path.ResolveObject() ? 1 : 0;
+    }
+
+    float HandleProgress = 0.0f;
+    if (!LoadHandles.IsEmpty() && LoadHandles.Last().IsValid())
+    {
+        HandleProgress = LoadHandles.Last()->GetProgress();
+    }
+
+    const float ResolvedPathProgress = RequestedPaths.IsEmpty()
+        ? 0.0f
+        : static_cast<float>(LoadedPathCount) / RequestedPaths.Num();
+
+    // 후속 단계에서 의존성이 추가될 수 있으므로 최종 완료 신호 전에는 100%를 예약한다.
+    const float MeasuredProgress =
+        FMath::Min(FMath::Max(ResolvedPathProgress, HandleProgress), 0.95f);
+    AssetStageProgress = FMath::Max(AssetStageProgress, MeasuredProgress);
+    UpdateLoadingProgress();
+
+    if (UWorld* World = GetWorld())
+    {
+        AssetProgressTimerHandle = World->GetTimerManager().SetTimerForNextTick(
+            this,
+            &ThisClass::PollAssetLoadProgress);
+    }
 }
 
 void ULastFPSDestinationContentComponent::HandleLoadPhaseCompleted()
@@ -192,6 +274,12 @@ void ULastFPSDestinationContentComponent::HandleAssetsLoaded()
     }
 
     LoadState = EContentLoadState::AwaitingRenderWarmup;
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(AssetProgressTimerHandle);
+    }
+    AssetStageProgress = 1.0f;
+    UpdateLoadingProgress();
 
     UE_LOG(LogLastFPSDestinationContent, Log,
         TEXT("목적지 에셋 로드 완료 — 실제 Pawn 생성 및 렌더 컴포넌트 준비 요청"));
@@ -205,7 +293,21 @@ void ULastFPSDestinationContentComponent::HandleAssetsLoaded()
     }
 }
 
-void ULastFPSDestinationContentComponent::BeginRenderWarmup(const TArray<AActor*>& Actors)
+void ULastFPSDestinationContentComponent::BeginActorPoolPreparation()
+{
+    PoolStageProgress = 0.0f;
+    UpdateLoadingProgress();
+}
+
+void ULastFPSDestinationContentComponent::CompleteActorPoolPreparation()
+{
+    PoolStageProgress = 1.0f;
+    UpdateLoadingProgress();
+}
+
+void ULastFPSDestinationContentComponent::BeginRenderWarmup(
+    const TArray<AActor*>& Actors,
+    FSimpleDelegate OnWarmupCompleted)
 {
     if (LoadState != EContentLoadState::AwaitingRenderWarmup)
     {
@@ -214,7 +316,10 @@ void ULastFPSDestinationContentComponent::BeginRenderWarmup(const TArray<AActor*
         return;
     }
 
+    CompleteActorPoolPreparation();
+    RenderWarmupCompletedDelegate = MoveTemp(OnWarmupCompleted);
     WarmupComponents.Reset();
+    MaxObservedShaderWork = 0;
 
     for (AActor* Actor : Actors)
     {
@@ -246,7 +351,10 @@ void ULastFPSDestinationContentComponent::BeginRenderWarmup(const TArray<AActor*
             Settings.bEnabled ? TEXT("예") : TEXT("아니요"),
             FApp::CanEverRender() ? TEXT("예") : TEXT("아니요"),
             WarmupComponents.Num());
-        FinishLoad();
+        RenderStageProgress = 1.0f;
+        ShaderStageProgress = 1.0f;
+        UpdateLoadingProgress();
+        CompleteRenderWarmup();
         return;
     }
 
@@ -268,7 +376,7 @@ void ULastFPSDestinationContentComponent::BeginRenderWarmup(const TArray<AActor*
     }
     else
     {
-        FinishLoad();
+        CompleteRenderWarmup();
     }
 }
 
@@ -315,6 +423,31 @@ void ULastFPSDestinationContentComponent::PollRenderWarmup()
         ShaderJobs,
         PSORequests);
 
+    const bool bRenderFenceComplete = RenderRegistrationFence.IsFenceComplete();
+    const int32 TotalComponents = WarmupComponents.Num();
+    const float MeasuredRenderProgress = TotalComponents > 0
+        ? 1.0f - static_cast<float>(CompilingComponents) / TotalComponents
+        : 1.0f;
+    const float CappedRenderProgress = bRenderFenceComplete
+        ? MeasuredRenderProgress
+        : FMath::Min(MeasuredRenderProgress, 0.95f);
+    RenderStageProgress = FMath::Max(
+        RenderStageProgress,
+        FMath::Clamp(CappedRenderProgress, 0.0f, 0.95f));
+
+    const int32 RemainingShaderWork =
+        FMath::Max(ShaderJobs, 0) + static_cast<int32>(PSORequests);
+    MaxObservedShaderWork = FMath::Max(
+        MaxObservedShaderWork,
+        RemainingShaderWork);
+    const float MeasuredShaderProgress = MaxObservedShaderWork > 0
+        ? 1.0f - static_cast<float>(RemainingShaderWork) / MaxObservedShaderWork
+        : 0.0f;
+    ShaderStageProgress = FMath::Max(
+        ShaderStageProgress,
+        FMath::Clamp(MeasuredShaderProgress, 0.0f, 0.95f));
+    UpdateLoadingProgress();
+
     StableRenderFrames = bBusy ? 0 : StableRenderFrames + 1;
 
     const FLastFPSRenderWarmupSettings Settings =
@@ -328,7 +461,7 @@ void ULastFPSDestinationContentComponent::PollRenderWarmup()
             TEXT("플레이어 렌더 준비 완료 — 컴포넌트 %d개, %.1fms"),
             WarmupComponents.Num(),
             ElapsedSeconds * 1000.0);
-        FinishLoad();
+        CompleteRenderWarmup();
         return;
     }
 
@@ -341,7 +474,7 @@ void ULastFPSDestinationContentComponent::PollRenderWarmup()
             CompilingComponents,
             ShaderJobs,
             PSORequests);
-        FinishLoad();
+        CompleteRenderWarmup();
         return;
     }
 
@@ -352,8 +485,22 @@ void ULastFPSDestinationContentComponent::PollRenderWarmup()
     }
     else
     {
-        FinishLoad();
+        CompleteRenderWarmup();
     }
+}
+
+void ULastFPSDestinationContentComponent::CompleteRenderWarmup()
+{
+    RenderStageProgress = 1.0f;
+    ShaderStageProgress = 1.0f;
+    UpdateLoadingProgress();
+
+    if (RenderWarmupCompletedDelegate.IsBound())
+    {
+        RenderWarmupCompletedDelegate.Execute();
+        RenderWarmupCompletedDelegate.Unbind();
+    }
+    FinishLoad();
 }
 
 void ULastFPSDestinationContentComponent::FinishLoad()
@@ -363,7 +510,12 @@ void ULastFPSDestinationContentComponent::FinishLoad()
         return;
     }
 
+    AssetStageProgress = 1.0f;
+    PoolStageProgress = 1.0f;
+    RenderStageProgress = 1.0f;
+    ShaderStageProgress = 1.0f;
     LoadState = EContentLoadState::Ready;
+    CompleteLoadingProgress();
     const double ElapsedMs =
         (FPlatformTime::Seconds() - LoadStartSeconds) * 1000.0;
 
@@ -382,6 +534,84 @@ void ULastFPSDestinationContentComponent::FinishLoad()
     OnContentReady.Broadcast();
 }
 
+void ULastFPSDestinationContentComponent::RegisterLoadingProgress()
+{
+    UGameInstance* GameInstance =
+        GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+    ULastFPSLoadingProcessSubsystem* LoadingProcesses = GameInstance
+        ? GameInstance->GetSubsystem<ULastFPSLoadingProcessSubsystem>()
+        : nullptr;
+    if (!LoadingProcesses)
+    {
+        return;
+    }
+
+    LoadingProcesses->EnsureLoadingTrackingActive();
+
+    const FLastFPSDestinationLoadingProgressSettings Settings =
+        LastFPSDestinationContentProgress::ResolveSettings(ActiveContentSet);
+    LoadingProcessHandle =
+        LoadingProcesses->RegisterLoadingProcessForTargetShare(
+            LastFPSDestinationContentProgress::Content,
+            Settings.OverallProgressShare,
+            true);
+    UpdateLoadingProgress();
+}
+
+void ULastFPSDestinationContentComponent::UpdateLoadingProgress()
+{
+    if (!LoadingProcessHandle.IsValid())
+    {
+        return;
+    }
+
+    UGameInstance* GameInstance =
+        GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+    ULastFPSLoadingProcessSubsystem* LoadingProcesses = GameInstance
+        ? GameInstance->GetSubsystem<ULastFPSLoadingProcessSubsystem>()
+        : nullptr;
+    if (!LoadingProcesses)
+    {
+        return;
+    }
+
+    const FLastFPSDestinationLoadingProgressSettings Settings =
+        LastFPSDestinationContentProgress::ResolveSettings(ActiveContentSet);
+    const float TotalStageWeight =
+        Settings.AssetAndGameplayCueWeight
+        + Settings.ActorPoolWeight
+        + Settings.RenderComponentWeight
+        + Settings.ShaderAndPSOWeight;
+    const float WeightedProgress =
+        AssetStageProgress * Settings.AssetAndGameplayCueWeight
+        + PoolStageProgress * Settings.ActorPoolWeight
+        + RenderStageProgress * Settings.RenderComponentWeight
+        + ShaderStageProgress * Settings.ShaderAndPSOWeight;
+    const float ContentProgress = TotalStageWeight > KINDA_SMALL_NUMBER
+        ? WeightedProgress / TotalStageWeight
+        : 0.0f;
+    LoadingProcesses->SetLoadingProcessProgress(
+        LoadingProcessHandle,
+        FMath::Clamp(ContentProgress, 0.0f, 1.0f));
+}
+
+void ULastFPSDestinationContentComponent::CompleteLoadingProgress()
+{
+    if (!LoadingProcessHandle.IsValid())
+    {
+        return;
+    }
+
+    UGameInstance* GameInstance =
+        GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+    if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GameInstance
+        ? GameInstance->GetSubsystem<ULastFPSLoadingProcessSubsystem>()
+        : nullptr)
+    {
+        LoadingProcesses->CompleteLoadingProcess(LoadingProcessHandle);
+    }
+}
+
 void ULastFPSDestinationContentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     OnAssetsLoaded.Clear();
@@ -397,7 +627,13 @@ void ULastFPSDestinationContentComponent::EndPlay(const EEndPlayReason::Type End
     LoadHandles.Reset();
     RequestedPaths.Reset();
     WarmupComponents.Reset();
+    RenderWarmupCompletedDelegate.Unbind();
     ActiveContentSet = nullptr;
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(AssetProgressTimerHandle);
+    }
+    LoadingProcessHandle = FLastFPSLoadingProcessHandle();
 
     Super::EndPlay(EndPlayReason);
 }
