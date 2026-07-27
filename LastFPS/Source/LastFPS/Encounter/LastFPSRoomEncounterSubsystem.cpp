@@ -1,19 +1,21 @@
 #include "Encounter/LastFPSRoomEncounterSubsystem.h"
 
-#include "Encounter/LastFPSRoomEncounterRuntime.h"
-#include "Encounter/LastFPSRoomEncounterSettings.h"
+#include "Data/Definitions/LastFPSDestinationContentSet.h"
+#include "Data/Definitions/LastFPSRoomEncounterProfile.h"
 #include "Data/Tables/LastFPSRoomEncounterData.h"
-#include "Engine/AssetManager.h"
 #include "Engine/DataTable.h"
-#include "Engine/StreamableManager.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/TriggerBox.h"
 #include "Engine/World.h"
+#include "Encounter/LastFPSRoomEncounterRuntime.h"
+#include "Game/LastFPSGameModeBase.h"
+#include "Game/Loading/LastFPSDestinationContentComponent.h"
+#include "GameFramework/GameStateBase.h"
 #include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSRoomEncounterSubsystem, Log, All);
 
-namespace
+namespace LastFPSRoomEncounterSubsystemInternal
 {
 	FName ResolveEncounterId(
 		const AActor& Actor,
@@ -48,127 +50,163 @@ void ULastFPSRoomEncounterSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		return;
 	}
 
-	const ULastFPSRoomEncounterSettings* Settings = GetDefault<ULastFPSRoomEncounterSettings>();
-	if (!Settings)
+	ALastFPSGameModeBase* GameMode =
+		InWorld.GetAuthGameMode<ALastFPSGameModeBase>();
+	ULastFPSDestinationContentSet* ContentSet =
+		GameMode ? GameMode->GetDestinationContentSet() : nullptr;
+	ActiveProfile = ContentSet
+		? ContentSet->FindFeature<ULastFPSRoomEncounterProfile>()
+		: nullptr;
+
+	if (!ActiveProfile)
 	{
-		UE_LOG(LogLastFPSRoomEncounterSubsystem, Error, TEXT("방 전투 설정을 찾을 수 없습니다."));
+		UE_LOG(
+			LogLastFPSRoomEncounterSubsystem,
+			Verbose,
+			TEXT("현재 GameMode에는 Room Encounter Profile이 없어 Encounter를 생성하지 않습니다: %s"),
+			*GetNameSafe(GameMode));
 		return;
 	}
 
-	UDataTable* EncounterTable = Settings->EncounterTable.Get();
-	if (EncounterTable)
-	{
-		InitializeRuntimeEncounters(InWorld, *EncounterTable);
-		return;
-	}
-
-	const FSoftObjectPath EncounterTablePath = Settings->EncounterTable.ToSoftObjectPath();
-	if (!EncounterTablePath.IsValid())
+	FString FailureReason;
+	if (!ActiveProfile->IsConfigurationValid(FailureReason))
 	{
 		UE_LOG(
 			LogLastFPSRoomEncounterSubsystem,
 			Error,
-			TEXT("Room Encounter Data Table 경로가 설정되지 않았습니다."));
+			TEXT("Room Encounter Profile 구성이 유효하지 않습니다: Profile=%s, 원인=%s"),
+			*GetNameSafe(ActiveProfile),
+			*FailureReason);
 		return;
 	}
 
-	EncounterTableLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
-		EncounterTablePath,
-		FStreamableDelegate::CreateUObject(
-			this,
-			&ULastFPSRoomEncounterSubsystem::HandleEncounterTableLoaded),
-		FStreamableManager::AsyncLoadHighPriority);
-	if (!EncounterTableLoadHandle.IsValid())
+	AGameStateBase* GameState = InWorld.GetGameState();
+	DestinationContentComponent = GameState
+		? GameState->FindComponentByClass<ULastFPSDestinationContentComponent>()
+		: nullptr;
+
+	ULastFPSDestinationContentComponent* Content =
+		DestinationContentComponent.Get();
+	if (!Content)
 	{
 		UE_LOG(
 			LogLastFPSRoomEncounterSubsystem,
 			Error,
-			TEXT("Room Encounter Data Table 비동기 로드를 시작하지 못했습니다: %s"),
-			*EncounterTablePath.ToString());
+			TEXT("중앙 콘텐츠 로딩 컴포넌트가 없어 Encounter 초기화를 시작할 수 없습니다: GameState=%s"),
+			*GetNameSafe(GameState));
+		return;
 	}
+
+	if (Content->IsContentReady())
+	{
+		HandleDestinationContentReady();
+		return;
+	}
+
+	ContentReadyHandle = Content->OnContentReady.AddUObject(
+		this,
+		&ThisClass::HandleDestinationContentReady);
 }
 
-void ULastFPSRoomEncounterSubsystem::HandleEncounterTableLoaded()
+void ULastFPSRoomEncounterSubsystem::HandleDestinationContentReady()
 {
+	if (bRuntimeEncountersInitialized)
+	{
+		return;
+	}
+
+	if (ULastFPSDestinationContentComponent* Content =
+		DestinationContentComponent.Get())
+	{
+		Content->OnContentReady.Remove(ContentReadyHandle);
+	}
+	ContentReadyHandle.Reset();
+
 	UWorld* World = GetWorld();
-	const ULastFPSRoomEncounterSettings* Settings = GetDefault<ULastFPSRoomEncounterSettings>();
-	UDataTable* EncounterTable = Settings ? Settings->EncounterTable.Get() : nullptr;
+	if (!World || !ActiveProfile)
+	{
+		return;
+	}
+
+	UDataTable* EncounterTable = ActiveProfile->EncounterTable.Get();
 	if (!EncounterTable)
 	{
 		UE_LOG(
 			LogLastFPSRoomEncounterSubsystem,
 			Error,
-			TEXT("Room Encounter Data Table 비동기 로드 결과가 유효하지 않습니다."));
-		EncounterTableLoadHandle.Reset();
+			TEXT("중앙 콘텐츠 로딩이 완료됐지만 EncounterTable이 메모리에 없습니다: Profile=%s, Path=%s"),
+			*GetNameSafe(ActiveProfile),
+			*ActiveProfile->EncounterTable.ToString());
 		return;
 	}
 
-	if (!World)
-	{
-		EncounterTableLoadHandle.Reset();
-		return;
-	}
-
-	InitializeRuntimeEncounters(*World, *EncounterTable);
-	EncounterTableLoadHandle.Reset();
+	bRuntimeEncountersInitialized = true;
+	InitializeRuntimeEncounters(*World, *EncounterTable, *ActiveProfile);
 }
 
 void ULastFPSRoomEncounterSubsystem::Deinitialize()
 {
-	if (EncounterTableLoadHandle.IsValid())
+	if (ULastFPSDestinationContentComponent* Content =
+		DestinationContentComponent.Get())
 	{
-		EncounterTableLoadHandle->CancelHandle();
-		EncounterTableLoadHandle.Reset();
+		Content->OnContentReady.Remove(ContentReadyHandle);
 	}
+
+	ContentReadyHandle.Reset();
+	DestinationContentComponent.Reset();
 	RuntimeEncounters.Reset();
+	ActiveProfile = nullptr;
+	bRuntimeEncountersInitialized = false;
 	Super::Deinitialize();
 }
 
 void ULastFPSRoomEncounterSubsystem::InitializeRuntimeEncounters(
 	UWorld& InWorld,
-	UDataTable& EncounterTable)
+	UDataTable& EncounterTable,
+	const ULastFPSRoomEncounterProfile& Profile)
 {
-	const ULastFPSRoomEncounterSettings* Settings = GetDefault<ULastFPSRoomEncounterSettings>();
-	if (!Settings)
+	if (EncounterTable.GetRowStruct()
+		!= FLastFPSRoomEncounterData::StaticStruct())
 	{
 		UE_LOG(
 			LogLastFPSRoomEncounterSubsystem,
 			Error,
-			TEXT("룸 인카운터 런타임 생성 실패: 설정 기본 객체를 찾을 수 없습니다."));
-		return;
-	}
-
-	if (EncounterTable.GetRowStruct() != FLastFPSRoomEncounterData::StaticStruct())
-	{
-		UE_LOG(
-			LogLastFPSRoomEncounterSubsystem,
-			Error,
-			TEXT("방 전투 Data Table의 Row Structure가 FLastFPSRoomEncounterData가 아닙니다: %s"),
+			TEXT("Room Encounter Data Table의 Row Structure가 FLastFPSRoomEncounterData가 아닙니다: %s"),
 			*GetNameSafe(&EncounterTable));
 		return;
 	}
 
 	TArray<AActor*> TriggerActors;
-	UGameplayStatics::GetAllActorsOfClass(&InWorld, ATriggerBox::StaticClass(), TriggerActors);
+	UGameplayStatics::GetAllActorsOfClass(
+		&InWorld,
+		ATriggerBox::StaticClass(),
+		TriggerActors);
 
 	TArray<AActor*> SpawnActors;
-	UGameplayStatics::GetAllActorsOfClass(&InWorld, ATargetPoint::StaticClass(), SpawnActors);
+	UGameplayStatics::GetAllActorsOfClass(
+		&InWorld,
+		ATargetPoint::StaticClass(),
+		SpawnActors);
 
 	for (AActor* TriggerActor : TriggerActors)
 	{
 		ATriggerBox* TriggerVolume = Cast<ATriggerBox>(TriggerActor);
-		if (!TriggerVolume || !TriggerVolume->ActorHasTag(Settings->TriggerMarkerTag))
+		if (!TriggerVolume
+			|| !TriggerVolume->ActorHasTag(Profile.TriggerMarkerTag))
 		{
 			continue;
 		}
 
-		const FName EncounterId = ResolveEncounterId(*TriggerVolume, EncounterTable);
+		const FName EncounterId =
+			LastFPSRoomEncounterSubsystemInternal::ResolveEncounterId(
+				*TriggerVolume,
+				EncounterTable);
 		if (EncounterId.IsNone())
 		{
 			UE_LOG(
 				LogLastFPSRoomEncounterSubsystem,
 				Error,
-				TEXT("트리거 %s에 Data Table 행과 일치하는 Encounter 식별 태그가 없습니다."),
+				TEXT("트리거 '%s'에 Data Table Row와 일치하는 Encounter 식별 태그가 없습니다."),
 				*TriggerVolume->GetName());
 			continue;
 		}
@@ -177,13 +215,16 @@ void ULastFPSRoomEncounterSubsystem::InitializeRuntimeEncounters(
 			TEXT("RoomEncounterSubsystem:%s"),
 			*EncounterId.ToString());
 		const FLastFPSRoomEncounterData* EncounterData =
-			EncounterTable.FindRow<FLastFPSRoomEncounterData>(EncounterId, RowContext, true);
+			EncounterTable.FindRow<FLastFPSRoomEncounterData>(
+				EncounterId,
+				RowContext,
+				true);
 		if (!EncounterData)
 		{
 			UE_LOG(
 				LogLastFPSRoomEncounterSubsystem,
 				Error,
-				TEXT("[%s] Encounter Data Table 행을 찾을 수 없습니다: %s"),
+				TEXT("[%s] Encounter Data Table Row를 찾을 수 없습니다: %s"),
 				*EncounterId.ToString(),
 				*GetNameSafe(&EncounterTable));
 			continue;
@@ -206,7 +247,7 @@ void ULastFPSRoomEncounterSubsystem::InitializeRuntimeEncounters(
 		{
 			ATriggerBox* CandidateBox = Cast<ATriggerBox>(Candidate);
 			if (CandidateBox
-				&& CandidateBox->ActorHasTag(Settings->BarrierMarkerTag)
+				&& CandidateBox->ActorHasTag(Profile.BarrierMarkerTag)
 				&& CandidateBox->ActorHasTag(EncounterId))
 			{
 				BarrierVolumes.Add(CandidateBox);
@@ -228,7 +269,7 @@ void ULastFPSRoomEncounterSubsystem::InitializeRuntimeEncounters(
 		{
 			ATargetPoint* SpawnPoint = Cast<ATargetPoint>(SpawnActor);
 			if (SpawnPoint
-				&& SpawnPoint->ActorHasTag(Settings->SpawnMarkerTag)
+				&& SpawnPoint->ActorHasTag(Profile.SpawnMarkerTag)
 				&& SpawnPoint->ActorHasTag(EncounterId))
 			{
 				SpawnPoints.Add(SpawnPoint);
@@ -248,22 +289,26 @@ void ULastFPSRoomEncounterSubsystem::InitializeRuntimeEncounters(
 		const FName RuntimeName = MakeUniqueObjectName(
 			&InWorld,
 			ALastFPSRoomEncounterRuntime::StaticClass(),
-			FName(*FString::Printf(TEXT("RoomEncounterRuntime_%s"), *EncounterId.ToString())));
+			FName(*FString::Printf(
+				TEXT("RoomEncounterRuntime_%s"),
+				*EncounterId.ToString())));
+
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.Name = RuntimeName;
 		SpawnParameters.SpawnCollisionHandlingOverride =
 			ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-		ALastFPSRoomEncounterRuntime* Runtime = InWorld.SpawnActor<ALastFPSRoomEncounterRuntime>(
-			ALastFPSRoomEncounterRuntime::StaticClass(),
-			FTransform::Identity,
-			SpawnParameters);
+		ALastFPSRoomEncounterRuntime* Runtime =
+			InWorld.SpawnActor<ALastFPSRoomEncounterRuntime>(
+				ALastFPSRoomEncounterRuntime::StaticClass(),
+				FTransform::Identity,
+				SpawnParameters);
 		if (!Runtime)
 		{
 			UE_LOG(
 				LogLastFPSRoomEncounterSubsystem,
 				Error,
-				TEXT("[%s] 런타임 전투 액터 생성에 실패했습니다."),
+				TEXT("[%s] Room Encounter Runtime Actor 생성에 실패했습니다."),
 				*EncounterId.ToString());
 			continue;
 		}
@@ -273,35 +318,43 @@ void ULastFPSRoomEncounterSubsystem::InitializeRuntimeEncounters(
 			*TriggerVolume,
 			BarrierVolumes,
 			SpawnPoints,
-			*EncounterData);
+			*EncounterData,
+			Profile);
 		RuntimeEncounters.Add(Runtime);
 	}
 
 	UE_LOG(
 		LogLastFPSRoomEncounterSubsystem,
 		Log,
-		TEXT("방 전투 런타임 %d개를 초기화했습니다."),
-		RuntimeEncounters.Num());
+		TEXT("Room Encounter Runtime %d개를 초기화했습니다: Profile=%s"),
+		RuntimeEncounters.Num(),
+		*GetNameSafe(&Profile));
 }
 
 #if !UE_BUILD_SHIPPING
-bool ULastFPSRoomEncounterSubsystem::DebugClearEncounter(const FName EncounterId)
+bool ULastFPSRoomEncounterSubsystem::DebugClearEncounter(
+	const FName EncounterId)
 {
 	UWorld* World = GetWorld();
-	if (!World || World->GetNetMode() == NM_Client || EncounterId.IsNone())
+	if (!World
+		|| World->GetNetMode() == NM_Client
+		|| EncounterId.IsNone())
 	{
 		UE_LOG(
 			LogLastFPSRoomEncounterSubsystem,
 			Warning,
-			TEXT("인카운터 클리어 치트 요청이 유효하지 않습니다. EncounterId=%s, World=%s"),
+			TEXT("Encounter 강제 완료 요청이 유효하지 않습니다: EncounterId=%s, World=%s"),
 			*EncounterId.ToString(),
 			*GetNameSafe(World));
 		return false;
 	}
 
-	for (int32 RuntimeIndex = RuntimeEncounters.Num() - 1; RuntimeIndex >= 0; --RuntimeIndex)
+	for (int32 RuntimeIndex = RuntimeEncounters.Num() - 1;
+		RuntimeIndex >= 0;
+		--RuntimeIndex)
 	{
-		ALastFPSRoomEncounterRuntime* Runtime = RuntimeEncounters[RuntimeIndex];
+		ALastFPSRoomEncounterRuntime* Runtime =
+			RuntimeEncounters[RuntimeIndex];
 		if (!IsValid(Runtime))
 		{
 			RuntimeEncounters.RemoveAtSwap(RuntimeIndex);
@@ -319,7 +372,7 @@ bool ULastFPSRoomEncounterSubsystem::DebugClearEncounter(const FName EncounterId
 			UE_LOG(
 				LogLastFPSRoomEncounterSubsystem,
 				Display,
-				TEXT("[%s] 인카운터 클리어 치트 완료"),
+				TEXT("[%s] Encounter 강제 완료 결과: 성공"),
 				*EncounterId.ToString());
 		}
 		else
@@ -327,7 +380,7 @@ bool ULastFPSRoomEncounterSubsystem::DebugClearEncounter(const FName EncounterId
 			UE_LOG(
 				LogLastFPSRoomEncounterSubsystem,
 				Warning,
-				TEXT("[%s] 인카운터 클리어 치트 실패: 해당 구역에 진입해 인카운터가 시작됐는지 확인하세요."),
+				TEXT("[%s] Encounter 강제 완료 결과: 실패"),
 				*EncounterId.ToString());
 		}
 		return bCompleted;
@@ -336,13 +389,14 @@ bool ULastFPSRoomEncounterSubsystem::DebugClearEncounter(const FName EncounterId
 	UE_LOG(
 		LogLastFPSRoomEncounterSubsystem,
 		Warning,
-		TEXT("[%s] 클리어할 런타임 인카운터를 찾지 못했습니다."),
+		TEXT("[%s] 강제 완료할 Room Encounter를 찾지 못했습니다."),
 		*EncounterId.ToString());
 	return false;
 }
 #endif
 
-void ULastFPSRoomEncounterSubsystem::NotifyEncounterCleared(FName EncounterId)
+void ULastFPSRoomEncounterSubsystem::NotifyEncounterCleared(
+	const FName EncounterId)
 {
 	if (OnEncounterCleared.IsBound())
 	{
@@ -364,4 +418,11 @@ void ULastFPSRoomEncounterSubsystem::NotifyEncounterProgress(
 		EncounterId,
 		FMath::Clamp(DefeatedEnemyCount, 0, TotalEnemyCount),
 		TotalEnemyCount);
+}
+
+const UDataTable* ULastFPSRoomEncounterSubsystem::GetEncounterTable() const
+{
+	return ActiveProfile
+		? ActiveProfile->EncounterTable.Get()
+		: nullptr;
 }

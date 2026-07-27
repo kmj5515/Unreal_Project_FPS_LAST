@@ -3,12 +3,18 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "LoadingProcessInterface.h"
+#include "RenderCommandFence.h"
 #include "LastFPSDestinationContentComponent.generated.h"
 
+class AActor;
+class UPrimitiveComponent;
 class ULastFPSDestinationContentSet;
 struct FStreamableHandle;
 
-/** 로드 완료(또는 로드할 것 없음) 시 1회. 스폰을 미뤄 둔 GameMode 가 구독한다. */
+/** 에셋 의존성 로드 완료 시 1회. GameMode가 실제 Pawn을 생성하고 렌더 준비를 시작한다. */
+DECLARE_MULTICAST_DELEGATE(FOnLastFPSDestinationAssetsLoaded);
+
+/** 에셋과 렌더 준비가 모두 완료될 때 1회. 최종 게임플레이 준비 신호다. */
 DECLARE_MULTICAST_DELEGATE(FOnLastFPSDestinationContentReady);
 
 /**
@@ -30,11 +36,18 @@ public:
 
     virtual bool ShouldShowLoadingScreen(FString& OutReason) const override;
 
-    /** GameMode 가 InitGameState 에서 호출한다. 목록이 비면 즉시 Ready 로 끝난다. */
-    void StartContentLoad(const ULastFPSDestinationContentSet* ContentSet);
+    /** GameMode가 InitGameState에서 호출한다. 단계별 에셋 의존성을 비동기로 준비한다. */
+    void StartContentLoad(ULastFPSDestinationContentSet* ContentSet);
+
+    /**
+     * 에셋 준비 콜백에서 실제로 생성한 Actor를 전달한다.
+     * 등록된 렌더 컴포넌트의 PSO와 렌더 스레드 반영을 기다린 뒤 최종 Ready로 전환한다.
+     */
+    void BeginRenderWarmup(const TArray<AActor*>& Actors);
 
     bool IsContentReady() const { return LoadState == EContentLoadState::Ready; }
 
+    FOnLastFPSDestinationAssetsLoaded OnAssetsLoaded;
     FOnLastFPSDestinationContentReady OnContentReady;
 
 protected:
@@ -44,16 +57,36 @@ private:
     enum class EContentLoadState : uint8
     {
         Unloaded,
-        Loading,
+        LoadingAssets,
+        AwaitingRenderWarmup,
+        WarmingRender,
         Ready,
     };
 
-    void HandleLoadCompleted();
+    void BeginNextLoadPhase();
+    void HandleLoadPhaseCompleted();
+    void HandleAssetsLoaded();
+    void PollRenderWarmup();
+    bool IsRenderWarmupBusy(int32& OutCompilingComponents, int32& OutShaderJobs,
+        uint32& OutPSORequests) const;
     void FinishLoad();
 
-    // 콘텐츠를 상주시키는 주체. 로컬 변수로 두면 로드 직후 해제된다.
-    TSharedPtr<FStreamableHandle> LoadHandle;
+    /** 단계가 바뀌어도 앞 단계의 에셋을 목적지를 떠날 때까지 상주시킨다. */
+    TArray<TSharedPtr<FStreamableHandle>> LoadHandles;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSDestinationContentSet> ActiveContentSet;
+
+    /** 실제 플레이어 컴포넌트의 수명과 준비 상태만 관찰하며 소유하지 않는다. */
+    UPROPERTY(Transient)
+    TArray<TWeakObjectPtr<UPrimitiveComponent>> WarmupComponents;
+
+    TSet<FSoftObjectPath> RequestedPaths;
 
     EContentLoadState LoadState = EContentLoadState::Unloaded;
     double LoadStartSeconds = 0.0;
+    double WarmupStartSeconds = 0.0;
+    int32 LoadPhase = 0;
+    int32 StableRenderFrames = 0;
+    FRenderCommandFence RenderRegistrationFence;
 };

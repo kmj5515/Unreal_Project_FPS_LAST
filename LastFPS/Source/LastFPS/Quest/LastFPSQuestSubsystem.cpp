@@ -182,11 +182,14 @@ ULastFPSEconomySubsystem* ULastFPSQuestSubsystem::GetEconomy() const
 
 const UDataTable* ULastFPSQuestSubsystem::GetEncounterTable() const
 {
-	if (const UDataTable* LoadedTable = EncounterTable.Get())
-	{
-		return LoadedTable;
-	}
-	return EncounterTable.LoadSynchronous();
+	const UGameInstance* GameInstance = GetGameInstance();
+	const UWorld* World = GameInstance ? GameInstance->GetWorld() : nullptr;
+	const ULastFPSRoomEncounterSubsystem* EncounterSubsystem = World
+		? World->GetSubsystem<ULastFPSRoomEncounterSubsystem>()
+		: nullptr;
+	return EncounterSubsystem
+		? EncounterSubsystem->GetEncounterTable()
+		: nullptr;
 }
 
 int32 ULastFPSQuestSubsystem::ResolveObjectiveRequiredCount(
@@ -195,6 +198,12 @@ int32 ULastFPSQuestSubsystem::ResolveObjectiveRequiredCount(
 	if (Objective.Type != ELastFPSObjectiveType::ClearEncounter || Objective.TargetId.IsNone())
 	{
 		return FMath::Max(Objective.RequiredCount, 1);
+	}
+
+	if (const int32* RuntimeRequiredCount =
+		EncounterRequiredCounts.Find(Objective.TargetId))
+	{
+		return FMath::Max(*RuntimeRequiredCount, 1);
 	}
 
 	const UDataTable* Table = GetEncounterTable();
@@ -382,14 +391,6 @@ void ULastFPSQuestSubsystem::ValidateReferences() const
 	const bool bCanValidateEncounters =
 		EncounterDefinitions
 		&& EncounterDefinitions->GetRowStruct() == FLastFPSRoomEncounterData::StaticStruct();
-	if (!bCanValidateEncounters)
-	{
-		UE_LOG(
-			LogLastFPSQuest,
-			Error,
-			TEXT("[Quest] EncounterTable이 없거나 Row Structure가 FLastFPSRoomEncounterData가 아닙니다."));
-	}
-
 	int32 Broken = 0;
 	static const FString Ctx(TEXT("ULastFPSQuestSubsystem::ValidateReferences"));
 	QuestDefinitions->ForeachRow<FLastFPSQuestData>(Ctx,
@@ -414,8 +415,8 @@ void ULastFPSQuestSubsystem::ValidateReferences() const
 					Obj.Type == ELastFPSObjectiveType::ClearEncounter
 					|| (Obj.Type == ELastFPSObjectiveType::ReachLocation && !Obj.TargetId.IsNone());
 				if (bReferencesEncounter
-					&& (!bCanValidateEncounters
-						|| !EncounterDefinitions->GetRowMap().Contains(Obj.TargetId)))
+					&& bCanValidateEncounters
+					&& !EncounterDefinitions->GetRowMap().Contains(Obj.TargetId))
 				{
 					++Broken;
 					UE_LOG(
@@ -741,6 +742,8 @@ void ULastFPSQuestSubsystem::NotifyEncounterProgress(
 		return;
 	}
 
+	EncounterRequiredCounts.FindOrAdd(EncounterId) = TotalEnemyCount;
+
 	FLastFPSObjectiveEvent Event;
 	Event.Type = ELastFPSObjectiveType::ClearEncounter;
 	Event.Id = EncounterId;
@@ -790,6 +793,7 @@ void ULastFPSQuestSubsystem::HandlePostWorldInitialization(const FActorsInitiali
 {
 	if (Params.World && Params.World->IsGameWorld())
 	{
+		EncounterRequiredCounts.Reset();
 		BindEncounterEvents(*Params.World);
 		ScanObjectivePaths(*Params.World);
 		AcceptDungeonQuestForMap(*Params.World);

@@ -113,7 +113,7 @@ struct FLastFPSQuestObjective
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(ClampMin=0.1, EditCondition="Type==ELastFPSObjectiveType::ReachLocation"))
 	float AcceptRadius = 3.f;
 
-	/** 필요 수량. ClearEncounter는 EncounterTable의 모든 웨이브 적 수 합계를 런타임 요구량으로 사용한다. */
+	/** 필요 수량. ClearEncounter는 현재 Mode의 Encounter Profile에 정의된 적 수 합계를 사용한다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(ClampMin=1))
 	int32 RequiredCount = 1;
 

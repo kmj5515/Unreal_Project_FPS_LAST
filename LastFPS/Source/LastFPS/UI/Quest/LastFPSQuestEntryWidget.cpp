@@ -35,7 +35,7 @@ void ULastFPSQuestEntryWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, F
 	}
 
 	// 진행도 — 데이터의 목표 문구와 실제 요구량을 줄별로 표시한다.
-	// ClearEncounter 요구량은 QuestTable의 중복 숫자가 아니라 EncounterTable의 적 수 합계다.
+	// ClearEncounter 요구량은 QuestTable의 중복 숫자가 아니라 현재 Mode의 Encounter Profile이 제공한다.
 	if (TB_Progress)
 	{
 		if (InQuest.Objectives.Num() > 0)

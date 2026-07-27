@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/Definitions/LastFPSRoomEncounterProfile.h"
 #include "Data/Tables/LastFPSRoomEncounterData.h"
 #include "GameFramework/Actor.h"
 #include "TimerManager.h"
@@ -40,7 +41,8 @@ public:
 		ATriggerBox& InTriggerVolume,
 		const TArray<ATriggerBox*>& InBarrierVolumes,
 		const TArray<ATargetPoint*>& InSpawnPoints,
-		const FLastFPSRoomEncounterData& InEncounterData);
+		const FLastFPSRoomEncounterData& InEncounterData,
+		const ULastFPSRoomEncounterProfile& InProfile);
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -65,6 +67,9 @@ private:
 
 	UFUNCTION()
 	void OnRep_BarrierVolumes();
+
+	UFUNCTION()
+	void OnRep_BarrierPresentationSettings();
 
 	UFUNCTION()
 	void OnRep_EncounterProgress();
@@ -113,6 +118,10 @@ private:
 
 	UPROPERTY(ReplicatedUsing=OnRep_BarrierState)
 	bool bBarrierActive = false;
+
+	/** 클라이언트도 서버가 선택한 GameMode의 배리어 표현 계약을 사용한다. */
+	UPROPERTY(ReplicatedUsing=OnRep_BarrierPresentationSettings)
+	FLastFPSRoomBarrierPresentationSettings BarrierPresentationSettings;
 
 	UPROPERTY(Replicated)
 	bool bEncounterCleared = false;

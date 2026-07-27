@@ -1,8 +1,32 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/Definitions/LastFPSDestinationFeature.h"
 #include "Engine/DataAsset.h"
 #include "LastFPSDestinationContentSet.generated.h"
+
+USTRUCT(BlueprintType)
+struct LASTFPS_API FLastFPSRenderWarmupSettings
+{
+    GENERATED_BODY()
+
+    /** 실제 플레이어 Pawn의 렌더 컴포넌트와 PSO가 준비될 때까지 로딩 화면을 유지한다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Render Warmup")
+    bool bEnabled = true;
+
+    /**
+     * 렌더 스레드가 등록된 컴포넌트를 처리할 시간을 보장한다.
+     * 셰이더·PSO 작업이 끝난 뒤에도 이 프레임 수만큼 연속으로 안정 상태여야 완료된다.
+     */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Render Warmup",
+        meta=(ClampMin="1", UIMin="1", UIMax="10"))
+    int32 MinimumStableFrames = 3;
+
+    /** 예기치 않은 컴파일 실패로 로딩 화면이 영구 유지되지 않게 하는 상한이다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Render Warmup",
+        meta=(ClampMin="1.0", UIMin="1.0", UIMax="30.0", Units="s"))
+    float TimeoutSeconds = 10.0f;
+};
 
 /**
  * 맵 진입 전에 준비되어야 하는 콘텐츠 목록.
@@ -27,6 +51,43 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="Content")
     TArray<TSoftClassPtr<UObject>> RequiredClasses;
 
-    /** 두 목록의 유효한 항목만 모은다. 비어 있으면 게이트가 걸리지 않는다. */
+    /**
+     * 목적지 기능별 데이터 계약이다.
+     * 각 기능은 중앙 로딩에 필요한 경로를 공통 계약으로 제공한다.
+     */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Features")
+    TArray<TObjectPtr<ULastFPSDestinationFeature>> Features;
+
+    /** 에셋 로드 다음 단계에서 수행할 렌더 준비 정책. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Loading")
+    FLastFPSRenderWarmupSettings RenderWarmup;
+
+    /** 직접 목록과 기능 계약의 유효한 경로를 모은다. 비어 있으면 게이트가 걸리지 않는다. */
     void CollectRequiredPaths(TArray<FSoftObjectPath>& OutPaths) const;
+
+    template <typename TFeature>
+    TFeature* FindFeature()
+    {
+        for (const TObjectPtr<ULastFPSDestinationFeature>& Feature : Features)
+        {
+            if (TFeature* TypedFeature = Cast<TFeature>(Feature.Get()))
+            {
+                return TypedFeature;
+            }
+        }
+        return nullptr;
+    }
+
+    template <typename TFeature>
+    const TFeature* FindFeature() const
+    {
+        for (const TObjectPtr<ULastFPSDestinationFeature>& Feature : Features)
+        {
+            if (const TFeature* TypedFeature = Cast<TFeature>(Feature.Get()))
+            {
+                return TypedFeature;
+            }
+        }
+        return nullptr;
+    }
 };

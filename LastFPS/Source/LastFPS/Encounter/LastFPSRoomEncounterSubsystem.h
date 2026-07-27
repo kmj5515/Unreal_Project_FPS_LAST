@@ -6,16 +6,27 @@
 
 class ALastFPSRoomEncounterRuntime;
 class UDataTable;
-struct FStreamableHandle;
+class ULastFPSDestinationContentComponent;
+class ULastFPSRoomEncounterProfile;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLastFPSOnEncounterCleared, FName, EncounterId);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FLastFPSOnEncounterCleared,
+	FName,
+	EncounterId);
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
 	FLastFPSOnEncounterProgressChanged,
-	FName, EncounterId,
-	int32, DefeatedEnemyCount,
-	int32, TotalEnemyCount);
+	FName,
+	EncounterId,
+	int32,
+	DefeatedEnemyCount,
+	int32,
+	TotalEnemyCount);
 
-/** 레벨 마커를 데이터 계약으로 해석해 방별 런타임 전투를 생성한다. */
+/**
+ * 현재 GameMode의 Destination Content Set에 포함된 Room Encounter Profile을 소비해
+ * 레벨 마커와 전투 데이터를 해석하고 런타임 Encounter를 생성한다.
+ */
 UCLASS()
 class LASTFPS_API ULastFPSRoomEncounterSubsystem : public UWorldSubsystem
 {
@@ -26,11 +37,18 @@ public:
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 	virtual void Deinitialize() override;
 
-	void NotifyEncounterCleared(FName EncounterId);
-	void NotifyEncounterProgress(FName EncounterId, int32 DefeatedEnemyCount, int32 TotalEnemyCount);
+	void NotifyEncounterCleared(
+		FName EncounterId);
+
+	void NotifyEncounterProgress(
+		FName EncounterId,
+		int32 DefeatedEnemyCount,
+		int32 TotalEnemyCount);
+
+	/** 현재 Mode의 중앙 Profile에서 이미 준비된 Encounter Table을 반환한다. */
+	const UDataTable* GetEncounterTable() const;
 
 #if !UE_BUILD_SHIPPING
-	/** 서버에서 지정한 인카운터를 개발용 치트로 즉시 완료한다. */
 	bool DebugClearEncounter(FName EncounterId);
 #endif
 
@@ -41,11 +59,20 @@ public:
 	FLastFPSOnEncounterProgressChanged OnEncounterProgressChanged;
 
 private:
-	void HandleEncounterTableLoaded();
-	void InitializeRuntimeEncounters(UWorld& InWorld, UDataTable& EncounterTable);
+	void HandleDestinationContentReady();
+
+	void InitializeRuntimeEncounters(
+		UWorld& InWorld,
+		UDataTable& EncounterTable,
+		const ULastFPSRoomEncounterProfile& Profile);
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ALastFPSRoomEncounterRuntime>> RuntimeEncounters;
 
-	TSharedPtr<FStreamableHandle> EncounterTableLoadHandle;
+	UPROPERTY(Transient)
+	TObjectPtr<ULastFPSRoomEncounterProfile> ActiveProfile;
+
+	TWeakObjectPtr<ULastFPSDestinationContentComponent> DestinationContentComponent;
+	FDelegateHandle ContentReadyHandle;
+	bool bRuntimeEncountersInitialized = false;
 };

@@ -54,6 +54,14 @@ public:
     FGameplayTag GetInitialScreenTag() const { return InitialScreenTag; }
     FGameplayTag GetEscMenuScreenTag() const { return EscMenuScreenTag; }
     bool ShouldShowQuestTracker() const { return bShowQuestTracker; }
+    ULastFPSDestinationContentSet* GetDestinationContentSet()
+    {
+        return DestinationContentSet;
+    }
+    const ULastFPSDestinationContentSet* GetDestinationContentSet() const
+    {
+        return DestinationContentSet;
+    }
 
     /** 맵 진입 시 자동으로 열 화면. 비우면 안 연다. */
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI", meta=(Categories="UI.Screen"))
@@ -85,8 +93,12 @@ protected:
 private:
     /** 게이트 컴포넌트가 없는 맵(GameState BP 재지정 등)에서는 게이트 없이 진행한다. */
     bool IsDestinationContentReady() const;
+    void HandleDestinationAssetsLoaded();
     void HandleDestinationContentReady();
+    void SetLocalWarmupInputBlocked(APlayerController* PlayerController, bool bBlocked);
 
     TWeakObjectPtr<ULastFPSDestinationContentComponent> DestinationContentComponent;
+    TArray<TWeakObjectPtr<APlayerController>> WarmupInputBlockedControllers;
+    FDelegateHandle AssetsLoadedHandle;
     FDelegateHandle ContentReadyHandle;
 };

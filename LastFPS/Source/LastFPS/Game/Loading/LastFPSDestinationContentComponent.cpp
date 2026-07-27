@@ -1,10 +1,17 @@
 #include "Game/Loading/LastFPSDestinationContentComponent.h"
 
 #include "Data/Definitions/LastFPSDestinationContentSet.h"
+#include "Components/PrimitiveComponent.h"
 #include "Engine/AssetManager.h"
 #include "Engine/Engine.h"
 #include "Engine/StreamableManager.h"
+#include "Engine/World.h"
+#include "GameFramework/Actor.h"
 #include "HAL/PlatformTime.h"
+#include "Misc/App.h"
+#include "PipelineStateCache.h"
+#include "ShaderCompiler.h"
+#include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSDestinationContent, Log, All);
 
@@ -90,16 +97,19 @@ ULastFPSDestinationContentComponent::ULastFPSDestinationContentComponent()
 bool ULastFPSDestinationContentComponent::ShouldShowLoadingScreen(FString& OutReason) const
 {
     // Unloaded(StartContentLoad 이전)에서 true 를 반환하면 로드할 것이 없는 맵이 영구 대기한다.
-    if (LoadState != EContentLoadState::Loading)
+    if (LoadState == EContentLoadState::Unloaded || LoadState == EContentLoadState::Ready)
     {
         return false;
     }
 
-    OutReason = TEXT("LastFPS destination content is still loading");
+    OutReason = LoadState == EContentLoadState::WarmingRender
+        ? TEXT("LastFPS player render components are warming up")
+        : TEXT("LastFPS destination content is still loading");
     return true;
 }
 
-void ULastFPSDestinationContentComponent::StartContentLoad(const ULastFPSDestinationContentSet* ContentSet)
+void ULastFPSDestinationContentComponent::StartContentLoad(
+    ULastFPSDestinationContentSet* ContentSet)
 {
     if (LoadState != EContentLoadState::Unloaded)
     {
@@ -108,76 +118,286 @@ void ULastFPSDestinationContentComponent::StartContentLoad(const ULastFPSDestina
         return;
     }
 
+    ActiveContentSet = ContentSet;
+    LoadStartSeconds = FPlatformTime::Seconds();
+    BeginNextLoadPhase();
+}
+
+void ULastFPSDestinationContentComponent::BeginNextLoadPhase()
+{
     TArray<FSoftObjectPath> RequiredPaths;
-    if (ContentSet)
+    if (ActiveContentSet)
     {
-        ContentSet->CollectRequiredPaths(RequiredPaths);
+        ActiveContentSet->CollectRequiredPaths(RequiredPaths);
     }
 
-    if (RequiredPaths.IsEmpty())
+    TArray<FSoftObjectPath> NewPaths;
+    for (const FSoftObjectPath& Path : RequiredPaths)
     {
-        // ContentSet 미지정은 정상 구성이다(로딩 게이트가 필요 없는 맵).
-        FinishLoad();
+        if (Path.IsValid() && !RequestedPaths.Contains(Path))
+        {
+            RequestedPaths.Add(Path);
+            NewPaths.Add(Path);
+        }
+    }
+
+    if (NewPaths.IsEmpty())
+    {
+        HandleAssetsLoaded();
         return;
     }
 
-    LastFPSDestinationContentInternal::LogPathBreakdown(RequiredPaths, ContentSet);
+    ++LoadPhase;
+    LastFPSDestinationContentInternal::LogPathBreakdown(
+        NewPaths,
+        ActiveContentSet);
 
-    LoadStartSeconds = FPlatformTime::Seconds();
-    LoadState = EContentLoadState::Loading;
-    LoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
-        RequiredPaths,
-        FStreamableDelegate::CreateUObject(this, &ThisClass::HandleLoadCompleted));
+    LoadState = EContentLoadState::LoadingAssets;
+    TSharedPtr<FStreamableHandle> PhaseHandle =
+        UAssetManager::GetStreamableManager().RequestAsyncLoad(
+            NewPaths,
+            FStreamableDelegate::CreateUObject(
+                this,
+                &ThisClass::HandleLoadPhaseCompleted));
 
-    if (!LoadHandle.IsValid())
+    if (!PhaseHandle.IsValid())
     {
         UE_LOG(LogLastFPSDestinationContent, Error,
             TEXT("콘텐츠 %d개 비동기 로드 요청에 실패했습니다: %s"),
-            RequiredPaths.Num(),
-            *GetNameSafe(ContentSet));
-        FinishLoad();
+            NewPaths.Num(),
+            *GetNameSafe(ActiveContentSet));
+        HandleAssetsLoaded();
         return;
+    }
+
+    LoadHandles.Add(MoveTemp(PhaseHandle));
+}
+
+void ULastFPSDestinationContentComponent::HandleLoadPhaseCompleted()
+{
+    UE_LOG(LogLastFPSDestinationContent, Log,
+        TEXT("목적지 콘텐츠 로드 단계 %d 완료"), LoadPhase);
+
+    // Data Table처럼 로드된 뒤에야 내부 소프트 참조를 열거할 수 있는 계약을 다시 평가한다.
+    BeginNextLoadPhase();
+}
+
+void ULastFPSDestinationContentComponent::HandleAssetsLoaded()
+{
+    if (LoadState == EContentLoadState::AwaitingRenderWarmup
+        || LoadState == EContentLoadState::WarmingRender
+        || LoadState == EContentLoadState::Ready)
+    {
+        return;
+    }
+
+    LoadState = EContentLoadState::AwaitingRenderWarmup;
+
+    UE_LOG(LogLastFPSDestinationContent, Log,
+        TEXT("목적지 에셋 로드 완료 — 실제 Pawn 생성 및 렌더 컴포넌트 준비 요청"));
+
+    OnAssetsLoaded.Broadcast();
+
+    // 구독자가 없거나 렌더 준비를 시작하지 않은 맵은 기존처럼 에셋 로드만으로 완료한다.
+    if (LoadState == EContentLoadState::AwaitingRenderWarmup)
+    {
+        FinishLoad();
     }
 }
 
-void ULastFPSDestinationContentComponent::HandleLoadCompleted()
+void ULastFPSDestinationContentComponent::BeginRenderWarmup(const TArray<AActor*>& Actors)
 {
-    const double ElapsedMs = (FPlatformTime::Seconds() - LoadStartSeconds) * 1000.0;
-
-    // 로드에 걸린 시간이 곧 로딩 화면이 추가로 유지된 시간이다.
-    UE_LOG(LogLastFPSDestinationContent, Log,
-        TEXT("목적지 콘텐츠 로드 완료 — %.1fms 동안 로딩 화면 유지"), ElapsedMs);
-
-    LastFPSDestinationContentDebug::Print(FString::Printf(
-        TEXT("[로딩] 완료 — %.1fms 동안 화면 유지"), ElapsedMs));
-
-    if (LoadHandle.IsValid())
+    if (LoadState != EContentLoadState::AwaitingRenderWarmup)
     {
-        TArray<UObject*> LoadedAssets;
-        LoadHandle->GetLoadedAssets(LoadedAssets);
-        UE_LOG(LogLastFPSDestinationContent, Verbose,
-            TEXT("로드된 에셋 %d개"), LoadedAssets.Num());
+        UE_LOG(LogLastFPSDestinationContent, Warning,
+            TEXT("렌더 준비를 시작할 수 없는 상태입니다: %d"), static_cast<int32>(LoadState));
+        return;
     }
 
-    FinishLoad();
+    WarmupComponents.Reset();
+
+    for (AActor* Actor : Actors)
+    {
+        if (!IsValid(Actor))
+        {
+            continue;
+        }
+
+        TInlineComponentArray<UPrimitiveComponent*> PrimitiveComponents(Actor);
+        for (UPrimitiveComponent* Primitive : PrimitiveComponents)
+        {
+            if (!IsValid(Primitive) || !Primitive->IsRegistered())
+            {
+                continue;
+            }
+
+            WarmupComponents.Add(Primitive);
+            Primitive->PrecachePSOs();
+        }
+    }
+
+    const FLastFPSRenderWarmupSettings Settings =
+        ActiveContentSet ? ActiveContentSet->RenderWarmup : FLastFPSRenderWarmupSettings();
+
+    if (!Settings.bEnabled || !FApp::CanEverRender() || WarmupComponents.IsEmpty())
+    {
+        UE_LOG(LogLastFPSDestinationContent, Log,
+            TEXT("렌더 준비 생략 — 활성=%s, 렌더 가능=%s, 컴포넌트=%d"),
+            Settings.bEnabled ? TEXT("예") : TEXT("아니요"),
+            FApp::CanEverRender() ? TEXT("예") : TEXT("아니요"),
+            WarmupComponents.Num());
+        FinishLoad();
+        return;
+    }
+
+    LoadState = EContentLoadState::WarmingRender;
+    WarmupStartSeconds = FPlatformTime::Seconds();
+    StableRenderFrames = 0;
+
+    // 이 시점 이전에 등록된 SceneProxy 명령이 렌더 스레드에 반영됐는지도 함께 확인한다.
+    RenderRegistrationFence.BeginFence();
+
+    UE_LOG(LogLastFPSDestinationContent, Log,
+        TEXT("플레이어 렌더 준비 시작 — PrimitiveComponent %d개"),
+        WarmupComponents.Num());
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().SetTimerForNextTick(
+            this, &ThisClass::PollRenderWarmup);
+    }
+    else
+    {
+        FinishLoad();
+    }
+}
+
+bool ULastFPSDestinationContentComponent::IsRenderWarmupBusy(
+    int32& OutCompilingComponents,
+    int32& OutShaderJobs,
+    uint32& OutPSORequests) const
+{
+    OutCompilingComponents = 0;
+    for (const TWeakObjectPtr<UPrimitiveComponent>& ComponentPtr : WarmupComponents)
+    {
+        const UPrimitiveComponent* Component = ComponentPtr.Get();
+        if (Component && (!Component->IsRegistered()
+            || !Component->IsRenderStateCreated()
+            || Component->IsCompiling()))
+        {
+            ++OutCompilingComponents;
+        }
+    }
+
+    OutShaderJobs = GShaderCompilingManager
+        ? GShaderCompilingManager->GetNumRemainingJobs()
+        : 0;
+    OutPSORequests = PipelineStateCache::NumActivePrecacheRequests();
+
+    return !RenderRegistrationFence.IsFenceComplete()
+        || OutCompilingComponents > 0
+        || OutShaderJobs > 0
+        || OutPSORequests > 0;
+}
+
+void ULastFPSDestinationContentComponent::PollRenderWarmup()
+{
+    if (LoadState != EContentLoadState::WarmingRender)
+    {
+        return;
+    }
+
+    int32 CompilingComponents = 0;
+    int32 ShaderJobs = 0;
+    uint32 PSORequests = 0;
+    const bool bBusy = IsRenderWarmupBusy(
+        CompilingComponents,
+        ShaderJobs,
+        PSORequests);
+
+    StableRenderFrames = bBusy ? 0 : StableRenderFrames + 1;
+
+    const FLastFPSRenderWarmupSettings Settings =
+        ActiveContentSet ? ActiveContentSet->RenderWarmup : FLastFPSRenderWarmupSettings();
+    const double ElapsedSeconds = FPlatformTime::Seconds() - WarmupStartSeconds;
+    const int32 RequiredStableFrames = FMath::Max(1, Settings.MinimumStableFrames);
+
+    if (!bBusy && StableRenderFrames >= RequiredStableFrames)
+    {
+        UE_LOG(LogLastFPSDestinationContent, Log,
+            TEXT("플레이어 렌더 준비 완료 — 컴포넌트 %d개, %.1fms"),
+            WarmupComponents.Num(),
+            ElapsedSeconds * 1000.0);
+        FinishLoad();
+        return;
+    }
+
+    if (ElapsedSeconds >= FMath::Max(1.0f, Settings.TimeoutSeconds))
+    {
+        UE_LOG(LogLastFPSDestinationContent, Warning,
+            TEXT("플레이어 렌더 준비 시간 초과 — %.1fs 후 진행합니다. "
+                 "컴파일 컴포넌트=%d, 셰이더 작업=%d, PSO 요청=%u"),
+            ElapsedSeconds,
+            CompilingComponents,
+            ShaderJobs,
+            PSORequests);
+        FinishLoad();
+        return;
+    }
+
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().SetTimerForNextTick(
+            this, &ThisClass::PollRenderWarmup);
+    }
+    else
+    {
+        FinishLoad();
+    }
 }
 
 void ULastFPSDestinationContentComponent::FinishLoad()
 {
+    if (LoadState == EContentLoadState::Ready)
+    {
+        return;
+    }
+
     LoadState = EContentLoadState::Ready;
+    const double ElapsedMs =
+        (FPlatformTime::Seconds() - LoadStartSeconds) * 1000.0;
+
+    UE_LOG(LogLastFPSDestinationContent, Log,
+        TEXT("목적지 콘텐츠 로드 완료 — %d단계, 총 %d개, %.1fms 동안 로딩 화면 유지"),
+        LoadPhase,
+        RequestedPaths.Num(),
+        ElapsedMs);
+
+    LastFPSDestinationContentDebug::Print(FString::Printf(
+        TEXT("[로딩] 완료 — %d단계 / %d개 / %.1fms"),
+        LoadPhase,
+        RequestedPaths.Num(),
+        ElapsedMs));
+
     OnContentReady.Broadcast();
 }
 
 void ULastFPSDestinationContentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    OnAssetsLoaded.Clear();
     OnContentReady.Clear();
 
-    if (LoadHandle.IsValid())
+    for (const TSharedPtr<FStreamableHandle>& LoadHandle : LoadHandles)
     {
-        // 목적지를 떠나면 이 맵 전용 콘텐츠의 상주를 해제한다.
-        LoadHandle->CancelHandle();
-        LoadHandle.Reset();
+        if (LoadHandle.IsValid())
+        {
+            LoadHandle->CancelHandle();
+        }
     }
+    LoadHandles.Reset();
+    RequestedPaths.Reset();
+    WarmupComponents.Reset();
+    ActiveContentSet = nullptr;
 
     Super::EndPlay(EndPlayReason);
 }

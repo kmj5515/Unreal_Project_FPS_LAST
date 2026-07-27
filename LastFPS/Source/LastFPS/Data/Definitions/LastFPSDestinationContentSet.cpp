@@ -8,7 +8,7 @@ void ULastFPSDestinationContentSet::CollectRequiredPaths(TArray<FSoftObjectPath>
     {
         if (!Asset.IsNull())
         {
-            OutPaths.Add(Asset.ToSoftObjectPath());
+            OutPaths.AddUnique(Asset.ToSoftObjectPath());
         }
     }
 
@@ -16,7 +16,15 @@ void ULastFPSDestinationContentSet::CollectRequiredPaths(TArray<FSoftObjectPath>
     {
         if (!Class.IsNull())
         {
-            OutPaths.Add(Class.ToSoftObjectPath());
+            OutPaths.AddUnique(Class.ToSoftObjectPath());
+        }
+    }
+
+    for (const ULastFPSDestinationFeature* Feature : Features)
+    {
+        if (Feature)
+        {
+            Feature->CollectRequiredPaths(OutPaths);
         }
     }
 }

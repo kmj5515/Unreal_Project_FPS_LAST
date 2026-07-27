@@ -98,7 +98,7 @@ public:
 	UFUNCTION(BlueprintPure, Category="LastFPS|Quest")
 	int32 GetObjectiveProgress(FName QuestId, int32 ObjectiveIndex) const;
 
-	/** 목표별 실제 요구량. ClearEncounter는 EncounterTable의 적 수 합계를 반환한다. */
+	/** 목표별 실제 요구량. ClearEncounter는 현재 Mode의 Encounter Profile을 기준으로 반환한다. */
 	UFUNCTION(BlueprintPure, Category="LastFPS|Quest")
 	int32 GetObjectiveRequiredCount(FName QuestId, int32 ObjectiveIndex) const;
 
@@ -205,10 +205,6 @@ protected:
 	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Quest")
 	TSoftObjectPtr<UDataTable> QuestTable;
 
-	/** ClearEncounter 목표 요구량과 던전 트리거 매칭에 사용하는 방 인카운터 정의 테이블. */
-	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Quest|Dungeon", meta=(RowType="/Script/LastFPS.LastFPSRoomEncounterData"))
-	TSoftObjectPtr<UDataTable> EncounterTable;
-
 	/** 무전 대사 테이블 (DT_RadioTransmission) — DefaultGame.ini 로 지정 */
 	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Quest|Radio")
 	TSoftObjectPtr<UDataTable> RadioTable;
@@ -271,6 +267,10 @@ private:
 
 	/** 던전 퀘스트를 이미 자동 수락한 월드 (동일 월드 중복 처리 방지, 재입장 시 재수행 허용). */
 	TWeakObjectPtr<UWorld> DungeonQuestAcceptedWorld;
+
+	/** 클라이언트는 복제된 Encounter 진행 이벤트에서 Mode별 실제 요구량을 받는다. */
+	TMap<FName, int32> EncounterRequiredCounts;
+
 	const UDataTable* GetRadioTable() const;
 	const FLastFPSRadioTransmissionData* FindRadioTransmission(FName RadioId) const;
 

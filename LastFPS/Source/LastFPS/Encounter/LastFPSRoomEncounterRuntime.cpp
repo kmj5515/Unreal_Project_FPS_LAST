@@ -12,7 +12,6 @@
 #include "Engine/TriggerBox.h"
 #include "Engine/World.h"
 #include "Encounter/LastFPSRoomBarrierPresentationComponent.h"
-#include "Encounter/LastFPSRoomEncounterSettings.h"
 #include "Encounter/LastFPSRoomSpawnPresentationComponent.h"
 #include "Encounter/LastFPSRoomEncounterSubsystem.h"
 #include "GameFramework/Pawn.h"
@@ -40,7 +39,8 @@ void ALastFPSRoomEncounterRuntime::InitializeEncounter(
 	ATriggerBox& InTriggerVolume,
 	const TArray<ATriggerBox*>& InBarrierVolumes,
 	const TArray<ATargetPoint*>& InSpawnPoints,
-	const FLastFPSRoomEncounterData& InEncounterData)
+	const FLastFPSRoomEncounterData& InEncounterData,
+	const ULastFPSRoomEncounterProfile& InProfile)
 {
 	if (!HasAuthority() || bInitialized)
 	{
@@ -86,11 +86,8 @@ void ALastFPSRoomEncounterRuntime::InitializeEncounter(
 	SpawnDelayAfterVFX = InEncounterData.SpawnVFX.NiagaraSystem.IsNull()
 		? 0.f
 		: FMath::Max(InEncounterData.SpawnVFX.DelayBeforeSpawn, 0.f);
-	if (const ULastFPSRoomEncounterSettings* Settings =
-		GetDefault<ULastFPSRoomEncounterSettings>())
-	{
-		MaxSpawnedActorsPerFrame = FMath::Max(Settings->MaxSpawnedActorsPerFrame, 1);
-	}
+	BarrierPresentationSettings = InProfile.BarrierPresentation;
+	MaxSpawnedActorsPerFrame = FMath::Max(InProfile.MaxSpawnedActorsPerFrame, 1);
 	SpawnPresentationComponent->Configure(InEncounterData.SpawnVFX);
 	ConfigureBarrierPresentation();
 
@@ -133,6 +130,7 @@ void ALastFPSRoomEncounterRuntime::GetLifetimeReplicatedProps(
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, BarrierVolumes);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, bBarrierActive);
+	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, BarrierPresentationSettings);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, bEncounterCleared);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, CurrentWave);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, EncounterId);
@@ -897,24 +895,14 @@ void ALastFPSRoomEncounterRuntime::ConfigureBarrierPresentation()
 	ResetBarrierPresentations();
 	CancelBarrierPresentationLoad();
 	if (GetNetMode() == NM_DedicatedServer
-		|| BarrierVolumes.IsEmpty())
+		|| BarrierVolumes.IsEmpty()
+		|| BarrierPresentationSettings.Mode == ELastFPSRoomBarrierPresentationMode::None)
 	{
 		return;
 	}
 
-	const ULastFPSRoomEncounterSettings* Settings = GetDefault<ULastFPSRoomEncounterSettings>();
-	if (!Settings)
-	{
-		UE_LOG(
-			LogLastFPSRoomEncounter,
-			Error,
-			TEXT("[%s] 배리어 표시 설정을 가져오지 못했습니다."),
-			*EncounterId.ToString());
-		return;
-	}
-
-	LoadedBarrierMesh = Settings->BarrierPresentation.Mesh.Get();
-	LoadedBarrierMaterial = Settings->BarrierPresentation.Material.Get();
+	LoadedBarrierMesh = BarrierPresentationSettings.Mesh.Get();
+	LoadedBarrierMaterial = BarrierPresentationSettings.Material.Get();
 	if (!LoadedBarrierMesh || !LoadedBarrierMaterial)
 	{
 		BeginBarrierPresentationLoad();
@@ -950,7 +938,7 @@ void ALastFPSRoomEncounterRuntime::ConfigureBarrierPresentation()
 		PresentationComponent->RegisterComponent();
 		PresentationComponent->Configure(
 			*BarrierVolume,
-			Settings->BarrierPresentation,
+			BarrierPresentationSettings,
 			*LoadedBarrierMesh,
 			*LoadedBarrierMaterial);
 		BarrierPresentationComponents.Add(PresentationComponent);
@@ -959,16 +947,17 @@ void ALastFPSRoomEncounterRuntime::ConfigureBarrierPresentation()
 
 void ALastFPSRoomEncounterRuntime::BeginBarrierPresentationLoad()
 {
-	const ULastFPSRoomEncounterSettings* Settings = GetDefault<ULastFPSRoomEncounterSettings>();
-	if (!Settings)
+	if (BarrierPresentationSettings.Mode
+		!= ELastFPSRoomBarrierPresentationMode::Mesh)
 	{
 		return;
 	}
 
 	TArray<FSoftObjectPath> PresentationPaths;
-	const FSoftObjectPath MeshPath = Settings->BarrierPresentation.Mesh.ToSoftObjectPath();
+	const FSoftObjectPath MeshPath =
+		BarrierPresentationSettings.Mesh.ToSoftObjectPath();
 	const FSoftObjectPath MaterialPath =
-		Settings->BarrierPresentation.Material.ToSoftObjectPath();
+		BarrierPresentationSettings.Material.ToSoftObjectPath();
 	if (MeshPath.IsValid())
 	{
 		PresentationPaths.Add(MeshPath);
@@ -1008,15 +997,8 @@ void ALastFPSRoomEncounterRuntime::BeginBarrierPresentationLoad()
 
 void ALastFPSRoomEncounterRuntime::HandleBarrierPresentationAssetsLoaded()
 {
-	const ULastFPSRoomEncounterSettings* Settings = GetDefault<ULastFPSRoomEncounterSettings>();
-	if (!Settings)
-	{
-		BarrierPresentationLoadHandle.Reset();
-		return;
-	}
-
-	LoadedBarrierMesh = Settings->BarrierPresentation.Mesh.Get();
-	LoadedBarrierMaterial = Settings->BarrierPresentation.Material.Get();
+	LoadedBarrierMesh = BarrierPresentationSettings.Mesh.Get();
+	LoadedBarrierMaterial = BarrierPresentationSettings.Material.Get();
 	BarrierPresentationLoadHandle.Reset();
 	if (!LoadedBarrierMesh || !LoadedBarrierMaterial)
 	{
@@ -1093,6 +1075,12 @@ void ALastFPSRoomEncounterRuntime::OnRep_BarrierState()
 }
 
 void ALastFPSRoomEncounterRuntime::OnRep_BarrierVolumes()
+{
+	ConfigureBarrierPresentation();
+	ApplyBarrierState();
+}
+
+void ALastFPSRoomEncounterRuntime::OnRep_BarrierPresentationSettings()
 {
 	ConfigureBarrierPresentation();
 	ApplyBarrierState();

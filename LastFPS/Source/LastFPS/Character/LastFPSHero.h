@@ -33,6 +33,7 @@ public:
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void PossessedBy(AController* NewController) override;
+    virtual void PawnClientRestart() override;
     virtual void OnRep_PlayerState() override;
 
     UFUNCTION(NetMulticast, Unreliable)
@@ -99,6 +100,9 @@ protected:
     virtual void OnCombatEngagedChanged() override;
 	virtual void OnMoveSpeedChanged(const FOnAttributeChangeData& Data) override;
 	virtual float ResolveMaxWalkSpeed(float AttributeMoveSpeed) const override;
+
+    /** 초기 스폰·지연 스폰·리스폰 모두에서 로컬 플레이어의 기본 입력 매핑을 보장한다. */
+    void EnsureDefaultInputMapping();
 
     void Move(const FInputActionValue& Value);
     void ClearMoveInput(const FInputActionValue& Value);

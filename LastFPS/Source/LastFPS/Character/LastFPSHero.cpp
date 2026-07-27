@@ -94,6 +94,13 @@ void ALastFPSHero::PossessedBy(AController* NewController)
 	Super::PossessedBy(NewController);
 	RefreshMaxWalkSpeed();
 	BindSpeedBoostCameraTag();
+	EnsureDefaultInputMapping();
+}
+
+void ALastFPSHero::PawnClientRestart()
+{
+	Super::PawnClientRestart();
+	EnsureDefaultInputMapping();
 }
 
 void ALastFPSHero::OnRep_PlayerState()
@@ -157,18 +164,9 @@ void ALastFPSHero::BeginPlay()
         WeaponComponent->OnWeaponEquippedChanged.AddUniqueDynamic(this, &ALastFPSHero::HandleWeaponEquippedChanged);
     }
 
-    ApplyRotationModeSettings();
+	ApplyRotationModeSettings();
 	BindSpeedBoostCameraTag();
-
-    if (APlayerController* PC = Cast<APlayerController>(GetController()))
-    {
-        if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
-            ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
-        {
-            if (DefaultMappingContext)
-                Subsystem->AddMappingContext(DefaultMappingContext, 0);
-        }
-    }
+	EnsureDefaultInputMapping();
 }
 
 void ALastFPSHero::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -205,11 +203,7 @@ void ALastFPSHero::SetGameplayInputEnabled(bool bEnabled)
 
     if (bEnabled)
     {
-        // 상호작용 종료 시 게임 입력을 복원한다. BeginPlay와 동일 우선순위로 다시 추가한다.
-        if (!Subsystem->HasMappingContext(DefaultMappingContext))
-        {
-            Subsystem->AddMappingContext(DefaultMappingContext, 0);
-        }
+        EnsureDefaultInputMapping();
     }
     else
     {
@@ -218,6 +212,24 @@ void ALastFPSHero::SetGameplayInputEnabled(bool bEnabled)
         // ADS 홀드 중 컨텍스트가 제거되면 해제 입력이 오지 않을 수 있어 방어적으로 해제한다.
         SetADS(false);
     }
+}
+
+void ALastFPSHero::EnsureDefaultInputMapping()
+{
+	if (!DefaultMappingContext || !IsLocallyControlled())
+	{
+		return;
+	}
+
+	const APlayerController* PC = Cast<APlayerController>(GetController());
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = PC
+		? ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(
+			PC->GetLocalPlayer())
+		: nullptr;
+	if (Subsystem && !Subsystem->HasMappingContext(DefaultMappingContext))
+	{
+		Subsystem->AddMappingContext(DefaultMappingContext, 0);
+	}
 }
 
 void ALastFPSHero::Tick(float DeltaTime)

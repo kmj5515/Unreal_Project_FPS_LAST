@@ -2,7 +2,7 @@
 
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "Encounter/LastFPSRoomEncounterSettings.h"
+#include "Data/Definitions/LastFPSRoomEncounterProfile.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/TriggerBox.h"

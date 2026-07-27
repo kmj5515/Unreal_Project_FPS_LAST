@@ -43,12 +43,14 @@ void ALastFPSGameModeBase::InitGameState()
         return;
     }
 
-    // InitGameState 는 Reset() 에서도 호출되므로 중복 구독(=중복 RestartPlayer)을 막는다.
-    if (ContentReadyHandle.IsValid())
+    // InitGameState 는 Reset() 에서도 호출되므로 중복 구독과 중복 스폰을 막는다.
+    if (AssetsLoadedHandle.IsValid() || ContentReadyHandle.IsValid())
     {
         return;
     }
 
+    AssetsLoadedHandle = Content->OnAssetsLoaded.AddUObject(
+        this, &ALastFPSGameModeBase::HandleDestinationAssetsLoaded);
     ContentReadyHandle = Content->OnContentReady.AddUObject(
         this, &ALastFPSGameModeBase::HandleDestinationContentReady);
     Content->StartContentLoad(DestinationContentSet);
@@ -58,9 +60,18 @@ void ALastFPSGameModeBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     if (ULastFPSDestinationContentComponent* Content = DestinationContentComponent.Get())
     {
+        Content->OnAssetsLoaded.Remove(AssetsLoadedHandle);
         Content->OnContentReady.Remove(ContentReadyHandle);
     }
+    AssetsLoadedHandle.Reset();
     ContentReadyHandle.Reset();
+
+    // Seamless Travel에서는 PlayerController가 다음 월드까지 살아남을 수 있어 입력 차단을 반드시 상쇄한다.
+    for (const TWeakObjectPtr<APlayerController>& ControllerPtr : WarmupInputBlockedControllers)
+    {
+        SetLocalWarmupInputBlocked(ControllerPtr.Get(), false);
+    }
+    WarmupInputBlockedControllers.Reset();
 
     Super::EndPlay(EndPlayReason);
 }
@@ -75,14 +86,14 @@ void ALastFPSGameModeBase::HandleStartingNewPlayer_Implementation(APlayerControl
 {
     if (!IsDestinationContentReady())
     {
-        // 스폰을 버리는 것이 아니라 미룬다. HandleDestinationContentReady 가 일괄 처리한다.
+        // 스폰을 버리는 것이 아니라 미룬다. 에셋 준비 콜백이 실제 Pawn을 생성한다.
         return;
     }
 
     Super::HandleStartingNewPlayer_Implementation(NewPlayer);
 }
 
-void ALastFPSGameModeBase::HandleDestinationContentReady()
+void ALastFPSGameModeBase::HandleDestinationAssetsLoaded()
 {
     UWorld* World = GetWorld();
     if (!World)
@@ -90,6 +101,7 @@ void ALastFPSGameModeBase::HandleDestinationContentReady()
         return;
     }
 
+    TArray<AActor*> WarmupActors;
     int32 RestartedPlayers = 0;
     for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
     {
@@ -99,10 +111,69 @@ void ALastFPSGameModeBase::HandleDestinationContentReady()
             RestartPlayer(PC);
             ++RestartedPlayers;
         }
+
+        if (PC && PC->GetPawn())
+        {
+            WarmupActors.Add(PC->GetPawn());
+            SetLocalWarmupInputBlocked(PC, true);
+        }
     }
 
     UE_LOG(LogLastFPSGameMode, Log,
-        TEXT("콘텐츠 준비 완료 — 대기 중이던 플레이어 %d명 스폰"), RestartedPlayers);
+        TEXT("에셋 준비 완료 — 대기 중이던 플레이어 %d명 스폰, 렌더 준비 Actor %d개"),
+        RestartedPlayers,
+        WarmupActors.Num());
+
+    if (ULastFPSDestinationContentComponent* Content = DestinationContentComponent.Get())
+    {
+        Content->BeginRenderWarmup(WarmupActors);
+    }
+}
+
+void ALastFPSGameModeBase::HandleDestinationContentReady()
+{
+    for (const TWeakObjectPtr<APlayerController>& ControllerPtr : WarmupInputBlockedControllers)
+    {
+        SetLocalWarmupInputBlocked(ControllerPtr.Get(), false);
+    }
+    WarmupInputBlockedControllers.Reset();
+
+    // 렌더 준비 도중 접속한 플레이어가 있다면 최종 준비 시점에 빠짐없이 생성한다.
+    int32 LateRestartedPlayers = 0;
+    if (UWorld* World = GetWorld())
+    {
+        for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+        {
+            APlayerController* PC = It->Get();
+            if (PC && PC->GetPawn() == nullptr && PlayerCanRestart(PC))
+            {
+                RestartPlayer(PC);
+                ++LateRestartedPlayers;
+            }
+        }
+    }
+
+    UE_LOG(LogLastFPSGameMode, Log,
+        TEXT("콘텐츠 및 플레이어 렌더 준비 완료 — 후발 플레이어 %d명 스폰"),
+        LateRestartedPlayers);
+}
+
+void ALastFPSGameModeBase::SetLocalWarmupInputBlocked(
+    APlayerController* PlayerController,
+    const bool bBlocked)
+{
+    if (!PlayerController || !PlayerController->IsLocalController())
+    {
+        return;
+    }
+
+    PlayerController->SetIgnoreMoveInput(bBlocked);
+    PlayerController->SetIgnoreLookInput(bBlocked);
+
+    if (bBlocked)
+    {
+        WarmupInputBlockedControllers.AddUnique(PlayerController);
+    }
 }
 
 void ALastFPSGameModeBase::PostLogin(APlayerController* NewPlayer)
