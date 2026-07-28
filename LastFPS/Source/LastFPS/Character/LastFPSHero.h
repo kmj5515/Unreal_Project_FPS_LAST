@@ -14,7 +14,9 @@ class UWeaponComponent;
 class ULastFPSGrapplingAnimationComponent;
 class ULastFPSGrapplingTargetingComponent;
 class UAnimMontage;
+class UUserWidget;
 struct FInputActionValue;
+struct FLastFPSWeaponScopeSettings;
 
 struct FLastFPSTemporaryCameraEffectOptions
 {
@@ -116,6 +118,11 @@ protected:
     void CancelAbilityByTag(FGameplayTag AbilityTag);
     void InputPressed(FGameplayTag InputID);
     void InputReleased(FGameplayTag InputID);
+
+    const FLastFPSWeaponScopeSettings* GetActiveScopeSettings() const;
+    void ShowScopeOverlay(bool bShow);
+    void EnsureScopeOverlay();
+    void DestroyScopeOverlay();
 
     void TickCameraInterp(float DeltaTime);
     void TickTemporaryCameraEffect(float DeltaTime);
@@ -268,6 +275,12 @@ private:
     bool bTemporaryCameraEffectBlendOutActive = false;
 
     bool bIsADS = false;
+
+    float ActiveAimSensitivityScale = 1.f;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UUserWidget> ScopeOverlayWidget;
+
     FVector2D CachedMoveInput = FVector2D::ZeroVector;
     FRotator LocomotionDirectionBaseRotation = FRotator::ZeroRotator;
     bool bHasMoveInputAction = false;

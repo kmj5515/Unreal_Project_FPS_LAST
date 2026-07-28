@@ -15,6 +15,7 @@ class UecsCrosshairEditorAsset;
 class UParticleSystem;
 class USkeletalMesh;
 class USoundBase;
+class UUserWidget;
 
 USTRUCT(BlueprintType)
 struct LASTFPS_API FLastFPSWeaponCrosshairSettings
@@ -90,6 +91,28 @@ struct LASTFPS_API FLastFPSWeaponMagazineVisualSettings
     /** 손 소켓에 스냅한 뒤 적용할 무기별 상대 변환입니다. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Magazine")
     FTransform HandAttachmentOffset = FTransform::Identity;
+};
+
+USTRUCT(BlueprintType)
+struct LASTFPS_API FLastFPSWeaponScopeSettings
+{
+    GENERATED_BODY()
+
+    /** 조준 시 스코프 뷰를 사용할지. 꺼두면 캐릭터 기본 ADS만 사용한다(라이플·피스톨). */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Scope")
+    bool bUseScope = false;
+
+    /** 조준 FOV. 캐릭터 기본 ADS FOV 대신 사용한다. 저격은 크게 낮춰 강한 줌을 만든다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Scope", meta=(EditCondition="bUseScope", ClampMin="5.0", ClampMax="170.0", Units="deg"))
+    float ScopeFOV = 25.f;
+
+    /** 조준 중 Look 입력 감도 배율(0~1). 강한 줌에서 흔들림을 줄인다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Scope", meta=(EditCondition="bUseScope", ClampMin="0.05", ClampMax="1.0"))
+    float ScopeSensitivityScale = 0.4f;
+
+    /** 조준 시 화면을 덮는 전체화면 스코프 오버레이 위젯이다. 저격총 장착 시에만 로드한다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Scope", meta=(EditCondition="bUseScope"))
+    TSoftClassPtr<UUserWidget> ScopeOverlayWidgetClass;
 };
 
 UCLASS(BlueprintType)
@@ -170,5 +193,8 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Recoil")
     FLastFPSWeaponAimRecoilSettings AimRecoil;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Scope")
+    FLastFPSWeaponScopeSettings Scope;
 
 };

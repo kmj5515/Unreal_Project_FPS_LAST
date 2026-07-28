@@ -2,6 +2,8 @@
 #include "Character/Components/LastFPSGrapplingAnimationComponent.h"
 #include "Character/Components/LastFPSGrapplingTargetingComponent.h"
 #include "Character/Components/WeaponComponent.h"
+#include "Data/Definitions/LastFPSWeaponDefinition.h"
+#include "Blueprint/UserWidget.h"
 #include "Input/LastFPSInputConfig.h"
 #include "Utility/LastFPSTags.h"
 #include "Animation/AnimInstance.h"
@@ -172,6 +174,7 @@ void ALastFPSHero::BeginPlay()
 void ALastFPSHero::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	UnbindSpeedBoostCameraTag();
+	DestroyScopeOverlay();
 
     if (WeaponComponent)
     {
@@ -557,7 +560,89 @@ void ALastFPSHero::RefreshCameraTargets()
 		? ADSArmLength
 		: DefaultArmLength + CurrentSpeedBoostArmLengthOffset;
 	TargetSocketOffset = bIsADS ? ADSSocketOffset : DefaultSocketOffset;
-	TargetFOV = bIsADS ? ADSFOV : DefaultFOV;
+
+	float AimFOV = ADSFOV;
+	if (const FLastFPSWeaponScopeSettings* ScopeSettings = GetActiveScopeSettings())
+	{
+		AimFOV = ScopeSettings->ScopeFOV;
+	}
+	TargetFOV = bIsADS ? AimFOV : DefaultFOV;
+}
+
+const FLastFPSWeaponScopeSettings* ALastFPSHero::GetActiveScopeSettings() const
+{
+	if (!WeaponComponent)
+	{
+		return nullptr;
+	}
+
+	const ULastFPSWeaponDefinition* Definition = WeaponComponent->GetWeaponDefinition();
+	if (!Definition || !Definition->Scope.bUseScope)
+	{
+		return nullptr;
+	}
+
+	return &Definition->Scope;
+}
+
+void ALastFPSHero::ShowScopeOverlay(bool bShow)
+{
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (bShow)
+	{
+		EnsureScopeOverlay();
+		if (ScopeOverlayWidget && !ScopeOverlayWidget->IsInViewport())
+		{
+			ScopeOverlayWidget->AddToViewport(5);
+		}
+	}
+	else if (ScopeOverlayWidget && ScopeOverlayWidget->IsInViewport())
+	{
+		ScopeOverlayWidget->RemoveFromParent();
+	}
+}
+
+void ALastFPSHero::EnsureScopeOverlay()
+{
+	if (ScopeOverlayWidget)
+	{
+		return;
+	}
+
+	const FLastFPSWeaponScopeSettings* ScopeSettings = GetActiveScopeSettings();
+	if (!ScopeSettings || ScopeSettings->ScopeOverlayWidgetClass.IsNull())
+	{
+		return;
+	}
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC)
+	{
+		return;
+	}
+
+	UClass* OverlayClass = ScopeSettings->ScopeOverlayWidgetClass.LoadSynchronous();
+	if (!OverlayClass)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("EnsureScopeOverlay: 스코프 오버레이 위젯 클래스를 로드하지 못했습니다. WeaponDefinition의 Scope.ScopeOverlayWidgetClass를 확인하세요."));
+		return;
+	}
+
+	ScopeOverlayWidget = CreateWidget<UUserWidget>(PC, OverlayClass);
+}
+
+void ALastFPSHero::DestroyScopeOverlay()
+{
+	if (ScopeOverlayWidget)
+	{
+		ScopeOverlayWidget->RemoveFromParent();
+		ScopeOverlayWidget = nullptr;
+	}
 }
 
 void ALastFPSHero::ApplyRotationModeSettings()
@@ -704,7 +789,7 @@ void ALastFPSHero::ClearMoveInput(const FInputActionValue& Value)
 
 void ALastFPSHero::Look(const FInputActionValue& Value)
 {
-    const FVector2D LookVector = Value.Get<FVector2D>();
+    const FVector2D LookVector = Value.Get<FVector2D>() * ActiveAimSensitivityScale;
     AddControllerYawInput(LookVector.X);
     AddControllerPitchInput(LookVector.Y);
 }
@@ -896,6 +981,13 @@ void ALastFPSHero::SetADS(bool bEnabled)
 	RefreshCameraTargets();
     ApplyRotationModeSettings();
 
+    if (IsLocallyControlled())
+    {
+        const FLastFPSWeaponScopeSettings* ScopeSettings = GetActiveScopeSettings();
+        ActiveAimSensitivityScale = (bIsADS && ScopeSettings) ? ScopeSettings->ScopeSensitivityScale : 1.f;
+        ShowScopeOverlay(bIsADS && ScopeSettings != nullptr);
+    }
+
     if (CameraBoom)
     {
         const bool bTargetCameraLagEnabled = !bIsADS;
@@ -1049,6 +1141,16 @@ void ALastFPSHero::OnRep_CombatState()
 void ALastFPSHero::HandleWeaponEquippedChanged(bool /*bEquipped*/)
 {
     ApplyRotationModeSettings();
+
+    DestroyScopeOverlay();
+    RefreshCameraTargets();
+
+    if (IsLocallyControlled())
+    {
+        const FLastFPSWeaponScopeSettings* ScopeSettings = GetActiveScopeSettings();
+        ActiveAimSensitivityScale = (bIsADS && ScopeSettings) ? ScopeSettings->ScopeSensitivityScale : 1.f;
+        ShowScopeOverlay(bIsADS && ScopeSettings != nullptr);
+    }
 }
 
 void ALastFPSHero::Multicast_PlayWeaponFireEffects_Implementation()
