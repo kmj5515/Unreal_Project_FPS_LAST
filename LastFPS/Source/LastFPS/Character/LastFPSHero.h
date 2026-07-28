@@ -25,6 +25,8 @@ struct FLastFPSTemporaryCameraEffectOptions
     float BlendOutDuration = 0.25f;
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLastFPSHeroAimingChanged, bool, bIsAiming);
+
 UCLASS()
 class LASTFPS_API ALastFPSHero : public ALastFPSCharacterBase, public ILastFPSWeaponUser
 {
@@ -40,6 +42,9 @@ public:
 
     UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayWeaponFireEffects();
+
+    UPROPERTY(BlueprintAssignable, Category="LastFPS|Aiming")
+    FLastFPSHeroAimingChanged OnAimingChanged;
 
     virtual void Tick(float DeltaTime) override;
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -118,11 +123,6 @@ protected:
     void CancelAbilityByTag(FGameplayTag AbilityTag);
     void InputPressed(FGameplayTag InputID);
     void InputReleased(FGameplayTag InputID);
-
-    const FLastFPSWeaponScopeSettings* GetActiveScopeSettings() const;
-    void ShowScopeOverlay(bool bShow);
-    void EnsureScopeOverlay();
-    void DestroyScopeOverlay();
 
     void TickCameraInterp(float DeltaTime);
     void TickTemporaryCameraEffect(float DeltaTime);
@@ -277,9 +277,6 @@ private:
     bool bIsADS = false;
 
     float ActiveAimSensitivityScale = 1.f;
-
-    UPROPERTY(Transient)
-    TObjectPtr<UUserWidget> ScopeOverlayWidget;
 
     FVector2D CachedMoveInput = FVector2D::ZeroVector;
     FRotator LocomotionDirectionBaseRotation = FRotator::ZeroRotator;

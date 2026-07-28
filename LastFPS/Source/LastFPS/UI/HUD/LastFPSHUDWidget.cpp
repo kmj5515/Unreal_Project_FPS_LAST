@@ -22,6 +22,7 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
 #include "Blueprint/WidgetTree.h"
+#include "Blueprint/UserWidget.h"
 #include "EasyCrosshairSystem/ecsCrosshairEditorAsset.h"
 #include "Game/LastFPSPlayerState.h"
 #include "Character/LastFPSHero.h"
@@ -146,6 +147,13 @@ void ULastFPSHUDWidget::NativeDestruct()
             &ULastFPSHUDWidget::HandleGrapplingTargetAvailabilityChanged);
     }
     BoundGrapplingTargetingComponent.Reset();
+
+    if (ALastFPSHero* Hero = BoundHero.Get())
+    {
+        Hero->OnAimingChanged.RemoveDynamic(this, &ULastFPSHUDWidget::HandleAimingChanged);
+    }
+    BoundHero.Reset();
+    ClearScopeOverlay();
     bPawnComponentsBound = false;
 
     if (UWorld* World = GetWorld())
@@ -271,6 +279,8 @@ void ULastFPSHUDWidget::TryBindPawnComponents()
     Weapon->OnWeaponEquippedChanged.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
     Weapon->OnWeaponReloadStarted.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleReloadStarted);
     Weapon->OnWeaponReloadFinished.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleReloadFinished);
+    Hero->OnAimingChanged.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleAimingChanged);
+    BoundHero = Hero;
     
     if (ReloadPresenter)
     {
@@ -552,6 +562,81 @@ void ULastFPSHUDWidget::HandleWeaponEquippedChanged(bool bEquipped)
     {
         SetEasyCrosshairVisibility(false);
     }
+
+    ClearScopeOverlay();
+    UpdateScopeOverlay(bEquipped && bLastAiming);
+}
+
+void ULastFPSHUDWidget::HandleAimingChanged(bool bIsAiming)
+{
+    bLastAiming = bIsAiming;
+    UpdateScopeOverlay(bIsAiming);
+}
+
+void ULastFPSHUDWidget::UpdateScopeOverlay(bool bAiming)
+{
+    const UWeaponComponent* Weapon = BoundWeaponComponent.Get();
+    const FLastFPSWeaponScopeSettings* ScopeSettings = Weapon ? Weapon->GetScopeSettings() : nullptr;
+    const bool bWantOverlay = bAiming && ScopeSettings && !ScopeSettings->ScopeOverlayWidgetClass.IsNull();
+
+    if (!bWantOverlay)
+    {
+        if (ScopeOverlayWidget)
+        {
+            ScopeOverlayWidget->SetVisibility(ESlateVisibility::Collapsed);
+        }
+        return;
+    }
+
+    if (!ScopeOverlayHost)
+    {
+        UE_LOG(LogLastFPSHUDWidget, Warning,
+            TEXT("HUD '%s'에 ScopeOverlayHost가 없어 스코프 오버레이를 표시할 수 없습니다. HUD 위젯 BP에 BindWidgetOptional 슬롯을 배치하세요."),
+            *GetNameSafe(this));
+        return;
+    }
+
+    UClass* OverlayClass = ScopeSettings->ScopeOverlayWidgetClass.LoadSynchronous();
+    if (!OverlayClass)
+    {
+        UE_LOG(LogLastFPSHUDWidget, Warning,
+            TEXT("HUD '%s'에서 스코프 오버레이 위젯 클래스 로드에 실패했습니다. WeaponDefinition의 Scope.ScopeOverlayWidgetClass를 확인하세요."),
+            *GetNameSafe(this));
+        return;
+    }
+
+    if (ScopeOverlayWidget && ScopeOverlayWidgetClass != OverlayClass)
+    {
+        ClearScopeOverlay();
+    }
+
+    if (!ScopeOverlayWidget)
+    {
+        ScopeOverlayWidget = CreateWidget<UUserWidget>(GetOwningPlayer(), OverlayClass);
+        if (!ScopeOverlayWidget)
+        {
+            return;
+        }
+        ScopeOverlayWidgetClass = OverlayClass;
+
+        if (UOverlaySlot* HostSlot = Cast<UOverlaySlot>(ScopeOverlayHost->AddChild(ScopeOverlayWidget)))
+        {
+            HostSlot->SetHorizontalAlignment(HAlign_Fill);
+            HostSlot->SetVerticalAlignment(VAlign_Fill);
+        }
+    }
+
+    ScopeOverlayWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
+void ULastFPSHUDWidget::ClearScopeOverlay()
+{
+    if (ScopeOverlayWidget)
+    {
+        ScopeOverlayWidget->RemoveFromParent();
+        ScopeOverlayWidget = nullptr;
+    }
+    ScopeOverlayWidgetClass = nullptr;
 }
 
 void ULastFPSHUDWidget::HandleReloadStarted(float ReloadDuration)

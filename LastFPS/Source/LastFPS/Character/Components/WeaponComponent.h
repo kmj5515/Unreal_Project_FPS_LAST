@@ -18,6 +18,7 @@ class USkeletalMeshComponent;
 class UParticleSystem;
 class USoundBase;
 class ULastFPSWeaponDefinition;
+struct FLastFPSWeaponScopeSettings;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponEquippedChanged, bool, bEquipped);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWeaponAmmoChanged, int32, CurrentAmmo, int32, MagazineCapacity);
@@ -116,6 +117,8 @@ public:
 
     UFUNCTION(BlueprintPure, Category="Weapon")
     ULastFPSWeaponDefinition* GetWeaponDefinition() const { return WeaponDefinition; }
+
+    const FLastFPSWeaponScopeSettings* GetScopeSettings() const;
 
     // 무기 BP마다 Unarmed / Rifle / Pistol 지정 (Chooser Table 분기 입력)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, ReplicatedUsing=OnRep_WeaponType, Category="Weapon")

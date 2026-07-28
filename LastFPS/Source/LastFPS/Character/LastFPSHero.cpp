@@ -174,7 +174,6 @@ void ALastFPSHero::BeginPlay()
 void ALastFPSHero::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	UnbindSpeedBoostCameraTag();
-	DestroyScopeOverlay();
 
     if (WeaponComponent)
     {
@@ -562,87 +561,11 @@ void ALastFPSHero::RefreshCameraTargets()
 	TargetSocketOffset = bIsADS ? ADSSocketOffset : DefaultSocketOffset;
 
 	float AimFOV = ADSFOV;
-	if (const FLastFPSWeaponScopeSettings* ScopeSettings = GetActiveScopeSettings())
+	if (const FLastFPSWeaponScopeSettings* ScopeSettings = WeaponComponent ? WeaponComponent->GetScopeSettings() : nullptr)
 	{
 		AimFOV = ScopeSettings->ScopeFOV;
 	}
 	TargetFOV = bIsADS ? AimFOV : DefaultFOV;
-}
-
-const FLastFPSWeaponScopeSettings* ALastFPSHero::GetActiveScopeSettings() const
-{
-	if (!WeaponComponent)
-	{
-		return nullptr;
-	}
-
-	const ULastFPSWeaponDefinition* Definition = WeaponComponent->GetWeaponDefinition();
-	if (!Definition || !Definition->Scope.bUseScope)
-	{
-		return nullptr;
-	}
-
-	return &Definition->Scope;
-}
-
-void ALastFPSHero::ShowScopeOverlay(bool bShow)
-{
-	if (!IsLocallyControlled())
-	{
-		return;
-	}
-
-	if (bShow)
-	{
-		EnsureScopeOverlay();
-		if (ScopeOverlayWidget && !ScopeOverlayWidget->IsInViewport())
-		{
-			ScopeOverlayWidget->AddToViewport(5);
-		}
-	}
-	else if (ScopeOverlayWidget && ScopeOverlayWidget->IsInViewport())
-	{
-		ScopeOverlayWidget->RemoveFromParent();
-	}
-}
-
-void ALastFPSHero::EnsureScopeOverlay()
-{
-	if (ScopeOverlayWidget)
-	{
-		return;
-	}
-
-	const FLastFPSWeaponScopeSettings* ScopeSettings = GetActiveScopeSettings();
-	if (!ScopeSettings || ScopeSettings->ScopeOverlayWidgetClass.IsNull())
-	{
-		return;
-	}
-
-	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (!PC)
-	{
-		return;
-	}
-
-	UClass* OverlayClass = ScopeSettings->ScopeOverlayWidgetClass.LoadSynchronous();
-	if (!OverlayClass)
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("EnsureScopeOverlay: 스코프 오버레이 위젯 클래스를 로드하지 못했습니다. WeaponDefinition의 Scope.ScopeOverlayWidgetClass를 확인하세요."));
-		return;
-	}
-
-	ScopeOverlayWidget = CreateWidget<UUserWidget>(PC, OverlayClass);
-}
-
-void ALastFPSHero::DestroyScopeOverlay()
-{
-	if (ScopeOverlayWidget)
-	{
-		ScopeOverlayWidget->RemoveFromParent();
-		ScopeOverlayWidget = nullptr;
-	}
 }
 
 void ALastFPSHero::ApplyRotationModeSettings()
@@ -983,9 +906,9 @@ void ALastFPSHero::SetADS(bool bEnabled)
 
     if (IsLocallyControlled())
     {
-        const FLastFPSWeaponScopeSettings* ScopeSettings = GetActiveScopeSettings();
+        const FLastFPSWeaponScopeSettings* ScopeSettings = WeaponComponent ? WeaponComponent->GetScopeSettings() : nullptr;
         ActiveAimSensitivityScale = (bIsADS && ScopeSettings) ? ScopeSettings->ScopeSensitivityScale : 1.f;
-        ShowScopeOverlay(bIsADS && ScopeSettings != nullptr);
+        OnAimingChanged.Broadcast(bIsADS);
     }
 
     if (CameraBoom)
@@ -1141,15 +1064,12 @@ void ALastFPSHero::OnRep_CombatState()
 void ALastFPSHero::HandleWeaponEquippedChanged(bool /*bEquipped*/)
 {
     ApplyRotationModeSettings();
-
-    DestroyScopeOverlay();
     RefreshCameraTargets();
 
-    if (IsLocallyControlled())
+    if (IsLocallyControlled() && WeaponComponent)
     {
-        const FLastFPSWeaponScopeSettings* ScopeSettings = GetActiveScopeSettings();
+        const FLastFPSWeaponScopeSettings* ScopeSettings = WeaponComponent->GetScopeSettings();
         ActiveAimSensitivityScale = (bIsADS && ScopeSettings) ? ScopeSettings->ScopeSensitivityScale : 1.f;
-        ShowScopeOverlay(bIsADS && ScopeSettings != nullptr);
     }
 }
 
