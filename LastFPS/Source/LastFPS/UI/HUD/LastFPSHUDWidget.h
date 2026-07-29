@@ -28,6 +28,7 @@ class ULastFPSSkillCooldownSlotWidget;
 class ULastFPSStatusEffectListWidget;
 class UOverlay;
 class UUserWidget;
+struct FStreamableHandle;
 class UWeaponComponent;
 class AActor;
 class ALastFPSCharacterBase;
@@ -251,6 +252,9 @@ private:
     void HandleAimingChanged(bool bIsAiming);
     void UpdateScopeOverlay(bool bAiming);
     void ClearScopeOverlay();
+    void RequestScopeOverlayPreload();
+    void CancelScopeOverlayPreload();
+    void HandleScopeOverlayLoaded();
 
     /*Reload */
     UFUNCTION()
@@ -308,4 +312,7 @@ private:
     TObjectPtr<UUserWidget> ScopeOverlayWidget;
     TSubclassOf<UUserWidget> ScopeOverlayWidgetClass;
     bool bLastAiming = false;
+
+    TSharedPtr<FStreamableHandle> ScopeOverlayLoadHandle;
+    FSoftObjectPath PendingScopeOverlayPath;
 };

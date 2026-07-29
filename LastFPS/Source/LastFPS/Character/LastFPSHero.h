@@ -107,6 +107,7 @@ protected:
     virtual void OnCombatEngagedChanged() override;
 	virtual void OnMoveSpeedChanged(const FOnAttributeChangeData& Data) override;
 	virtual float ResolveMaxWalkSpeed(float AttributeMoveSpeed) const override;
+	virtual void UpdateAliveCollisionState(bool bAlive) override;
 
     /** 초기 스폰·지연 스폰·리스폰 모두에서 로컬 플레이어의 기본 입력 매핑을 보장한다. */
     void EnsureDefaultInputMapping();
@@ -316,6 +317,8 @@ private:
 	void HandleSpeedBoostCameraTagChanged(FGameplayTag Tag, int32 NewCount);
 	void UpdateSpeedBoostCameraOffset(float EffectiveMoveSpeed);
 	void RefreshCameraTargets();
+	void RefreshAimSensitivity();
+	float ResolveAimInterpSpeed() const;
 
     void HandleAbilityInput(const FInputActionValue& value, FGameplayTag InputID);
     bool ShouldCancelFireBeforeAbilityInput(FGameplayTag InputID) const;

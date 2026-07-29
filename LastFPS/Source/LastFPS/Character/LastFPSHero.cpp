@@ -337,12 +337,13 @@ void ALastFPSHero::TickAutoSprint(float DeltaTime)
 
 void ALastFPSHero::TickCameraInterp(float DeltaTime)
 {
+	const float AimInterpSpeed = ResolveAimInterpSpeed();
 	const float ArmInterpSpeed = !bIsADS && bSpeedBoostCameraTransition
 		? SpeedBoostCameraInterpSpeed
-		: ADSInterpSpeed;
+		: AimInterpSpeed;
     CameraBoom->TargetArmLength = FMath::FInterpTo(CameraBoom->TargetArmLength, TargetArmLength, DeltaTime, ArmInterpSpeed);
-    CameraBoom->SocketOffset = FMath::VInterpTo(CameraBoom->SocketOffset, TargetSocketOffset, DeltaTime, ADSInterpSpeed);
-    FollowCamera->FieldOfView = FMath::FInterpTo(FollowCamera->FieldOfView, TargetFOV, DeltaTime, ADSInterpSpeed);
+    CameraBoom->SocketOffset = FMath::VInterpTo(CameraBoom->SocketOffset, TargetSocketOffset, DeltaTime, AimInterpSpeed);
+    FollowCamera->FieldOfView = FMath::FInterpTo(FollowCamera->FieldOfView, TargetFOV, DeltaTime, AimInterpSpeed);
 
 	if (bSpeedBoostCameraTransition
 		&& FMath::IsNearlyEqual(CameraBoom->TargetArmLength, TargetArmLength, 0.5f))
@@ -566,6 +567,35 @@ void ALastFPSHero::RefreshCameraTargets()
 		AimFOV = ScopeSettings->ScopeFOV;
 	}
 	TargetFOV = bIsADS ? AimFOV : DefaultFOV;
+}
+
+void ALastFPSHero::RefreshAimSensitivity()
+{
+	const FLastFPSWeaponScopeSettings* ScopeSettings =
+		WeaponComponent ? WeaponComponent->GetScopeSettings() : nullptr;
+
+	if (!bIsADS || !ScopeSettings || DefaultFOV <= 0.f)
+	{
+		ActiveAimSensitivityScale = 1.f;
+		return;
+	}
+
+	const float ZoomRatio = FMath::Clamp(ScopeSettings->ScopeFOV / DefaultFOV, 0.f, 1.f);
+	ActiveAimSensitivityScale =
+		FMath::Max(ZoomRatio * ScopeSettings->ScopeSensitivityMultiplier, KINDA_SMALL_NUMBER);
+}
+
+float ALastFPSHero::ResolveAimInterpSpeed() const
+{
+	const FLastFPSWeaponScopeSettings* ScopeSettings =
+		WeaponComponent ? WeaponComponent->GetScopeSettings() : nullptr;
+
+	if (ScopeSettings && ScopeSettings->ScopeInterpSpeed > 0.f)
+	{
+		return ScopeSettings->ScopeInterpSpeed;
+	}
+
+	return ADSInterpSpeed;
 }
 
 void ALastFPSHero::ApplyRotationModeSettings()
@@ -906,8 +936,7 @@ void ALastFPSHero::SetADS(bool bEnabled)
 
     if (IsLocallyControlled())
     {
-        const FLastFPSWeaponScopeSettings* ScopeSettings = WeaponComponent ? WeaponComponent->GetScopeSettings() : nullptr;
-        ActiveAimSensitivityScale = (bIsADS && ScopeSettings) ? ScopeSettings->ScopeSensitivityScale : 1.f;
+        RefreshAimSensitivity();
         OnAimingChanged.Broadcast(bIsADS);
     }
 
@@ -1066,10 +1095,19 @@ void ALastFPSHero::HandleWeaponEquippedChanged(bool /*bEquipped*/)
     ApplyRotationModeSettings();
     RefreshCameraTargets();
 
-    if (IsLocallyControlled() && WeaponComponent)
+    if (IsLocallyControlled())
     {
-        const FLastFPSWeaponScopeSettings* ScopeSettings = WeaponComponent->GetScopeSettings();
-        ActiveAimSensitivityScale = (bIsADS && ScopeSettings) ? ScopeSettings->ScopeSensitivityScale : 1.f;
+        RefreshAimSensitivity();
+    }
+}
+
+void ALastFPSHero::UpdateAliveCollisionState(bool bAlive)
+{
+    Super::UpdateAliveCollisionState(bAlive);
+
+    if (!bAlive && bIsADS)
+    {
+        SetADS(false);
     }
 }
 

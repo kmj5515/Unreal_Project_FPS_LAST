@@ -15,6 +15,8 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
 #include "GameFramework/PlayerController.h"
 #include "PrimaryGameLayout.h"
 #include "Components/Overlay.h"
@@ -153,6 +155,7 @@ void ULastFPSHUDWidget::NativeDestruct()
         Hero->OnAimingChanged.RemoveDynamic(this, &ULastFPSHUDWidget::HandleAimingChanged);
     }
     BoundHero.Reset();
+    CancelScopeOverlayPreload();
     ClearScopeOverlay();
     bPawnComponentsBound = false;
 
@@ -281,7 +284,7 @@ void ULastFPSHUDWidget::TryBindPawnComponents()
     Weapon->OnWeaponReloadFinished.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleReloadFinished);
     Hero->OnAimingChanged.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleAimingChanged);
     BoundHero = Hero;
-    
+
     if (ReloadPresenter)
     {
         // 최초 바인딩 시에는 리로드 중이 아니므로 표시 요소를 숨겨 초기 상태를 정리한다.
@@ -305,6 +308,7 @@ void ULastFPSHUDWidget::TryBindPawnComponents()
         GrapplingReticlePresenter->SetAvailability(GrapplingTargeting->IsTargetAvailable());
     }
     RefreshEasyCrosshair();
+    RequestScopeOverlayPreload();
 }
 
 bool ULastFPSHUDWidget::InitializeHUD()
@@ -564,6 +568,7 @@ void ULastFPSHUDWidget::HandleWeaponEquippedChanged(bool bEquipped)
     }
 
     ClearScopeOverlay();
+    RequestScopeOverlayPreload();
     UpdateScopeOverlay(bEquipped && bLastAiming);
 }
 
@@ -596,7 +601,12 @@ void ULastFPSHUDWidget::UpdateScopeOverlay(bool bAiming)
         return;
     }
 
-    UClass* OverlayClass = ScopeSettings->ScopeOverlayWidgetClass.LoadSynchronous();
+    UClass* OverlayClass = ScopeSettings->ScopeOverlayWidgetClass.Get();
+    if (!OverlayClass)
+    {
+        OverlayClass = ScopeSettings->ScopeOverlayWidgetClass.LoadSynchronous();
+    }
+
     if (!OverlayClass)
     {
         UE_LOG(LogLastFPSHUDWidget, Warning,
@@ -637,6 +647,59 @@ void ULastFPSHUDWidget::ClearScopeOverlay()
         ScopeOverlayWidget = nullptr;
     }
     ScopeOverlayWidgetClass = nullptr;
+}
+
+void ULastFPSHUDWidget::RequestScopeOverlayPreload()
+{
+    const UWeaponComponent* Weapon = BoundWeaponComponent.Get();
+    const FLastFPSWeaponScopeSettings* ScopeSettings = Weapon ? Weapon->GetScopeSettings() : nullptr;
+    if (!ScopeSettings)
+    {
+        CancelScopeOverlayPreload();
+        return;
+    }
+
+    const FSoftObjectPath OverlayPath = ScopeSettings->ScopeOverlayWidgetClass.ToSoftObjectPath();
+    if (!OverlayPath.IsValid() || (ScopeOverlayLoadHandle.IsValid() && PendingScopeOverlayPath == OverlayPath))
+    {
+        return;
+    }
+
+    CancelScopeOverlayPreload();
+    PendingScopeOverlayPath = OverlayPath;
+    ScopeOverlayLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+        OverlayPath,
+        FStreamableDelegate::CreateUObject(this, &ULastFPSHUDWidget::HandleScopeOverlayLoaded),
+        FStreamableManager::AsyncLoadHighPriority);
+
+    if (!ScopeOverlayLoadHandle.IsValid())
+    {
+        UE_LOG(LogLastFPSHUDWidget, Error,
+            TEXT("HUD '%s'에서 스코프 오버레이 '%s' 비동기 로드를 시작하지 못했습니다."),
+            *GetNameSafe(this), *OverlayPath.ToString());
+        PendingScopeOverlayPath.Reset();
+    }
+}
+
+void ULastFPSHUDWidget::CancelScopeOverlayPreload()
+{
+    if (ScopeOverlayLoadHandle.IsValid())
+    {
+        ScopeOverlayLoadHandle->CancelHandle();
+        ScopeOverlayLoadHandle.Reset();
+    }
+    PendingScopeOverlayPath.Reset();
+}
+
+void ULastFPSHUDWidget::HandleScopeOverlayLoaded()
+{
+    ScopeOverlayLoadHandle.Reset();
+    PendingScopeOverlayPath.Reset();
+
+    if (bLastAiming)
+    {
+        UpdateScopeOverlay(true);
+    }
 }
 
 void ULastFPSHUDWidget::HandleReloadStarted(float ReloadDuration)
