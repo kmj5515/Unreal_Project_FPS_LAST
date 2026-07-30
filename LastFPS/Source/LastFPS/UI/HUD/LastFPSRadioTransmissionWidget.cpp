@@ -10,6 +10,7 @@ void ULastFPSRadioTransmissionWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
+	SetVisibility(ESlateVisibility::Collapsed);
 	if (BackgroundPanel)
 	{
 		BackgroundPanel->SetVisibility(ESlateVisibility::Collapsed);
@@ -21,8 +22,9 @@ void ULastFPSRadioTransmissionWidget::NativeConstruct()
 		{
 			if (ULastFPSQuestSubsystem* QuestSubsystem = GI->GetSubsystem<ULastFPSQuestSubsystem>())
 			{
-				QuestSubsystem->OnRadioTransmission.AddDynamic(
+				QuestSubsystem->OnRadioTransmission.AddUniqueDynamic(
 					this, &ULastFPSRadioTransmissionWidget::HandleQuestRadioTransmission);
+				QuestSubsystem->FlushPendingRadioTransmissions();
 			}
 		}
 	}
@@ -87,6 +89,7 @@ void ULastFPSRadioTransmissionWidget::ProcessNextTransmission()
 	if (TransmissionQueue.IsEmpty())
 	{
 		bIsPlaying = false;
+		SetVisibility(ESlateVisibility::Collapsed);
 		if (BackgroundPanel)
 		{
 			BackgroundPanel->SetVisibility(ESlateVisibility::Collapsed);
@@ -99,6 +102,7 @@ void ULastFPSRadioTransmissionWidget::ProcessNextTransmission()
 	CurrentTransmission = TransmissionQueue[0];
 	TransmissionQueue.RemoveAt(0);
 
+	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	if (BackgroundPanel)
 	{
 		BackgroundPanel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);

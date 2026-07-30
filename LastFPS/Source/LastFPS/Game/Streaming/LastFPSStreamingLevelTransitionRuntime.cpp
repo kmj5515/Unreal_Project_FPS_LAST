@@ -1,13 +1,17 @@
 #include "Game/Streaming/LastFPSStreamingLevelTransitionRuntime.h"
 
 #include "AbilitySystemComponent.h"
+#include "Character/LastFPSCharacterBase.h"
 #include "Character/LastFPSEnemyCharacter.h"
+#include "Components/SceneComponent.h"
 #include "Data/Definitions/LastFPSEnemyDefinition.h"
 #include "Engine/AssetManager.h"
+#include "Engine/GameInstance.h"
 #include "Engine/Level.h"
 #include "Engine/LevelStreamingDynamic.h"
 #include "Engine/PlayerStartPIE.h"
 #include "Engine/StreamableManager.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/TriggerBox.h"
 #include "Engine/World.h"
@@ -17,7 +21,11 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerStart.h"
 #include "Net/UnrealNetwork.h"
+#include "Encounter/LastFPSRoomEncounterSubsystem.h"
+#include "Game/Streaming/LastFPSArrivalContainmentPresentationComponent.h"
+#include "Materials/MaterialInterface.h"
 #include "Pooling/LastFPSActorPoolSubsystem.h"
+#include "Quest/LastFPSQuestSubsystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSStreamingTransition, Log, All);
 
@@ -28,6 +36,18 @@ ALastFPSStreamingLevelTransitionRuntime::
 	bReplicates = true;
 	bAlwaysRelevant = true;
 	SetReplicateMovement(false);
+
+	EncounterObjectiveMarker =
+		CreateDefaultSubobject<USceneComponent>(
+			TEXT("EncounterObjectiveMarker"));
+	SetRootComponent(EncounterObjectiveMarker);
+
+	ArrivalContainmentPresentation =
+		CreateDefaultSubobject<
+			ULastFPSArrivalContainmentPresentationComponent>(
+				TEXT("ArrivalContainmentPresentation"));
+	ArrivalContainmentPresentation->SetupAttachment(
+		EncounterObjectiveMarker);
 }
 
 void ALastFPSStreamingLevelTransitionRuntime::ConfigureRoute(
@@ -54,6 +74,7 @@ void ALastFPSStreamingLevelTransitionRuntime::BeginPlay()
 	Super::BeginPlay();
 
 	BeginDestinationPreload();
+	BeginArrivalContainmentPreload();
 	BeginDelayedEnemyContentPreload();
 
 	if (HasAuthority() && IsValid(TriggerVolume))
@@ -85,8 +106,21 @@ void ALastFPSStreamingLevelTransitionRuntime::EndPlay(
 	}
 
 	GetWorldTimerManager().ClearTimer(DelayedEnemySpawnTimerHandle);
+	GetWorldTimerManager().ClearTimer(ArrivalHoldTimerHandle);
+	GetWorldTimerManager().ClearTimer(ArrivalContainmentTimerHandle);
+	ReleaseArrivalHold();
+	HideArrivalContainment();
+	UnregisterEncounterObjectiveMarker();
+	if (ALastFPSEnemyCharacter* SpawnedEnemy =
+		SpawnedDelayedEnemy.Get())
+	{
+		SpawnedEnemy->OnDeath.RemoveAll(this);
+	}
 	CancelDelayedEnemyContentPreload();
+	CancelArrivalContainmentPreload();
 	LoadedDelayedEnemyDefinition = nullptr;
+	LoadedArrivalContainmentMesh = nullptr;
+	LoadedArrivalContainmentMaterial = nullptr;
 	PendingPawn.Reset();
 	SpawnedDelayedEnemy.Reset();
 	Super::EndPlay(EndPlayReason);
@@ -153,6 +187,8 @@ void ALastFPSStreamingLevelTransitionRuntime::
 
 void ALastFPSStreamingLevelTransitionRuntime::HandleDestinationLevelShown()
 {
+	UpdateEncounterObjectiveMarker();
+
 	if (HasAuthority())
 	{
 		CompletePendingPawnTransition();
@@ -162,6 +198,7 @@ void ALastFPSStreamingLevelTransitionRuntime::HandleDestinationLevelShown()
 void ALastFPSStreamingLevelTransitionRuntime::OnRep_Route()
 {
 	BeginDestinationPreload();
+	BeginArrivalContainmentPreload();
 	BeginDelayedEnemyContentPreload();
 }
 
@@ -171,6 +208,77 @@ void ALastFPSStreamingLevelTransitionRuntime::
 	if (bTransitionRequested)
 	{
 		RequestDestinationVisibility();
+	}
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
+	Multicast_NotifyTransitionArrived_Implementation(
+		const FVector_NetQuantize ArrivalLocation,
+		const FRotator ArrivalRotation)
+{
+	if (Route.ArrivalLocationTag.IsValid())
+	{
+		const UWorld* World = GetWorld();
+		UGameInstance* GameInstance = World
+			? World->GetGameInstance()
+			: nullptr;
+		if (ULastFPSQuestSubsystem* QuestSubsystem = GameInstance
+			? GameInstance->GetSubsystem<ULastFPSQuestSubsystem>()
+			: nullptr)
+		{
+			// 스트리밍 전환이 같은 TriggerBox의 오버랩을 먼저 끊어도 도착 목표를 확정한다.
+			QuestSubsystem->NotifyLocationTriggerChanged(
+				Route.ArrivalLocationTag,
+				true);
+			QuestSubsystem->NotifyLocationTriggerChanged(
+				Route.ArrivalLocationTag,
+				false);
+		}
+	}
+
+	if (Route.ArrivalContainment.bEnabled
+		&& ArrivalContainmentPresentation)
+	{
+		ArrivalContainmentPresentation->ShowAt(
+			FTransform(
+				ArrivalRotation,
+				ArrivalLocation));
+		GetWorldTimerManager().ClearTimer(
+			ArrivalContainmentTimerHandle);
+		GetWorldTimerManager().SetTimer(
+			ArrivalContainmentTimerHandle,
+			this,
+			&ThisClass::HideArrivalContainment,
+			FMath::Max(Route.ArrivalHoldDuration, 0.f),
+			false);
+	}
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
+	Multicast_NotifyDelayedEnemyEncounterProgress_Implementation(
+		const int32 DefeatedEnemyCount,
+		const int32 TotalEnemyCount,
+		const bool bEncounterCleared)
+{
+	if (Route.DelayedEnemyEncounterId.IsNone())
+	{
+		return;
+	}
+
+	if (ULastFPSRoomEncounterSubsystem* EncounterSubsystem =
+		GetWorld()
+			? GetWorld()->GetSubsystem<ULastFPSRoomEncounterSubsystem>()
+			: nullptr)
+	{
+		EncounterSubsystem->NotifyEncounterProgress(
+			Route.DelayedEnemyEncounterId,
+			DefeatedEnemyCount,
+			TotalEnemyCount);
+		if (bEncounterCleared)
+		{
+			EncounterSubsystem->NotifyEncounterCleared(
+				Route.DelayedEnemyEncounterId);
+		}
 	}
 }
 
@@ -230,6 +338,102 @@ void ALastFPSStreamingLevelTransitionRuntime::BeginDestinationPreload()
 		&& DestinationStreamingLevel->IsLevelVisible())
 	{
 		HandleDestinationLevelShown();
+	}
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
+	BeginArrivalContainmentPreload()
+{
+	CancelArrivalContainmentPreload();
+	LoadedArrivalContainmentMesh = nullptr;
+	LoadedArrivalContainmentMaterial = nullptr;
+
+	if (!Route.ArrivalContainment.bEnabled)
+	{
+		HideArrivalContainment();
+		return;
+	}
+
+	LoadedArrivalContainmentMesh =
+		Route.ArrivalContainment.Mesh.Get();
+	LoadedArrivalContainmentMaterial =
+		Route.ArrivalContainment.Material.Get();
+	if (LoadedArrivalContainmentMesh
+		&& LoadedArrivalContainmentMaterial)
+	{
+		HandleArrivalContainmentLoaded();
+		return;
+	}
+
+	TArray<FSoftObjectPath> RequiredPaths;
+	RequiredPaths.AddUnique(
+		Route.ArrivalContainment.Mesh.ToSoftObjectPath());
+	RequiredPaths.AddUnique(
+		Route.ArrivalContainment.Material.ToSoftObjectPath());
+	ArrivalContainmentLoadHandle =
+		UAssetManager::GetStreamableManager().RequestAsyncLoad(
+			RequiredPaths,
+			FStreamableDelegate::CreateUObject(
+				this,
+				&ThisClass::HandleArrivalContainmentLoaded),
+			FStreamableManager::AsyncLoadHighPriority);
+	if (!ArrivalContainmentLoadHandle.IsValid())
+	{
+		UE_LOG(
+			LogLastFPSStreamingTransition,
+			Error,
+			TEXT("[%s] 도착 경고 원통의 비동기 로드를 시작하지 못했습니다."),
+			*Route.RouteId.ToString());
+	}
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
+	HandleArrivalContainmentLoaded()
+{
+	LoadedArrivalContainmentMesh =
+		Route.ArrivalContainment.Mesh.Get();
+	LoadedArrivalContainmentMaterial =
+		Route.ArrivalContainment.Material.Get();
+	ArrivalContainmentLoadHandle.Reset();
+
+	if (!LoadedArrivalContainmentMesh
+		|| !LoadedArrivalContainmentMaterial
+		|| !ArrivalContainmentPresentation)
+	{
+		UE_LOG(
+			LogLastFPSStreamingTransition,
+			Error,
+			TEXT("[%s] 도착 경고 원통 자산이 준비되지 않았습니다: Mesh=%s, Material=%s"),
+			*Route.RouteId.ToString(),
+			*Route.ArrivalContainment.Mesh.ToString(),
+			*Route.ArrivalContainment.Material.ToString());
+		return;
+	}
+
+	ArrivalContainmentPresentation->Configure(
+		Route.ArrivalContainment,
+		*LoadedArrivalContainmentMesh,
+		*LoadedArrivalContainmentMaterial);
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
+	CancelArrivalContainmentPreload()
+{
+	if (ArrivalContainmentLoadHandle.IsValid())
+	{
+		ArrivalContainmentLoadHandle->CancelHandle();
+		ArrivalContainmentLoadHandle.Reset();
+	}
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
+	HideArrivalContainment()
+{
+	GetWorldTimerManager().ClearTimer(
+		ArrivalContainmentTimerHandle);
+	if (ArrivalContainmentPresentation)
+	{
+		ArrivalContainmentPresentation->Hide();
 	}
 }
 
@@ -408,6 +612,67 @@ bool ALastFPSStreamingLevelTransitionRuntime::
 }
 
 void ALastFPSStreamingLevelTransitionRuntime::
+	UpdateEncounterObjectiveMarker()
+{
+	if (Route.DelayedEnemyEncounterId.IsNone()
+		|| !EncounterObjectiveMarker)
+	{
+		return;
+	}
+
+	FTransform SpawnTransform;
+	if (!ResolveDelayedEnemySpawnTransform(SpawnTransform))
+	{
+		return;
+	}
+
+	EncounterObjectiveMarker->SetWorldTransform(SpawnTransform);
+	if (bEncounterMarkerRegistered)
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	UGameInstance* GameInstance = World
+		? World->GetGameInstance()
+		: nullptr;
+	if (ULastFPSQuestSubsystem* QuestSubsystem = GameInstance
+		? GameInstance->GetSubsystem<ULastFPSQuestSubsystem>()
+		: nullptr)
+	{
+		QuestSubsystem->RegisterEncounterMarker(
+			Route.DelayedEnemyEncounterId,
+			EncounterObjectiveMarker);
+		bEncounterMarkerRegistered = true;
+	}
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
+	UnregisterEncounterObjectiveMarker()
+{
+	if (!bEncounterMarkerRegistered
+		|| Route.DelayedEnemyEncounterId.IsNone()
+		|| !EncounterObjectiveMarker)
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	UGameInstance* GameInstance = World
+		? World->GetGameInstance()
+		: nullptr;
+	if (ULastFPSQuestSubsystem* QuestSubsystem = GameInstance
+		? GameInstance->GetSubsystem<ULastFPSQuestSubsystem>()
+		: nullptr)
+	{
+		QuestSubsystem->UnregisterEncounterMarker(
+			Route.DelayedEnemyEncounterId,
+			EncounterObjectiveMarker);
+	}
+	bEncounterMarkerRegistered = false;
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
 	CompletePendingPawnTransition()
 {
 	APawn* Pawn = PendingPawn.Get();
@@ -458,7 +723,79 @@ void ALastFPSStreamingLevelTransitionRuntime::
 		*GetNameSafe(Pawn),
 		*Route.DestinationLevel.ToString());
 	PendingPawn.Reset();
+	const bool bArrivalHoldStarted =
+		BeginArrivalHold(*Pawn);
+	Multicast_NotifyTransitionArrived(
+		DestinationTransform.GetLocation(),
+		DestinationTransform.Rotator());
+	if (!bArrivalHoldStarted)
+	{
+		ScheduleDelayedEnemySpawn();
+	}
+}
+
+bool ALastFPSStreamingLevelTransitionRuntime::BeginArrivalHold(
+	APawn& Pawn)
+{
+	const float HoldDuration = FMath::Max(
+		Route.ArrivalHoldDuration,
+		0.f);
+	ACharacter* Character = Cast<ACharacter>(&Pawn);
+	if (!Character || HoldDuration <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	UCharacterMovementComponent* Movement =
+		Character->GetCharacterMovement();
+	if (!Movement)
+	{
+		return false;
+	}
+
+	ReleaseArrivalHold();
+	HeldCharacter = Character;
+	PreviousMovementMode = static_cast<uint8>(
+		Movement->MovementMode.GetValue());
+	PreviousCustomMovementMode = Movement->CustomMovementMode;
+	Movement->StopMovementImmediately();
+	Movement->DisableMovement();
+
+	GetWorldTimerManager().SetTimer(
+		ArrivalHoldTimerHandle,
+		this,
+		&ThisClass::HandleArrivalHoldFinished,
+		HoldDuration,
+		false);
+	return true;
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
+	HandleArrivalHoldFinished()
+{
+	ReleaseArrivalHold();
 	ScheduleDelayedEnemySpawn();
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::ReleaseArrivalHold()
+{
+	GetWorldTimerManager().ClearTimer(ArrivalHoldTimerHandle);
+
+	ACharacter* Character = HeldCharacter.Get();
+	HeldCharacter.Reset();
+	if (!Character)
+	{
+		return;
+	}
+
+	if (UCharacterMovementComponent* Movement =
+		Character->GetCharacterMovement();
+		Movement && Movement->MovementMode == MOVE_None)
+	{
+		Movement->SetMovementMode(
+			static_cast<EMovementMode>(PreviousMovementMode),
+			PreviousCustomMovementMode);
+	}
 }
 
 void ALastFPSStreamingLevelTransitionRuntime::
@@ -491,7 +828,7 @@ void ALastFPSStreamingLevelTransitionRuntime::
 	UE_LOG(
 		LogLastFPSStreamingTransition,
 		Log,
-		TEXT("[%s] 목적지 전환 완료 후 %.2f초 뒤 지연 적 생성을 예약했습니다."),
+		TEXT("[%s] 도착 이동 제한 해제 후 %.2f초 뒤 지연 적 생성을 예약했습니다."),
 		*Route.RouteId.ToString(),
 		SpawnDelay);
 }
@@ -624,6 +961,9 @@ void ALastFPSStreamingLevelTransitionRuntime::SpawnDelayedEnemy()
 	}
 
 	SpawnedEnemy->SpawnDefaultController();
+	SpawnedEnemy->OnDeath.AddUObject(
+		this,
+		&ThisClass::HandleDelayedEnemyDeath);
 	if (Route.DelayedEnemySpawnGameplayCueTag.IsValid())
 	{
 		if (UAbilitySystemComponent* ASC =
@@ -648,6 +988,8 @@ void ALastFPSStreamingLevelTransitionRuntime::SpawnDelayedEnemy()
 	SpawnedDelayedEnemy = SpawnedEnemy;
 	bDelayedEnemySpawnDue = false;
 
+	Multicast_NotifyDelayedEnemyEncounterProgress(0, 1, false);
+
 	UE_LOG(
 		LogLastFPSStreamingTransition,
 		Log,
@@ -656,6 +998,25 @@ void ALastFPSStreamingLevelTransitionRuntime::SpawnDelayedEnemy()
 		*GetNameSafe(SpawnedEnemy),
 		*GetNameSafe(LoadedDelayedEnemyDefinition),
 		bAcquiredFromPool ? TEXT("true") : TEXT("false"));
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
+	HandleDelayedEnemyDeath(ALastFPSCharacterBase* DeadCharacter)
+{
+	if (!HasAuthority()
+		|| !DeadCharacter
+		|| DeadCharacter != SpawnedDelayedEnemy.Get())
+	{
+		return;
+	}
+
+	DeadCharacter->OnDeath.RemoveAll(this);
+	if (Route.DelayedEnemyEncounterId.IsNone())
+	{
+		return;
+	}
+
+	Multicast_NotifyDelayedEnemyEncounterProgress(1, 1, true);
 }
 
 FString ALastFPSStreamingLevelTransitionRuntime::

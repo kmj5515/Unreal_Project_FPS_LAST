@@ -19,7 +19,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLastFPSQuestStateChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLastFPSRadioTransmission, const FLastFPSRadioTransmissionData&, RadioData);
 
 /**
- * 화면 마커 대상 1건 — 진행중 퀘스트의 위치 목표(ReachLocation)를 월드 좌표로 노출.
+ * 화면 마커 대상 1건 — 진행중 퀘스트의 안내 가능한 목표를 월드 좌표로 노출.
  * 거리(m)는 플레이어 위치에 따라 매 프레임 바뀌므로 여기 담지 않고 HUD 위젯이 계산한다.
  */
 USTRUCT(BlueprintType)
@@ -174,6 +174,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest|Radio")
 	void TriggerRadioByIds(const TArray<FName>& RadioIds);
 
+	/** HUD 무전 위젯이 준비되기 전에 발생한 무전을 등록 순서대로 전달한다. */
+	void FlushPendingRadioTransmissions();
+
 	// ── 위치 마커 등록소 (ReachLocation 위치 소스 / HUD 공용) ─────────
 
 	/** 위치 마커 등록 (ULastFPSObjectiveMarkerComponent 가 BeginPlay 에서 호출). */
@@ -182,6 +185,13 @@ public:
 	void UnregisterLocationMarker(FGameplayTag LocationTag, USceneComponent* Marker);
 	/** 태그에 등록된 월드 위치 조회. 없거나 파괴됐으면 false. */
 	bool GetTrackedLocation(FGameplayTag LocationTag, FVector& OutLocation) const;
+
+	/** 일반 RoomEncounter 밖에서 제공하는 Encounter 목표 위치를 등록한다. */
+	void RegisterEncounterMarker(FName EncounterId, USceneComponent* Marker);
+	/** 같은 컴포넌트가 등록한 Encounter 목표 위치만 해제한다. */
+	void UnregisterEncounterMarker(FName EncounterId, USceneComponent* Marker);
+	/** 등록된 Encounter 목표 위치를 조회한다. */
+	bool GetTrackedEncounterLocation(FName EncounterId, FVector& OutLocation) const;
 
 	/**
 	 * 위치 목표의 도달 지점 — 등록된 마커 컴포넌트를 우선 사용하고, 없으면
@@ -196,8 +206,8 @@ public:
 	bool IsLocationTriggerActive(FGameplayTag LocationTag) const;
 
 	/**
-	 * 진행중 퀘스트의 미완료 위치 목표(ReachLocation) 중 위치를 확정할 수 있는 것들. HUD 마커용.
-	 * 목적지 앞에 배치 경로의 중간 지점(bIsRoutePoint)이 진행 순서대로 먼저 담긴다.
+	 * 진행중 퀘스트의 미완료 ReachLocation과 위치가 등록된 ClearEncounter를 반환한다.
+	 * ReachLocation은 목적지 앞에 배치한 경로 지점을 진행 순서대로 먼저 안내한다.
 	 */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	void GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint>& OutWaypoints) const;
@@ -279,8 +289,14 @@ private:
 	/** 클라이언트는 복제된 Encounter 진행 이벤트에서 Mode별 실제 요구량을 받는다. */
 	TMap<FName, int32> EncounterRequiredCounts;
 
+	/** 일반 RoomEncounter 밖에서 제공하는 Encounter 목표 위치다. */
+	TMap<FName, TWeakObjectPtr<USceneComponent>> EncounterMarkers;
+
 	const UDataTable* GetRadioTable() const;
 	const FLastFPSRadioTransmissionData* FindRadioTransmission(FName RadioId) const;
+
+	/** 월드 초기화와 HUD 생성 사이에 발생한 무전을 유실하지 않기 위한 대기열이다. */
+	TArray<FLastFPSRadioTransmissionData> PendingRadioTransmissions;
 
 	/** 유형별 목표 트래커 구성 (Initialize 1회). */
 	void BuildTrackers();
