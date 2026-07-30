@@ -5,6 +5,7 @@
 #include "LastFPSScopeOverlayWidget.generated.h"
 
 class UImage;
+class UTextBlock;
 class UMaterialInstanceDynamic;
 
 UCLASS(Abstract)
@@ -19,9 +20,16 @@ protected:
 
 private:
     void ApplyAspectRatio(const FVector2D& LocalSize);
+    void UpdateRange();
 
     UPROPERTY(meta=(BindWidget))
     TObjectPtr<UImage> ScopeVignette;
+
+    UPROPERTY(meta=(BindWidgetOptional))
+    TObjectPtr<UTextBlock> RangeText;
+
+    UPROPERTY(EditDefaultsOnly, Category="Scope", meta=(ClampMin="1.0"))
+    float MaxRangeMeters = 500.f;
 
     UPROPERTY(EditDefaultsOnly, Category="Scope")
     FName AspectParameterName = TEXT("AspectRatio");
@@ -30,4 +38,5 @@ private:
     TObjectPtr<UMaterialInstanceDynamic> VignetteMaterial;
 
     float AppliedAspectRatio = 0.f;
+    int32 DisplayedRangeMeters = -1;
 };
