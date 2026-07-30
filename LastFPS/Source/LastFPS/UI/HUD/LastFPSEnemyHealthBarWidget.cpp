@@ -335,10 +335,19 @@ void ULastFPSEnemyHealthBarWidget::UpdateDamageTrail(
         return;
     }
 
-    const float DrainDuration = FMath::Max(Settings.DamageTrailDrainDuration, KINDA_SMALL_NUMBER);
-    const float DrainSpeed = CurrentMaxHealth / DrainDuration;
-    DamageTrailHealth = FMath::FInterpConstantTo(
-        DamageTrailHealth, CurrentHealth, SafeDeltaTime, DrainSpeed);
+    const float InterpSpeed =
+    1.f / FMath::Max(Settings.DamageTrailDrainDuration, KINDA_SMALL_NUMBER);
+
+    DamageTrailHealth = FMath::FInterpTo(
+        DamageTrailHealth,
+        CurrentHealth,
+        SafeDeltaTime,
+        InterpSpeed);
+
+    if (FMath::IsNearlyEqual(DamageTrailHealth, CurrentHealth, 0.01f))
+    {
+        DamageTrailHealth = CurrentHealth;
+    }
     ApplyHealthBars();
 }
 
