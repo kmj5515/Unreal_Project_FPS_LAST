@@ -14,7 +14,9 @@ class UWeaponComponent;
 class ULastFPSGrapplingAnimationComponent;
 class ULastFPSGrapplingTargetingComponent;
 class UAnimMontage;
+class UUserWidget;
 struct FInputActionValue;
+struct FLastFPSWeaponScopeSettings;
 
 struct FLastFPSTemporaryCameraEffectOptions
 {
@@ -22,6 +24,8 @@ struct FLastFPSTemporaryCameraEffectOptions
     float MotionBlurAmount = 0.f;
     float BlendOutDuration = 0.25f;
 };
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLastFPSHeroAimingChanged, bool, bIsAiming);
 
 UCLASS()
 class LASTFPS_API ALastFPSHero : public ALastFPSCharacterBase, public ILastFPSWeaponUser
@@ -38,6 +42,9 @@ public:
 
     UFUNCTION(NetMulticast, Unreliable)
     void Multicast_PlayWeaponFireEffects();
+
+    UPROPERTY(BlueprintAssignable, Category="LastFPS|Aiming")
+    FLastFPSHeroAimingChanged OnAimingChanged;
 
     virtual void Tick(float DeltaTime) override;
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -100,6 +107,7 @@ protected:
     virtual void OnCombatEngagedChanged() override;
 	virtual void OnMoveSpeedChanged(const FOnAttributeChangeData& Data) override;
 	virtual float ResolveMaxWalkSpeed(float AttributeMoveSpeed) const override;
+	virtual void UpdateAliveCollisionState(bool bAlive) override;
 
     /** 초기 스폰·지연 스폰·리스폰 모두에서 로컬 플레이어의 기본 입력 매핑을 보장한다. */
     void EnsureDefaultInputMapping();
@@ -268,6 +276,9 @@ private:
     bool bTemporaryCameraEffectBlendOutActive = false;
 
     bool bIsADS = false;
+
+    float ActiveAimSensitivityScale = 1.f;
+
     FVector2D CachedMoveInput = FVector2D::ZeroVector;
     FRotator LocomotionDirectionBaseRotation = FRotator::ZeroRotator;
     bool bHasMoveInputAction = false;
@@ -306,6 +317,8 @@ private:
 	void HandleSpeedBoostCameraTagChanged(FGameplayTag Tag, int32 NewCount);
 	void UpdateSpeedBoostCameraOffset(float EffectiveMoveSpeed);
 	void RefreshCameraTargets();
+	void RefreshAimSensitivity();
+	float ResolveAimInterpSpeed() const;
 
     void HandleAbilityInput(const FInputActionValue& value, FGameplayTag InputID);
     bool ShouldCancelFireBeforeAbilityInput(FGameplayTag InputID) const;

@@ -15,6 +15,7 @@ class UecsCrosshairEditorAsset;
 class UParticleSystem;
 class USkeletalMesh;
 class USoundBase;
+class UUserWidget;
 
 USTRUCT(BlueprintType)
 struct LASTFPS_API FLastFPSWeaponCrosshairSettings
@@ -90,6 +91,27 @@ struct LASTFPS_API FLastFPSWeaponMagazineVisualSettings
     /** 손 소켓에 스냅한 뒤 적용할 무기별 상대 변환입니다. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Magazine")
     FTransform HandAttachmentOffset = FTransform::Identity;
+};
+
+USTRUCT(BlueprintType)
+struct LASTFPS_API FLastFPSWeaponScopeSettings
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Scope")
+    bool bUseScope = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Scope", meta=(EditCondition="bUseScope", ClampMin="5.0", ClampMax="170.0", Units="deg"))
+    float ScopeFOV = 25.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Scope", meta=(EditCondition="bUseScope", ClampMin="0.1", ClampMax="3.0"))
+    float ScopeSensitivityMultiplier = 1.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Scope", meta=(EditCondition="bUseScope", ClampMin="0.0"))
+    float ScopeInterpSpeed = 0.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Scope", meta=(EditCondition="bUseScope"))
+    TSoftClassPtr<UUserWidget> ScopeOverlayWidgetClass;
 };
 
 UCLASS(BlueprintType)
@@ -170,5 +192,8 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Recoil")
     FLastFPSWeaponAimRecoilSettings AimRecoil;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Scope")
+    FLastFPSWeaponScopeSettings Scope;
 
 };

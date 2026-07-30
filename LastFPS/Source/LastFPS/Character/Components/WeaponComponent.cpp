@@ -1187,6 +1187,16 @@ void UWeaponComponent::FireSinglePelletFromServer(
     }
 }
 
+const FLastFPSWeaponScopeSettings* UWeaponComponent::GetScopeSettings() const
+{
+    if (!WeaponDefinition || !WeaponDefinition->Scope.bUseScope)
+    {
+        return nullptr;
+    }
+
+    return &WeaponDefinition->Scope;
+}
+
 bool UWeaponComponent::ValidateClientMuzzleLocation(const FVector& ClientMuzzleLocation) const
 {
     ACharacter* Character = Cast<ACharacter>(GetOwner());

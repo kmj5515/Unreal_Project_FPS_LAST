@@ -30,9 +30,12 @@ class ULastFPSEnemyHealthBarWidget;
 class ULastFPSSkillCooldownSlotWidget;
 class ULastFPSStatusEffectListWidget;
 class UOverlay;
+class UUserWidget;
+struct FStreamableHandle;
 class UWeaponComponent;
 class AActor;
 class ALastFPSCharacterBase;
+class ALastFPSHero;
 class ALastFPSPlayerState;
 
 /**
@@ -104,6 +107,9 @@ protected:
     /** 지정하면 EasyCrosshair가 이 Overlay 안에 배치된다. 비어 있으면 런타임에 HUD 루트에 생성한다. */
     UPROPERTY(BlueprintReadOnly, Category="HUD|Crosshair", meta=(BindWidgetOptional))
     TObjectPtr<UOverlay> CrosshairHost;
+
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Scope", meta=(BindWidgetOptional))
+    TObjectPtr<UOverlay> ScopeOverlayHost;
 
     /** EasyCrosshair 아래에서 항상 표시되는 그래플링 가능 상태 점이다. 없으면 런타임에 생성한다. */
     UPROPERTY(BlueprintReadOnly, Category="HUD|Grappling Reticle", meta=(BindWidgetOptional))
@@ -255,7 +261,15 @@ private:
 
     UFUNCTION()
     void HandleWeaponEquippedChanged(bool bEquipped);
-    
+
+    UFUNCTION()
+    void HandleAimingChanged(bool bIsAiming);
+    void UpdateScopeOverlay(bool bAiming);
+    void ClearScopeOverlay();
+    void RequestScopeOverlayPreload();
+    void CancelScopeOverlayPreload();
+    void HandleScopeOverlayLoaded();
+
     /*Reload */
     UFUNCTION()
     void HandleReloadStarted(float ReloadDuration);
@@ -308,6 +322,15 @@ private:
     TWeakObjectPtr<UWeaponComponent> BoundWeaponComponent;
     TWeakObjectPtr<ULastFPSGrapplingTargetingComponent> BoundGrapplingTargetingComponent;
     TWeakObjectPtr<ALastFPSPlayerState> BoundPlayerState;
+    TWeakObjectPtr<ALastFPSHero> BoundHero;
 
     bool bPawnComponentsBound = false;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UUserWidget> ScopeOverlayWidget;
+    TSubclassOf<UUserWidget> ScopeOverlayWidgetClass;
+    bool bLastAiming = false;
+
+    TSharedPtr<FStreamableHandle> ScopeOverlayLoadHandle;
+    FSoftObjectPath PendingScopeOverlayPath;
 };

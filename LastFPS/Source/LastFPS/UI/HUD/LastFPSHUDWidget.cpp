@@ -18,6 +18,8 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
 #include "GameFramework/PlayerController.h"
 #include "PrimaryGameLayout.h"
 #include "Components/Overlay.h"
@@ -25,6 +27,7 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
 #include "Blueprint/WidgetTree.h"
+#include "Blueprint/UserWidget.h"
 #include "EasyCrosshairSystem/ecsCrosshairEditorAsset.h"
 #include "Game/LastFPSPlayerState.h"
 #include "Character/LastFPSHero.h"
@@ -154,6 +157,14 @@ void ULastFPSHUDWidget::NativeDestruct()
             &ULastFPSHUDWidget::HandleGrapplingTargetAvailabilityChanged);
     }
     BoundGrapplingTargetingComponent.Reset();
+
+    if (ALastFPSHero* Hero = BoundHero.Get())
+    {
+        Hero->OnAimingChanged.RemoveDynamic(this, &ULastFPSHUDWidget::HandleAimingChanged);
+    }
+    BoundHero.Reset();
+    CancelScopeOverlayPreload();
+    ClearScopeOverlay();
     bPawnComponentsBound = false;
 
     if (ObjectiveHudPresenter)
@@ -290,7 +301,9 @@ void ULastFPSHUDWidget::TryBindPawnComponents()
     Weapon->OnWeaponEquippedChanged.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleWeaponEquippedChanged);
     Weapon->OnWeaponReloadStarted.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleReloadStarted);
     Weapon->OnWeaponReloadFinished.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleReloadFinished);
-    
+    Hero->OnAimingChanged.AddUniqueDynamic(this, &ULastFPSHUDWidget::HandleAimingChanged);
+    BoundHero = Hero;
+
     if (ReloadPresenter)
     {
         // 최초 바인딩 시에는 리로드 중이 아니므로 표시 요소를 숨겨 초기 상태를 정리한다.
@@ -314,6 +327,7 @@ void ULastFPSHUDWidget::TryBindPawnComponents()
         GrapplingReticlePresenter->SetAvailability(GrapplingTargeting->IsTargetAvailable());
     }
     RefreshEasyCrosshair();
+    RequestScopeOverlayPreload();
 }
 
 bool ULastFPSHUDWidget::InitializeHUD()
@@ -570,6 +584,140 @@ void ULastFPSHUDWidget::HandleWeaponEquippedChanged(bool bEquipped)
     else
     {
         SetEasyCrosshairVisibility(false);
+    }
+
+    ClearScopeOverlay();
+    RequestScopeOverlayPreload();
+    UpdateScopeOverlay(bEquipped && bLastAiming);
+}
+
+void ULastFPSHUDWidget::HandleAimingChanged(bool bIsAiming)
+{
+    bLastAiming = bIsAiming;
+    UpdateScopeOverlay(bIsAiming);
+}
+
+void ULastFPSHUDWidget::UpdateScopeOverlay(bool bAiming)
+{
+    const UWeaponComponent* Weapon = BoundWeaponComponent.Get();
+    const FLastFPSWeaponScopeSettings* ScopeSettings = Weapon ? Weapon->GetScopeSettings() : nullptr;
+    const bool bWantOverlay = bAiming && ScopeSettings && !ScopeSettings->ScopeOverlayWidgetClass.IsNull();
+
+    if (!bWantOverlay)
+    {
+        if (ScopeOverlayWidget)
+        {
+            ScopeOverlayWidget->SetVisibility(ESlateVisibility::Collapsed);
+        }
+        return;
+    }
+
+    if (!ScopeOverlayHost)
+    {
+        UE_LOG(LogLastFPSHUDWidget, Warning,
+            TEXT("HUD '%s'에 ScopeOverlayHost가 없어 스코프 오버레이를 표시할 수 없습니다. HUD 위젯 BP에 BindWidgetOptional 슬롯을 배치하세요."),
+            *GetNameSafe(this));
+        return;
+    }
+
+    UClass* OverlayClass = ScopeSettings->ScopeOverlayWidgetClass.Get();
+    if (!OverlayClass)
+    {
+        OverlayClass = ScopeSettings->ScopeOverlayWidgetClass.LoadSynchronous();
+    }
+
+    if (!OverlayClass)
+    {
+        UE_LOG(LogLastFPSHUDWidget, Warning,
+            TEXT("HUD '%s'에서 스코프 오버레이 위젯 클래스 로드에 실패했습니다. WeaponDefinition의 Scope.ScopeOverlayWidgetClass를 확인하세요."),
+            *GetNameSafe(this));
+        return;
+    }
+
+    if (ScopeOverlayWidget && ScopeOverlayWidgetClass != OverlayClass)
+    {
+        ClearScopeOverlay();
+    }
+
+    if (!ScopeOverlayWidget)
+    {
+        ScopeOverlayWidget = CreateWidget<UUserWidget>(GetOwningPlayer(), OverlayClass);
+        if (!ScopeOverlayWidget)
+        {
+            return;
+        }
+        ScopeOverlayWidgetClass = OverlayClass;
+
+        if (UOverlaySlot* HostSlot = Cast<UOverlaySlot>(ScopeOverlayHost->AddChild(ScopeOverlayWidget)))
+        {
+            HostSlot->SetHorizontalAlignment(HAlign_Fill);
+            HostSlot->SetVerticalAlignment(VAlign_Fill);
+        }
+    }
+
+    ScopeOverlayWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
+void ULastFPSHUDWidget::ClearScopeOverlay()
+{
+    if (ScopeOverlayWidget)
+    {
+        ScopeOverlayWidget->RemoveFromParent();
+        ScopeOverlayWidget = nullptr;
+    }
+    ScopeOverlayWidgetClass = nullptr;
+}
+
+void ULastFPSHUDWidget::RequestScopeOverlayPreload()
+{
+    const UWeaponComponent* Weapon = BoundWeaponComponent.Get();
+    const FLastFPSWeaponScopeSettings* ScopeSettings = Weapon ? Weapon->GetScopeSettings() : nullptr;
+    if (!ScopeSettings)
+    {
+        CancelScopeOverlayPreload();
+        return;
+    }
+
+    const FSoftObjectPath OverlayPath = ScopeSettings->ScopeOverlayWidgetClass.ToSoftObjectPath();
+    if (!OverlayPath.IsValid() || (ScopeOverlayLoadHandle.IsValid() && PendingScopeOverlayPath == OverlayPath))
+    {
+        return;
+    }
+
+    CancelScopeOverlayPreload();
+    PendingScopeOverlayPath = OverlayPath;
+    ScopeOverlayLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+        OverlayPath,
+        FStreamableDelegate::CreateUObject(this, &ULastFPSHUDWidget::HandleScopeOverlayLoaded),
+        FStreamableManager::AsyncLoadHighPriority);
+
+    if (!ScopeOverlayLoadHandle.IsValid())
+    {
+        UE_LOG(LogLastFPSHUDWidget, Error,
+            TEXT("HUD '%s'에서 스코프 오버레이 '%s' 비동기 로드를 시작하지 못했습니다."),
+            *GetNameSafe(this), *OverlayPath.ToString());
+        PendingScopeOverlayPath.Reset();
+    }
+}
+
+void ULastFPSHUDWidget::CancelScopeOverlayPreload()
+{
+    if (ScopeOverlayLoadHandle.IsValid())
+    {
+        ScopeOverlayLoadHandle->CancelHandle();
+        ScopeOverlayLoadHandle.Reset();
+    }
+    PendingScopeOverlayPath.Reset();
+}
+
+void ULastFPSHUDWidget::HandleScopeOverlayLoaded()
+{
+    ScopeOverlayLoadHandle.Reset();
+    PendingScopeOverlayPath.Reset();
+
+    if (bLastAiming)
+    {
+        UpdateScopeOverlay(true);
     }
 }
 
