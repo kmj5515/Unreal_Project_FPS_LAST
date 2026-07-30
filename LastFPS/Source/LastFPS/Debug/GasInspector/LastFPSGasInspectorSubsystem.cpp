@@ -6,8 +6,10 @@
 
 #include "AbilitySystemGlobals.h"
 #include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
+#include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "HAL/IConsoleManager.h"
@@ -21,6 +23,34 @@ namespace
 	constexpr int32 GasInspectorZOrder = 1000;
 	// 값 갱신 주기(초). 매 프레임 위젯 트리를 다시 만들지 않기 위해 완만하게 둔다.
 	constexpr float GasInspectorRefreshInterval = 0.15f;
+
+#if !UE_BUILD_SHIPPING
+	void ToggleGasInspectorForWorld(UWorld* World)
+	{
+		if (!World || World->GetNetMode() == NM_DedicatedServer)
+		{
+			return;
+		}
+
+		UGameInstance* GameInstance = World->GetGameInstance();
+		ULocalPlayer* LocalPlayer =
+			GameInstance ? GameInstance->GetFirstGamePlayer() : nullptr;
+		ULastFPSGasInspectorSubsystem* Inspector =
+			LocalPlayer
+			? LocalPlayer->GetSubsystem<ULastFPSGasInspectorSubsystem>()
+			: nullptr;
+		if (Inspector)
+		{
+			Inspector->Toggle();
+		}
+	}
+
+	FAutoConsoleCommandWithWorld GasInspectorToggleCommand(
+		TEXT("LastFPS.GasInspector"),
+		TEXT("GAS 런타임 인스펙터 열기/닫기 토글"),
+		FConsoleCommandWithWorldDelegate::CreateStatic(
+			&ToggleGasInspectorForWorld));
+#endif
 }
 
 bool ULastFPSGasInspectorSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -28,33 +58,23 @@ bool ULastFPSGasInspectorSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 #if UE_BUILD_SHIPPING
 	return false;
 #else
+	if (IsRunningDedicatedServer())
+	{
+		return false;
+	}
+
+	if (!Cast<ULocalPlayer>(Outer))
+	{
+		return false;
+	}
+
 	return Super::ShouldCreateSubsystem(Outer);
-#endif
-}
-
-void ULastFPSGasInspectorSubsystem::Initialize(FSubsystemCollectionBase& Collection)
-{
-	Super::Initialize(Collection);
-
-#if !UE_BUILD_SHIPPING
-	// 콘솔/키 바인딩에서 호출할 토글 명령을 등록한다.
-	ToggleCommand = IConsoleManager::Get().RegisterConsoleCommand(
-		TEXT("LastFPS.GasInspector"),
-		TEXT("GAS 런타임 인스펙터 열기/닫기 토글"),
-		FConsoleCommandDelegate::CreateUObject(this, &ULastFPSGasInspectorSubsystem::Toggle),
-		ECVF_Default);
 #endif
 }
 
 void ULastFPSGasInspectorSubsystem::Deinitialize()
 {
 	Close();
-
-	if (ToggleCommand)
-	{
-		IConsoleManager::Get().UnregisterConsoleObject(ToggleCommand);
-		ToggleCommand = nullptr;
-	}
 
 	Super::Deinitialize();
 }
@@ -221,7 +241,11 @@ void ULastFPSGasInspectorSubsystem::RefreshPanel()
 APlayerController* ULastFPSGasInspectorSubsystem::GetOwningPlayerController() const
 {
 	const ULocalPlayer* LocalPlayer = GetLocalPlayer();
-	return LocalPlayer ? LocalPlayer->GetPlayerController(LocalPlayer->GetWorld()) : nullptr;
+	APlayerController* PlayerController =
+		LocalPlayer ? LocalPlayer->GetPlayerController(LocalPlayer->GetWorld()) : nullptr;
+	return PlayerController && PlayerController->IsLocalController()
+		? PlayerController
+		: nullptr;
 }
 
 UWorld* ULastFPSGasInspectorSubsystem::GetTickableGameObjectWorld() const

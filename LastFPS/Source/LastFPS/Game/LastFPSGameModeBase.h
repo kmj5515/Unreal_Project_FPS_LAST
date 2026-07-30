@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "Engine/TimerHandle.h"
 #include "GameplayTagContainer.h"
 #include "LastFPSGameModeBase.generated.h"
 
@@ -10,6 +11,7 @@ class UAbilitySystemComponent;
 class UGameplayEffect;
 class ULastFPSCharacterDefinition;
 class ULastFPSCharacterRoster;
+class ULastFPSBattleDefinition;
 class ULastFPSDestinationContentComponent;
 class ULastFPSDestinationContentSet;
 
@@ -21,6 +23,10 @@ class LASTFPS_API ALastFPSGameModeBase : public AGameModeBase
 public:
     ALastFPSGameModeBase();
 
+    virtual void InitGame(
+        const FString& MapName,
+        const FString& Options,
+        FString& ErrorMessage) override;
     virtual void InitGameState() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void PostLogin(APlayerController* NewPlayer) override;
@@ -42,6 +48,14 @@ public:
     bool ApplyCharacterDefinitionToAbilitySystem(
         UAbilitySystemComponent* ASC,
         const ULastFPSCharacterDefinition* CharacterDefinition) const;
+
+    /**
+     * 미션 실패 처리 — 실패 이후 무엇을 할지는 맵마다 다른 규칙이므로 GameMode 가 소유한다
+     * (InitialScreenTag / LevelRestrictionEffect 와 같은 소유 규칙).
+     * 인카운터·목표 시스템은 "실패했다"만 알리고 이 결정에 관여하지 않는다.
+     */
+    UFUNCTION(BlueprintCallable, Category="LastFPS|Mission")
+    void HandleMissionFailed(FName FailedEncounterId);
 
     // 서버: 이 맵의 제한 효과(예: 전투 금지)를 대상 ASC 에 적용한다.
     // "어떤 제한을 걸지"는 맵마다 다른 규칙이므로 InitialScreenTag 처럼 GameMode 가 소유한다.
@@ -79,6 +93,18 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Combat")
     TSubclassOf<UGameplayEffect> LevelRestrictionEffect;
 
+    /** 미션 실패 시 띄울 화면. 비우면 화면 없이 곧바로 귀환한다. */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Mission", meta=(Categories="UI.Screen"))
+    FGameplayTag MissionFailedScreenTag;
+
+    /** 실패 화면을 보여준 뒤 귀환까지 기다리는 시간(초). 0 이면 즉시 귀환한다. */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Mission", meta=(ClampMin="0.0", Units="s"))
+    float MissionFailedReturnDelay = 3.f;
+
+    /** 미션 실패 시 허브로 돌려보낼지. 끄면 실패를 알리기만 하고 맵에 머문다(개발용). */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Mission")
+    bool bReturnToHubOnMissionFailed = true;
+
     /**
      * 이 맵 진입 전에 준비할 콘텐츠. 비우면 게이트 없이 기존처럼 즉시 스폰한다.
      * 에셋 내부가 전부 소프트 참조라 이 강한 참조는 목록 자체만 로드한다.
@@ -98,8 +124,24 @@ private:
     void HandleDestinationContentReady();
     void SetLocalWarmupInputBlocked(APlayerController* PlayerController, bool bBlocked);
 
+    /** 인카운터 실패 통지를 구독한다. 월드 서브시스템이 준비된 뒤 호출한다. */
+    void BindEncounterFailureEvents();
+    void UnbindEncounterFailureEvents();
+
+    UFUNCTION()
+    void HandleEncounterFailed(FName EncounterId);
+
+    /** 실패 연출 후 실제 귀환을 수행한다. */
+    void ExecuteMissionFailedReturn();
+
     TWeakObjectPtr<ULastFPSDestinationContentComponent> DestinationContentComponent;
+    FTimerHandle MissionFailedReturnTimerHandle;
+    bool bMissionFailedHandled = false;
     TArray<TWeakObjectPtr<APlayerController>> WarmupInputBlockedControllers;
     FDelegateHandle AssetsLoadedHandle;
     FDelegateHandle ContentReadyHandle;
+
+    /** 이동 URL로 선택된 정의를 전투 월드 수명 동안 유지한다. */
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSBattleDefinition> ActiveBattleDefinition;
 };

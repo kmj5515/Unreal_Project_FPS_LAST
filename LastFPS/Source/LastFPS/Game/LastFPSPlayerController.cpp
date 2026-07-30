@@ -9,12 +9,12 @@
 #include "UI/HUD/LastFPSHUDWidget.h"
 #include "UI/HUD/LastFPSQuestTrackerWidget.h"
 #include "UI/HUD/LastFPSObjectiveMarkerWidget.h"
-#include "UI/Common/LastFPSNoticeWidget.h"
 #include "UI/Dialogue/LastFPSDialogueWidget.h"
 #include "UI/Hub/LastFPSNPCInteractionWidget.h"
 #include "UI/Common/LastFPSQuantityDialogWidget.h"
 
 #include "Camera/CameraComponent.h"
+#include "UI/Framework/LastFPSPopupSubsystem.h"
 #include "UI/Framework/LastFPSUIManagerSubsystem.h"
 #include "UI/Framework/LastFPSUITags.h"
 
@@ -23,6 +23,7 @@
 #include "Widgets/CommonActivatableWidgetContainer.h"
 #include "Input/CommonUIActionRouterBase.h"
 #include "Input/CommonUIInputTypes.h"
+#include "Messaging/CommonGameDialog.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
@@ -31,6 +32,7 @@
 #include "Game/Loading/LastFPSLoadingProcessSubsystem.h"
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSGameModeBase.h"
+#include "Game/LastFPSGameStateBase.h"
 #include "Game/LastFPSPlayerState.h"
 #include "HAL/IConsoleManager.h"
 #include "InputCoreTypes.h"
@@ -39,6 +41,15 @@
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPlayerController, Log, All);
+
+void ALastFPSPlayerController::ClientReturnToHub_Implementation()
+{
+	if (ULastFPSGameInstance* LastFPSGameInstance =
+		GetGameInstance<ULastFPSGameInstance>())
+	{
+		LastFPSGameInstance->RequestTravelToHub();
+	}
+}
 
 #if !UE_BUILD_SHIPPING
 namespace
@@ -126,25 +137,6 @@ FGenericTeamId ALastFPSPlayerController::GetGenericTeamId() const
     return TeamId;
 }
 
-template<typename TWidget>
-TWidget* ALastFPSPlayerController::PushWidgetToModalLayer(TSubclassOf<TWidget> WidgetClass)
-{
-    if (!WidgetClass)
-    {
-        return nullptr;
-    }
-
-    UPrimaryGameLayout* RootLayout = UPrimaryGameLayout::GetPrimaryGameLayout(this);
-    if (!RootLayout)
-    {
-        return nullptr;
-    }
-
-    return RootLayout->PushWidgetToLayerStack<TWidget>(
-        LastFPSUITags::Layer_Modal(),
-        WidgetClass);
-}
-
 void ALastFPSPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -158,6 +150,16 @@ void ALastFPSPlayerController::BeginPlay()
     if (!IsLocalController())
     {
         return;
+    }
+
+    ULocalPlayer* LocalPlayer = GetLocalPlayer();
+    if (ULastFPSPopupSubsystem* PopupSubsystem = LocalPlayer
+        ? LocalPlayer->GetSubsystem<ULastFPSPopupSubsystem>()
+        : nullptr)
+    {
+        PopupSubsystem->BindDestinationContextSource(
+            GetWorld() ? GetWorld()->GetGameState<ALastFPSGameStateBase>()
+                       : nullptr);
     }
 
     if (bPushHUDOnBeginPlay)
@@ -653,14 +655,32 @@ void ALastFPSPlayerController::ShowConfirm(
     const FText& Message,
     FLastFPSConfirmResultDelegate OnResult)
 {
-    if (ULastFPSConfirmWidget* ConfirmWidget = PushWidgetToModalLayer<ULastFPSConfirmWidget>(ConfirmWidgetClass))
+    ULocalPlayer* LocalPlayer = GetLocalPlayer();
+    ULastFPSPopupSubsystem* PopupSubsystem = LocalPlayer
+        ? LocalPlayer->GetSubsystem<ULastFPSPopupSubsystem>()
+        : nullptr;
+    if (!PopupSubsystem)
     {
-        ConfirmWidget->SetupConfirm(Title, Message);
-        if (OnResult.IsBound())
-        {
-            ConfirmWidget->OnConfirmResult.Add(OnResult);
-        }
+        UE_LOG(
+            LogLastFPSPlayerController,
+            Warning,
+            TEXT("ShowConfirm: 로컬 플레이어의 PopupSubsystem을 찾지 못했습니다."));
+        OnResult.ExecuteIfBound(false);
+        return;
     }
+
+    FCommonMessagingResultDelegate ResultCallback =
+        FCommonMessagingResultDelegate::CreateWeakLambda(
+            this,
+            [OnResult](const ECommonMessagingResult Result) mutable
+            {
+                OnResult.ExecuteIfBound(
+                    Result == ECommonMessagingResult::Confirmed);
+            });
+
+    UCommonGameDialogDescriptor* Descriptor =
+        UCommonGameDialogDescriptor::CreateConfirmationYesNo(Title, Message);
+    PopupSubsystem->ShowConfirmation(Descriptor, MoveTemp(ResultCallback));
 }
 
 void ALastFPSPlayerController::ShowQuantityPrompt(
@@ -670,9 +690,27 @@ void ALastFPSPlayerController::ShowQuantityPrompt(
     int32 MaxQuantity,
     FLastFPSQuantityResultDelegate OnResult)
 {
-    if (ULastFPSQuantityDialogWidget* Dialog = PushWidgetToModalLayer<ULastFPSQuantityDialogWidget>(QuantityDialogWidgetClass))
+    ULocalPlayer* LocalPlayer = GetLocalPlayer();
+    ULastFPSPopupSubsystem* PopupSubsystem = LocalPlayer
+        ? LocalPlayer->GetSubsystem<ULastFPSPopupSubsystem>()
+        : nullptr;
+    if (!PopupSubsystem)
     {
-        Dialog->SetupQuantity(Title, ItemName, UnitPrice, MaxQuantity);
+        UE_LOG(
+            LogLastFPSPlayerController,
+            Warning,
+            TEXT("ShowQuantityPrompt: 로컬 플레이어의 PopupSubsystem을 찾지 못했습니다."));
+        OnResult.ExecuteIfBound(0);
+        return;
+    }
+
+    ULastFPSQuantityDialogWidget* Dialog = PopupSubsystem->ShowQuantityPrompt(
+        Title,
+        ItemName,
+        UnitPrice,
+        MaxQuantity);
+    if (Dialog)
+    {
         if (OnResult.IsBound())
         {
             Dialog->OnQuantityResult.Add(OnResult);
@@ -680,27 +718,49 @@ void ALastFPSPlayerController::ShowQuantityPrompt(
     }
     else
     {
-        // 클래스 미지정 또는 레이아웃 없음 → 모달이 뜨지 않으니 원인을 로그로 남긴다
-        UE_LOG(LogLastFPSPlayerController, Warning,
-            TEXT("ShowQuantityPrompt: 수량 모달을 띄우지 못했습니다. PlayerController BP의 QuantityDialogWidgetClass에 WBP_QuantityDialog 가 지정됐는지 확인하세요."));
+        UE_LOG(
+            LogLastFPSPlayerController,
+            Warning,
+            TEXT("ShowQuantityPrompt: 수량 팝업을 열지 못했습니다."));
+        OnResult.ExecuteIfBound(0);
     }
 }
 
 void ALastFPSPlayerController::ShowNotice(const FText& Title, const FText& Message)
 {
-    if (ULastFPSNoticeWidget* NoticeWidget = PushWidgetToModalLayer<ULastFPSNoticeWidget>(NoticeWidgetClass))
+    ULocalPlayer* LocalPlayer = GetLocalPlayer();
+    if (ULastFPSPopupSubsystem* PopupSubsystem = LocalPlayer
+        ? LocalPlayer->GetSubsystem<ULastFPSPopupSubsystem>()
+        : nullptr)
     {
-        NoticeWidget->SetupNotice(Title, Message);
+        UCommonGameDialogDescriptor* Descriptor =
+            UCommonGameDialogDescriptor::CreateConfirmationOk(Title, Message);
+        PopupSubsystem->ShowError(Descriptor);
+        return;
     }
+
+    UE_LOG(
+        LogLastFPSPlayerController,
+        Warning,
+        TEXT("ShowNotice: 로컬 플레이어의 PopupSubsystem을 찾지 못했습니다."));
 }
 
-ULastFPSDialogueWidget* ALastFPSPlayerController::ShowDialogue(const FText& Speaker, const TArray<FText>& Lines)
+ULastFPSDialogueWidget* ALastFPSPlayerController::ShowDialogue(
+    const FText& Speaker,
+    const TArray<FText>& Lines)
 {
-    if (ULastFPSDialogueWidget* DialogueWidget = PushWidgetToModalLayer<ULastFPSDialogueWidget>(DialogueWidgetClass))
+    ULocalPlayer* LocalPlayer = GetLocalPlayer();
+    if (ULastFPSPopupSubsystem* PopupSubsystem = LocalPlayer
+        ? LocalPlayer->GetSubsystem<ULastFPSPopupSubsystem>()
+        : nullptr)
     {
-        DialogueWidget->SetupDialogue(Speaker, Lines);
-        return DialogueWidget;
+        return PopupSubsystem->ShowDialogue(Speaker, Lines);
     }
+
+    UE_LOG(
+        LogLastFPSPlayerController,
+        Warning,
+        TEXT("ShowDialogue: 로컬 플레이어의 PopupSubsystem을 찾지 못했습니다."));
     return nullptr;
 }
 

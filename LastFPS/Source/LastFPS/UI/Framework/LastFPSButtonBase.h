@@ -3,6 +3,7 @@
 #include "CommonButtonBase.h"
 #include "LastFPSButtonBase.generated.h"
 
+class USizeBox;
 class UTextBlock;
 class USoundBase;
 
@@ -30,17 +31,6 @@ public:
 protected:
 	virtual void NativePreConstruct() override;
 
-	/** 클릭 시 재생할 UI 사운드 (비우면 무음). */
-	UPROPERTY(EditDefaultsOnly, Category="LastFPS|Button|Sound")
-	TObjectPtr<USoundBase> PressedSound;
-
-	/** 마우스 hover 시 재생할 UI 사운드 (비우면 무음). */
-	UPROPERTY(EditDefaultsOnly, Category="LastFPS|Button|Sound")
-	TObjectPtr<USoundBase> HoveredSound;
-
-	virtual void NativeOnClicked() override;
-	virtual void NativeOnHovered() override;
-
 	/** WBP에 동일 이름으로 TextBlock을 두면 자동 바인딩 */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TextBlock;
@@ -48,4 +38,15 @@ protected:
 	/** 인스턴스별 라벨. 부모 WBP의 각 버튼 Details에서 입력. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|Button")
 	FText ButtonText;
+
+	/** 버튼의 크기를 조절 할 수 있게 한다**/
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<USizeBox> SizeBox;
+
+	UPROPERTY(EditAnywhere, Category="LastFPS|Button")
+	bool bOverrideSize = false;
+
+	UPROPERTY(EditAnywhere, Category="LastFPS|Button",
+		meta=(EditCondition="bOverrideSize", ClampMin="0.0"))
+	FVector2D ButtonSize = FVector2D::ZeroVector;
 };

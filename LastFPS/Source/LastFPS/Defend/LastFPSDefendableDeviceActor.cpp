@@ -1,7 +1,8 @@
 #include "Defend/LastFPSDefendableDeviceActor.h"
 
+#include "AbilitySystemComponent.h"
+#include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Components/StaticMeshComponent.h"
-#include "Net/UnrealNetwork.h"
 
 ALastFPSDefendableDeviceActor::ALastFPSDefendableDeviceActor()
 {
@@ -11,67 +12,109 @@ ALastFPSDefendableDeviceActor::ALastFPSDefendableDeviceActor()
 
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	SetRootComponent(Mesh);
+
+	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	AbilitySystemComponent->SetIsReplicated(true);
+	// 장치는 예측 입력이 없으므로 최소 복제 모드로 대역폭을 아낀다.
+	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
+
+	AttributeSet = CreateDefaultSubobject<ULastFPSAttributeSet>(TEXT("AttributeSet"));
 }
 
-void ALastFPSDefendableDeviceActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+UAbilitySystemComponent* ALastFPSDefendableDeviceActor::GetAbilitySystemComponent() const
 {
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(ALastFPSDefendableDeviceActor, Integrity);
+	return AbilitySystemComponent;
 }
 
 void ALastFPSDefendableDeviceActor::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 초기 내구도는 서버가 세팅 → 복제로 클라 전파. (스폰 시 0 이면 즉시 파괴 오판을 막는다.)
-	if (HasAuthority())
-	{
-		Integrity = MaxIntegrity;
-	}
-}
-
-void ALastFPSDefendableDeviceActor::ApplyIntegrityDamage(float Amount)
-{
-	if (!HasAuthority() || bDestroyedBroadcast || Amount <= 0.f)
+	if (!AbilitySystemComponent)
 	{
 		return;
 	}
 
-	Integrity = FMath::Max(0.f, Integrity - Amount);
-	HandleIntegrityUpdated();
-	ForceNetUpdate();
+	AbilitySystemComponent->InitAbilityActorInfo(this, this);
+
+	// 체력 변경을 HUD 델리게이트로 옮긴다. 실패 판정은 목표 컴포넌트가 따로 구독한다.
+	HealthChangedHandle = AbilitySystemComponent
+		->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetHealthAttribute())
+		.AddUObject(this, &ALastFPSDefendableDeviceActor::HandleHealthChanged);
+	MaxHealthChangedHandle = AbilitySystemComponent
+		->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetMaxHealthAttribute())
+		.AddUObject(this, &ALastFPSDefendableDeviceActor::HandleMaxHealthChanged);
+
+	BroadcastHealth();
 }
 
-void ALastFPSDefendableDeviceActor::ResetIntegrity()
+void ALastFPSDefendableDeviceActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (!HasAuthority())
+	if (AbilitySystemComponent)
+	{
+		if (HealthChangedHandle.IsValid())
+		{
+			AbilitySystemComponent
+				->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetHealthAttribute())
+				.Remove(HealthChangedHandle);
+			HealthChangedHandle.Reset();
+		}
+
+		if (MaxHealthChangedHandle.IsValid())
+		{
+			AbilitySystemComponent
+				->GetGameplayAttributeValueChangeDelegate(ULastFPSAttributeSet::GetMaxHealthAttribute())
+				.Remove(MaxHealthChangedHandle);
+			MaxHealthChangedHandle.Reset();
+		}
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+float ALastFPSDefendableDeviceActor::GetHealth01() const
+{
+	if (!AbilitySystemComponent)
+	{
+		return 0.f;
+	}
+
+	const float MaxHealth =
+		AbilitySystemComponent->GetNumericAttribute(ULastFPSAttributeSet::GetMaxHealthAttribute());
+	if (MaxHealth <= 0.f)
+	{
+		return 0.f;
+	}
+
+	const float Health =
+		AbilitySystemComponent->GetNumericAttribute(ULastFPSAttributeSet::GetHealthAttribute());
+	return FMath::Clamp(Health / MaxHealth, 0.f, 1.f);
+}
+
+bool ALastFPSDefendableDeviceActor::IsDestroyed() const
+{
+	return AbilitySystemComponent
+		&& AbilitySystemComponent->GetNumericAttribute(ULastFPSAttributeSet::GetHealthAttribute()) <= 0.f;
+}
+
+void ALastFPSDefendableDeviceActor::HandleHealthChanged(const FOnAttributeChangeData& /*Data*/)
+{
+	BroadcastHealth();
+}
+
+void ALastFPSDefendableDeviceActor::HandleMaxHealthChanged(const FOnAttributeChangeData& /*Data*/)
+{
+	BroadcastHealth();
+}
+
+void ALastFPSDefendableDeviceActor::BroadcastHealth() const
+{
+	if (!AbilitySystemComponent)
 	{
 		return;
 	}
 
-	Integrity = MaxIntegrity;
-	bDestroyedBroadcast = false;
-	HandleIntegrityUpdated();
-	ForceNetUpdate();
-}
-
-float ALastFPSDefendableDeviceActor::GetIntegrity01() const
-{
-	return MaxIntegrity > 0.f ? FMath::Clamp(Integrity / MaxIntegrity, 0.f, 1.f) : 0.f;
-}
-
-void ALastFPSDefendableDeviceActor::OnRep_Integrity()
-{
-	HandleIntegrityUpdated();
-}
-
-void ALastFPSDefendableDeviceActor::HandleIntegrityUpdated()
-{
-	OnIntegrityChanged.Broadcast(Integrity, MaxIntegrity);
-
-	if (Integrity <= 0.f && !bDestroyedBroadcast)
-	{
-		bDestroyedBroadcast = true;
-		OnDeviceDestroyed.Broadcast();
-	}
+	OnHealthChanged.Broadcast(
+		AbilitySystemComponent->GetNumericAttribute(ULastFPSAttributeSet::GetHealthAttribute()),
+		AbilitySystemComponent->GetNumericAttribute(ULastFPSAttributeSet::GetMaxHealthAttribute()));
 }

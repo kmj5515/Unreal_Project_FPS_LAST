@@ -16,11 +16,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
 	void SetupConfirm(const FText& InTitle, const FText& InBody);
 
+	virtual void SetupDialog(
+		UCommonGameDialogDescriptor* Descriptor,
+		FCommonMessagingResultDelegate ResultCallback) override;
+
+	virtual void KillDialog() override;
+
 	UPROPERTY(BlueprintAssignable, Category="LastFPS|UI")
 	FOnLastFPSConfirmResult OnConfirmResult;
 
 protected:
-	virtual void NativeConstruct() override;
+	virtual void NativeOnInitialized() override;
 	virtual bool NativeOnHandleBackAction() override;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
@@ -36,4 +42,12 @@ protected:
 	void HandleCancelClicked();
 
 	void CloseWithResult(bool bConfirmed);
+	void CloseWithMessagingResult(
+		bool bConfirmed,
+		ECommonMessagingResult Result);
+
+private:
+	ECommonMessagingResult ConfirmResult = ECommonMessagingResult::Confirmed;
+	ECommonMessagingResult CancelResult = ECommonMessagingResult::Declined;
+	ECommonMessagingResult BackResult = ECommonMessagingResult::Cancelled;
 };

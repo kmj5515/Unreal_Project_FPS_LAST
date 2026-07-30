@@ -6,7 +6,25 @@
 #include "LastFPSRoomEncounterData.generated.h"
 
 class ULastFPSCharacterDefinition;
+class ULastFPSEncounterObjectiveDefinition;
 class UNiagaraSystem;
+
+/**
+ * 이 방이 요구하는 목표 1건이다.
+ *
+ * 구조체로 감싼 이유: 목표 활성 시점(웨이브 연동·선행 목표 등)이 나중에 필요해질 때
+ * 필드를 추가만 하면 되고 기존 행이 그대로 살기 때문이다. 소프트 참조 배열로 두면
+ * 그때 배열 원소 타입이 바뀌어 데이터 마이그레이션이 필요하다.
+ */
+USTRUCT(BlueprintType)
+struct FLastFPSEncounterObjectiveEntry
+{
+	GENERATED_BODY()
+
+	/** 목표의 종류와 밸런스를 소유하는 정의 에셋이다. 위치는 레벨 배치물이 소유한다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter")
+	TSoftObjectPtr<ULastFPSEncounterObjectiveDefinition> Definition;
+};
 
 /** 룸 인카운터에서 적 생성 순간에 재생할 시각 효과 설정이다. */
 USTRUCT(BlueprintType)
@@ -87,9 +105,24 @@ struct FLastFPSRoomEncounterData : public FTableRowBase
 {
 	GENERATED_BODY()
 
+	/**
+	 * 이 방이 속한 목적지 식별자다(DT_Destination 행 이름).
+	 * 프로파일이 자기 목적지와 다른 행을 프리로드·초기화에서 건너뛰는 기준이며,
+	 * 비워 두면 목적지를 가리지 않는다(기존 행 호환).
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter")
+	FName DestinationId;
+
 	/** 실행 순서대로 구성한 웨이브 목록이다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter")
 	TArray<FLastFPSRoomEncounterWaveDefinition> Waves;
+
+	/**
+	 * 이 방이 요구하는 목표들이다. 비우면 섬멸형(웨이브를 모두 소진하면 클리어)이다.
+	 * 목표가 하나라도 있으면 전부 성공할 때까지 웨이브를 순환하며 클리어를 보류한다.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter")
+	TArray<FLastFPSEncounterObjectiveEntry> Objectives;
 
 	/** Spawn Point 수보다 유닛이 많을 때 재사용 위치에 적용할 간격이다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter", meta=(ClampMin="0.0", Units="cm"))

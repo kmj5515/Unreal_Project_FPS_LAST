@@ -10,6 +10,7 @@ class UTextBlock;
 class UTexture2D;
 class UDataTable;
 class ULastFPSLoadingProcessSubsystem;
+class ULastFPSLevelTravelSubsystem;
 struct FGameplayTag;
 
 UCLASS()
@@ -35,7 +36,7 @@ protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
 
-    void RefreshFromGameInstance();
+    void RefreshFromTravelSubsystem();
 
     /** TipTable에서 팁 1건을 랜덤 선택해 이미지/제목/본문 위젯에 적용 */
     void ApplyRandomTip();

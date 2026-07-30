@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "Data/Definitions/LastFPSDestinationFeature.h"
 #include "Engine/DataAsset.h"
 #include "LastFPSDestinationContentSet.generated.h"
@@ -68,6 +69,14 @@ class LASTFPS_API ULastFPSDestinationContentSet : public UPrimaryDataAsset
     GENERATED_BODY()
 
 public:
+    /** 팝업과 같은 로컬 콘텐츠 수명 정책이 현재 목적지를 식별할 때 사용한다. */
+    UPROPERTY(
+        EditDefaultsOnly,
+        BlueprintReadOnly,
+        Category="Context",
+        meta=(Categories="Game.Context"))
+    FGameplayTagContainer ContextTags;
+
     /** 데이터 테이블·텍스처·데이터 에셋 등. 로드가 끝날 때까지 로딩 화면을 유지한다. */
     UPROPERTY(EditDefaultsOnly, Category="Content")
     TArray<TSoftObjectPtr<UObject>> RequiredAssets;

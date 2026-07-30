@@ -2,7 +2,9 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Character/LastFPSCharacterBase.h"
+#include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "UI/HUD/LastFPSObjectiveHudSubsystem.h"
 #include "Utility/LastFPSTags.h"
 
 void ULastFPSEnemyHealthPresenter::Initialize(
@@ -47,9 +49,12 @@ void ULastFPSEnemyHealthPresenter::ShowEnemyHealthBar(
         if (!Enemy->IsAlive())
         {
             ClearBossHealthBar();
+            ReleaseBossPresentation();
         }
-        else if (BossHealthBar)
+        else if (BossHealthBar && RequestBossPresentation())
         {
+            // 슬롯을 얻었을 때만 띄운다 — InitializeForFixedHUDTarget 이 스스로 가시성을 켜므로
+            // 허가 없이 부르면 점령·방어 표시 위에 겹쳐 뜬다.
             BossHealthBar->InitializeForFixedHUDTarget(Enemy, Settings, DamageAmount);
         }
         return;
@@ -141,6 +146,9 @@ void ULastFPSEnemyHealthPresenter::Tick(float DeltaTime)
     {
         BossHealthBar->UpdateFixedHUDTarget(DeltaTime, Settings);
     }
+
+    // 위젯이 스스로 대상을 놓는 경로(체력 0 복제 등)가 있어 여기서 슬롯 반납을 확인한다.
+    ReleaseBossPresentationIfDetached();
 }
 
 void ULastFPSEnemyHealthPresenter::ClearEnemyHealthBars()
@@ -162,4 +170,54 @@ void ULastFPSEnemyHealthPresenter::ClearBossHealthBar()
     {
         BossHealthBar->ReleaseFromEnemy();
     }
+    ReleaseBossPresentation();
+}
+
+bool ULastFPSEnemyHealthPresenter::RequestBossPresentation()
+{
+    if (bBossPresentationActive)
+    {
+        return true;
+    }
+
+    if (ULastFPSObjectiveHudSubsystem* Hud = GetHudSubsystem())
+    {
+        bBossPresentationActive =
+            Hud->RequestPresentation(ELastFPSObjectiveHudMode::Boss, this);
+    }
+    return bBossPresentationActive;
+}
+
+void ULastFPSEnemyHealthPresenter::ReleaseBossPresentationIfDetached()
+{
+    if (!bBossPresentationActive)
+    {
+        return;
+    }
+
+    // 위젯이 대상을 놓았다면(보스 사망·대상 무효) 표시가 이미 끝난 것이다.
+    if (!BossHealthBar || BossHealthBar->IsAvailable())
+    {
+        ReleaseBossPresentation();
+    }
+}
+
+void ULastFPSEnemyHealthPresenter::ReleaseBossPresentation()
+{
+    if (!bBossPresentationActive)
+    {
+        return;
+    }
+    bBossPresentationActive = false;
+
+    if (ULastFPSObjectiveHudSubsystem* Hud = GetHudSubsystem())
+    {
+        Hud->ReleasePresentation(this);
+    }
+}
+
+ULastFPSObjectiveHudSubsystem* ULastFPSEnemyHealthPresenter::GetHudSubsystem() const
+{
+    UWorld* World = GetWorld();
+    return World ? World->GetSubsystem<ULastFPSObjectiveHudSubsystem>() : nullptr;
 }

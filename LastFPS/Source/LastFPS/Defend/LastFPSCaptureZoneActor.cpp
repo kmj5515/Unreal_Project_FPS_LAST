@@ -1,6 +1,6 @@
 #include "Defend/LastFPSCaptureZoneActor.h"
 
-#include "Defend/LastFPSCaptureZoneComponent.h"
+#include "Components/BoxComponent.h"
 
 ALastFPSCaptureZoneActor::ALastFPSCaptureZoneActor()
 {
@@ -8,9 +8,13 @@ ALastFPSCaptureZoneActor::ALastFPSCaptureZoneActor()
 	bReplicates = true;
 	SetReplicateMovement(false);
 
-	CaptureZone = CreateDefaultSubobject<ULastFPSCaptureZoneComponent>(TEXT("CaptureZone"));
-	SetRootComponent(CaptureZone);
+	Volume = CreateDefaultSubobject<UBoxComponent>(TEXT("Volume"));
+	SetRootComponent(Volume);
 
-	// 배치 직후 보이고 겹치도록 기본 볼륨 크기 부여 — 실제 점령 범위는 인스턴스에서 조정.
-	CaptureZone->InitBoxExtent(FVector(200.f, 200.f, 100.f));
+	// 배치 직후 보이고 겹치도록 기본 크기를 준다 — 실제 점령 범위는 인스턴스에서 조정한다.
+	Volume->InitBoxExtent(FVector(200.f, 200.f, 100.f));
+	Volume->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	Volume->SetCollisionResponseToAllChannels(ECR_Ignore);
+	Volume->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	Volume->SetGenerateOverlapEvents(true);
 }

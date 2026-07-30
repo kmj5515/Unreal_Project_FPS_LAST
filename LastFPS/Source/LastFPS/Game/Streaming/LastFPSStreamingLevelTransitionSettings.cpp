@@ -58,8 +58,7 @@ bool FLastFPSStreamingLevelTransitionRoute::IsValid(
 	return true;
 }
 
-const FLastFPSStreamingLevelTransitionRoute*
-ULastFPSStreamingLevelTransitionSettings::FindRouteForTrigger(
+const FLastFPSStreamingLevelTransitionRoute* ULastFPSStreamingLevelTransitionSettings::FindRouteForTrigger(
 	const UWorld& World,
 	const AActor& TriggerActor) const
 {

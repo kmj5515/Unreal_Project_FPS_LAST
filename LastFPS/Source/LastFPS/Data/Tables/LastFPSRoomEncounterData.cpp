@@ -117,5 +117,18 @@ bool FLastFPSRoomEncounterData::IsValid(FString& OutFailureReason) const
 		}
 	}
 
+	// 목표 참조가 비면 런타임 로그에 에셋 경로조차 남지 않아 원인을 알 수 없다.
+	// 정의 에셋 내부 검사는 로드 이후라야 가능하므로 여기서는 참조 유무만 본다.
+	for (int32 ObjectiveIndex = 0; ObjectiveIndex < Objectives.Num(); ++ObjectiveIndex)
+	{
+		if (Objectives[ObjectiveIndex].Definition.IsNull())
+		{
+			OutFailureReason = FString::Printf(
+				TEXT("목표 %d 의 정의 에셋이 지정되지 않았습니다."),
+				ObjectiveIndex + 1);
+			return false;
+		}
+	}
+
 	return true;
 }

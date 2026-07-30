@@ -31,6 +31,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
 	void SetupQuantity(const FText& InTitle, const FText& InItemName, int32 InUnitPrice, int32 InMaxQuantity);
 
+	virtual void KillDialog() override;
+
 	UPROPERTY(BlueprintAssignable, Category="LastFPS|UI")
 	FOnLastFPSQuantityResult OnQuantityResult;
 

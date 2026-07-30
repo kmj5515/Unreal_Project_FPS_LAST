@@ -15,12 +15,13 @@ public class LastFPS : ModuleRules
 			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
 			"UMG", "Json", "JsonUtilities", "AssetRegistry", "DeveloperSettings",
-			"CommonUI", "CommonInput", "CommonGame", "ModularGameplayActors",
+			"CommonUI", "CommonInput", "CommonGame", "CommonUser", "ModularGameplayActors",
 			"AIModule", "NavigationSystem", "Niagara", "EasyCrosshairSystem"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
-			"NetCore", "Slate", "SlateCore", "CommonLoadingScreen", "RenderCore", "RHI"
+			"NetCore", "Slate", "SlateCore", "CommonLoadingScreen", "RenderCore", "RHI",
+			"OnlineBase", "OnlineSubsystem"
 		});
 
 		// Uncomment if you are using online features

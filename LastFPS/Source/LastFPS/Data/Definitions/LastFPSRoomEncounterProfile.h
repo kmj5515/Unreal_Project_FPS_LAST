@@ -89,6 +89,14 @@ public:
 		meta=(RowType="/Script/LastFPS.LastFPSRoomEncounterData"))
 	TSoftObjectPtr<UDataTable> EncounterTable;
 
+	/**
+	 * 이 프로파일이 담당하는 목적지 식별자다.
+	 * 테이블은 모든 목적지의 방을 함께 담고, 프로파일이 이 값으로 자기 몫만 걸러
+	 * 프리로드와 런타임 생성 범위를 좁힌다. 비워 두면 모든 행을 사용한다.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Data")
+	FName DestinationId;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Level Contract")
 	FName TriggerMarkerTag = TEXT("RoomEncounter.Trigger");
 
@@ -97,6 +105,10 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Level Contract")
 	FName SpawnMarkerTag = TEXT("RoomEncounter.Spawn");
+
+	/** 목표 배치물(앵커)을 식별하는 Actor Tag 다. 정의의 ObjectiveTag 와 함께 붙인다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Level Contract")
+	FName ObjectiveMarkerTag = TEXT("RoomEncounter.Objective");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Barrier Presentation")
 	FLastFPSRoomBarrierPresentationSettings BarrierPresentation;
@@ -108,4 +120,7 @@ public:
 	virtual void CollectRequiredPaths(TArray<FSoftObjectPath>& OutPaths) const override;
 
 	bool IsConfigurationValid(FString& OutFailureReason) const;
+
+	/** 이 프로파일이 담당하는 행인가. DestinationId 를 비워 둔 쪽은 항상 통과시킨다. */
+	bool OwnsEncounterRow(FName RowDestinationId) const;
 };

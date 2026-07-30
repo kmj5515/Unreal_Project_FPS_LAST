@@ -5,6 +5,8 @@
 #include "Components/BoxComponent.h"
 #include "Components/SceneComponent.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
+#include "Data/Definitions/LastFPSEncounterObjectiveDefinition.h"
+#include "Encounter/LastFPSTimedObjectiveComponent.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
 #include "Engine/StaticMesh.h"
@@ -15,6 +17,7 @@
 #include "Encounter/LastFPSRoomSpawnPresentationComponent.h"
 #include "Encounter/LastFPSRoomEncounterSubsystem.h"
 #include "GameFramework/Pawn.h"
+#include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
 #include "NavigationSystem.h"
 #include "Net/UnrealNetwork.h"
@@ -80,7 +83,8 @@ void ALastFPSRoomEncounterRuntime::InitializeEncounter(
 			}
 		}
 	}
-	TotalEnemyCount = InEncounterData.GetTotalEnemyCount();
+	BaseTotalEnemyCount = InEncounterData.GetTotalEnemyCount();
+	TotalEnemyCount = BaseTotalEnemyCount;
 	DefeatedEnemyCount = 0;
 	ReusedSpawnPointSpacing = FMath::Max(InEncounterData.ReusedSpawnPointSpacing, 0.f);
 	SpawnPointRandomRadius = FMath::Max(InEncounterData.SpawnPointRandomRadius, 0.f);
@@ -100,6 +104,11 @@ void ALastFPSRoomEncounterRuntime::InitializeEncounter(
 			SpawnPoints.Add(SpawnPoint);
 		}
 	}
+
+	// 목표 생성은 전투 시작까지 미룬다 — 배치물이 스트리밍 서브레벨에 있으면
+	// 지금은 월드에 존재하지 않는다. 여기서는 무엇을 만들지만 기억해 둔다.
+	ObjectiveEntries = InEncounterData.Objectives;
+	ObjectiveMarkerTag = InProfile.ObjectiveMarkerTag;
 
 	TriggerVolume->OnActorBeginOverlap.AddUniqueDynamic(
 		this,
@@ -134,6 +143,7 @@ void ALastFPSRoomEncounterRuntime::GetLifetimeReplicatedProps(
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, BarrierPresentationSettings);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, bEncounterCleared);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, CurrentWave);
+	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, WaveLoopCount);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, EncounterId);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, TotalEnemyCount);
 	DOREPLIFETIME(ALastFPSRoomEncounterRuntime, DefeatedEnemyCount);
@@ -164,6 +174,23 @@ void ALastFPSRoomEncounterRuntime::EndPlay(const EEndPlayReason::Type EndPlayRea
 		}
 	}
 	AliveEnemies.Reset();
+	StopObjectives();
+	for (ULastFPSTimedObjectiveComponent* Objective : Objectives)
+	{
+		if (!IsValid(Objective))
+		{
+			continue;
+		}
+
+		Objective->OnObjectiveResolved.RemoveDynamic(
+			this,
+			&ALastFPSRoomEncounterRuntime::HandleObjectiveResolved);
+
+		// 런타임이 만들어 붙인 컴포넌트이므로 런타임이 걷어낸다.
+		// 남겨 두면 앵커 액터에 비활성 컴포넌트가 누적된다.
+		Objective->DestroyComponent();
+	}
+	Objectives.Reset();
 	CancelEnemyDefinitionPreload();
 	CancelBarrierPresentationLoad();
 	LoadedEnemyDefinitions.Reset();
@@ -204,7 +231,7 @@ void ALastFPSRoomEncounterRuntime::StartEncounter()
 		if (bEnemyDefinitionsFailed)
 		{
 			bStartRequested = false;
-			FailEncounterOpen(TEXT("적 Character Definition 비동기 로드가 실패했습니다."));
+			AbortEncounterOnConfigurationError(TEXT("적 Character Definition 비동기 로드가 실패했습니다."));
 		}
 		else
 		{
@@ -226,18 +253,171 @@ void ALastFPSRoomEncounterRuntime::StartEncounter()
 
 	if (SpawnPoints.IsEmpty())
 	{
-		FailEncounterOpen(TEXT("Spawn Point가 없습니다."));
+		AbortEncounterOnConfigurationError(TEXT("Spawn Point가 없습니다."));
 		return;
 	}
 
 	if (Waves.IsEmpty())
 	{
-		FailEncounterOpen(TEXT("웨이브 데이터가 없습니다."));
+		AbortEncounterOnConfigurationError(TEXT("웨이브 데이터가 없습니다."));
 		return;
 	}
 
 	SetBarrierActive(true);
+	CreateObjectives();
+	StartObjectives();
 	ScheduleNextWave();
+}
+
+void ALastFPSRoomEncounterRuntime::CreateObjectives()
+{
+	if (bObjectivesCreated || ObjectiveEntries.IsEmpty())
+	{
+		return;
+	}
+	bObjectivesCreated = true;
+
+	UWorld* World = GetWorld();
+	if (!World || ObjectiveMarkerTag.IsNone())
+	{
+		return;
+	}
+
+	// 플레이어가 방에 들어온 시점이라 스트리밍 서브레벨도 이미 로드돼 있다.
+	TArray<AActor*> ObjectiveAnchors;
+	UGameplayStatics::GetAllActorsWithTag(World, ObjectiveMarkerTag, ObjectiveAnchors);
+
+	for (const FLastFPSEncounterObjectiveEntry& Entry : ObjectiveEntries)
+	{
+		const ULastFPSEncounterObjectiveDefinition* Definition = Entry.Definition.Get();
+		if (!Definition)
+		{
+			UE_LOG(
+				LogLastFPSRoomEncounter,
+				Error,
+				TEXT("[%s] 목표 정의가 로드되지 않았습니다: %s"),
+				*EncounterId.ToString(),
+				*Entry.Definition.ToString());
+			continue;
+		}
+
+		FString FailureReason;
+		if (!Definition->IsConfigurationValid(FailureReason))
+		{
+			UE_LOG(
+				LogLastFPSRoomEncounter,
+				Error,
+				TEXT("[%s] 목표 정의 구성이 유효하지 않습니다: 정의=%s, 원인=%s"),
+				*EncounterId.ToString(),
+				*GetNameSafe(Definition),
+				*FailureReason);
+			continue;
+		}
+
+		// 같은 마커 태그를 단 다른 방의 배치물과 섞이지 않도록 인카운터 소속까지 함께 본다.
+		AActor* const* FoundAnchor = ObjectiveAnchors.FindByPredicate(
+			[this, Definition](const AActor* Candidate)
+			{
+				return IsValid(Candidate)
+					&& Candidate->ActorHasTag(EncounterId)
+					&& Candidate->ActorHasTag(Definition->ObjectiveTag);
+			});
+		if (!FoundAnchor)
+		{
+			// 배치 누락을 조용히 넘기면 방이 그냥 섬멸형으로 동작해 원인 추적이 어려워진다.
+			UE_LOG(
+				LogLastFPSRoomEncounter,
+				Error,
+				TEXT("[%s] 목표 배치물을 찾지 못했습니다: 정의=%s, ObjectiveTag=%s"),
+				*EncounterId.ToString(),
+				*GetNameSafe(Definition),
+				*Definition->ObjectiveTag.ToString());
+			continue;
+		}
+
+		// 목표 컴포넌트는 앵커의 서브오브젝트로 복제되므로, 앵커가 복제되지 않으면
+		// 클라이언트는 진행률·결과를 전혀 받지 못한다(HUD 게이지가 죽는다).
+		if (!(*FoundAnchor)->GetIsReplicated())
+		{
+			UE_LOG(
+				LogLastFPSRoomEncounter,
+				Error,
+				TEXT("[%s] 목표 배치물이 복제되지 않아 클라이언트에 목표 진행이 전달되지 않습니다: 앵커=%s"),
+				*EncounterId.ToString(),
+				*GetNameSafe(*FoundAnchor));
+		}
+
+		ULastFPSTimedObjectiveComponent* Objective = Definition->CreateRuntimeObjective(**FoundAnchor);
+		if (!Objective)
+		{
+			UE_LOG(
+				LogLastFPSRoomEncounter,
+				Error,
+				TEXT("[%s] 런타임 목표 생성에 실패했습니다: 정의=%s"),
+				*EncounterId.ToString(),
+				*GetNameSafe(Definition));
+			continue;
+		}
+
+		Objective->OnObjectiveResolved.AddUniqueDynamic(
+			this,
+			&ALastFPSRoomEncounterRuntime::HandleObjectiveResolved);
+		Objectives.Add(Objective);
+	}
+}
+
+bool ALastFPSRoomEncounterRuntime::AreAllObjectivesSucceeded() const
+{
+	// 목표가 없으면 참 — 섬멸형 인카운터의 기존 동작을 그대로 유지한다.
+	for (const ULastFPSTimedObjectiveComponent* Objective : Objectives)
+	{
+		if (IsValid(Objective) && !Objective->IsSucceeded())
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+void ALastFPSRoomEncounterRuntime::StartObjectives()
+{
+	for (ULastFPSTimedObjectiveComponent* Objective : Objectives)
+	{
+		if (IsValid(Objective))
+		{
+			Objective->StartObjective();
+		}
+	}
+}
+
+void ALastFPSRoomEncounterRuntime::StopObjectives()
+{
+	for (ULastFPSTimedObjectiveComponent* Objective : Objectives)
+	{
+		if (IsValid(Objective))
+		{
+			Objective->StopObjective();
+		}
+	}
+}
+
+void ALastFPSRoomEncounterRuntime::HandleObjectiveResolved(
+	UActorComponent* /*Objective*/,
+	const ELastFPSObjectiveResult ObjectiveResult)
+{
+	if (!HasAuthority() || bEncounterCleared)
+	{
+		return;
+	}
+
+	if (ObjectiveResult == ELastFPSObjectiveResult::Failed)
+	{
+		FailEncounter();
+		return;
+	}
+
+	// 버티기 타이머가 적 전멸보다 먼저 끝날 수 있으므로 완료 조건을 다시 평가한다.
+	EvaluateWaveCompletion();
 }
 
 void ALastFPSRoomEncounterRuntime::BeginEnemyDefinitionPreload()
@@ -314,7 +494,7 @@ void ALastFPSRoomEncounterRuntime::HandleEnemyDefinitionPreloadCompleted()
 		if (HasAuthority() && bStartRequested)
 		{
 			bStartRequested = false;
-			FailEncounterOpen(TEXT("적 Character Definition 비동기 로드 결과가 유효하지 않습니다."));
+			AbortEncounterOnConfigurationError(TEXT("적 Character Definition 비동기 로드 결과가 유효하지 않습니다."));
 		}
 		return;
 	}
@@ -645,7 +825,7 @@ void ALastFPSRoomEncounterRuntime::FinishWaveSpawning()
 
 	if (CurrentWaveSpawnedCount == 0)
 	{
-		FailEncounterOpen(TEXT("웨이브에서 적을 한 마리도 생성하지 못했습니다."));
+		AbortEncounterOnConfigurationError(TEXT("웨이브에서 적을 한 마리도 생성하지 못했습니다."));
 		return;
 	}
 
@@ -780,14 +960,16 @@ void ALastFPSRoomEncounterRuntime::HandleEnemyDestroyed(AActor* DestroyedActor)
 	EvaluateWaveCompletion();
 }
 
-void ALastFPSRoomEncounterRuntime::RemoveTrackedEnemy(ALastFPSCharacterBase& Enemy)
+void ALastFPSRoomEncounterRuntime::RemoveTrackedEnemy(
+	ALastFPSCharacterBase& Enemy,
+	const bool bCountAsDefeated)
 {
 	Enemy.OnDeath.RemoveAll(this);
 	Enemy.OnDestroyed.RemoveDynamic(
 		this,
 		&ALastFPSRoomEncounterRuntime::HandleEnemyDestroyed);
 	const int32 RemovedCount = AliveEnemies.Remove(TWeakObjectPtr<ALastFPSCharacterBase>(&Enemy));
-	if (RemovedCount > 0)
+	if (RemovedCount > 0 && bCountAsDefeated)
 	{
 		DefeatedEnemyCount = FMath::Min(DefeatedEnemyCount + 1, TotalEnemyCount);
 		BroadcastEncounterProgress();
@@ -817,6 +999,15 @@ void ALastFPSRoomEncounterRuntime::OnRep_EncounterProgress()
 
 void ALastFPSRoomEncounterRuntime::EvaluateWaveCompletion()
 {
+	// 목표가 먼저 성공하면 남은 적을 정리하고 즉시 끝낸다 — 배리어가 열린 뒤에도
+	// 적이 따라 나오는 상황을 막는다.
+	if (!bEncounterCleared && !Objectives.IsEmpty() && AreAllObjectivesSucceeded())
+	{
+		ClearAliveEnemies();
+		CompleteEncounter();
+		return;
+	}
+
 	if (bWaveSpawning || !AliveEnemies.IsEmpty() || bEncounterCleared)
 	{
 		return;
@@ -824,6 +1015,25 @@ void ALastFPSRoomEncounterRuntime::EvaluateWaveCompletion()
 
 	if (CurrentWave < Waves.Num())
 	{
+		ScheduleNextWave();
+		return;
+	}
+
+	// 웨이브를 다 소진했는데 목표가 남았다면 처음부터 다시 몰아친다.
+	if (!AreAllObjectivesSucceeded())
+	{
+		CurrentWave = 0;
+		++WaveLoopCount;
+		// 분모도 한 바퀴분 늘려야 처치 수 기반 진행 표시가 100%에 고정되지 않는다.
+		TotalEnemyCount += BaseTotalEnemyCount;
+		BroadcastEncounterProgress();
+		ForceNetUpdate();
+		UE_LOG(
+			LogLastFPSRoomEncounter,
+			Verbose,
+			TEXT("[%s] 목표가 남아 웨이브를 순환합니다 (%d회차)."),
+			*EncounterId.ToString(),
+			WaveLoopCount);
 		ScheduleNextWave();
 		return;
 	}
@@ -860,9 +1070,10 @@ bool ALastFPSRoomEncounterRuntime::DebugForceCompleteEncounter()
 			Enemy->OnDestroyed.RemoveDynamic(
 				this,
 				&ALastFPSRoomEncounterRuntime::HandleEnemyDestroyed);
-			if (ULastFPSActorPoolSubsystem* Pool =
-				GetWorld()->GetSubsystem<ULastFPSActorPoolSubsystem>();
-				!Pool || !Pool->ReleaseActor(Enemy))
+			ULastFPSActorPoolSubsystem* Pool = GetWorld()
+				? GetWorld()->GetSubsystem<ULastFPSActorPoolSubsystem>()
+				: nullptr;
+			if (!Pool || !Pool->ReleaseActor(Enemy))
 			{
 				Enemy->Destroy();
 			}
@@ -879,6 +1090,16 @@ bool ALastFPSRoomEncounterRuntime::DebugForceCompleteEncounter()
 	CurrentWave = Waves.Num();
 	DefeatedEnemyCount = TotalEnemyCount;
 	BroadcastEncounterProgress();
+
+	// 목표를 남겨 두면 방은 열리는데 퀘스트는 미해결로 남아 건너뛰기가 반쪽이 된다.
+	for (ULastFPSTimedObjectiveComponent* Objective : Objectives)
+	{
+		if (IsValid(Objective))
+		{
+			Objective->DebugForceSucceed();
+		}
+	}
+
 	CompleteEncounter();
 	return bEncounterCleared;
 }
@@ -897,13 +1118,21 @@ void ALastFPSRoomEncounterRuntime::CompleteEncounter()
 	GetWorldTimerManager().ClearTimer(SpawnPresentationDelayTimerHandle);
 	PendingEnemySpawns.Reset();
 	bWaveSpawning = false;
+	StopObjectives();
+
+	// 목표 성공으로 조기 종료한 경우 남은 적이 처치로 집계되지 않으므로 진행 표시가
+	// 100%에 못 미친 채 끝난다. 클리어는 클리어이므로 표시를 맞춰 준다(디버그 경로와 동일).
+	DefeatedEnemyCount = TotalEnemyCount;
+	BroadcastEncounterProgress();
+
 	SetBarrierActive(false);
 	ForceNetUpdate();
 	UE_LOG(
 		LogLastFPSRoomEncounter,
 		Log,
-		TEXT("[%s] 모든 웨이브를 완료했습니다."),
-		*EncounterId.ToString());
+		TEXT("[%s] 인카운터를 완료했습니다 (순환 %d회)."),
+		*EncounterId.ToString(),
+		WaveLoopCount);
 
 	if (const UWorld* World = GetWorld())
 	{
@@ -914,7 +1143,75 @@ void ALastFPSRoomEncounterRuntime::CompleteEncounter()
 	}
 }
 
-void ALastFPSRoomEncounterRuntime::FailEncounterOpen(const TCHAR* Reason)
+void ALastFPSRoomEncounterRuntime::FailEncounter()
+{
+	if (!HasAuthority() || bEncounterCleared)
+	{
+		return;
+	}
+
+	// 실패도 전투 종료다 — 클리어 플래그를 세워 이후 웨이브·재평가를 모두 막는다.
+	bEncounterCleared = true;
+	GetWorldTimerManager().ClearTimer(NextWaveTimerHandle);
+	GetWorldTimerManager().ClearTimer(SequentialSpawnTimerHandle);
+	GetWorldTimerManager().ClearTimer(SpawnPresentationDelayTimerHandle);
+	PendingEnemySpawns.Reset();
+	bWaveSpawning = false;
+	StopObjectives();
+	ClearAliveEnemies();
+	SetBarrierActive(false);
+	ForceNetUpdate();
+
+	UE_LOG(
+		LogLastFPSRoomEncounter,
+		Log,
+		TEXT("[%s] 목표 실패로 인카운터를 종료합니다."),
+		*EncounterId.ToString());
+
+	// 실패 이후 처리(미션 실패 연출·귀환)는 맵마다 다른 규칙이라 GameMode 가 소유한다.
+	if (const UWorld* World = GetWorld())
+	{
+		if (ULastFPSRoomEncounterSubsystem* EncounterSubsystem = World->GetSubsystem<ULastFPSRoomEncounterSubsystem>())
+		{
+			EncounterSubsystem->NotifyEncounterFailed(EncounterId);
+		}
+	}
+}
+
+void ALastFPSRoomEncounterRuntime::ClearAliveEnemies()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	ULastFPSActorPoolSubsystem* Pool = GetWorld()
+		? GetWorld()->GetSubsystem<ULastFPSActorPoolSubsystem>()
+		: nullptr;
+
+	// 순회 중 RemoveTrackedEnemy 가 집합을 수정하므로 스냅샷을 뜬다.
+	TArray<TWeakObjectPtr<ALastFPSCharacterBase>> Snapshot = AliveEnemies.Array();
+	for (const TWeakObjectPtr<ALastFPSCharacterBase>& EnemyPtr : Snapshot)
+	{
+		ALastFPSCharacterBase* Enemy = EnemyPtr.Get();
+		if (!IsValid(Enemy))
+		{
+			continue;
+		}
+
+		// 강제 정리는 처치가 아니다 — 집계에 넣으면 퀘스트 진행이 부풀어 오른다.
+		RemoveTrackedEnemy(*Enemy, /*bCountAsDefeated=*/false);
+
+		// 스폰 경로와 동일하게 풀에 먼저 반납한다. 풀 소속이 아니면 파괴한다.
+		if (!Pool || !Pool->ReleaseActor(Enemy))
+		{
+			Enemy->Destroy();
+		}
+	}
+	AliveEnemies.Reset();
+}
+
+void ALastFPSRoomEncounterRuntime::AbortEncounterOnConfigurationError(const TCHAR* Reason)
 {
 	UE_LOG(
 		LogLastFPSRoomEncounter,

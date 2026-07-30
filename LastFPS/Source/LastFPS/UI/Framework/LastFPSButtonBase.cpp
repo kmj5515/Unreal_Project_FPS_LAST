@@ -1,28 +1,7 @@
 #include "UI/Framework/LastFPSButtonBase.h"
-
+#include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
-#include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
-
-void ULastFPSButtonBase::NativeOnClicked()
-{
-	if (PressedSound)
-	{
-		UGameplayStatics::PlaySound2D(this, PressedSound);
-	}
-
-	Super::NativeOnClicked();
-}
-
-void ULastFPSButtonBase::NativeOnHovered()
-{
-	if (HoveredSound)
-	{
-		UGameplayStatics::PlaySound2D(this, HoveredSound);
-	}
-
-	Super::NativeOnHovered();
-}
 
 void ULastFPSButtonBase::NativePreConstruct()
 {
@@ -31,6 +10,20 @@ void ULastFPSButtonBase::NativePreConstruct()
 	if (TextBlock)
 	{
 		TextBlock->SetText(ButtonText);
+	}
+
+	if (SizeBox)
+	{
+		if (bOverrideSize)
+		{
+			SizeBox->SetWidthOverride(ButtonSize.X);
+			SizeBox->SetHeightOverride(ButtonSize.Y);
+		}
+		else
+		{
+			SizeBox->ClearWidthOverride();
+			SizeBox->ClearHeightOverride();
+		}
 	}
 }
 

@@ -3,9 +3,9 @@
 #include "UI/Framework/LastFPSButtonBase.h"
 #include "Components/TextBlock.h"
 
-void ULastFPSDialogueWidget::NativeConstruct()
+void ULastFPSDialogueWidget::NativeOnInitialized()
 {
-	Super::NativeConstruct();
+	Super::NativeOnInitialized();
 
 	if (Button_Next)
 	{
@@ -33,6 +33,12 @@ void ULastFPSDialogueWidget::SetupDialogue(const FText& InSpeaker, const TArray<
 	}
 
 	ShowCurrentLine();
+}
+
+void ULastFPSDialogueWidget::KillDialog()
+{
+	CompleteDialog(ECommonMessagingResult::Killed);
+	CloseDialogue();
 }
 
 void ULastFPSDialogueWidget::HandleNextClicked()

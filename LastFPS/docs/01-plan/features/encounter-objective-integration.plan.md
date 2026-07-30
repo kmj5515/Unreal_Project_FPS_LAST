@@ -56,50 +56,47 @@
 
 ## 2. 기술 전략
 
-### 2.1 목표 계약 — `ILastFPSEncounterObjective` (D1, D2 해결)
+### 2.1 목표 계약 — 컴포넌트 하나 (D1, D2 해결)
 
-신규 `Source/LastFPS/Encounter/LastFPSEncounterObjectiveInterface.h`
+> **개정 이력**: 초안은 `ILastFPSEncounterObjective` 인터페이스를 두고 점령·방어 컴포넌트가 각각 구현하는 형태였다. **인터페이스를 제거한다.** §2.1.2에서 두 컴포넌트를 하나의 래퍼로 통합하면서 **구현체가 1개가 됐다.** 구현체 하나짜리 인터페이스는 추상화 비용만 남는다.
+
+신규 `Source/LastFPS/Encounter/LastFPSTimedObjectiveComponent.h`
 
 ```cpp
 UENUM(BlueprintType)
-enum class ELastFPSEncounterObjectiveResult : uint8
-{
-    Succeeded,
-    Failed
-};
+enum class ELastFPSObjectiveResult : uint8 { Succeeded, Failed };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
-    FOnLastFPSEncounterObjectiveResolved,
-    UObject*, Objective,
-    ELastFPSEncounterObjectiveResult, Result);
+    FOnLastFPSObjectiveResolved,
+    UActorComponent*, Objective,
+    ELastFPSObjectiveResult, Result);
 
-UINTERFACE(MinimalAPI)
-class ULastFPSEncounterObjective : public UInterface { GENERATED_BODY() };
-
-class ILastFPSEncounterObjective
+UCLASS(ClassGroup=(LastFPS), meta=(BlueprintSpawnableComponent))
+class LASTFPS_API ULastFPSTimedObjectiveComponent : public UActorComponent
 {
-    GENERATED_BODY()
 public:
     /** 인카운터 시작 시 서버가 호출한다. 진행 초기화 후 판정을 시작한다. */
-    virtual void StartEncounterObjective() = 0;
+    void StartObjective();
 
-    /** 인카운터 종료(완료/실패/언로드) 시 호출한다. 판정을 중단하며 결과를 통지하지 않는다. */
-    virtual void StopEncounterObjective() = 0;
+    /** 인카운터 종료(완료/실패/언로드) 시 호출한다. 판정 중단 — 결과를 통지하지 않는다. */
+    void StopObjective();
 
     /** 성공으로 해결됐는가. 미해결이면 인카운터는 웨이브를 순환하며 완료를 보류한다. */
-    virtual bool IsObjectiveSucceeded() const = 0;
+    bool IsSucceeded() const;
 
-    /** 0~1 진행률 — HUD 및 인카운터 진행 이벤트가 공유하는 단일 계약. */
-    virtual float GetObjectiveProgress01() const = 0;
+    /** 0~1 진행률 — HUD·마커·인카운터 진행 이벤트가 공유하는 단일 값. */
+    float GetProgress01() const;
 
     /** 성공/실패 1회 통지. 런타임이 구독한다. */
-    virtual FOnLastFPSEncounterObjectiveResolved& GetOnObjectiveResolved() = 0;
+    FOnLastFPSObjectiveResolved OnObjectiveResolved;
 };
 ```
 
-`ULastFPSDefendObjectiveComponent`와 `ULastFPSCaptureZoneComponent`가 이 인터페이스를 구현한다. 기존 `StartDefense()`/`StopDefense()`는 인터페이스 구현으로 흡수하고 **`bAutoStart`는 제거**한다 — 목표의 수명 소유권을 인카운터로 일원화하기 위함이다.
+런타임은 `TArray<TObjectPtr<ULastFPSTimedObjectiveComponent>>`로 보관한다. **목표 종류를 묻는 코드는 여전히 없다** — 종류는 §2.1.2의 두 참조 유무로만 결정되고, 런타임은 위 다섯 멤버만 쓴다.
 
-> **설계 이유**: 인카운터 런타임이 `ULastFPSDefendObjectiveComponent`를 직접 알면 "호위/해킹/생존" 목표를 추가할 때마다 런타임을 수정해야 한다. 인터페이스로 두면 신규 목표는 구현 추가만으로 붙는다(OCP). 런타임 코드에 목표 유형을 열거하는 switch/cast가 생기지 않는지가 이 설계의 검증 기준이다.
+> **인터페이스 추출 시점**: "시간으로 진행되지 않는" 목표(즉사형 스위치, 보스 처치 등)가 등장해 **두 번째 컴포넌트 클래스**가 필요해질 때다. 그때 위 다섯 멤버를 그대로 인터페이스로 올리면 런타임 코드는 바뀌지 않는다. 그전까지는 비용만 남는다.
+
+기존 `StartDefense()`/`StopDefense()`는 여기로 흡수하고 **`bAutoStart`는 제거**한다 — 목표의 수명 소유권을 인카운터로 일원화하기 위함이다.
 
 #### 2.1.1 점령과 방어는 진행 계산이 동일하다 — 중복 추출
 
@@ -115,7 +112,115 @@ public:
 
 공통으로 중복된 것: `ElapsedSeconds`(ReplicatedUsing) · `UpdateInterval` · `GetProgress01()` · `BroadcastProgress()` · `OnRep_Elapsed()` · 타이머 핸들.
 
-**차이는 딱 두 가지다** — ① 타이머를 돌릴지 판단하는 조건, ② 실패 개념의 유무. 그 외는 전부 같으므로, 시간 누적·복제·진행률 브로드캐스트를 공통 기반(예: `ULastFPSTimedObjectiveComponentBase`)으로 올리고 파생 클래스는 "지금 시간이 흘러야 하는가"만 답하게 한다. CLAUDE.md의 *"기능 전용 클래스를 만들기 전에 공통으로 재사용할 수 있는 책임인지 먼저 확인한다"* 에 해당하는 지점이다.
+**차이는 딱 두 가지다** — ① 타이머를 돌릴지 판단하는 조건, ② 실패 개념의 유무. 그 외는 전부 같다.
+
+#### 2.1.2 중복 제거는 상속이 아니라 전략(Strategy)으로 한다
+
+> **개정 이력**: 초안은 "공통 베이스 컴포넌트(`ULastFPSTimedObjectiveComponentBase`)로 올린다"였다. **상속으로는 불가능하다** — 두 컴포넌트의 부모가 다르다.
+>
+> ```cpp
+> class ULastFPSCaptureZoneComponent      : public UBoxComponent    // 볼륨이어야 함(오버랩)
+> class ULastFPSDefendObjectiveComponent  : public UActorComponent
+> ```
+>
+> 공통 베이스를 `UActorComponent`로 두면 점령이 볼륨이 될 수 없고, `UBoxComponent`로 두면 방어가 불필요한 콜리전을 끌고 온다. 상속 계층이 갈리는 지점이라 **컴포지션이 유일한 해결책**이며, 이는 CLAUDE.md의 *"상속보다 컴포지션을 우선한다"* 와도 일치한다.
+
+해결책은 **컴포넌트 하나(래퍼)가 시간 누적·복제·진행률을 소유하고, 변하는 두 축을 선택적 의존으로 받는 것**이다.
+
+```cpp
+/**
+ * 시간 기반 목표의 진행·복제·판정을 소유하는 단일 컴포넌트.
+ * 목표 종류는 아래 두 참조의 유무로 결정되며, 유형을 나타내는 플래그나 enum을 두지 않는다.
+ */
+UCLASS()
+class ULastFPSTimedObjectiveComponent : public UActorComponent, public ILastFPSEncounterObjective
+{
+    /** 지정하면 이 볼륨 안에 로컬 플레이어가 있을 때만 진행한다. 비우면 항상 진행. */
+    UPROPERTY(EditInstanceOnly, Category="Objective")
+    TObjectPtr<UShapeComponent> RequiredVolume;
+
+    /** 지정하면 이 대상이 파괴될 때 실패한다. 비우면 실패 개념이 없다. */
+    UPROPERTY(EditInstanceOnly, Category="Objective")
+    TObjectPtr<AActor> FailureWatchTarget;
+
+    // ElapsedSeconds(ReplicatedUsing) · UpdateInterval · GetProgress01() · 타이머 — 전부 여기
+};
+```
+
+| 목표 | `RequiredVolume` | `FailureWatchTarget` |
+|---|---|---|
+| 점령 | 볼륨 지정 | 없음 |
+| 방어 | 없음 | 장치 지정 |
+| (조합) 볼륨 안에서 장치 지키기 | 볼륨 지정 | 장치 지정 |
+
+**유형 분기가 아니라 널 체크다.** "점령이냐 방어냐"를 묻는 코드가 없고, 두 참조의 유무만 본다. 세 번째 행은 코드를 한 줄도 안 쓰고 얻어지는 조합이다.
+
+이 구조에서 기존 두 클래스의 역할이 줄어든다.
+
+- `ULastFPSCaptureZoneComponent` → **불필요.** `ALastFPSCaptureZoneActor`가 평범한 `UBoxComponent`(콜리전) + `ULastFPSTimedObjectiveComponent`(볼륨 참조)를 갖는다. 상속 대신 소유가 되면서 §2.1.2 서두의 계층 충돌이 사라진다.
+- `ULastFPSDefendObjectiveComponent` → **불필요.** 장치 참조를 `FailureWatchTarget`에 넣으면 끝이다.
+
+레벨 디자이너 관점의 작업(박스 크기 조절)은 그대로다.
+
+#### 2.1.3 퀘스트 통지도 데이터로 넘긴다 (누락 보완)
+
+컴포넌트를 하나로 합치면서 빠진 것이 있다. 기존 두 컴포넌트는 성공 시 호출할 퀘스트 진입점을 **코드에 박아** 두고 있었다.
+
+```cpp
+// LastFPSCaptureZoneComponent.cpp:137
+Quest->NotifyObjectiveCaptured(ZoneTag);
+// LastFPSDefendObjectiveComponent.cpp:133
+Quest->NotifyObjectiveDefended(ZoneTag);
+```
+
+래퍼는 둘 중 하나를 고를 수 없다. 유형을 **데이터로 받아 그대로 전달**한다.
+
+```cpp
+/** 성공 시 퀘스트에 통지할 목표 유형과 구역 태그. 컴포넌트는 값을 해석하지 않고 넘기기만 한다. */
+UPROPERTY(EditInstanceOnly, Category="Objective")
+ELastFPSObjectiveType QuestObjectiveType = ELastFPSObjectiveType::DefendZone;
+
+UPROPERTY(EditInstanceOnly, Category="Objective")
+FGameplayTag ZoneTag;
+```
+
+`ULastFPSQuestSubsystem::NotifyTaggedObjective(Type, Tag)`가 이미 존재하므로(현재 `private`) 이를 열어 쓴다. `NotifyObjectiveCaptured` / `NotifyObjectiveDefended`는 그 위의 얇은 래퍼로 남는다.
+
+> **enum 필드지만 모드 판별이 아니다**: 컴포넌트는 이 값으로 **분기하지 않는다.** 받아서 그대로 전달할 뿐이라 `if (Type == CaptureZone)` 같은 코드가 생기지 않는다. 값을 해석하는 곳은 퀘스트 서브시스템 하나뿐이고, 거기서는 이미 `TMap<Type, Tracker>` 로 처리된다.
+
+> **참고 — 두 유형은 판정이 동일하다**: `CaptureZone`과 `DefendZone`은 퀘스트 쪽에서 같은 `FTagEventTracker`를 쓴다. 유형이 갈려 있는 이유는 이벤트 매칭 시 네임스페이스 역할뿐이다. 태그 체계를 `Objective.Zone.Capture.*` / `Objective.Zone.Defense.*` 로 분리하면 유형 없이 태그만으로도 매칭이 가능하지만, 퀘스트 데이터 구조 변경은 이 계획의 범위 밖이라 현행 유형을 유지한다.
+
+#### 2.1.4 전략은 지금 넣지 않는다 — 넣을 시점만 정해둔다
+
+전략 객체(`ILastFPSTimedObjectiveRule`)로 뽑는 방식도 같은 문제를 푼다. 이 프로젝트는 이미 `ULastFPSQuestSubsystem`에서 그 패턴을 쓴다.
+
+```cpp
+TMap<ELastFPSObjectiveType, TUniquePtr<ILastFPSObjectiveTracker>> Trackers;
+```
+
+다만 **지금 변형이 2축뿐이라 전략은 과하다.** 전략을 쓰면 클래스와 파일이 늘고, 순수 C++이라 에디터에 노출되지 않아 정의 Data Asset이 규칙을 만들어 주입하는 조립 단계가 반드시 필요해진다. 널 체크 두 줄로 끝나는 일에 그 비용을 낼 이유가 없다.
+
+| | 래퍼 + 선택적 의존 | 전략 객체 |
+|---|---|---|
+| 클래스 수 | 1 | 컴포넌트 1 + 규칙 N |
+| 에디터 노출 | `UPROPERTY`로 바로 보임 | 안 보임 — 정의 에셋이 주입 |
+| 2축 변형 | 널 체크 2개 | 규칙 클래스 2개 |
+| 새 축 추가 (감소·이동 추종 등) | **필드가 늘고 결국 분기 발생** | 컴포넌트 불변 |
+
+**전환 시점**: 세 번째 축이 등장할 때다. 예를 들어 해킹(중단 시 진행 **감소**)이나 호위(대상이 **이동**해야 진행)는 "볼륨 체류 / 실패 감시"로 표현되지 않는다. 그때 `ShouldAdvance()` / `IsFailed()`를 가상 함수 이음매로 열고 규칙을 주입하면, **컴포넌트의 공개 계약을 바꾸지 않고** 전략으로 이행할 수 있다.
+
+**점령 확장 항목별 판정** — 어디까지 래퍼로 버티는가:
+
+| 확장 | 필요한 것 | 축이 느는가 |
+|---|---|---|
+| 점령 기본형 | `RequiredVolume` 지정, `QuestObjectiveType = CaptureZone` | **코드 0줄** |
+| 적 경합 (구역에 적 있으면 정지) | `bBlockedByEnemies` bool — 같은 볼륨의 오버랩에서 적을 세면 됨 | 아니오 (조건 강화) |
+| 점령 후 유지 (되돌리기 가능) | 진행 감소 필요 | **예 → 전략 전환** |
+| 다인 점령 가속 (협동) | `ShouldAdvance()`가 bool이 아니라 **속도 배율**을 반환해야 함 | **예 → 전략 전환** |
+
+앞 둘은 지금 구조로 흡수되고, 뒤 둘은 반환 타입 자체가 바뀌므로 전략 도입 시점이다. 협동 점령을 곧 붙일 계획이면 전략을 먼저 넣는 편이 낫다.
+
+> **경계 하나는 지킨다**: 진행 상태(`ElapsedSeconds`)는 복제가 필요하므로 항상 컴포넌트가 소유한다. 나중에 전략을 도입해도 상태는 넘기지 않는다 — 판단만 넘긴다.
 
 > 인터페이스는 이 비대칭을 이미 수용한다. 점령은 `OnObjectiveResolved`로 `Succeeded`만 내보내고 `Failed`를 쓰지 않는다. 런타임은 실패를 받으면 처리할 뿐 "점령에는 실패가 없다"를 알 필요가 없다.
 
@@ -611,13 +716,104 @@ struct FLastFPSDestinationData : public FTableRowBase
 
 ---
 
+### 2.13 확장성 평가 — 콘텐츠가 늘면 어디가 먼저 깨지는가
+
+#### 2.13.1 데이터만으로 확장되는 것
+
+| 신규 콘텐츠 | 필요한 작업 |
+|---|---|
+| 새 방 (섬멸형) | `DT_RoomEncounter` 행 + 레벨 배치 |
+| 새 웨이브 구성·적 조합 | 행 편집 |
+| 새 방어/점령 방 | 행 + 정의 에셋 + 레벨 배치 |
+| 새 목적지(맵) | `DestinationId` + 행 + `DA_ContentSet_*` |
+| 순환 난이도 곡선 | 정의 에셋의 Curve (`LoopCount` 훅) |
+
+**런타임 코드는 손대지 않는다.** 이 범위가 콘텐츠 작업의 대부분이다.
+
+#### 2.13.2 코드가 필요하지만 기존 코드를 안 건드리는 것
+
+| 신규 목표 | 필요한 작업 | 기존 코드 영향 |
+|---|---|---|
+| 호위 (대상 이동해야 진행) | 규칙 전략 + 정의 서브클래스 | `ShouldAdvance()` 가상화 1회 (§2.1.4) |
+| 해킹 (중단 시 감소) | 위와 동일 | 위와 동일 |
+| 보스 처치 (시간 무관) | 새 컴포넌트 클래스 | 인터페이스 추출 1회 (§2.1) |
+
+세 경우 모두 **일회성 이음매 개방** 후에는 추가 콘텐츠가 다시 §2.13.1로 내려온다.
+
+#### 2.13.3 지금 구조로 표현되지 않는 것 ⚠️
+
+| 요구 | 왜 안 되는가 |
+|---|---|
+| **목표 순차 진행** ("A 점령 후 B 방어") | `Objectives[]`가 인카운터 시작 시 **전부 동시에** `StartObjective()`를 받는다. 단계 개념이 없다 |
+| **웨이브 연동 목표** ("3웨이브에서 장치 등장") | 목표 활성 시점이 인카운터 시작으로 고정 |
+| **배리어 없는 인카운터** (야외·광역 이벤트) | `InitializeRuntimeEncounters()`가 배리어 볼륨이 없으면 에러 후 건너뛴다 — 방을 가두는 것이 전제 |
+| **인원수 스케일링** (협동) | `LoopCount` 훅은 있으나 인원 기반 스케일이 없다 |
+
+앞 둘은 **가장 먼저 들어올 요구**로 보인다. 뒤 둘은 기존 `RoomEncounter` 설계에서 온 제약이며 이 계획이 만든 것은 아니다.
+
+#### 2.13.4 지금 0비용으로 대비할 것 — 배열 원소를 구조체로 감싼다
+
+§2.10.2의 `Objectives[]`를 소프트 참조 배열이 아니라 **엔트리 구조체 배열**로 둔다.
+
+```cpp
+USTRUCT(BlueprintType)
+struct FLastFPSEncounterObjectiveEntry
+{
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter")
+    TSoftObjectPtr<ULastFPSEncounterObjectiveDefinition> Definition;
+
+    // 향후 확장 자리 — 지금은 비워 둔다.
+    // int32 StartAfterWave = 0;      // 웨이브 연동 활성
+    // FName PrerequisiteObjective;   // 순차 진행
+};
+
+UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter")
+TArray<FLastFPSEncounterObjectiveEntry> Objectives;
+```
+
+**이유**: `TArray<TSoftObjectPtr<>>` → `TArray<FStruct>` 변경은 기존 행의 데이터 마이그레이션을 요구한다. 처음부터 구조체로 두면 나중에 필드를 **추가만** 하면 되고 기존 행은 그대로 산다. `DestinationId`를 지금 넣는 것과 같은 논리다 — 나중에 아픈 것을 지금 0비용으로.
+
+**컴포넌트 쪽은 이미 준비되어 있다.** `StartObjective()` / `StopObjective()`가 공개 함수라 **런타임이 원하는 시점에 부를 수 있다.** 순차·웨이브 연동에 필요한 것은 "언제 부를지"를 런타임이 데이터로 아는 것뿐이고, 그 데이터가 들어갈 자리가 위 구조체다.
+
+#### 2.13.5 유지보수 리스크
+
+| 리스크 | 완화 |
+|---|---|
+| `ObjectiveTag` 오타가 런타임 에러로만 잡힘 | 초기화 시 짝 못 찾은 정의 이름을 에러 로그 (Phase 1). 에디터 검증은 후속 |
+| 레벨 태그 계약이 4종으로 증가 (`Trigger`/`Barrier`/`Spawn`/`Objective` + `EncounterId` + `ObjectiveTag`) | 배치 실수 여지가 콘텐츠 수에 비례해 늘어난다. **에디터 검증 툴이 언젠가 필요해진다** |
+| 정의 에셋 입도 — 방별 미세조정 시 에셋 폭발 | 프리셋 재사용 원칙 + 편차 허용 범위 사전 합의 (§4 열린 질문) |
+| 목표·웨이브·퀘스트가 서로 다른 테이블에 흩어짐 | 각자 소유가 명확하므로 의도된 분리다. 다만 한 콘텐츠를 만들 때 3곳을 봐야 한다 |
+
+---
+
 ## 3. 작업 목록 (Tasks)
+
+### 3.0 최소 코어 — 이것만으로 디펜스 한 방이 돌아간다
+
+아래 5개가 요구사항에서 직접 유도되는 필수 항목이다. 나머지 Phase는 **완성도를 올리는 것이지 동작을 만드는 것이 아니다.**
+
+| # | 항목 | 없으면 |
+|---|---|---|
+| 1 | `ULastFPSTimedObjectiveComponent` | 목표 진행·판정 자체가 없음 |
+| 2 | `RoomEncounterRuntime` 완료 조건 + 웨이브 순환 + `FailEncounter()` | 방어가 인카운터와 무관하게 돎 |
+| 3 | `ALastFPSDefendableDeviceActor` GAS 전환 | **적이 장치를 때릴 수 없음** — 디펜스가 성립 안 함 |
+| 4 | `ULastFPSCombatTargetRegistry` | 적이 장치를 타깃으로 잡지 못함 |
+| 5 | `GameModeBase::HandleMissionFailed()` | 실패해도 아무 일도 안 일어남 |
+
+**나머지가 늦어도 되는 이유:**
+
+- 목표 정의 Data Asset(§2.10) — 없으면 밸런스가 배치 인스턴스에 남을 뿐 동작은 한다. 다만 점령을 붙이는 시점에는 필요하다.
+- `DestinationId`(§2.12) — 현재 목적지가 하나라 필터링이 아무것도 거르지 않는다. **필드만 먼저 넣는다** (나중에 넣으면 데이터 마이그레이션이 필요하므로 추가 비용이 거의 0인 지금 넣는다).
+- HUD 패널(§2.7) — 게이지가 없어도 승패는 난다.
+- 화면 마커(§2.8) — 마커 등록소·앵커 enum·웨이포인트 구조 개정이 전부 여기 딸린 비용이다. **디펜스 플레이 자체에는 불필요하며, 기존 마커 시스템을 건드리는 유일한 항목이라 위험도도 가장 높다.** 별도로 떼어 마지막에 한다.
+
+> **점검 기준**: Phase를 진행하다 "이게 왜 필요하지?"가 들면 위 표에 없는 항목이다. 그렇다면 미뤄도 된다.
 
 ### Phase 0 — 계약 정의 (동작 변화 없음, 빌드만 통과)
 - [ ] `ILastFPSEncounterObjective` 인터페이스 + 결과 enum + 델리게이트 정의
 - [ ] `ULastFPSRoomEncounterProfile::ObjectiveMarkerTag` 추가
 - [ ] `ULastFPSEncounterObjectiveDefinition` 추상 Data Asset (`ObjectiveTag`, `MarkerLabel`, `CreateRuntimeObjective`, `CollectRequiredPaths`)
-- [ ] `FLastFPSRoomEncounterData::Objectives` 추가 (다형 정의 소프트 참조 배열, 빈 배열 = 섬멸형 → 기존 행 무영향)
+- [ ] `FLastFPSEncounterObjectiveEntry` 구조체 + `FLastFPSRoomEncounterData::Objectives` 추가 (§2.13.4 — 소프트 참조 배열이 아니라 구조체 배열로 둘 것. 빈 배열 = 섬멸형 → 기존 행 무영향)
 - [ ] `FLastFPSRoomEncounterData::DestinationId` + `ULastFPSRoomEncounterProfile::DestinationId` 추가 (§2.12)
 - [ ] `CollectRequiredPaths()`가 목표 정의 경로도 수집하되 `DestinationId`로 행 필터링
 - [ ] `InitializeRuntimeEncounters()`도 `DestinationId` 불일치 행은 건너뜀
@@ -625,8 +821,11 @@ struct FLastFPSDestinationData : public FTableRowBase
 - [ ] `ULastFPSRoomEncounterSubsystem`에 `OnEncounterFailed` / `OnEncounterObjectiveProgress` 이벤트 추가
 
 ### Phase 1 — 수명 연결
-- [ ] `ULastFPSDefendObjectiveComponent`가 인터페이스 구현, `bAutoStart` 제거
-- [ ] `ULastFPSCaptureZoneComponent`가 인터페이스 구현 (점령 배선도 같은 배관에 태움)
+- [ ] `ULastFPSTimedObjectiveComponent` 신설 — 시간 누적·복제·진행률·타이머 + `RequiredVolume` / `FailureWatchTarget` (§2.1.2)
+- [ ] `ULastFPSCaptureZoneComponent` / `ULastFPSDefendObjectiveComponent` 제거, 로직 이관
+- [ ] `ALastFPSCaptureZoneActor`를 `UBoxComponent` + 목표 컴포넌트 구성으로 변경 (상속 → 소유)
+- [ ] `bAutoStart` 제거 — 수명은 인카운터가 소유
+- [ ] **검증**: 런타임·컴포넌트 어디에도 "점령/방어"를 묻는 분기가 없는지 확인 (널 체크만 존재)
 - [ ] 서브시스템이 목표 마커 액터 수집 → `InitializeEncounter` 시그니처 확장
 - [ ] 행의 `Objectives` 정의별로 `ObjectiveTag`가 일치하는 배치물을 찾아 `CreateRuntimeObjective()` 호출
 - [ ] 짝을 못 찾은 정의는 어느 목표인지 이름을 찍어 에러 로그 (배치 누락의 조용한 실패 방지)

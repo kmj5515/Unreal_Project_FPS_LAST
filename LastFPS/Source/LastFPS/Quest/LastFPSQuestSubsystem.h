@@ -142,6 +142,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	void NotifyObjectiveDefended(FGameplayTag ZoneTag);
 
+	/**
+	 * 태그형 목표 완료 통지 — 유형을 데이터로 받는 공용 진입점.
+	 * 목표 컴포넌트가 정의 에셋에서 받은 유형을 해석하지 않고 그대로 넘기는 데 쓴다.
+	 * 유형별 처리는 트래커가 소유하므로 여기서 유형을 분기하지 않는다.
+	 */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
+	void NotifyTaggedObjective(ELastFPSObjectiveType Type, FGameplayTag Tag);
+
 	/** 대화 통지 — NPC 상호작용 시작 시 호출. TalkToNPC 목표를 누적. */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	void NotifyTalkedToNPC(FName NPCRowName);
@@ -305,9 +313,6 @@ private:
 
 	/** 한 퀘스트의 pull형 진행을 절대상태에서 재계산. 완료 도달 시 Completed 로 단조 승격. 변경 시 true. */
 	bool RecomputeProgress(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def);
-
-	/** 태그형 완료 통지 공통 처리 — 이벤트 적용 + 전이 + 브로드캐스트. 점령/방어 진입점이 공유. */
-	void NotifyTaggedObjective(ELastFPSObjectiveType Type, FGameplayTag Tag);
 
 	/** 외부 이벤트를 진행중 퀘스트들에 적용(push형 목표 누적). 변경 시 true(브로드캐스트/연쇄는 호출부). */
 	bool ApplyObjectiveEventToActive(const FLastFPSObjectiveEvent& Event);
