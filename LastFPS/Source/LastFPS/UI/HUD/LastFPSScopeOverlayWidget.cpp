@@ -1,9 +1,16 @@
 #include "UI/HUD/LastFPSScopeOverlayWidget.h"
 
 #include "Components/Image.h"
+#include "Components/TextBlock.h"
+#include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSScopeOverlay, Log, All);
+
+namespace
+{
+    constexpr float CentimetersPerMeter = 100.f;
+}
 
 void ULastFPSScopeOverlayWidget::NativeConstruct()
 {
@@ -28,6 +35,7 @@ void ULastFPSScopeOverlayWidget::NativeConstruct()
     }
 
     AppliedAspectRatio = 0.f;
+    DisplayedRangeMeters = -1;
 }
 
 void ULastFPSScopeOverlayWidget::NativeDestruct()
@@ -43,6 +51,37 @@ void ULastFPSScopeOverlayWidget::NativeTick(const FGeometry& MyGeometry, float I
     Super::NativeTick(MyGeometry, InDeltaTime);
 
     ApplyAspectRatio(MyGeometry.GetLocalSize());
+    UpdateRange();
+}
+
+void ULastFPSScopeOverlayWidget::UpdateRange()
+{
+    if (!RangeText)
+    {
+        return;
+    }
+
+    const APlayerController* PC = GetOwningPlayer();
+    if (!PC || !PC->PlayerCameraManager)
+    {
+        return;
+    }
+
+    const FVector Start = PC->PlayerCameraManager->GetCameraLocation();
+    const FVector End = Start + PC->PlayerCameraManager->GetCameraRotation().Vector() * (MaxRangeMeters * CentimetersPerMeter);
+
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(ScopeRangefinder), false, PC->GetPawn());
+    FHitResult Hit;
+
+    const bool bHit = GetWorld() && GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params);
+    const int32 Meters = bHit ? FMath::RoundToInt(Hit.Distance / CentimetersPerMeter) : -1;
+    if (Meters == DisplayedRangeMeters)
+    {
+        return;
+    }
+
+    DisplayedRangeMeters = Meters;
+    RangeText->SetText(FText::FromString(bHit ? FString::Printf(TEXT("%dm"), Meters) : TEXT("??m")));
 }
 
 void ULastFPSScopeOverlayWidget::ApplyAspectRatio(const FVector2D& LocalSize)
