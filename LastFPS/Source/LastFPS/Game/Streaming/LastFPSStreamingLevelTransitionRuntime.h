@@ -6,11 +6,17 @@
 #include "TimerManager.h"
 #include "LastFPSStreamingLevelTransitionRuntime.generated.h"
 
+class ALastFPSCharacterBase;
 class ALastFPSEnemyCharacter;
+class ACharacter;
 class APawn;
 class ATriggerBox;
+class ULastFPSArrivalContainmentPresentationComponent;
+class USceneComponent;
 class ULevelStreamingDynamic;
 class ULastFPSEnemyDefinition;
+class UMaterialInterface;
+class UStaticMesh;
 struct FStreamableHandle;
 
 /**
@@ -52,16 +58,37 @@ private:
 	UFUNCTION()
 	void OnRep_TransitionRequested();
 
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_NotifyTransitionArrived(
+		FVector_NetQuantize ArrivalLocation,
+		FRotator ArrivalRotation);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_NotifyDelayedEnemyEncounterProgress(
+		int32 DefeatedEnemyCount,
+		int32 TotalEnemyCount,
+		bool bEncounterCleared);
+
 	void BeginDestinationPreload();
+	void BeginArrivalContainmentPreload();
+	void HandleArrivalContainmentLoaded();
+	void CancelArrivalContainmentPreload();
+	void HideArrivalContainment();
 	void BeginDelayedEnemyContentPreload();
 	void HandleDelayedEnemyContentLoaded();
 	void CancelDelayedEnemyContentPreload();
 	void RequestDestinationVisibility();
 	bool ResolveDestinationTransform(FTransform& OutTransform) const;
 	bool ResolveDelayedEnemySpawnTransform(FTransform& OutTransform) const;
+	void UpdateEncounterObjectiveMarker();
+	void UnregisterEncounterObjectiveMarker();
 	void CompletePendingPawnTransition();
+	bool BeginArrivalHold(APawn& Pawn);
+	void HandleArrivalHoldFinished();
+	void ReleaseArrivalHold();
 	void ScheduleDelayedEnemySpawn();
 	void SpawnDelayedEnemy();
+	void HandleDelayedEnemyDeath(ALastFPSCharacterBase* DeadCharacter);
 	FString MakeStreamingInstanceName() const;
 
 	UPROPERTY(ReplicatedUsing=OnRep_Route)
@@ -79,11 +106,31 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<ULastFPSEnemyDefinition> LoadedDelayedEnemyDefinition;
 
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<USceneComponent> EncounterObjectiveMarker;
+
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<ULastFPSArrivalContainmentPresentationComponent>
+		ArrivalContainmentPresentation;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMesh> LoadedArrivalContainmentMesh;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> LoadedArrivalContainmentMaterial;
+
 	TWeakObjectPtr<APawn> PendingPawn;
+	TWeakObjectPtr<ACharacter> HeldCharacter;
 	TWeakObjectPtr<ALastFPSEnemyCharacter> SpawnedDelayedEnemy;
+	TSharedPtr<FStreamableHandle> ArrivalContainmentLoadHandle;
 	TSharedPtr<FStreamableHandle> DelayedEnemyContentLoadHandle;
 	FTimerHandle DelayedEnemySpawnTimerHandle;
+	FTimerHandle ArrivalHoldTimerHandle;
+	FTimerHandle ArrivalContainmentTimerHandle;
+	uint8 PreviousMovementMode = 0;
+	uint8 PreviousCustomMovementMode = 0;
 	bool bDestinationLoaded = false;
 	bool bDelayedEnemySpawnScheduled = false;
 	bool bDelayedEnemySpawnDue = false;
+	bool bEncounterMarkerRegistered = false;
 };

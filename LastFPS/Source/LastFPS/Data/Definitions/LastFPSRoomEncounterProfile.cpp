@@ -1,5 +1,6 @@
 #include "Data/Definitions/LastFPSRoomEncounterProfile.h"
 
+#include "Data/Definitions/LastFPSEncounterObjectiveDefinition.h"
 #include "Data/Tables/LastFPSRoomEncounterData.h"
 #include "Engine/DataTable.h"
 
@@ -48,6 +49,12 @@ void ULastFPSRoomEncounterProfile::CollectRequiredPaths(
 			continue;
 		}
 
+		// 다른 목적지의 방까지 프리로드하면 입장 시간이 무의미하게 늘어난다.
+		if (!OwnsEncounterRow(EncounterRow->DestinationId))
+		{
+			continue;
+		}
+
 		const FSoftObjectPath SpawnVFXPath =
 			EncounterRow->SpawnVFX.NiagaraSystem.ToSoftObjectPath();
 		if (SpawnVFXPath.IsValid())
@@ -68,7 +75,31 @@ void ULastFPSRoomEncounterProfile::CollectRequiredPaths(
 				}
 			}
 		}
+
+		// 목표 정의와 그 하위 에셋도 첫 전투 전에 준비되어야 한다.
+		for (const FLastFPSEncounterObjectiveEntry& Entry : EncounterRow->Objectives)
+		{
+			const FSoftObjectPath ObjectivePath = Entry.Definition.ToSoftObjectPath();
+			if (!ObjectivePath.IsValid())
+			{
+				continue;
+			}
+
+			OutPaths.AddUnique(ObjectivePath);
+			if (const ULastFPSEncounterObjectiveDefinition* Objective = Entry.Definition.Get())
+			{
+				Objective->CollectRequiredPaths(OutPaths);
+			}
+		}
 	}
+}
+
+bool ULastFPSRoomEncounterProfile::OwnsEncounterRow(const FName RowDestinationId) const
+{
+	// 어느 한쪽이라도 목적지를 지정하지 않았다면 가르지 않는다(기존 데이터 호환).
+	return DestinationId.IsNone()
+		|| RowDestinationId.IsNone()
+		|| RowDestinationId == DestinationId;
 }
 
 bool ULastFPSRoomEncounterProfile::IsConfigurationValid(

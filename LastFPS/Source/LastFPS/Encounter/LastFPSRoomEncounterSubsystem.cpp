@@ -178,8 +178,7 @@ void ULastFPSRoomEncounterSubsystem::InitializeRuntimeEncounters(
 	}
 
 	TArray<AActor*> TriggerActors;
-	UGameplayStatics::GetAllActorsOfClass(
-		&InWorld,
+	UGameplayStatics::GetAllActorsOfClass(&InWorld,
 		ATriggerBox::StaticClass(),
 		TriggerActors);
 
@@ -188,6 +187,9 @@ void ULastFPSRoomEncounterSubsystem::InitializeRuntimeEncounters(
 		&InWorld,
 		ATargetPoint::StaticClass(),
 		SpawnActors);
+
+	// 목표 배치물은 여기서 모으지 않는다 — 스트리밍 서브레벨에 있으면 아직 존재하지 않으므로
+	// 런타임이 전투 시작 시점에 직접 찾는다.
 
 	const ULastFPSStreamingLevelTransitionSettings* TransitionSettings =
 		GetDefault<ULastFPSStreamingLevelTransitionSettings>();
@@ -240,6 +242,12 @@ void ULastFPSRoomEncounterSubsystem::InitializeRuntimeEncounters(
 				TEXT("[%s] Encounter Data Table Row를 찾을 수 없습니다: %s"),
 				*EncounterId.ToString(),
 				*GetNameSafe(&EncounterTable));
+			continue;
+		}
+
+		// 다른 목적지의 방은 이 맵에서 생성하지 않는다.
+		if (!Profile.OwnsEncounterRow(EncounterData->DestinationId))
+		{
 			continue;
 		}
 
@@ -431,6 +439,23 @@ void ULastFPSRoomEncounterSubsystem::NotifyEncounterProgress(
 		EncounterId,
 		FMath::Clamp(DefeatedEnemyCount, 0, TotalEnemyCount),
 		TotalEnemyCount);
+}
+
+void ULastFPSRoomEncounterSubsystem::NotifyEncounterFailed(
+	const FName EncounterId)
+{
+	if (EncounterId.IsNone())
+	{
+		return;
+	}
+
+	UE_LOG(
+		LogLastFPSRoomEncounterSubsystem,
+		Log,
+		TEXT("[%s] 인카운터가 목표 실패로 종료됐습니다."),
+		*EncounterId.ToString());
+
+	OnEncounterFailed.Broadcast(EncounterId);
 }
 
 const UDataTable* ULastFPSRoomEncounterSubsystem::GetEncounterTable() const

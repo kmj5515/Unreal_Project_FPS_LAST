@@ -44,7 +44,7 @@ class LASTFPS_API ULastFPSLoadingProcessSubsystem : public UGameInstanceSubsyste
 public:
     virtual void Deinitialize() override;
 
-    void BeginTravelLoading(ELastFPSTravelDestination Destination);
+    void BeginTravelLoading(ELastFPSTravelReadiness Readiness);
 
     /**
      * 직접 PIE 실행처럼 맵 전환 요청 없이 외부 로딩 게이트가 먼저 활성화된 경우
@@ -91,7 +91,7 @@ private:
         bool bRequired = true;
     };
 
-    void RegisterBuiltInProcesses(ELastFPSTravelDestination Destination);
+    void RegisterBuiltInProcesses(ELastFPSTravelReadiness Readiness);
     void BroadcastProgress(FGameplayTag ChangedProcessTag);
     void TryCompleteLoading();
     void CompleteLoading();
@@ -99,8 +99,6 @@ private:
     void ResetSessionState();
     bool AreRequiredProcessesComplete() const;
     float CalculateOverallProgress() const;
-    static bool DoesDestinationRequirePlayerPawn(ELastFPSTravelDestination Destination);
-
     UPROPERTY(Config, EditAnywhere, Category="LastFPS|Loading", meta=(ClampMin="0.0", ForceUnits="s"))
     float MinimumLoadingScreenDisplaySeconds = 1.0f;
 
@@ -112,7 +110,7 @@ private:
     FLastFPSLoadingProcessHandle ControllerProcessHandle;
     FLastFPSLoadingProcessHandle PawnProcessHandle;
 
-    ELastFPSTravelDestination ActiveDestination = ELastFPSTravelDestination::MainMenu;
+    ELastFPSTravelReadiness ActiveReadiness = ELastFPSTravelReadiness::LevelAndController;
     FTimerHandle CompletionTimerHandle;
     double LoadingStartSeconds = 0.0;
     float DisplayedProgress = 0.0f;

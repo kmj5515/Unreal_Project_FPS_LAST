@@ -1,5 +1,6 @@
 #include "Character/AI/BTService_UpdateCombatTarget.h"
 
+#include "Character/AI/LastFPSCombatTargetRegistry.h"
 #include "Character/AI/LastFPSEnemyBlackboardKeys.h"
 #include "Character/LastFPSAIProfile.h"
 #include "Character/LastFPSCharacterBase.h"
@@ -7,6 +8,7 @@
 
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Engine/World.h"
 
 namespace
 {
@@ -41,22 +43,43 @@ void UBTService_UpdateCombatTarget::TickNode(UBehaviorTreeComponent& OwnerComp, 
 		BB->SetValueAsBool(LastFPSEnemyBBKeys::bTargetTooClose, false);
 	};
 
+	const ULastFPSAIProfile* Profile = Enemy->GetAIProfile();
+
 	AActor* TargetActor = Cast<AActor>(BB->GetValueAsObject(LastFPSEnemyBBKeys::TargetActor));
+
+	// 사망한 타깃은 없는 것으로 본다.
+	const ALastFPSCharacterBase* TargetChar = Cast<ALastFPSCharacterBase>(TargetActor);
+	if (TargetChar && !TargetChar->IsAlive())
+	{
+		TargetActor = nullptr;
+	}
+
+	// 퍼셉션으로 잡을 수 없는 등록 타깃(방어 대상 등)을 보조 후보로 쓴다.
+	// AI 는 "무엇을 지키는 장치인지" 알 필요 없이 등록소에만 질의한다.
+	// 프로파일이 없으면 탐색 거리를 알 수 없다. 등록소는 0 을 "무제한"으로 해석하므로
+	// 여기서 조회 자체를 건너뛰지 않으면 맵 전역의 장치를 타깃으로 잡게 된다.
+	if (!IsValid(TargetActor) && Profile && Profile->DetectionRange > 0.f)
+	{
+		const UWorld* World = Enemy->GetWorld();
+		
+		const ULastFPSCombatTargetRegistry* Registry = World 
+		? World->GetSubsystem<ULastFPSCombatTargetRegistry>()
+		: nullptr;
+		
+		if (Registry && Registry->HasTargets())
+		{
+			TargetActor = Registry->FindBestTarget(Enemy->GetActorLocation(),Profile->DetectionRange);
+		}
+	}
+
 	if (!IsValid(TargetActor))
 	{
 		ClearTarget();
 		return;
 	}
 
-	// 사망한 타깃은 즉시 해제.
-	const ALastFPSCharacterBase* TargetChar = Cast<ALastFPSCharacterBase>(TargetActor);
-	if (TargetChar && !TargetChar->IsAlive())
-	{
-		ClearTarget();
-		return;
-	}
+	BB->SetValueAsObject(LastFPSEnemyBBKeys::TargetActor, TargetActor);
 
-	const ULastFPSAIProfile* Profile = Enemy->GetAIProfile();
 	const float LoseRange = Profile
 		? ((Profile->LoseSightRange > Profile->DetectionRange) ? Profile->LoseSightRange : Profile->DetectionRange)
 		: 1600.f;

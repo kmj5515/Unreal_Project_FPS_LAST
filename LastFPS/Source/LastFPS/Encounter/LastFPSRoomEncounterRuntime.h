@@ -14,9 +14,11 @@ class ATriggerBox;
 class ULastFPSCharacterDefinition;
 class ULastFPSRoomBarrierPresentationComponent;
 class ULastFPSRoomSpawnPresentationComponent;
+class ULastFPSTimedObjectiveComponent;
 class UMaterialInterface;
 class USceneComponent;
 class UStaticMesh;
+enum class ELastFPSObjectiveResult : uint8;
 struct FStreamableHandle;
 
 /** 이펙트 예고 후 실제 생성을 기다리는 적 한 마리의 불변 요청이다. */
@@ -77,6 +79,28 @@ private:
 	UFUNCTION()
 	void OnRep_EnemyDefinitionAssets();
 
+	/** 목표가 성공·실패로 확정됐을 때 — 완료 재평가 또는 인카운터 실패 전파. */
+	UFUNCTION()
+	void HandleObjectiveResolved(UActorComponent* Objective, ELastFPSObjectiveResult ObjectiveResult);
+
+	/**
+	 * 행의 목표 정의와 레벨 배치물을 ObjectiveTag 로 짝지어 런타임 목표를 만든다.
+	 * 짝을 찾지 못한 정의는 에러 로그를 남긴다(배치 누락이 조용히 섬멸형으로 흐르는 것을 막는다).
+	 *
+	 * 월드 초기화가 아니라 전투 시작 시점에 호출한다 — 목표 배치물이 스트리밍 서브레벨에 있으면
+	 * 초기화 시점에는 아직 존재하지 않기 때문이다. 플레이어가 트리거를 밟은 시점에는 방이 로드돼 있다.
+	 */
+	void CreateObjectives();
+
+	/** 모든 목표가 성공했는가. 목표가 없으면 참이다(기존 섬멸형과 동일). */
+	bool AreAllObjectivesSucceeded() const;
+
+	void StartObjectives();
+	void StopObjectives();
+
+	/** 게임플레이 실패 — 웨이브를 정지하고 배리어를 열며 실패를 전파한다. */
+	void FailEncounter();
+
 	void StartEncounter();
 	void BeginEnemyDefinitionPreload();
 	void HandleEnemyDefinitionPreloadCompleted();
@@ -96,11 +120,22 @@ private:
 		const FTransform& SpawnTransform,
 		int32 SpawnIndex);
 	void HandleEnemyDeath(ALastFPSCharacterBase* DeadCharacter);
-	void RemoveTrackedEnemy(ALastFPSCharacterBase& Enemy);
+
+	/**
+	 * 추적 목록에서 제거한다.
+	 * bCountAsDefeated 가 false 면 처치 수를 올리지 않는다 — 목표 성공·실패로 남은 적을
+	 * 강제 정리하는 경우가 처치로 집계되면 퀘스트 진행이 부풀기 때문이다.
+	 */
+	void RemoveTrackedEnemy(ALastFPSCharacterBase& Enemy, bool bCountAsDefeated = true);
 	void BroadcastEncounterProgress() const;
 	void EvaluateWaveCompletion();
 	void CompleteEncounter();
-	void FailEncounterOpen(const TCHAR* Reason);
+
+	/** 구성 오류로 진행이 불가능할 때 — 플레이어가 갇히지 않도록 출구만 열고 끝낸다. */
+	void AbortEncounterOnConfigurationError(const TCHAR* Reason);
+
+	/** 남은 적을 즉시 정리한다(목표 성공·실패로 전투를 끝낼 때). */
+	void ClearAliveEnemies();
 	void SetBarrierActive(bool bNewActive);
 	void ConfigureBarrierPresentation();
 	void BeginBarrierPresentationLoad();
@@ -129,12 +164,39 @@ private:
 	UPROPERTY(Replicated)
 	int32 CurrentWave = 0;
 
+	/**
+	 * 웨이브 목록을 몇 번 되감았는가. 목표가 미해결이면 웨이브가 순환하므로 이 값이 오른다.
+	 * HUD 표시용이자 추후 순환 난이도 스케일링의 입력이다.
+	 */
+	UPROPERTY(Replicated)
+	int32 WaveLoopCount = 0;
+
+	/** 이 방이 요구하는 목표들. 비어 있으면 섬멸형이다. 전투 시작 시 생성한다. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<ULastFPSTimedObjectiveComponent>> Objectives;
+
+	/** 행에서 받아 둔 목표 정의 목록. 실제 생성은 전투 시작까지 미룬다. */
+	TArray<FLastFPSEncounterObjectiveEntry> ObjectiveEntries;
+
+	/** 목표 배치물을 찾을 Actor Tag (프로파일의 레벨 계약). */
+	FName ObjectiveMarkerTag;
+
+	/** 목표를 이미 만들었는가 — 웨이브 순환으로 시작이 재진입해도 중복 생성하지 않는다. */
+	bool bObjectivesCreated = false;
+
 	/** 클라이언트 HUD도 같은 인카운터 진행 이벤트를 받도록 식별자와 카운트를 복제한다. */
 	UPROPERTY(ReplicatedUsing=OnRep_EncounterProgress)
 	FName EncounterId = NAME_None;
 
+	/**
+	 * 진행 표시의 분모. 웨이브가 순환하면 한 바퀴분을 더해 처치 수가 조기에 포화되지 않게 한다
+	 * (분모가 고정이면 1회차 전멸 시점에 100%가 되어 퀘스트가 먼저 완료된다).
+	 */
 	UPROPERTY(ReplicatedUsing=OnRep_EncounterProgress)
 	int32 TotalEnemyCount = 0;
+
+	/** 웨이브 한 바퀴분 적 수. 순환 시 분모를 늘리는 단위다. */
+	int32 BaseTotalEnemyCount = 0;
 
 	UPROPERTY(ReplicatedUsing=OnRep_EncounterProgress)
 	int32 DefeatedEnemyCount = 0;

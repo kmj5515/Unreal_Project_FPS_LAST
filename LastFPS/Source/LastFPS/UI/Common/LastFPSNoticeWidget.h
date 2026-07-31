@@ -16,11 +16,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
 	void SetupNotice(const FText& InTitle, const FText& InBody);
 
+	virtual void SetupDialog(
+		UCommonGameDialogDescriptor* Descriptor,
+		FCommonMessagingResultDelegate ResultCallback) override;
+
+	virtual void KillDialog() override;
+
 	UPROPERTY(BlueprintAssignable, Category="LastFPS|UI")
 	FOnLastFPSNoticeClosed OnNoticeClosed;
 
 protected:
-	virtual void NativeConstruct() override;
+	virtual void NativeOnInitialized() override;
 	virtual bool NativeOnHandleBackAction() override;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
@@ -30,4 +36,7 @@ protected:
 	void HandleOkClicked();
 
 	void CloseNotice();
+
+private:
+	ECommonMessagingResult CloseResult = ECommonMessagingResult::Confirmed;
 };

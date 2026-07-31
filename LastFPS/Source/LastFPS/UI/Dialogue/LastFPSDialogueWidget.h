@@ -21,8 +21,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
 	void SetupDialogue(const FText& InSpeaker, const TArray<FText>& InLines);
 
+	virtual void KillDialog() override;
+
 protected:
-	virtual void NativeConstruct() override;
+	virtual void NativeOnInitialized() override;
 	virtual bool NativeOnHandleBackAction() override;
 
 	/** 다음/닫기 버튼 */

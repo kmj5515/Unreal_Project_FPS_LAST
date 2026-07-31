@@ -38,6 +38,24 @@ private:
     void ClearEnemyHealthBars();
     void ClearBossHealthBar();
 
+    /**
+     * 보스 체력바 표시 슬롯을 점유한다. 허가를 받았을 때만 true.
+     * 점령·방어와 화면을 공유하므로 거부되면 보스 바를 띄우지 않는다.
+     */
+    bool RequestBossPresentation();
+    void ReleaseBossPresentation();
+
+    /**
+     * 체력바가 스스로 대상을 놓은 경우를 감지해 슬롯을 반납한다.
+     * 위젯은 체력 0 복제·대상 무효화 시 자체적으로 해제하는데 프레젠터는 그 사실을 모르므로,
+     * 이 확인이 없으면 슬롯이 레벨 내내 잠겨 점령·방어 표시가 영영 거부된다.
+     */
+    void ReleaseBossPresentationIfDetached();
+    class ULastFPSObjectiveHudSubsystem* GetHudSubsystem() const;
+
+    /** 슬롯 점유 여부 래치 — 중복 요청과 반납 누락을 막는다. */
+    bool bBossPresentationActive = false;
+
     UPROPERTY(Transient)
     TArray<TObjectPtr<ULastFPSEnemyHealthBarWidget>> EnemyHealthBarPool;
 

@@ -20,6 +20,11 @@ bool ULastFPSQuantityDialogWidget::NativeOnHandleBackAction()
 	return true;
 }
 
+void ULastFPSQuantityDialogWidget::KillDialog()
+{
+	CloseWithResult(0);
+}
+
 void ULastFPSQuantityDialogWidget::SetupQuantity(const FText& InTitle, const FText& InItemName, int32 InUnitPrice, int32 InMaxQuantity)
 {
 	UnitPrice       = FMath::Max(0, InUnitPrice);

@@ -157,6 +157,8 @@ void ULastFPSQuestSubsystem::Deinitialize()
 	// 등록한 델리게이트 리스트에서 정확히 해제한다 (Initialize 는 OnWorldInitializedActors 에 등록).
 	FWorldDelegates::OnWorldInitializedActors.Remove(OnWorldInitHandle);
 	UnbindEncounterEvents();
+	PendingRadioTransmissions.Reset();
+	EncounterMarkers.Reset();
 
 	if (bInventorySubscribed)
 	{
@@ -763,7 +765,11 @@ void ULastFPSQuestSubsystem::TriggerRadioTransmission(const FLastFPSRadioTransmi
 	if (OnRadioTransmission.IsBound())
 	{
 		OnRadioTransmission.Broadcast(RadioData);
+		return;
 	}
+
+	// 월드 초기화가 로컬 HUD 생성보다 먼저 끝나는 경우에도 입장 무전을 잃지 않는다.
+	PendingRadioTransmissions.Add(RadioData);
 }
 
 void ULastFPSQuestSubsystem::TriggerRadioTransmissions(const TArray<FLastFPSRadioTransmissionData>& RadioDataArray)
@@ -789,11 +795,30 @@ void ULastFPSQuestSubsystem::TriggerRadioByIds(const TArray<FName>& RadioIds)
 	}
 }
 
+void ULastFPSQuestSubsystem::FlushPendingRadioTransmissions()
+{
+	if (!OnRadioTransmission.IsBound() || PendingRadioTransmissions.IsEmpty())
+	{
+		return;
+	}
+
+	TArray<FLastFPSRadioTransmissionData> Pending = MoveTemp(PendingRadioTransmissions);
+	PendingRadioTransmissions.Reset();
+
+	for (const FLastFPSRadioTransmissionData& RadioData : Pending)
+	{
+		OnRadioTransmission.Broadcast(RadioData);
+	}
+}
+
 void ULastFPSQuestSubsystem::HandlePostWorldInitialization(const FActorsInitializedParams& Params)
 {
 	if (Params.World && Params.World->IsGameWorld())
 	{
+		// 이전 월드에서 소비되지 못한 무전은 새 전투 레벨에 이어서 재생하지 않는다.
+		PendingRadioTransmissions.Reset();
 		EncounterRequiredCounts.Reset();
+		EncounterMarkers.Reset();
 		BindEncounterEvents(*Params.World);
 		ScanObjectivePaths(*Params.World);
 		AcceptDungeonQuestForMap(*Params.World);
@@ -895,6 +920,47 @@ bool ULastFPSQuestSubsystem::GetTrackedLocation(FGameplayTag LocationTag, FVecto
 	return false;
 }
 
+void ULastFPSQuestSubsystem::RegisterEncounterMarker(
+	const FName EncounterId,
+	USceneComponent* Marker)
+{
+	if (EncounterId.IsNone() || !Marker)
+	{
+		return;
+	}
+
+	EncounterMarkers.Add(EncounterId, Marker);
+}
+
+void ULastFPSQuestSubsystem::UnregisterEncounterMarker(
+	const FName EncounterId,
+	USceneComponent* Marker)
+{
+	const TWeakObjectPtr<USceneComponent>* Found =
+		EncounterMarkers.Find(EncounterId);
+	if (Found && Found->Get() == Marker)
+	{
+		EncounterMarkers.Remove(EncounterId);
+	}
+}
+
+bool ULastFPSQuestSubsystem::GetTrackedEncounterLocation(
+	const FName EncounterId,
+	FVector& OutLocation) const
+{
+	if (const TWeakObjectPtr<USceneComponent>* Found =
+		EncounterMarkers.Find(EncounterId))
+	{
+		if (const USceneComponent* Marker = Found->Get())
+		{
+			OutLocation = Marker->GetComponentLocation();
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool ULastFPSQuestSubsystem::ResolveObjectiveLocation(
 	const FLastFPSQuestObjective& Objective,
 	FVector& OutLocation) const
@@ -972,7 +1038,11 @@ void ULastFPSQuestSubsystem::GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint
 				continue;
 			}
 
-			if (Obj.Type != ELastFPSObjectiveType::ReachLocation)
+			const bool bIsReachLocation =
+				Obj.Type == ELastFPSObjectiveType::ReachLocation;
+			const bool bIsClearEncounter =
+				Obj.Type == ELastFPSObjectiveType::ClearEncounter;
+			if (!bIsReachLocation && !bIsClearEncounter)
 			{
 				if (Def->bSequentialObjectives)
 				{
@@ -980,20 +1050,31 @@ void ULastFPSQuestSubsystem::GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint
 				}
 				continue;
 			}
-			// 이미 도달한 목표는 마커를 띄우지 않는다.
+			// 이미 완료된 목표는 마커를 띄우지 않는다.
 			if (Progress >= RequiredCount)
 			{
 				continue;
 			}
 
-			// 안내는 항상 지점 1개 — 경로가 있으면 현재 안내 지점, 없으면 도달 지점 자체.
 			FVector MarkerLocation = FVector::ZeroVector;
 			bool bIsDestination = true;
-			if (!GetCurrentRoutePoint(Obj.TargetTag, MarkerLocation, bIsDestination))
+			if (bIsClearEncounter)
+			{
+				if (!GetTrackedEncounterLocation(
+					Obj.TargetId,
+					MarkerLocation))
+				{
+					continue;
+				}
+			}
+			else if (!GetCurrentRoutePoint(
+				Obj.TargetTag,
+				MarkerLocation,
+				bIsDestination))
 			{
 				if (!ResolveObjectiveLocation(Obj, MarkerLocation))
 				{
-					continue; // 레벨에 마커도 경로도 없으면 건너뜀
+					continue;
 				}
 				bIsDestination = true;
 			}
@@ -1321,18 +1402,32 @@ void ULastFPSQuestSubsystem::AcceptDungeonQuestForMap(UWorld& World)
 	DungeonQuestAcceptedWorld = &World;
 
 	const FName TargetQuestId = Mapping->QuestId.IsNone() ? DefaultDungeonQuestId : Mapping->QuestId;
-	if (TargetQuestId.IsNone() || GetStatus(TargetQuestId) != ELastFPSQuestStatus::NotStarted)
+	if (TargetQuestId.IsNone())
 	{
 		return;
 	}
 
-	UE_LOG(
-		LogLastFPSQuest,
-		Log,
-		TEXT("[Quest] 던전 맵 진입 — 퀘스트 '%s' 자동 수락: %s"),
-		*TargetQuestId.ToString(),
-		*MapName);
-	AcceptQuest(TargetQuestId);
+	const ELastFPSQuestStatus Status = GetStatus(TargetQuestId);
+	if (Status == ELastFPSQuestStatus::NotStarted)
+	{
+		UE_LOG(
+			LogLastFPSQuest,
+			Log,
+			TEXT("[Quest] 던전 맵 진입 — 퀘스트 '%s' 자동 수락: %s"),
+			*TargetQuestId.ToString(),
+			*MapName);
+		AcceptQuest(TargetQuestId);
+		return;
+	}
+
+	// 개발용 시드나 재진입으로 이미 진행 중이어도 해당 전투 레벨의 시작 브리핑은 재생한다.
+	if (Status == ELastFPSQuestStatus::InProgress)
+	{
+		if (const FLastFPSQuestData* Definition = FindQuest(TargetQuestId))
+		{
+			TriggerRadioByIds(Definition->RadioOnStart);
+		}
+	}
 }
 
 void ULastFPSQuestSubsystem::NotifyObjectiveCompleted(

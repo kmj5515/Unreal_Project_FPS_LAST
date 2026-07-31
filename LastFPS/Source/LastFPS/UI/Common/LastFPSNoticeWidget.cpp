@@ -2,9 +2,9 @@
 
 #include "UI/Framework/LastFPSButtonBase.h"
 
-void ULastFPSNoticeWidget::NativeConstruct()
+void ULastFPSNoticeWidget::NativeOnInitialized()
 {
-	Super::NativeConstruct();
+	Super::NativeOnInitialized();
 
 	if (Button_Ok)
 	{
@@ -20,7 +20,37 @@ bool ULastFPSNoticeWidget::NativeOnHandleBackAction()
 
 void ULastFPSNoticeWidget::SetupNotice(const FText& InTitle, const FText& InBody)
 {
-	SetDialogText(InTitle, InBody);
+	UCommonGameDialogDescriptor* Descriptor =
+		UCommonGameDialogDescriptor::CreateConfirmationOk(InTitle, InBody);
+	SetupDialog(Descriptor, FCommonMessagingResultDelegate());
+}
+
+void ULastFPSNoticeWidget::SetupDialog(
+	UCommonGameDialogDescriptor* Descriptor,
+	FCommonMessagingResultDelegate ResultCallback)
+{
+	OnNoticeClosed.Clear();
+	CloseResult = ECommonMessagingResult::Confirmed;
+	if (Descriptor && Button_Ok && Descriptor->ButtonActions.IsValidIndex(0))
+	{
+		const FConfirmationDialogAction& CloseAction =
+			Descriptor->ButtonActions[0];
+		CloseResult = CloseAction.Result;
+		const FText& DisplayText = CloseAction.OptionalDisplayText;
+		if (!DisplayText.IsEmpty())
+		{
+			Button_Ok->SetButtonText(DisplayText);
+		}
+	}
+
+	Super::SetupDialog(Descriptor, MoveTemp(ResultCallback));
+}
+
+void ULastFPSNoticeWidget::KillDialog()
+{
+	CompleteDialog(ECommonMessagingResult::Killed);
+	OnNoticeClosed.Broadcast();
+	DeactivateWidget();
 }
 
 void ULastFPSNoticeWidget::HandleOkClicked()
@@ -30,6 +60,7 @@ void ULastFPSNoticeWidget::HandleOkClicked()
 
 void ULastFPSNoticeWidget::CloseNotice()
 {
+	CompleteDialog(CloseResult);
 	OnNoticeClosed.Broadcast();
 	DeactivateWidget();
 }

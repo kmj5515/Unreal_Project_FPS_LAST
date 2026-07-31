@@ -2,6 +2,7 @@
 
 #include "Game/Loading/LastFPSLoadingProcessSubsystem.h"
 #include "Game/LastFPSGameInstance.h"
+#include "Game/Travel/LastFPSLevelTravelSubsystem.h"
 #include "Data/Tables/LastFPSLoadingTipData.h"
 
 #include "Components/Image.h"
@@ -32,7 +33,7 @@ void ULastFPSLoadingScreenWidget::SetMapNameText(const FText& InText)
 void ULastFPSLoadingScreenWidget::NativeConstruct()
 {
     Super::NativeConstruct();
-    RefreshFromGameInstance();
+    RefreshFromTravelSubsystem();
     ApplyRandomTip();
 
     if (PB_Loading)
@@ -46,10 +47,14 @@ void ULastFPSLoadingScreenWidget::NativeConstruct()
             TEXT("WBP_LoadingScreen에 이름이 PB_Loading인 Progress Bar가 없어 진행 표시를 바인딩하지 못했습니다."));
     }
 
-    if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
+    if (UGameInstance* GameInstance = GetGameInstance())
     {
-        TravelPresentationChangedHandle = GI->OnTravelPresentationChanged.AddUObject(
-            this, &ULastFPSLoadingScreenWidget::HandleTravelPresentationChanged);
+        if (ULastFPSLevelTravelSubsystem* Travel =
+            GameInstance->GetSubsystem<ULastFPSLevelTravelSubsystem>())
+        {
+            TravelPresentationChangedHandle = Travel->OnTravelPresentationChanged.AddUObject(
+                this, &ULastFPSLoadingScreenWidget::HandleTravelPresentationChanged);
+        }
     }
 
     if (UGameInstance* GameInstance = GetGameInstance())
@@ -70,9 +75,13 @@ void ULastFPSLoadingScreenWidget::NativeConstruct()
 
 void ULastFPSLoadingScreenWidget::NativeDestruct()
 {
-    if (ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
+    if (UGameInstance* GameInstance = GetGameInstance())
     {
-        GI->OnTravelPresentationChanged.Remove(TravelPresentationChangedHandle);
+        if (ULastFPSLevelTravelSubsystem* Travel =
+            GameInstance->GetSubsystem<ULastFPSLevelTravelSubsystem>())
+        {
+            Travel->OnTravelPresentationChanged.Remove(TravelPresentationChangedHandle);
+        }
     }
 
     if (UGameInstance* GameInstance = GetGameInstance())
@@ -86,12 +95,19 @@ void ULastFPSLoadingScreenWidget::NativeDestruct()
     Super::NativeDestruct();
 }
 
-void ULastFPSLoadingScreenWidget::RefreshFromGameInstance()
+void ULastFPSLoadingScreenWidget::RefreshFromTravelSubsystem()
 {
-    if (const ULastFPSGameInstance* GI = GetGameInstance<ULastFPSGameInstance>())
+    if (const UGameInstance* GameInstance = GetGameInstance())
     {
-        const FText Status = GI->GetPendingTravelStatusText();
-        const FText MapName = GI->GetPendingTravelMapNameText();
+        const ULastFPSLevelTravelSubsystem* Travel =
+            GameInstance->GetSubsystem<ULastFPSLevelTravelSubsystem>();
+        if (!Travel)
+        {
+            return;
+        }
+
+        const FText Status = Travel->GetPendingTravelStatusText();
+        const FText MapName = Travel->GetPendingTravelMapNameText();
 
         if (!Status.IsEmpty())
         {

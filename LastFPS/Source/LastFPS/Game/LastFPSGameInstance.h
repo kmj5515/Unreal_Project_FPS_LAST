@@ -9,10 +9,6 @@ class ULastFPSCharacterRoster;
 class UDataTable;
 class UTexture2D;
 
-DECLARE_MULTICAST_DELEGATE_TwoParams(FOnLastFPSTravelPresentationChanged,
-	const FText& /*StatusText*/,
-	const FText& /*MapNameText*/);
-
 UCLASS(Config=Game)
 class LASTFPS_API ULastFPSGameInstance : public UGameInstance
 {
@@ -50,13 +46,13 @@ public:
     bool ResolveMapURL(ELastFPSTravelDestination Destination, FString& OutMapURL) const;
 
     UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
-    ELastFPSTravelDestination GetPendingTravelDestination() const { return PendingTravelDestination; }
+    ELastFPSTravelDestination GetPendingTravelDestination() const;
 
     UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
-    FText GetPendingTravelStatusText() const { return PendingTravelStatusText; }
+    FText GetPendingTravelStatusText() const;
 
     UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
-    FText GetPendingTravelMapNameText() const { return PendingTravelMapNameText; }
+    FText GetPendingTravelMapNameText() const;
 
     UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
     static FText GetDefaultStatusTextForDestination(ELastFPSTravelDestination Destination);
@@ -64,25 +60,7 @@ public:
     UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
     static FText GetDefaultMapNameTextForDestination(ELastFPSTravelDestination Destination);
 
-    FOnLastFPSTravelPresentationChanged OnTravelPresentationChanged;
-
 protected:
-    void ExecuteServerTravel(const FString& MapURL, ELastFPSTravelDestination DestinationForUI);
-    void SetPendingTravelPresentation(ELastFPSTravelDestination Destination, const FText& StatusText, const FText& MapNameText);
-    void ClearPendingTravelPresentation();
-
-    void HandlePostLoadMap(UWorld* LoadedWorld);
-    void HandleLoadingFinished(bool bSucceeded);
-
-    UPROPERTY(Config, EditAnywhere, Category="LastFPS|Travel")
-    FString MainMenuMap = TEXT("/Game/Maps/Test/MainMenuMap");
-
-    UPROPERTY(Config, EditAnywhere, Category="LastFPS|Travel")
-    FString CharacterSelectMap = TEXT("/Game/Maps/Test/CharacterSelectMap");
-
-    UPROPERTY(Config, EditAnywhere, Category="LastFPS|Travel")
-    FString HubMap = TEXT("/Game/Maps/IngameMap/HubMap_New");
-
     /** 캐릭터 로스터 에셋 경로 — DefaultGame.ini의 [/Script/LastFPS.LastFPSGameInstance] 에서 지정 */
     UPROPERTY(Config, EditAnywhere, Category="LastFPS|Character")
     TSoftObjectPtr<ULastFPSCharacterRoster> CharacterRosterAsset;
@@ -106,10 +84,4 @@ private:
     UPROPERTY()
     TMap<FString, int32> SelectedCharacterIndexByPlayerKey;
 
-    ELastFPSTravelDestination PendingTravelDestination = ELastFPSTravelDestination::MainMenu;
-    FText PendingTravelStatusText;
-    FText PendingTravelMapNameText;
-
-    FDelegateHandle PostLoadMapDelegateHandle;
-    FDelegateHandle LoadingFinishedDelegateHandle;
 };

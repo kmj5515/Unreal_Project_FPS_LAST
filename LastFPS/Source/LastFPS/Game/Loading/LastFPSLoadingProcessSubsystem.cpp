@@ -32,7 +32,7 @@ void ULastFPSLoadingProcessSubsystem::Deinitialize()
     Super::Deinitialize();
 }
 
-void ULastFPSLoadingProcessSubsystem::BeginTravelLoading(const ELastFPSTravelDestination Destination)
+void ULastFPSLoadingProcessSubsystem::BeginTravelLoading(const ELastFPSTravelReadiness Readiness)
 {
     if (bLoadingActive)
     {
@@ -48,15 +48,15 @@ void ULastFPSLoadingProcessSubsystem::BeginTravelLoading(const ELastFPSTravelDes
 
     ResetSessionState();
     bLoadingActive = true;
-    ActiveDestination = Destination;
+    ActiveReadiness = Readiness;
     LoadingStartSeconds = FPlatformTime::Seconds();
 
-    RegisterBuiltInProcesses(Destination);
+    RegisterBuiltInProcesses(Readiness);
 
     LoadingScreenTask = ULoadingProcessTask::CreateLoadingScreenProcessTask(
         GetGameInstance(),
         FString::Printf(TEXT("LastFPS loading processes: %s"),
-            *StaticEnum<ELastFPSTravelDestination>()->GetNameStringByValue(static_cast<int64>(Destination))));
+            *StaticEnum<ELastFPSTravelReadiness>()->GetNameStringByValue(static_cast<int64>(Readiness))));
 
     if (!LoadingScreenTask)
     {
@@ -239,7 +239,7 @@ bool ULastFPSLoadingProcessSubsystem::IsWaitingForLocalPlayerPawn() const
     return Entry && Entry->Progress < 1.0f;
 }
 
-void ULastFPSLoadingProcessSubsystem::RegisterBuiltInProcesses(const ELastFPSTravelDestination Destination)
+void ULastFPSLoadingProcessSubsystem::RegisterBuiltInProcesses(const ELastFPSTravelReadiness Readiness)
 {
     if (IsRunningDedicatedServer())
     {
@@ -247,7 +247,7 @@ void ULastFPSLoadingProcessSubsystem::RegisterBuiltInProcesses(const ELastFPSTra
         return;
     }
 
-    if (DoesDestinationRequirePlayerPawn(Destination))
+    if (Readiness == ELastFPSTravelReadiness::LevelControllerAndPawn)
     {
         LevelProcessHandle = RegisterLoadingProcess(LastFPSLoadingProcessTags::Level, 0.65f);
         ControllerProcessHandle = RegisterLoadingProcess(LastFPSLoadingProcessTags::LocalPlayerController, 0.15f);
@@ -364,10 +364,4 @@ float ULastFPSLoadingProcessSubsystem::CalculateOverallProgress() const
     return TotalWeight > KINDA_SMALL_NUMBER
         ? FMath::Clamp(WeightedProgress / TotalWeight, 0.0f, 1.0f)
         : 0.0f;
-}
-
-bool ULastFPSLoadingProcessSubsystem::DoesDestinationRequirePlayerPawn(
-    const ELastFPSTravelDestination Destination)
-{
-    return Destination == ELastFPSTravelDestination::Hub;
 }

@@ -19,6 +19,9 @@ class ULastFPSVitalsGaugePresenter;
 class ULastFPSReloadPresenter;
 class ULastFPSSkillCooldownPresenter;
 class ULastFPSAmmoPresenter;
+class ULastFPSObjectiveHudPresenter;
+class ULastFPSDefendObjectiveWidget;
+class ULastFPSCaptureObjectiveWidget;
 class UTextBlock;
 class ULastFPSGrapplingTargetingComponent;
 class ULastFPSDamageDirectionIndicatorWidget;
@@ -225,6 +228,17 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category="HUD|Boss Health", meta=(BindWidgetOptional))
     TObjectPtr<ULastFPSEnemyHealthBarWidget> WBP_BossHealthBar;
 
+    /**
+     * 방어 목표 표시 — 남은 시간.
+     * 점령·보스와 표시 슬롯을 공유해 셋 중 하나만 화면에 나온다.
+     */
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Objective", meta=(BindWidgetOptional))
+    TObjectPtr<ULastFPSDefendObjectiveWidget> WBP_DefendObjective;
+
+    /** 점령 목표 표시 — 차오르는 게이지. */
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Objective", meta=(BindWidgetOptional))
+    TObjectPtr<ULastFPSCaptureObjectiveWidget> WBP_CaptureObjective;
+
 private:
     bool InitializeHUD();
 
@@ -297,6 +311,10 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<ULastFPSAmmoPresenter> AmmoPresenter;
+
+    /** 점령·방어·보스 표시를 배타적으로 전환한다. */
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSObjectiveHudPresenter> ObjectiveHudPresenter;
 
     bool bCrosshairConfigurationWarningLogged = false;
 

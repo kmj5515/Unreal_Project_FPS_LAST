@@ -8,7 +8,79 @@
 
 class AActor;
 class ULastFPSEnemyDefinition;
+class UMaterialInterface;
+class UStaticMesh;
 class UWorld;
+
+/** 전환 도착 직후 플레이어를 둘러싸는 경고 원통 표현 설정이다. */
+USTRUCT(BlueprintType)
+struct LASTFPS_API FLastFPSArrivalContainmentPresentationSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Visual")
+	bool bEnabled = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Visual", meta=(EditCondition="bEnabled", EditConditionHides))
+	TSoftObjectPtr<UStaticMesh> Mesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Visual", meta=(EditCondition="bEnabled", EditConditionHides))
+	TSoftObjectPtr<UMaterialInterface> Material;
+
+	/** 플레이어 액터 원점에서 원통 바닥까지의 보정값이다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Layout", meta=(EditCondition="bEnabled", EditConditionHides, Units="cm"))
+	FVector Offset = FVector(0.f, 0.f, -90.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Layout", meta=(ClampMin="1.0", EditCondition="bEnabled", EditConditionHides, Units="cm"))
+	float Radius = 240.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Layout", meta=(ClampMin="1.0", EditCondition="bEnabled", EditConditionHides, Units="cm"))
+	float Height = 300.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Warning Bands", meta=(ClampMin="1", ClampMax="16", EditCondition="bEnabled", EditConditionHides))
+	int32 BandCount = 7;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Warning Bands", meta=(ClampMin="1.0", EditCondition="bEnabled", EditConditionHides, Units="cm"))
+	float BandHeight = 14.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Visual", meta=(EditCondition="bEnabled", EditConditionHides))
+	FLinearColor FieldColor = FLinearColor(1.f, 0.08f, 0.01f, 1.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Visual", meta=(ClampMin="0.0", ClampMax="1.0", EditCondition="bEnabled", EditConditionHides))
+	float FieldOpacity = 0.1f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Warning Bands", meta=(EditCondition="bEnabled", EditConditionHides))
+	FLinearColor PrimaryBandColor = FLinearColor(1.f, 0.55f, 0.01f, 1.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Warning Bands", meta=(EditCondition="bEnabled", EditConditionHides))
+	FLinearColor SecondaryBandColor = FLinearColor(1.f, 0.03f, 0.01f, 1.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Warning Bands", meta=(ClampMin="0.0", ClampMax="1.0", EditCondition="bEnabled", EditConditionHides))
+	float BandOpacity = 0.8f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Material", meta=(ClampMin="0.1", EditCondition="bEnabled", EditConditionHides))
+	float FresnelPower = 4.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Material", meta=(ClampMin="0.0", EditCondition="bEnabled", EditConditionHides))
+	float FresnelIntensity = 10.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Material", meta=(EditCondition="bEnabled", EditConditionHides))
+	FName ColorParameter = TEXT("BarrierColor");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Material", meta=(EditCondition="bEnabled", EditConditionHides))
+	FName OpacityParameter = TEXT("BarrierOpacity");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Material", meta=(EditCondition="bEnabled", EditConditionHides))
+	FName DissolveParameter = TEXT("DissolveProgress");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Material", meta=(EditCondition="bEnabled", EditConditionHides))
+	FName FresnelPowerParameter = TEXT("FresnelPower");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Material", meta=(EditCondition="bEnabled", EditConditionHides))
+	FName FresnelIntensityParameter = TEXT("FresnelIntensity");
+
+	bool IsValid(FString& OutFailureReason) const;
+};
 
 /** 동일한 Persistent World 안에서 미리 로드한 목적지 레벨로 이동하는 경로 설정이다. */
 USTRUCT(BlueprintType)
@@ -51,11 +123,27 @@ struct LASTFPS_API FLastFPSStreamingLevelTransitionRoute
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Destination")
 	FVector DestinationOffset = FVector::ZeroVector;
 
+	/** 도착이 확정됐을 때 완료 처리할 위치 목표 태그다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Arrival", meta=(Categories="Location"))
+	FGameplayTag ArrivalLocationTag;
+
+	/** 도착 직후 플레이어 이동을 잠그는 시간이다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Arrival", meta=(ClampMin="0.0", Units="s"))
+	float ArrivalHoldDuration = 0.f;
+
+	/** 이동 제한 중 표시할 경고 원통 표현이다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Arrival")
+	FLastFPSArrivalContainmentPresentationSettings ArrivalContainment;
+
 	/** 전환 완료 후 지연 생성할 적 정의다. 비어 있으면 적을 생성하지 않는다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Delayed Enemy Spawn")
 	TSoftObjectPtr<ULastFPSEnemyDefinition> DelayedEnemyDefinition;
 
-	/** 플레이어 전환이 끝난 시점부터 적을 생성할 때까지의 시간이다. */
+	/** 지연 생성 적이 대표하는 Encounter ID다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Delayed Enemy Spawn")
+	FName DelayedEnemyEncounterId = NAME_None;
+
+	/** 도착 이동 제한이 끝난 시점부터 적을 생성할 때까지의 시간이다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Delayed Enemy Spawn", meta=(ClampMin="0.0", Units="s"))
 	float DelayedEnemySpawnDelay = 10.f;
 

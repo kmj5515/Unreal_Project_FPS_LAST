@@ -5,6 +5,7 @@
 #include "LastFPSLobbyWidget.generated.h"
 
 class ULastFPSButtonBase;
+class ULastFPSTravelEntryButton;
 class UTextBlock;
 
 /**
@@ -19,11 +20,11 @@ class LASTFPS_API ULastFPSLobbyWidget : public ULastFPSActivatableWidget
 protected:
 	virtual void NativeConstruct() override;
 
-	// ── 플레이어 정보 ─────────────────────────────────────────────
+	// 플레이어 정보
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_PlayerName;
 
-	// ── 퀵 메뉴 ──────────────────────────────────────────────────
+	// 퀵 메뉴
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<ULastFPSButtonBase> Button_Inventory;
 
@@ -40,9 +41,13 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<ULastFPSButtonBase> Button_Module;
 
-	// ── 하단 ──────────────────────────────────────────────────────
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<ULastFPSButtonBase> Button_Settings;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<ULastFPSTravelEntryButton> Button_GotoDungeon;
+
+	// 하단 메뉴
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<ULastFPSButtonBase> Button_BackToMain;
@@ -55,6 +60,7 @@ private:
 	UFUNCTION() void HandleModuleClicked();
 	UFUNCTION() void HandleSettingsClicked();
 	UFUNCTION() void HandleBackToMainClicked();
+	UFUNCTION() void HandleGotoDungeonClicked();
 
 	/** 화면을 연다. 레지스트리에 없으면 "준비 중" 공지로 폴백. */
 	void OpenScreenOrNotice(const FGameplayTag& ScreenTag, const FText& FeatureName);

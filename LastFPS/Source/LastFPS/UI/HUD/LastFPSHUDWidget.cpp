@@ -9,6 +9,9 @@
 #include "UI/HUD/Presenters/LastFPSReloadPresenter.h"
 #include "UI/HUD/Presenters/LastFPSSkillCooldownPresenter.h"
 #include "UI/HUD/Presenters/LastFPSAmmoPresenter.h"
+#include "UI/HUD/Presenters/LastFPSObjectiveHudPresenter.h"
+#include "UI/HUD/LastFPSCaptureObjectiveWidget.h"
+#include "UI/HUD/LastFPSDefendObjectiveWidget.h"
 #include "UI/LastFPSDamageNumberWidget.h"
 #include "UI/HUD/LastFPSStatusEffectListWidget.h"
 #include "UI/HUD/LastFPSHUDStyle.h"
@@ -67,6 +70,11 @@ void ULastFPSHUDWidget::InitializePresenters()
 
     EnemyHealthPresenter = NewObject<ULastFPSEnemyHealthPresenter>(this);
     EnemyHealthPresenter->Initialize(WBP_BossHealthBar, EnemyHealthBarSettings);
+
+    // 점령·방어·보스는 표시 슬롯 하나를 나눠 쓰므로 전환을 한 곳에서 관리한다.
+    ObjectiveHudPresenter = NewObject<ULastFPSObjectiveHudPresenter>(this);
+    ObjectiveHudPresenter->Initialize(WBP_DefendObjective, WBP_CaptureObjective);
+    ObjectiveHudPresenter->BindToWorld(GetWorld());
 
     GrapplingReticlePresenter = NewObject<ULastFPSGrapplingReticlePresenter>(this);
     FLastFPSGrapplingReticleConfig GrapplingConfig;
@@ -159,6 +167,11 @@ void ULastFPSHUDWidget::NativeDestruct()
     ClearScopeOverlay();
     bPawnComponentsBound = false;
 
+    if (ObjectiveHudPresenter)
+    {
+        ObjectiveHudPresenter->Unbind();
+    }
+
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearTimer(RetryTimerHandle);
@@ -240,6 +253,12 @@ void ULastFPSHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTim
     if (EnemyHealthPresenter)
     {
         EnemyHealthPresenter->Tick(DeltaTime);
+    }
+    if (ObjectiveHudPresenter)
+    {
+        // 월드가 늦게 준비되는 경우가 있어 매 틱 구독을 확인한다(중복 구독은 무시된다).
+        ObjectiveHudPresenter->BindToWorld(World);
+        ObjectiveHudPresenter->Tick(DeltaTime);
     }
     if (WBP_StatusEffectList)
     {

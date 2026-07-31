@@ -1,65 +1,18 @@
 #include "Game/LastFPSGameInstance.h"
 
+#include "CommonLocalPlayer.h"
 #include "Data/Definitions/LastFPSCharacterRoster.h"
 #include "Data/Tables/LastFPSLoadingTipData.h"
-#include "Game/Loading/LastFPSLoadingProcessSubsystem.h"
-#include "UI/Framework/LastFPSUIManagerSubsystem.h"
-
-#include "CommonLocalPlayer.h"
 #include "Engine/DataTable.h"
-#include "Engine/Engine.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
-#include "Kismet/GameplayStatics.h"
-#include "Misc/Paths.h"
-#include "TimerManager.h"
-#include "UObject/UObjectGlobals.h"
+#include "Game/Travel/LastFPSLevelTravelSettings.h"
+#include "Game/Travel/LastFPSLevelTravelSubsystem.h"
+#include "UI/Framework/LastFPSUIManagerSubsystem.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LastFPSGameInstance)
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSTravel, Log, All);
-
-namespace LastFPSTravelInternal
-{
-	static FString NormalizeMapURL(const FString& MapURL)
-	{
-		if (MapURL.IsEmpty())
-		{
-			return MapURL;
-		}
-
-		FString Normalized = MapURL;
-		Normalized.TrimStartAndEndInline();
-		Normalized.ReplaceInline(TEXT("\\"), TEXT("/"));
-
-		if (!Normalized.StartsWith(TEXT("/")))
-		{
-			Normalized = TEXT("/") + Normalized;
-		}
-
-		if (!Normalized.Contains(TEXT(".")))
-		{
-			const FString AssetName = FPaths::GetBaseFilename(Normalized);
-			if (!AssetName.IsEmpty())
-			{
-				Normalized += TEXT(".") + AssetName;
-			}
-		}
-
-		return Normalized;
-	}
-
-	static FString GetPackagePathFromMapURL(const FString& NormalizedMapURL)
-	{
-		FString PackagePath = NormalizedMapURL;
-		int32 DotIndex = INDEX_NONE;
-		if (PackagePath.FindChar(TEXT('.'), DotIndex))
-		{
-			PackagePath = PackagePath.Left(DotIndex);
-		}
-		return PackagePath;
-	}
-}
 
 namespace LastFPSTravelConsole
 {
@@ -73,35 +26,30 @@ namespace LastFPSTravelConsole
 		ULastFPSGameInstance* LastGI = Cast<ULastFPSGameInstance>(World->GetGameInstance());
 		if (!LastGI)
 		{
-			UE_LOG(LogLastFPSTravel, Warning, TEXT("LastFPS.Travel: GameInstance is not ULastFPSGameInstance"));
-			return false;
-		}
-
-		const FString Arg = Args.Num() > 0 ? Args[0] : FString();
-		if (Arg.IsEmpty())
-		{
 			UE_LOG(LogLastFPSTravel, Warning,
-				TEXT("Usage: LastFPS.Travel MainMenu|CharacterSelect|Hub"));
+				TEXT("LastFPS.Travel: ULastFPSGameInstance를 찾을 수 없습니다."));
 			return false;
 		}
 
-		ELastFPSTravelDestination Destination = ELastFPSTravelDestination::MainMenu;
-		if (Arg.Equals(TEXT("MainMenu"), ESearchCase::IgnoreCase))
+		const FString Argument = Args.IsEmpty() ? FString() : Args[0];
+		ELastFPSTravelDestination Destination;
+		if (Argument.Equals(TEXT("MainMenu"), ESearchCase::IgnoreCase))
 		{
 			Destination = ELastFPSTravelDestination::MainMenu;
 		}
-		else if (Arg.Equals(TEXT("CharacterSelect"), ESearchCase::IgnoreCase)
-			|| Arg.Equals(TEXT("CharSelect"), ESearchCase::IgnoreCase))
+		else if (Argument.Equals(TEXT("CharacterSelect"), ESearchCase::IgnoreCase)
+			|| Argument.Equals(TEXT("CharSelect"), ESearchCase::IgnoreCase))
 		{
 			Destination = ELastFPSTravelDestination::CharacterSelect;
 		}
-		else if (Arg.Equals(TEXT("Hub"), ESearchCase::IgnoreCase))
+		else if (Argument.Equals(TEXT("Hub"), ESearchCase::IgnoreCase))
 		{
 			Destination = ELastFPSTravelDestination::Hub;
 		}
 		else
 		{
-			UE_LOG(LogLastFPSTravel, Warning, TEXT("Unknown destination: %s"), *Arg);
+			UE_LOG(LogLastFPSTravel, Warning,
+				TEXT("사용법: LastFPS.Travel MainMenu|CharacterSelect|Hub"));
 			return false;
 		}
 
@@ -109,9 +57,9 @@ namespace LastFPSTravelConsole
 		return true;
 	}
 
-	static FAutoConsoleCommandWithWorldAndArgs CCmdTravel(
+	static FAutoConsoleCommandWithWorldAndArgs TravelCommand(
 		TEXT("LastFPS.Travel"),
-		TEXT("Travel to a configured map. Args: MainMenu | CharacterSelect | Hub"),
+		TEXT("설정된 로컬 맵으로 이동합니다. MainMenu | CharacterSelect | Hub"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda(
 			[](const TArray<FString>& Args, UWorld* World)
 			{
@@ -119,7 +67,8 @@ namespace LastFPSTravelConsole
 			}));
 }
 
-FText ULastFPSGameInstance::GetDefaultStatusTextForDestination(const ELastFPSTravelDestination Destination)
+FText ULastFPSGameInstance::GetDefaultStatusTextForDestination(
+	const ELastFPSTravelDestination Destination)
 {
 	switch (Destination)
 	{
@@ -130,11 +79,12 @@ FText ULastFPSGameInstance::GetDefaultStatusTextForDestination(const ELastFPSTra
 	case ELastFPSTravelDestination::Hub:
 		return NSLOCTEXT("LastFPS", "TravelStatus_Hub", "허브로 이동 중...");
 	default:
-		return NSLOCTEXT("LastFPS", "TravelStatus_Generic", "맵 로딩 중...");
+		return NSLOCTEXT("LastFPS", "TravelStatus_Generic", "맵 이동 중...");
 	}
 }
 
-FText ULastFPSGameInstance::GetDefaultMapNameTextForDestination(const ELastFPSTravelDestination Destination)
+FText ULastFPSGameInstance::GetDefaultMapNameTextForDestination(
+	const ELastFPSTravelDestination Destination)
 {
 	switch (Destination)
 	{
@@ -152,18 +102,80 @@ FText ULastFPSGameInstance::GetDefaultMapNameTextForDestination(const ELastFPSTr
 void ULastFPSGameInstance::Init()
 {
 	Super::Init();
-
-	PostLoadMapDelegateHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
-		this, &ULastFPSGameInstance::HandlePostLoadMap);
-
-	if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GetSubsystem<ULastFPSLoadingProcessSubsystem>())
-	{
-		LoadingFinishedDelegateHandle = LoadingProcesses->OnLoadingFinished.AddUObject(
-			this, &ULastFPSGameInstance::HandleLoadingFinished);
-	}
-
-	// 로딩 팁 이미지를 미리 로드·상주시켜 캐싱 → 첫 로딩 화면부터 즉시 표시.
 	PreloadLoadingTipTextures();
+}
+
+void ULastFPSGameInstance::Shutdown()
+{
+	Super::Shutdown();
+}
+
+int32 ULastFPSGameInstance::AddLocalPlayer(
+	ULocalPlayer* NewPlayer,
+	const FPlatformUserId UserId)
+{
+	const int32 Result = Super::AddLocalPlayer(NewPlayer, UserId);
+	if (Result != INDEX_NONE)
+	{
+		if (ULastFPSUIManagerSubsystem* UIManager =
+			GetSubsystem<ULastFPSUIManagerSubsystem>())
+		{
+			if (UCommonLocalPlayer* CommonPlayer = Cast<UCommonLocalPlayer>(NewPlayer))
+			{
+				UIManager->NotifyPlayerAdded(CommonPlayer);
+			}
+		}
+	}
+	return Result;
+}
+
+bool ULastFPSGameInstance::RemoveLocalPlayer(ULocalPlayer* ExistingPlayer)
+{
+	if (ULastFPSUIManagerSubsystem* UIManager =
+		GetSubsystem<ULastFPSUIManagerSubsystem>())
+	{
+		if (UCommonLocalPlayer* CommonPlayer = Cast<UCommonLocalPlayer>(ExistingPlayer))
+		{
+			UIManager->NotifyPlayerDestroyed(CommonPlayer);
+		}
+	}
+	return Super::RemoveLocalPlayer(ExistingPlayer);
+}
+
+void ULastFPSGameInstance::SaveSelectedCharacterIndex(
+	const FString& PlayerKey,
+	const int32 SelectedIndex)
+{
+	if (!PlayerKey.IsEmpty())
+	{
+		SelectedCharacterIndexByPlayerKey.Add(PlayerKey, FMath::Max(0, SelectedIndex));
+	}
+}
+
+bool ULastFPSGameInstance::TryGetSelectedCharacterIndex(
+	const FString& PlayerKey,
+	int32& OutSelectedIndex) const
+{
+	if (const int32* FoundIndex = SelectedCharacterIndexByPlayerKey.Find(PlayerKey))
+	{
+		OutSelectedIndex = *FoundIndex;
+		return true;
+	}
+	return false;
+}
+
+const ULastFPSCharacterRoster* ULastFPSGameInstance::GetCharacterRoster()
+{
+	if (!CachedCharacterRoster)
+	{
+		CachedCharacterRoster = CharacterRosterAsset.LoadSynchronous();
+		if (!CachedCharacterRoster)
+		{
+			UE_LOG(LogLastFPSTravel, Error,
+				TEXT("CharacterRosterAsset을 불러오지 못했습니다. DefaultGame.ini 설정을 확인하세요."));
+		}
+	}
+	return CachedCharacterRoster;
 }
 
 UDataTable* ULastFPSGameInstance::GetLoadingTipTable()
@@ -177,7 +189,7 @@ void ULastFPSGameInstance::PreloadLoadingTipTextures()
 	if (!Table)
 	{
 		UE_LOG(LogLastFPSTravel, Warning,
-			TEXT("[LoadingTip] 프리로드 실패: LoadingTipTable 로드 불가. DefaultGame.ini의 [/Script/LastFPS.LastFPSGameInstance] LoadingTipTable 경로를 확인하세요."));
+			TEXT("LoadingTipTable을 불러오지 못했습니다. DefaultGame.ini 설정을 확인하세요."));
 		return;
 	}
 
@@ -194,244 +206,39 @@ void ULastFPSGameInstance::PreloadLoadingTipTextures()
 
 		if (UTexture2D* Texture = Row->Image.LoadSynchronous())
 		{
-			// 밉을 강제 상주시키고(장시간) 하드 레퍼런스로 붙잡아 둔다 → 로딩 때 즉시 렌더 가능.
+			// 첫 로딩 화면에서 이미지 스트리밍 지연이 발생하지 않도록 게임 인스턴스가 수명을 유지한다.
 			Texture->SetForceMipLevelsToBeResident(3600.0f);
 			Texture->WaitForStreaming();
 			PreloadedLoadingTipTextures.Add(Texture);
 		}
 	}
 
-	UE_LOG(LogLastFPSTravel, Log, TEXT("[LoadingTip] 프리로드 완료: %d개"), PreloadedLoadingTipTextures.Num());
+	UE_LOG(LogLastFPSTravel, Log,
+		TEXT("로딩 팁 이미지 사전 로드 완료: %d개"),
+		PreloadedLoadingTipTextures.Num());
 }
 
-void ULastFPSGameInstance::Shutdown()
-{
-	if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GetSubsystem<ULastFPSLoadingProcessSubsystem>())
-	{
-		LoadingProcesses->OnLoadingFinished.Remove(LoadingFinishedDelegateHandle);
-	}
-	FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapDelegateHandle);
-	Super::Shutdown();
-}
-
-int32 ULastFPSGameInstance::AddLocalPlayer(ULocalPlayer* NewPlayer, FPlatformUserId UserId)
-{
-	const int32 Result = Super::AddLocalPlayer(NewPlayer, UserId);
-	if (Result != INDEX_NONE)
-	{
-		if (ULastFPSUIManagerSubsystem* UIManager = GetSubsystem<ULastFPSUIManagerSubsystem>())
-		{
-			if (UCommonLocalPlayer* CommonPlayer = Cast<UCommonLocalPlayer>(NewPlayer))
-			{
-				UIManager->NotifyPlayerAdded(CommonPlayer);
-			}
-		}
-	}
-	return Result;
-}
-
-bool ULastFPSGameInstance::RemoveLocalPlayer(ULocalPlayer* ExistingPlayer)
-{
-	if (ULastFPSUIManagerSubsystem* UIManager = GetSubsystem<ULastFPSUIManagerSubsystem>())
-	{
-		if (UCommonLocalPlayer* CommonPlayer = Cast<UCommonLocalPlayer>(ExistingPlayer))
-		{
-			UIManager->NotifyPlayerDestroyed(CommonPlayer);
-		}
-	}
-	return Super::RemoveLocalPlayer(ExistingPlayer);
-}
-
-void ULastFPSGameInstance::SaveSelectedCharacterIndex(const FString& PlayerKey, const int32 SelectedIndex)
-{
-	if (PlayerKey.IsEmpty())
-	{
-		return;
-	}
-	SelectedCharacterIndexByPlayerKey.Add(PlayerKey, FMath::Max(0, SelectedIndex));
-}
-
-bool ULastFPSGameInstance::TryGetSelectedCharacterIndex(const FString& PlayerKey, int32& OutSelectedIndex) const
-{
-	if (const int32* FoundIndex = SelectedCharacterIndexByPlayerKey.Find(PlayerKey))
-	{
-		OutSelectedIndex = *FoundIndex;
-		return true;
-	}
-	return false;
-}
-
-const ULastFPSCharacterRoster* ULastFPSGameInstance::GetCharacterRoster()
-{
-	if (CachedCharacterRoster)
-	{
-		return CachedCharacterRoster;
-	}
-
-	CachedCharacterRoster = CharacterRosterAsset.LoadSynchronous();
-	if (!CachedCharacterRoster)
-	{
-		UE_LOG(LogLastFPSTravel, Error,
-			TEXT("CharacterRoster 미지정 — DefaultGame.ini의 [/Script/LastFPS.LastFPSGameInstance] CharacterRosterAsset 경로를 설정하세요."));
-	}
-	return CachedCharacterRoster;
-}
-
-bool ULastFPSGameInstance::ResolveMapURL(const ELastFPSTravelDestination Destination, FString& OutMapURL) const
-{
-	switch (Destination)
-	{
-	case ELastFPSTravelDestination::MainMenu:
-		OutMapURL = MainMenuMap;
-		break;
-	case ELastFPSTravelDestination::CharacterSelect:
-		OutMapURL = CharacterSelectMap;
-		break;
-	case ELastFPSTravelDestination::Hub:
-		OutMapURL = HubMap;
-		break;
-	default:
-		OutMapURL.Reset();
-		return false;
-	}
-
-	return !OutMapURL.IsEmpty();
-}
-
-void ULastFPSGameInstance::SetPendingTravelPresentation(
+bool ULastFPSGameInstance::ResolveMapURL(
 	const ELastFPSTravelDestination Destination,
-	const FText& StatusText,
-	const FText& MapNameText)
+	FString& OutMapURL) const
 {
-	PendingTravelDestination = Destination;
-	PendingTravelStatusText = StatusText;
-	PendingTravelMapNameText = MapNameText;
-	OnTravelPresentationChanged.Broadcast(PendingTravelStatusText, PendingTravelMapNameText);
+	const ULastFPSLevelTravelSettings* Settings =
+		GetDefault<ULastFPSLevelTravelSettings>();
+	const ULastFPSLevelTravelSubsystem* Travel =
+		GetSubsystem<ULastFPSLevelTravelSubsystem>();
+	return Settings
+		&& Travel
+		&& Travel->ResolveMapPackageName(Settings->GetMapId(Destination), OutMapURL);
 }
 
-void ULastFPSGameInstance::ClearPendingTravelPresentation()
+void ULastFPSGameInstance::RequestTravelToDestination(
+	const ELastFPSTravelDestination Destination)
 {
-	PendingTravelStatusText = FText::GetEmpty();
-	PendingTravelMapNameText = FText::GetEmpty();
-	OnTravelPresentationChanged.Broadcast(PendingTravelStatusText, PendingTravelMapNameText);
-}
-
-void ULastFPSGameInstance::HandlePostLoadMap(UWorld* LoadedWorld)
-{
-	if (!LoadedWorld || LoadedWorld->GetGameInstance() != this)
+	if (ULastFPSLevelTravelSubsystem* Travel =
+		GetSubsystem<ULastFPSLevelTravelSubsystem>())
 	{
-		return;
+		Travel->TravelToDestination(Destination);
 	}
-
-	UE_LOG(LogLastFPSTravel, Log, TEXT("PostLoadMap: %s"), *LoadedWorld->GetMapName());
-	if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GetSubsystem<ULastFPSLoadingProcessSubsystem>())
-	{
-		LoadingProcesses->NotifyLevelLoadComplete(LoadedWorld);
-	}
-}
-
-void ULastFPSGameInstance::HandleLoadingFinished(const bool bSucceeded)
-{
-	ClearPendingTravelPresentation();
-	UE_LOG(LogLastFPSTravel, Log, TEXT("Loading processes finished: Success=%d"), bSucceeded ? 1 : 0);
-}
-
-void ULastFPSGameInstance::ExecuteServerTravel(const FString& MapURL, const ELastFPSTravelDestination DestinationForUI)
-{
-	if (MapURL.IsEmpty())
-	{
-		UE_LOG(LogLastFPSTravel, Error, TEXT("ExecuteServerTravel: empty MapURL"));
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		UE_LOG(LogLastFPSTravel, Error, TEXT("ExecuteServerTravel: no world"));
-		return;
-	}
-
-	const FString NormalizedURL = LastFPSTravelInternal::NormalizeMapURL(MapURL);
-	const FString PackagePath = LastFPSTravelInternal::GetPackagePathFromMapURL(NormalizedURL);
-	if (!FPackageName::DoesPackageExist(PackagePath))
-	{
-		UE_LOG(LogLastFPSTravel, Error,
-			TEXT("Map package does not exist: %s (configured: %s)"),
-			*PackagePath,
-			*MapURL);
-		return;
-	}
-
-	SetPendingTravelPresentation(
-		DestinationForUI,
-		GetDefaultStatusTextForDestination(DestinationForUI),
-		GetDefaultMapNameTextForDestination(DestinationForUI));
-
-	ULastFPSLoadingProcessSubsystem* LoadingProcesses = GetSubsystem<ULastFPSLoadingProcessSubsystem>();
-	if (LoadingProcesses)
-	{
-		LoadingProcesses->BeginTravelLoading(DestinationForUI);
-	}
-	else
-	{
-		UE_LOG(LogLastFPSTravel, Error, TEXT("LoadingProcessSubsystem is unavailable"));
-	}
-
-	const ENetMode NetMode = World->GetNetMode();
-	UE_LOG(LogLastFPSTravel, Log, TEXT("Travel scheduled -> %s (%s, NetMode=%d)"),
-		*PackagePath,
-		*StaticEnum<ELastFPSTravelDestination>()->GetNameStringByValue(static_cast<int64>(DestinationForUI)),
-		static_cast<int32>(NetMode));
-
-	// UI 버튼 콜백 안에서 즉시 Travel 하면 PIE/에디터가 죽는 경우가 있어 1틱 지연
-	World->GetTimerManager().SetTimerForNextTick(
-		FTimerDelegate::CreateWeakLambda(this, [this, PackagePath, NetMode]()
-		{
-			UWorld* TravelWorld = GetWorld();
-			if (!TravelWorld)
-			{
-				if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GetSubsystem<ULastFPSLoadingProcessSubsystem>())
-				{
-					LoadingProcesses->CancelLoading(TEXT("world is no longer valid"));
-				}
-				return;
-			}
-
-			if (NetMode == NM_Client)
-			{
-				UE_LOG(LogLastFPSTravel, Error,
-					TEXT("Client cannot travel. Use Standalone PIE or Play -> Standalone Game."));
-				if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GetSubsystem<ULastFPSLoadingProcessSubsystem>())
-				{
-					LoadingProcesses->CancelLoading(TEXT("client attempted to initiate travel"));
-				}
-				return;
-			}
-
-			// PIE(Standalone/ListenServer): OpenLevel. ServerTravel URL에는 '.MapName' 접미사 불가(FURL 거부).
-			if (NetMode == NM_Standalone || NetMode == NM_ListenServer)
-			{
-				UE_LOG(LogLastFPSTravel, Log, TEXT("OpenLevel: %s"), *PackagePath);
-				UGameplayStatics::OpenLevel(TravelWorld, FName(*PackagePath), true);
-				return;
-			}
-
-			UE_LOG(LogLastFPSTravel, Log, TEXT("ServerTravel: %s"), *PackagePath);
-			TravelWorld->ServerTravel(PackagePath);
-		}));
-}
-
-void ULastFPSGameInstance::RequestTravelToDestination(const ELastFPSTravelDestination Destination)
-{
-	FString MapURL;
-	if (!ResolveMapURL(Destination, MapURL))
-	{
-		UE_LOG(LogLastFPSTravel, Error, TEXT("RequestTravelToDestination: no URL for %s"),
-			*StaticEnum<ELastFPSTravelDestination>()->GetNameStringByValue(static_cast<int64>(Destination)));
-		return;
-	}
-
-	ExecuteServerTravel(MapURL, Destination);
 }
 
 void ULastFPSGameInstance::RequestTravelToMainMenu()
@@ -447,4 +254,27 @@ void ULastFPSGameInstance::RequestTravelToCharacterSelect()
 void ULastFPSGameInstance::RequestTravelToHub()
 {
 	RequestTravelToDestination(ELastFPSTravelDestination::Hub);
+}
+
+ELastFPSTravelDestination ULastFPSGameInstance::GetPendingTravelDestination() const
+{
+	const ULastFPSLevelTravelSubsystem* Travel =
+		GetSubsystem<ULastFPSLevelTravelSubsystem>();
+	return Travel
+		? Travel->GetPendingLocalDestination()
+		: ELastFPSTravelDestination::MainMenu;
+}
+
+FText ULastFPSGameInstance::GetPendingTravelStatusText() const
+{
+	const ULastFPSLevelTravelSubsystem* Travel =
+		GetSubsystem<ULastFPSLevelTravelSubsystem>();
+	return Travel ? Travel->GetPendingTravelStatusText() : FText::GetEmpty();
+}
+
+FText ULastFPSGameInstance::GetPendingTravelMapNameText() const
+{
+	const ULastFPSLevelTravelSubsystem* Travel =
+		GetSubsystem<ULastFPSLevelTravelSubsystem>();
+	return Travel ? Travel->GetPendingTravelMapNameText() : FText::GetEmpty();
 }

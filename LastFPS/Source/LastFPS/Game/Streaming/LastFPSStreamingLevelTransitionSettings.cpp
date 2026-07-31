@@ -3,6 +3,37 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 
+bool FLastFPSArrivalContainmentPresentationSettings::IsValid(
+	FString& OutFailureReason) const
+{
+	if (!bEnabled)
+	{
+		OutFailureReason.Reset();
+		return true;
+	}
+
+	if (Mesh.IsNull() || Material.IsNull())
+	{
+		OutFailureReason =
+			TEXT("ArrivalContainment을 사용하려면 Mesh와 Material이 필요합니다.");
+		return false;
+	}
+
+	if (Radius <= 0.f
+		|| Height <= 0.f
+		|| BandCount < 1
+		|| BandHeight <= 0.f
+		|| BandHeight > Height)
+	{
+		OutFailureReason =
+			TEXT("ArrivalContainment의 크기 또는 경고 띠 설정이 유효하지 않습니다.");
+		return false;
+	}
+
+	OutFailureReason.Reset();
+	return true;
+}
+
 bool FLastFPSStreamingLevelTransitionRoute::IsValid(
 	FString& OutFailureReason) const
 {
@@ -46,6 +77,34 @@ bool FLastFPSStreamingLevelTransitionRoute::IsValid(
 		return false;
 	}
 
+	if (ArrivalHoldDuration < 0.f)
+	{
+		OutFailureReason =
+			TEXT("ArrivalHoldDuration은 0 이상이어야 합니다.");
+		return false;
+	}
+
+	if (ArrivalContainment.bEnabled
+		&& ArrivalHoldDuration <= KINDA_SMALL_NUMBER)
+	{
+		OutFailureReason =
+			TEXT("ArrivalContainment을 사용하려면 ArrivalHoldDuration이 0보다 커야 합니다.");
+		return false;
+	}
+
+	if (!ArrivalContainment.IsValid(OutFailureReason))
+	{
+		return false;
+	}
+
+	if (DelayedEnemyDefinition.IsNull()
+		&& !DelayedEnemyEncounterId.IsNone())
+	{
+		OutFailureReason =
+			TEXT("DelayedEnemyEncounterId를 사용하려면 DelayedEnemyDefinition이 필요합니다.");
+		return false;
+	}
+
 	if (DelayedEnemyDefinition.IsNull()
 		&& DelayedEnemySpawnGameplayCueTag.IsValid())
 	{
@@ -58,8 +117,7 @@ bool FLastFPSStreamingLevelTransitionRoute::IsValid(
 	return true;
 }
 
-const FLastFPSStreamingLevelTransitionRoute*
-ULastFPSStreamingLevelTransitionSettings::FindRouteForTrigger(
+const FLastFPSStreamingLevelTransitionRoute* ULastFPSStreamingLevelTransitionSettings::FindRouteForTrigger(
 	const UWorld& World,
 	const AActor& TriggerActor) const
 {

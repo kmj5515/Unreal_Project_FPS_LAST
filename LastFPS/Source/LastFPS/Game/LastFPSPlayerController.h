@@ -6,7 +6,6 @@
 #include "GameplayTagContainer.h"
 #include "Hub/ILastFPSInteractable.h"
 #include "Hub/LastFPSNPCTypes.h"
-#include "UI/Common/LastFPSConfirmWidget.h"
 #include "LastFPSPlayerController.generated.h"
 
 class APawn;
@@ -17,10 +16,8 @@ class ULastFPSCharacterRoster;
 class ULastFPSHUDWidget;
 class ULastFPSQuestTrackerWidget;
 class ULastFPSObjectiveMarkerWidget;
-class ULastFPSNoticeWidget;
 class ULastFPSDialogueWidget;
 class ULastFPSNPCInteractionWidget;
-class ULastFPSQuantityDialogWidget;
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FLastFPSConfirmResultDelegate, bool, bConfirmed);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FLastFPSQuantityResultDelegate, int32, Quantity);
@@ -125,24 +122,15 @@ public:
     /** 개발용 콘솔 명령을 서버 권한의 인카운터 처리로 전달한다. Shipping 빌드에서는 동작하지 않는다. */
     void RequestDebugClearEncounter(FName EncounterId);
 
+    /** 전투 서버가 각 소유 클라이언트를 로컬 허브로 복귀시킨다. */
+    UFUNCTION(Client, Reliable)
+    void ClientReturnToHub();
+
 protected:
     // 진입/ESC 화면 태그는 GameMode가 소유 → BeginPlay에 읽어와 캐시한다.
     // (맵별 차이를 GameMode가 가지므로 PlayerController는 1개로 공유 가능)
 
     // ── 모달 / HUD 위젯 클래스 ──────────────────────────────────────
-
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
-    TSubclassOf<ULastFPSConfirmWidget> ConfirmWidgetClass;
-
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
-    TSubclassOf<ULastFPSNoticeWidget> NoticeWidgetClass;
-
-    /** 수량 선택 모달 위젯 클래스 (WBP_QuantityDialog) */
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
-    TSubclassOf<ULastFPSQuantityDialogWidget> QuantityDialogWidgetClass;
-
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
-    TSubclassOf<ULastFPSDialogueWidget> DialogueWidgetClass;
 
     /** NPC 상호작용 허브 위젯 클래스 (WBP_NPCInteraction) */
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
@@ -203,9 +191,6 @@ protected:
 
     /** 메뉴류가 있으면 Menu config, 없으면 Game config 를 적용. */
     void ApplyInputConfigForMenuState();
-
-    template<typename TWidget>
-    TWidget* PushWidgetToModalLayer(TSubclassOf<TWidget> WidgetClass);
 
     int32 ClampSelectedCharacterIndex(int32 NewIndex) const;
     void SyncSelectedCharacterState(int32 CharacterIndex);
