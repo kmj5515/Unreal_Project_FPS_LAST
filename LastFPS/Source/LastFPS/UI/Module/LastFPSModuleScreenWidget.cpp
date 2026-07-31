@@ -2,6 +2,8 @@
 
 #include "UI/Module/LastFPSModuleEntryWidget.h"
 #include "UI/Module/LastFPSModuleSlotWidget.h"
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Data/Tables/LastFPSItemData.h"
 #include "Data/Tables/LastFPSModuleData.h"
 #include "Inventory/LastFPSLoadoutSubsystem.h"
@@ -67,6 +69,13 @@ namespace
 void ULastFPSModuleScreenWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (ULastFPSGameDataSubsystem* GameData = GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>())
+		{
+			ItemTable = GameData->FindTable(LastFPSGameDataTags::Data_Table_Economy_Item);
+		}
+	}
 
 	if (ULastFPSLoadoutSubsystem* Loadout = GetLoadout())
 	{

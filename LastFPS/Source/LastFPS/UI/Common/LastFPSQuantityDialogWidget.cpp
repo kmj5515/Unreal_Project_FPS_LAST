@@ -73,5 +73,5 @@ void ULastFPSQuantityDialogWidget::HandleCancelClicked()  { CloseWithResult(0); 
 void ULastFPSQuantityDialogWidget::CloseWithResult(const int32 Quantity)
 {
 	OnQuantityResult.Broadcast(Quantity);
-	DeactivateWidget();
+	DeactivateWithAnimation();
 }

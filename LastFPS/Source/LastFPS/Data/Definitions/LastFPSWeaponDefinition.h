@@ -120,6 +120,10 @@ class LASTFPS_API ULastFPSWeaponDefinition : public UPrimaryDataAsset
     GENERATED_BODY()
 
 public:
+    static const FPrimaryAssetType PrimaryAssetType;
+
+    virtual FPrimaryAssetId GetPrimaryAssetId() const override;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
     FName WeaponId;
 

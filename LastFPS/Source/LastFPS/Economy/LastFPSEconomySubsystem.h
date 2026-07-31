@@ -55,7 +55,7 @@ public:
 	/** 보유 아이템 전체 (DT_ItemData 행 이름 → 수량) — 인벤토리 화면이 읽음 */
 	const TMap<FName, int32>& GetOwnedItems() const { return OwnedItems; }
 
-	/** RowId 가 DT_ItemData 에 실제 정의된 아이템인지. (ItemTable 미설정 시 검증 불가 → false) */
+	/** RowId가 DT_ItemData에 실제 정의된 아이템인지. GameDataSet 로드 실패 시 false. */
 	bool HasItemDefinition(FName ItemRowId) const;
 
 	/** RowId 의 표시 이름 (DT_ItemData.ItemName). 정의가 없으면 RowId 문자열로 폴백. */
@@ -64,13 +64,13 @@ public:
 	/** RowId 의 등급을 조회. 정의가 있으면 OutRarity 채우고 true, 없으면 false(OutRarity 미변경). */
 	bool TryGetItemRarity(FName ItemRowId, ELastFPSItemRarity& OutRarity) const;
 
-	/** DT_ItemData 가 설정·로드 가능한지. 검증 로직이 "미설정"과 "행 없음"을 구분하는 데 사용. */
+	/** DT_ItemData가 GameDataSet을 통해 로드됐는지 반환한다. */
 	bool IsItemTableConfigured() const;
 
 	/**
 	 * 시작 시 테이블 간 참조 무결성 검사 — 깨진 참조를 에러 로그로 출력한다.
 	 * DT_ShopData 의 GrantItemRowId, StartingOwnedItems 키가 DT_ItemData 에 존재하는지 확인.
-	 * (모듈 테이블 검증은 LoadoutSubsystem 이 담당 — 그쪽이 ModuleTable 을 보유.)
+	 * 모듈 테이블 검증은 LoadoutSubsystem이 담당한다.
 	 */
 	void ValidateReferences() const;
 
@@ -89,16 +89,8 @@ protected:
 	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Economy")
 	TMap<FName, int32> StartingOwnedItems;
 
-	/** 아이템 정의 테이블 (DT_ItemData) — 지급 검증/표시 기준. DefaultGame.ini 로 지정. */
-	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Economy")
-	TSoftObjectPtr<UDataTable> ItemTable;
-
-	/** 상점 판매 테이블 (DT_ShopData) — 시작 시 참조 검증에만 사용. DefaultGame.ini 로 지정. */
-	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Economy")
-	TSoftObjectPtr<UDataTable> ShopTable;
-
 private:
-	/** DT_ItemData 로드 (없으면 nullptr) */
+	/** GameDataSet에서 DT_ItemData를 조회한다. */
 	const UDataTable* GetItemTable() const;
 
 	int32 Credits = 0;

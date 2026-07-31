@@ -1,6 +1,8 @@
 #include "Game/LastFPSGameInstance.h"
 
 #include "CommonLocalPlayer.h"
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Data/Definitions/LastFPSCharacterRoster.h"
 #include "Data/Tables/LastFPSLoadingTipData.h"
 #include "Engine/DataTable.h"
@@ -99,14 +101,19 @@ FText ULastFPSGameInstance::GetDefaultMapNameTextForDestination(
 	}
 }
 
-void ULastFPSGameInstance::Init()
+void ULastFPSGameInstance::OnStart()
 {
-	Super::Init();
-	PreloadLoadingTipTextures();
+	Super::OnStart();
+
+	if (!IsDedicatedServerInstance())
+	{
+		PreloadLoadingTipTextures();
+	}
 }
 
 void ULastFPSGameInstance::Shutdown()
 {
+	PreloadedLoadingTipTextures.Reset();
 	Super::Shutdown();
 }
 
@@ -166,30 +173,30 @@ bool ULastFPSGameInstance::TryGetSelectedCharacterIndex(
 
 const ULastFPSCharacterRoster* ULastFPSGameInstance::GetCharacterRoster()
 {
-	if (!CachedCharacterRoster)
+	if (ULastFPSGameDataSubsystem* GameData = GetSubsystem<ULastFPSGameDataSubsystem>())
 	{
-		CachedCharacterRoster = CharacterRosterAsset.LoadSynchronous();
-		if (!CachedCharacterRoster)
-		{
-			UE_LOG(LogLastFPSTravel, Error,
-				TEXT("CharacterRosterAsset을 불러오지 못했습니다. DefaultGame.ini 설정을 확인하세요."));
-		}
+		return GameData->GetCharacterRoster();
 	}
-	return CachedCharacterRoster;
+
+	UE_LOG(LogLastFPSTravel, Error, TEXT("GameDataSubsystem을 찾지 못해 CharacterRoster를 조회할 수 없습니다."));
+	return nullptr;
 }
 
 UDataTable* ULastFPSGameInstance::GetLoadingTipTable()
 {
-	return LoadingTipTable.LoadSynchronous();
+	if (ULastFPSGameDataSubsystem* GameData = GetSubsystem<ULastFPSGameDataSubsystem>())
+	{
+		return GameData->FindTable(LastFPSGameDataTags::Data_Table_Loading_Tip);
+	}
+	return nullptr;
 }
 
 void ULastFPSGameInstance::PreloadLoadingTipTextures()
 {
-	UDataTable* Table = LoadingTipTable.LoadSynchronous();
+	UDataTable* Table = GetLoadingTipTable();
 	if (!Table)
 	{
-		UE_LOG(LogLastFPSTravel, Warning,
-			TEXT("LoadingTipTable을 불러오지 못했습니다. DefaultGame.ini 설정을 확인하세요."));
+		UE_LOG(LogLastFPSTravel, Warning, TEXT("Startup GameDataSet에서 LoadingTipTable을 찾지 못했습니다."));
 		return;
 	}
 
@@ -206,9 +213,8 @@ void ULastFPSGameInstance::PreloadLoadingTipTextures()
 
 		if (UTexture2D* Texture = Row->Image.LoadSynchronous())
 		{
-			// 첫 로딩 화면에서 이미지 스트리밍 지연이 발생하지 않도록 게임 인스턴스가 수명을 유지한다.
+			// 렌더 스트리밍 완료를 동기 대기하지 않고 수명 유지와 mip residency만 요청한다.
 			Texture->SetForceMipLevelsToBeResident(3600.0f);
-			Texture->WaitForStreaming();
 			PreloadedLoadingTipTextures.Add(Texture);
 		}
 	}

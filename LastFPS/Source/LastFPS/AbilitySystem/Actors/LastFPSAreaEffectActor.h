@@ -8,10 +8,12 @@
 #include "LastFPSAreaEffectActor.generated.h"
 
 class UAbilitySystemComponent;
+class UAudioComponent;
 class UGameplayEffect;
 class UNiagaraComponent;
 class UNiagaraSystem;
 class USceneComponent;
+class USoundBase;
 class USphereComponent;
 
 UENUM(BlueprintType)
@@ -77,6 +79,19 @@ struct LASTFPS_API FLastFPSAreaEffectConfig
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|VFX")
 	FName SurfaceNormalNiagaraParameterName = TEXT("User.SurfaceNormal");
 
+	/** 영역 액터에 부착해 재생할 사운드다. 반복과 거리 감쇠는 Sound Cue에서 구성한다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Audio")
+	TObjectPtr<USoundBase> AttachedSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Audio", meta=(ClampMin="0.0", Units="s"))
+	float SoundStartTime = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Audio", meta=(ClampMin="0.0"))
+	float SoundVolumeMultiplier = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Audio", meta=(ClampMin="0.01"))
+	float SoundPitchMultiplier = 1.f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Area Effect|Debug")
 	bool bDrawDebug = false;
 
@@ -119,11 +134,16 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Area Effect")
 	TObjectPtr<UNiagaraComponent> EffectNiagaraComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Area Effect|Audio")
+	TObjectPtr<UAudioComponent> AttachedAudioComponent;
+
 private:
 	UFUNCTION()
 	void OnRep_AreaConfig();
 
 	void ConfigureArea();
+	void ConfigureAttachedAudio();
+	void StopAttachedAudio();
 	void StartAreaEffect();
 	void ApplyAreaEffects();
 	bool ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass, bool bApplyDamage);

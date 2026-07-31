@@ -17,6 +17,7 @@ enum class ELastFPSTravelDestination : uint8
 UENUM(BlueprintType)
 enum class ELastFPSTravelEntryType : uint8
 {
+	None, 
 	LocalDestination,
 	QuickPlayBattle,
 };
@@ -29,7 +30,7 @@ struct LASTFPS_API FLastFPSTravelEntryRequest
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Travel")
 	ELastFPSTravelEntryType Type =
-		ELastFPSTravelEntryType::LocalDestination;
+		ELastFPSTravelEntryType::None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Travel",
 		meta=(
@@ -38,10 +39,9 @@ struct LASTFPS_API FLastFPSTravelEntryRequest
 	ELastFPSTravelDestination Destination =
 		ELastFPSTravelDestination::MainMenu;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Travel",
-		meta=(
-			AllowedTypes="BattleDefinition",
-			EditCondition="Type == ELastFPSTravelEntryType::QuickPlayBattle",
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Travel"
+		,meta=(AllowedTypes="BattleDefinition",
+		EditCondition="Type == ELastFPSTravelEntryType::QuickPlayBattle",
 			EditConditionHides))
 	FPrimaryAssetId BattleDefinitionId;
 };

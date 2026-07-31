@@ -1,5 +1,15 @@
 #include "Data/Definitions/LastFPSDestinationContentSet.h"
 
+#include "Data/AssetManagement/LastFPSPrimaryAssetTypes.h"
+
+const FPrimaryAssetType ULastFPSDestinationContentSet::PrimaryAssetType =
+    LastFPSPrimaryAssetTypes::DestinationContentSet;
+
+FPrimaryAssetId ULastFPSDestinationContentSet::GetPrimaryAssetId() const
+{
+    return FPrimaryAssetId(PrimaryAssetType, GetFName());
+}
+
 void ULastFPSDestinationContentSet::CollectRequiredPaths(TArray<FSoftObjectPath>& OutPaths) const
 {
     OutPaths.Reserve(OutPaths.Num() + RequiredAssets.Num() + RequiredClasses.Num());

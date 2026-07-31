@@ -3,9 +3,11 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameplayTagContainer.h"
+#include "UObject/PrimaryAssetId.h"
 #include "LastFPSGameStateBase.generated.h"
 
 class ULastFPSDestinationContentComponent;
+class ULastFPSDestinationContentSet;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(
     FOnLastFPSDestinationContextChanged,
@@ -29,6 +31,10 @@ public:
     void SetDestinationContextTags(
         const FGameplayTagContainer& NewContextTags);
 
+    /** 서버가 선택한 목적지 Content Set을 모든 클라이언트의 로컬 로더에 전달한다. */
+    void SetDestinationContentSet(
+        const ULastFPSDestinationContentSet* NewContentSet);
+
     const FGameplayTagContainer& GetDestinationContextTags() const
     {
         return DestinationContextTags;
@@ -40,9 +46,15 @@ private:
     UFUNCTION()
     void OnRep_DestinationContextTags();
 
+    UFUNCTION()
+    void OnRep_DestinationContentSetId();
+
     UPROPERTY(VisibleAnywhere, Category="LastFPS|Loading")
     TObjectPtr<ULastFPSDestinationContentComponent> DestinationContent;
 
     UPROPERTY(ReplicatedUsing=OnRep_DestinationContextTags)
     FGameplayTagContainer DestinationContextTags;
+
+    UPROPERTY(ReplicatedUsing=OnRep_DestinationContentSetId)
+    FPrimaryAssetId DestinationContentSetId;
 };

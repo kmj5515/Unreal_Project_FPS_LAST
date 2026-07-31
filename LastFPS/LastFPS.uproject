@@ -76,6 +76,10 @@
 		{
 			"Name": "EasyCrosshairSystem",
 			"Enabled": true
+		},
+		{
+			"Name": "Synthesis",
+			"Enabled": true
 		}
 	]
 }

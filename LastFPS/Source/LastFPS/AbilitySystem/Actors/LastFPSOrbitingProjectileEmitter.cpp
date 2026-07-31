@@ -245,7 +245,8 @@ void ALastFPSOrbitingProjectileEmitter::FireProjectile()
 		Config.ProjectileData->EffectsOnHit,
 		Config.ProjectileData->VisualData,
 		BaseDamageOverride,
-		&Config.ProjectileData->CollisionSettings);
+		&Config.ProjectileData->CollisionSettings,
+		&Config.ProjectileData->AudioSettings);
 
 	if (Projectile->ProjectileMovement)
 	{

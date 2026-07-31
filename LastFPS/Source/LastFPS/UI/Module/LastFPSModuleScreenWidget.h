@@ -30,7 +30,7 @@ protected:
 	virtual void NativeDestruct() override;
 
 	/** 모듈 표시용 아이템 정의 테이블 (RowType = FLastFPSItemData) */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Module", meta=(RequiredAssetDataTags="RowStructure=/Script/LastFPS.LastFPSItemData"))
+	UPROPERTY(Transient)
 	TObjectPtr<UDataTable> ItemTable;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Module")

@@ -3,6 +3,7 @@
 #include "Algo/AllOf.h"
 #include "Character/LastFPSCharacterBase.h"
 #include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
 #include "Data/Definitions/LastFPSEncounterObjectiveDefinition.h"
@@ -903,11 +904,26 @@ ALastFPSCharacterBase* ALastFPSRoomEncounterRuntime::SpawnEnemy(
 		// 풀 Actor는 이미 BeginPlay를 마쳤으므로 상태 복구로 충돌을 켠 다음 같은 보정을 명시적으로 수행한다.
 		FVector AdjustedLocation = SpawnTransform.GetLocation();
 		const FRotator AdjustedRotation = SpawnTransform.Rotator();
+		if (UCapsuleComponent* Capsule = SpawnedEnemy->GetCapsuleComponent())
+		{
+			AdjustedLocation.Z += Capsule->GetScaledCapsuleHalfHeight();
+		}
+
 		if (World->FindTeleportSpot(
 			SpawnedPawn,
 			AdjustedLocation,
 			AdjustedRotation))
 		{
+			SpawnedPawn->SetActorLocationAndRotation(
+				AdjustedLocation,
+				AdjustedRotation,
+				false,
+				nullptr,
+				ETeleportType::TeleportPhysics);
+		}
+		else
+		{
+			// TeleportSpot을 찾지 못한 경우에도 최소한 바닥에 파묻히지 않도록 강제 적용한다.
 			SpawnedPawn->SetActorLocationAndRotation(
 				AdjustedLocation,
 				AdjustedRotation,

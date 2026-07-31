@@ -57,7 +57,7 @@ public:
 	void NotifyEncounterFailed(
 		FName EncounterId);
 
-	/** 현재 Mode의 중앙 Profile에서 이미 준비된 Encounter Table을 반환한다. */
+	/** Battle GameDataSet에서 준비된 Encounter Table을 반환한다. */
 	const UDataTable* GetEncounterTable() const;
 
 #if !UE_BUILD_SHIPPING
@@ -86,6 +86,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULastFPSRoomEncounterProfile> ActiveProfile;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UDataTable> LoadedEncounterTable;
 
 	TWeakObjectPtr<ULastFPSDestinationContentComponent> DestinationContentComponent;
 	FDelegateHandle ContentReadyHandle;

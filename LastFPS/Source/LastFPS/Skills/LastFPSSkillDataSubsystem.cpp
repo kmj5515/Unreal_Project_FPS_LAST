@@ -1,27 +1,30 @@
 #include "Skills/LastFPSSkillDataSubsystem.h"
 
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Data/Tables/LastFPSSkillBalanceData.h"
 #include "Engine/DataTable.h"
+#include "Engine/GameInstance.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSSkillData, Log, All);
 
 void ULastFPSSkillDataSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	Collection.InitializeDependency<ULastFPSGameDataSubsystem>();
 
 	SkillsByCharacter.Reset();
-	LoadedCharacterSkillTable = CharacterSkillTable.LoadSynchronous();
-	LoadedSkillBalanceTable = SkillBalanceTable.LoadSynchronous();
+	ULastFPSGameDataSubsystem* GameData = GetGameInstance()->GetSubsystem<ULastFPSGameDataSubsystem>();
+	LoadedCharacterSkillTable = GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_Character_Skill) : nullptr;
+	LoadedSkillBalanceTable = GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_Balance_Skill) : nullptr;
 	if (!LoadedCharacterSkillTable)
 	{
-		UE_LOG(LogLastFPSSkillData, Error,
-			TEXT("공용 CharacterSkillTable을 로드하지 못했습니다. DefaultGame.ini의 LastFPSSkillDataSubsystem 설정을 확인하세요."));
+		UE_LOG(LogLastFPSSkillData, Error, TEXT("GameDataSet에서 공용 CharacterSkillTable을 찾지 못했습니다."));
 		return;
 	}
 	if (!LoadedSkillBalanceTable)
 	{
-		UE_LOG(LogLastFPSSkillData, Error,
-			TEXT("공용 SkillBalanceTable을 로드하지 못했습니다. DefaultGame.ini의 LastFPSSkillDataSubsystem 설정을 확인하세요."));
+		UE_LOG(LogLastFPSSkillData, Error, TEXT("GameDataSet에서 공용 SkillBalanceTable을 찾지 못했습니다."));
 	}
 	else if (!LoadedSkillBalanceTable->GetRowStruct()
 		|| !LoadedSkillBalanceTable->GetRowStruct()->IsChildOf(FLastFPSSkillBalanceData::StaticStruct()))

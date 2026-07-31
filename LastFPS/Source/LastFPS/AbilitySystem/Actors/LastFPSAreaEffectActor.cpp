@@ -2,6 +2,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
+#include "Components/AudioComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SphereComponent.h"
 #include "DrawDebugHelpers.h"
@@ -29,6 +30,12 @@ ALastFPSAreaEffectActor::ALastFPSAreaEffectActor()
 	EffectNiagaraComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("EffectNiagaraComponent"));
 	EffectNiagaraComponent->SetupAttachment(SceneRoot);
 	EffectNiagaraComponent->bAutoActivate = false;
+
+	AttachedAudioComponent =
+		CreateDefaultSubobject<UAudioComponent>(TEXT("AttachedAudioComponent"));
+	AttachedAudioComponent->SetupAttachment(SceneRoot);
+	AttachedAudioComponent->bAutoActivate = false;
+	AttachedAudioComponent->bAllowSpatialization = true;
 }
 
 void ALastFPSAreaEffectActor::BeginPlay()
@@ -110,7 +117,57 @@ void ALastFPSAreaEffectActor::ConfigureArea()
 		}
 	}
 
+	ConfigureAttachedAudio();
 	DrawAreaDebug();
+}
+
+void ALastFPSAreaEffectActor::ConfigureAttachedAudio()
+{
+	if (!AttachedAudioComponent)
+	{
+		return;
+	}
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		StopAttachedAudio();
+		return;
+	}
+
+	USoundBase* ConfiguredSound = AreaConfig.AttachedSound.Get();
+	if (!ConfiguredSound)
+	{
+		StopAttachedAudio();
+		return;
+	}
+
+	const bool bSoundChanged =
+		AttachedAudioComponent->Sound != ConfiguredSound;
+	if (bSoundChanged)
+	{
+		AttachedAudioComponent->Stop();
+		AttachedAudioComponent->SetSound(ConfiguredSound);
+	}
+
+	AttachedAudioComponent->SetVolumeMultiplier(
+		FMath::Max(AreaConfig.SoundVolumeMultiplier, 0.f));
+	AttachedAudioComponent->SetPitchMultiplier(
+		FMath::Max(AreaConfig.SoundPitchMultiplier, 0.01f));
+	if (bSoundChanged || !AttachedAudioComponent->IsPlaying())
+	{
+		AttachedAudioComponent->Play(
+			FMath::Max(AreaConfig.SoundStartTime, 0.f));
+	}
+}
+
+void ALastFPSAreaEffectActor::StopAttachedAudio()
+{
+	if (!AttachedAudioComponent)
+	{
+		return;
+	}
+
+	AttachedAudioComponent->Stop();
+	AttachedAudioComponent->SetSound(nullptr);
 }
 
 void ALastFPSAreaEffectActor::StartAreaEffect()
@@ -252,6 +309,7 @@ void ALastFPSAreaEffectActor::OnAcquiredFromPool_Implementation()
 	SourceActor.Reset();
 	SourceASC.Reset();
 	AreaConfig = FLastFPSAreaEffectConfig();
+	StopAttachedAudio();
 	SetActorEnableCollision(true);
 }
 
@@ -262,6 +320,7 @@ void ALastFPSAreaEffectActor::OnReleasedToPool_Implementation()
 	SourceActor.Reset();
 	SourceASC.Reset();
 	AreaConfig = FLastFPSAreaEffectConfig();
+	StopAttachedAudio();
 
 	if (AreaSphere)
 	{

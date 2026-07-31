@@ -132,7 +132,8 @@ ALastFPSProjectile* LastFPSProjectileLaunch::SpawnProjectile(const FLastFPSProje
 		ProjectileData->EffectsOnHit,
 		ProjectileData->VisualData,
 		Request.BaseDamageOverride,
-		&ProjectileData->CollisionSettings);
+		&ProjectileData->CollisionSettings,
+		&ProjectileData->AudioSettings);
 
 	if (Projectile->ProjectileMovement)
 	{

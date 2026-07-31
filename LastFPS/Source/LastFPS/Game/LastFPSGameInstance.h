@@ -15,7 +15,6 @@ class LASTFPS_API ULastFPSGameInstance : public UGameInstance
     GENERATED_BODY()
 
 public:
-    virtual void Init() override;
     virtual void Shutdown() override;
 
     virtual int32 AddLocalPlayer(ULocalPlayer* NewPlayer, FPlatformUserId UserId) override;
@@ -61,13 +60,7 @@ public:
     static FText GetDefaultMapNameTextForDestination(ELastFPSTravelDestination Destination);
 
 protected:
-    /** 캐릭터 로스터 에셋 경로 — DefaultGame.ini의 [/Script/LastFPS.LastFPSGameInstance] 에서 지정 */
-    UPROPERTY(Config, EditAnywhere, Category="LastFPS|Character")
-    TSoftObjectPtr<ULastFPSCharacterRoster> CharacterRosterAsset;
-
-    /** 로딩 팁 테이블 (FLastFPSLoadingTipData) — 시작 시 이미지 프리로드용 */
-    UPROPERTY(Config, EditAnywhere, Category="LastFPS|Loading")
-    TSoftObjectPtr<UDataTable> LoadingTipTable = TSoftObjectPtr<UDataTable>(FSoftObjectPath(TEXT("/Game/Data/Loading/DT_LoadingTips.DT_LoadingTips")));
+    virtual void OnStart() override;
 
 private:
     /** 시작 시 로딩 팁 이미지들을 로드·상주시켜 캐싱 (첫 로딩 화면부터 즉시 표시) */
@@ -76,10 +69,6 @@ private:
     /** 프리로드한 텍스처의 하드 레퍼런스 — GC 방지 + 상주 유지 */
     UPROPERTY(Transient)
     TArray<TObjectPtr<UTexture2D>> PreloadedLoadingTipTextures;
-
-    /** GetCharacterRoster의 lazy 로드 캐시 */
-    UPROPERTY(Transient)
-    TObjectPtr<ULastFPSCharacterRoster> CachedCharacterRoster;
 
     UPROPERTY()
     TMap<FString, int32> SelectedCharacterIndexByPlayerKey;

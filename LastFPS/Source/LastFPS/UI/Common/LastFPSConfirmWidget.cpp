@@ -111,5 +111,5 @@ void ULastFPSConfirmWidget::CloseWithMessagingResult(
 {
 	CompleteDialog(Result);
 	OnConfirmResult.Broadcast(bConfirmed);
-	DeactivateWidget();
+	DeactivateWithAnimation();
 }

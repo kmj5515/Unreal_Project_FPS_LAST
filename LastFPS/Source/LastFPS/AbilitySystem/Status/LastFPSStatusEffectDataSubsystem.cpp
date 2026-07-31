@@ -1,23 +1,23 @@
 #include "AbilitySystem/Status/LastFPSStatusEffectDataSubsystem.h"
 
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Engine/DataTable.h"
+#include "Engine/GameInstance.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSStatusEffectData, Log, All);
 
 void ULastFPSStatusEffectDataSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	Collection.InitializeDependency<ULastFPSGameDataSubsystem>();
 
 	DataByStatusTag.Reset();
-	LoadedTable = StatusEffectUITable.LoadSynchronous();
+	ULastFPSGameDataSubsystem* GameData = GetGameInstance()->GetSubsystem<ULastFPSGameDataSubsystem>();
+	LoadedTable = GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_Status_UI) : nullptr;
 	if (!LoadedTable)
 	{
-		if (!StatusEffectUITable.IsNull())
-		{
-			UE_LOG(LogLastFPSStatusEffectData, Error,
-				TEXT("상태 효과 UI 데이터 테이블 '%s'을 로드하지 못했습니다."),
-				*StatusEffectUITable.ToString());
-		}
+		UE_LOG(LogLastFPSStatusEffectData, Error, TEXT("GameDataSet에서 상태 효과 UI 데이터 테이블을 찾지 못했습니다."));
 		return;
 	}
 

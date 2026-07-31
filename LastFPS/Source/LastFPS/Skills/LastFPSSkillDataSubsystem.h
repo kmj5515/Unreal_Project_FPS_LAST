@@ -32,15 +32,6 @@ public:
 
 	const FLastFPSSkillBalanceData* FindBalance(FName SkillId) const;
 
-protected:
-	/** 모든 캐릭터가 공유하는 FLastFPSCharacterSkillData 테이블이다. */
-	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Skills")
-	TSoftObjectPtr<UDataTable> CharacterSkillTable;
-
-	/** SkillId와 같은 행 이름을 사용하는 FLastFPSSkillBalanceData 테이블이다. */
-	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Skills")
-	TSoftObjectPtr<UDataTable> SkillBalanceTable;
-
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UDataTable> LoadedCharacterSkillTable;

@@ -34,7 +34,8 @@ public class WidgetTreeGen : ModuleRules
 				"ToolMenus",
 				"PropertyEditor",
 				"DesktopPlatform",
-				"EditorUtility"
+				"EditorUtility",
+				"LastFPS"
 			}
 		);
 	}

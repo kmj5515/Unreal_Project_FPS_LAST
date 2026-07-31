@@ -19,7 +19,6 @@ public:
 private:
 	void LoadSettings();
 	void SaveSettings() const;
-	void SetMasterTable(const FAssetData& AssetData);
 	FString GetMasterTableObjectPath() const;
 	void SetLocomotionAnimationSet(const FAssetData& AssetData);
 	FString GetLocomotionAnimationSetObjectPath() const;

@@ -500,33 +500,43 @@ void ALastFPSCharacterBase::InitAbilitySystem()
 	}
 
     const bool bDefaultsAlreadyGranted = PS ? PS->HasGrantedGASDefaults() : bOwnedGASDefaultsGranted;
-    if (HasAuthority() && !bDefaultsAlreadyGranted)
+    if (HasAuthority())
     {
-        if (ALastFPSGameModeBase* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALastFPSGameModeBase>() : nullptr)
-        {
-            GM->ApplyCharacterDefinitionToAbilitySystem(ASC, ResolvedDefinition);
-            GM->ApplyLevelRestrictionsToAbilitySystem(ASC);
-        }
+        ALastFPSGameModeBase* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ALastFPSGameModeBase>() : nullptr;
 
-        // 베이스 스탯 적용 직후, 장착 모듈 보정을 Infinite GE 로 얹는다 (서버 권위).
-        if (UGameInstance* GI = GetGameInstance())
+        if (!bDefaultsAlreadyGranted)
         {
-            if (ULastFPSLoadoutSubsystem* Loadout = GI->GetSubsystem<ULastFPSLoadoutSubsystem>())
+            if (GM)
             {
-                Loadout->ApplyToAbilitySystem(ASC);
+                GM->ApplyCharacterDefinitionToAbilitySystem(ASC, ResolvedDefinition);
+            }
+
+            // 베이스 스탯 적용 직후, 장착 모듈 보정을 Infinite GE 로 얹는다 (서버 권위).
+            if (UGameInstance* GI = GetGameInstance())
+            {
+                if (ULastFPSLoadoutSubsystem* Loadout = GI->GetSubsystem<ULastFPSLoadoutSubsystem>())
+                {
+                    Loadout->ApplyToAbilitySystem(ASC);
+                }
+            }
+
+            GiveDefaultAbilities();
+            ApplyDefaultEffects();
+
+            if (PS)
+            {
+                PS->MarkGASDefaultsGranted();
+            }
+            else
+            {
+                bOwnedGASDefaultsGranted = true;
             }
         }
 
-        GiveDefaultAbilities();
-        ApplyDefaultEffects();
-
-        if (PS)
+        // 레벨 제한(예: 허브 내 전투 금지)은 맵마다 다르므로 항상 새로 적용/갱신한다.
+        if (GM)
         {
-            PS->MarkGASDefaultsGranted();
-        }
-        else
-        {
-            bOwnedGASDefaultsGranted = true;
+            GM->ApplyLevelRestrictionsToAbilitySystem(ASC);
         }
     }
 

@@ -1,13 +1,17 @@
 #include "Weapons/LastFPSWeaponDataSubsystem.h"
 
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Data/Tables/LastFPSWeaponBalanceData.h"
 #include "Engine/DataTable.h"
+#include "Engine/GameInstance.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSWeaponData, Log, All);
 
 void ULastFPSWeaponDataSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	Collection.InitializeDependency<ULastFPSGameDataSubsystem>();
 
 	AmmoSettingsByWeaponId.Reset();
 	for (const FLastFPSWeaponAmmoConfigEntry& Entry : WeaponAmmoConfigurations)
@@ -36,11 +40,11 @@ void ULastFPSWeaponDataSubsystem::Initialize(FSubsystemCollectionBase& Collectio
 		AmmoSettingsByWeaponId.Add(Entry.WeaponId, Entry.Settings);
 	}
 
-	LoadedWeaponBalanceTable = WeaponBalanceTable.LoadSynchronous();
+	ULastFPSGameDataSubsystem* GameData = GetGameInstance()->GetSubsystem<ULastFPSGameDataSubsystem>();
+	LoadedWeaponBalanceTable = GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_Balance_Weapon) : nullptr;
 	if (!LoadedWeaponBalanceTable)
 	{
-		UE_LOG(LogLastFPSWeaponData, Error,
-			TEXT("공용 WeaponBalanceTable을 로드하지 못했습니다. DefaultGame.ini의 LastFPSWeaponDataSubsystem 설정을 확인하세요."));
+		UE_LOG(LogLastFPSWeaponData, Error, TEXT("GameDataSet에서 공용 WeaponBalanceTable을 찾지 못했습니다."));
 		return;
 	}
 

@@ -60,6 +60,8 @@ void UGA_ViolaIceAura::ActivateAbility(
 	{
 		Hero->SetCombatState(EMMCombatState::Casting);
 	}
+
+	PlayActivationSound();
 	
 	if (AuraEffectEventTag.IsValid())
 	{

@@ -11,10 +11,15 @@
 #include "Data/Characters/LastFPSCharacterAcceleratorData.h"
 #include "Data/Characters/LastFPSCharacterStatData.h"
 #include "Data/Characters/LastFPSCharacterVisualData.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
+#include "Data/AssetManagement/LastFPSPrimaryAssetTypes.h"
+#include "Data/Definitions/LastFPSGameDataSet.h"
 #include "ContentBrowserModule.h"
 #include "Settings/MW_Settings.h"
 #include "Editor.h"
+#include "Engine/AssetManager.h"
 #include "Engine/DataTable.h"
+#include "Engine/StreamableManager.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
 #include "Data/Definitions/LastFPSHeroDefinition.h"
 #include "Data/Definitions/LastFPSEnemyDefinition.h"
@@ -39,6 +44,8 @@
 #include "Styling/AppStyle.h"
 
 #define LOCTEXT_NAMESPACE "SCharacterDataAssetTool"
+
+DEFINE_LOG_CATEGORY_STATIC(LogLastFPSCharacterDataAssetTool, Log, All);
 
 namespace
 {
@@ -122,10 +129,11 @@ void SCharacterDataAssetTool::Construct(const FArguments& InArgs)
 						[
 							LastFPSEditorWidgets::MakeFormRow(
 								LOCTEXT("MasterTableRowLabel", "데이터 테이블"),
-								SNew(SObjectPropertyEntryBox)
-								.AllowedClass(UDataTable::StaticClass())
-								.ObjectPath(this, &SCharacterDataAssetTool::GetMasterTableObjectPath)
-								.OnObjectChanged(this, &SCharacterDataAssetTool::SetMasterTable))
+								SNew(STextBlock)
+								.Text_Lambda([this]()
+								{
+									return FText::FromString(GetMasterTableObjectPath());
+								}))
 						]
 
 						+ SVerticalBox::Slot()
@@ -301,7 +309,6 @@ void SCharacterDataAssetTool::LoadSettings()
 
 	if (const UMW_Settings* Settings = UMW_Settings::Get())
 	{
-		MasterTableObjectPath = Settings->CharacterMasterTable.ToSoftObjectPath().ToString();
 		DefinitionOutputRoot = Settings->CharacterDefinitionOutputRoot.IsEmpty()
 			                       ? DefinitionOutputRoot
 			                       : Settings->CharacterDefinitionOutputRoot;
@@ -317,13 +324,31 @@ void SCharacterDataAssetTool::LoadSettings()
 			                                : Settings->LocomotionAnimationSourceRoot;
 		LocomotionAnimationNameFilter = Settings->LocomotionAnimationNameFilter;
 		LocomotionAnimationPrefixFilter = Settings->LocomotionAnimationPrefixFilter;
-		MasterTable = Settings->CharacterMasterTable.LoadSynchronous();
 		LocomotionAnimationSet = Settings->LocomotionAnimationSet.LoadSynchronous();
 	}
 
-	if (!MasterTable.IsValid() && !MasterTableObjectPath.IsEmpty())
+	const FPrimaryAssetId StartupDataSetId(LastFPSPrimaryAssetTypes::GameDataSet, TEXT("DA_DataSet_Startup"));
+	UAssetManager& AssetManager = UAssetManager::Get();
+	const TArray<FName> BundlesToLoad{LastFPSAssetBundles::Startup};
+	TSharedPtr<FStreamableHandle> Handle = AssetManager.LoadPrimaryAsset(StartupDataSetId, BundlesToLoad);
+	if (Handle.IsValid())
 	{
-		MasterTable = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, *MasterTableObjectPath));
+		Handle->WaitUntilComplete();
+		if (const ULastFPSGameDataSet* DataSet = Cast<ULastFPSGameDataSet>(AssetManager.GetPrimaryAssetObject(StartupDataSetId)))
+		{
+			if (const FLastFPSDataTableReference* Reference = DataSet->FindTable(LastFPSGameDataTags::Data_Table_Character_Master))
+			{
+				MasterTable = Reference->Table.Get();
+				MasterTableObjectPath = Reference->Table.ToSoftObjectPath().ToString();
+			}
+		}
+	}
+	if (!MasterTable.IsValid())
+	{
+		UE_LOG(
+			LogLastFPSCharacterDataAssetTool,
+			Error,
+			TEXT("Startup GameDataSet에서 Data.Table.Character.Master 테이블을 찾지 못했습니다."));
 	}
 
 	if (!LocomotionAnimationSet.IsValid() && !LocomotionAnimationSetObjectPath.IsEmpty())
@@ -338,7 +363,6 @@ void SCharacterDataAssetTool::SaveSettings() const
 {
 	if (UMW_Settings* Settings = GetMutableDefault<UMW_Settings>())
 	{
-		Settings->CharacterMasterTable = TSoftObjectPtr<UDataTable>(FSoftObjectPath(MasterTableObjectPath));
 		Settings->CharacterDefinitionOutputRoot = DefinitionOutputRoot;
 		Settings->CharacterStatOutputRoot = StatOutputRoot;
 		Settings->CharacterAbilitySetOutputRoot = AbilitySetOutputRoot;
@@ -349,14 +373,6 @@ void SCharacterDataAssetTool::SaveSettings() const
 		Settings->LocomotionAnimationPrefixFilter = LocomotionAnimationPrefixFilter;
 		Settings->SaveConfig();
 	}
-}
-
-void SCharacterDataAssetTool::SetMasterTable(const FAssetData& AssetData)
-{
-	MasterTable = Cast<UDataTable>(AssetData.GetAsset());
-	MasterTableObjectPath = AssetData.IsValid() ? AssetData.GetSoftObjectPath().ToString() : FString();
-	RefreshRowNames();
-	SaveSettings();
 }
 
 FString SCharacterDataAssetTool::GetMasterTableObjectPath() const

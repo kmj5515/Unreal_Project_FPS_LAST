@@ -5,7 +5,6 @@
 #include "Engine/DeveloperSettings.h"
 #include "MW_Settings.generated.h"
 
-class UDataTable;
 class UEditorUtilityWidgetBlueprint;
 class UWorld;
 
@@ -28,9 +27,6 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category="Play Tools")
 	TSoftObjectPtr<UWorld> ForcedPlayStartMap;
-
-	UPROPERTY(Config, EditAnywhere, Category="Character Data Asset Tool")
-	TSoftObjectPtr<UDataTable> CharacterMasterTable;
 
 	UPROPERTY(Config, EditAnywhere, Category="Character Data Asset Tool")
 	FString CharacterDefinitionOutputRoot = TEXT("/Game/Data/Characters");

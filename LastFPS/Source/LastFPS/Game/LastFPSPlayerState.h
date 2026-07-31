@@ -4,6 +4,7 @@
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
+#include "ActiveGameplayEffectHandle.h"
 #include "LastFPSPlayerState.generated.h"
 
 class UAbilitySystemComponent;
@@ -47,6 +48,9 @@ public:
     FORCEINLINE float GetStatHealingReceived() const { return StatHealingReceived; }
     FORCEINLINE float GetStatHealingGiven() const { return StatHealingGiven; }
     FORCEINLINE int32 GetSelectedCharacterIndex() const { return SelectedCharacterIndex; }
+
+    /** 허브/맵 이동 시 부여되는 현재 레벨의 제한(전투 금지 등) 효과 핸들. GameMode가 관리한다. */
+    FActiveGameplayEffectHandle LevelRestrictionHandle;
 
     UPROPERTY(BlueprintAssignable, Category="LastFPS|Damage")
     FLastFPSDamageDealtSignature OnDamageDealt;

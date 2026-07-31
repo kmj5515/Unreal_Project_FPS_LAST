@@ -32,7 +32,7 @@ protected:
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
 	/** 아이템 정의 테이블 (RowType = FLastFPSItemData) */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory", meta=(RequiredAssetDataTags="RowStructure=/Script/LastFPS.LastFPSItemData"))
+	UPROPERTY(Transient)
 	TObjectPtr<UDataTable> ItemTable;
 
 	/** 슬롯 1칸 위젯 클래스 (WBP_ItemSlot) */

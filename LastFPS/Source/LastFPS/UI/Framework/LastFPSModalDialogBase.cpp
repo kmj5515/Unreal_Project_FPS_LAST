@@ -49,7 +49,7 @@ void ULastFPSModalDialogBase::SetupDialog(
 void ULastFPSModalDialogBase::KillDialog()
 {
 	CompleteDialog(ECommonMessagingResult::Killed);
-	DeactivateWidget();
+	DeactivateWithAnimation();
 }
 
 TOptional<FUIInputConfig> ULastFPSModalDialogBase::GetDesiredInputConfig() const
@@ -67,6 +67,19 @@ void ULastFPSModalDialogBase::NativeOnActivated()
 {
 	Super::NativeOnActivated();
 
+	bWaitingForOutAnimation = false;
+	SetIsEnabled(true);
+
+	if (OutAnimation && IsAnimationPlaying(OutAnimation))
+	{
+		StopAnimation(OutAnimation);
+	}
+
+	if (InAnimation)
+	{
+		PlayAnimation(InAnimation);
+	}
+
 	if (ActivateSound)
 	{
 		UGameplayStatics::PlaySound2D(this, ActivateSound);
@@ -78,6 +91,8 @@ void ULastFPSModalDialogBase::NativeOnActivated()
 
 void ULastFPSModalDialogBase::NativeOnDeactivated()
 {
+	bWaitingForOutAnimation = false;
+
 	if (!bResultCompleted && PendingResultCallback.IsBound())
 	{
 		CompleteDialog(ECommonMessagingResult::Killed);
@@ -114,6 +129,18 @@ void ULastFPSModalDialogBase::NativeOnDeactivated()
 	});
 }
 
+void ULastFPSModalDialogBase::OnAnimationFinished_Implementation(
+	const UWidgetAnimation* Animation)
+{
+	Super::OnAnimationFinished_Implementation(Animation);
+
+	if (bWaitingForOutAnimation && Animation == OutAnimation)
+	{
+		bWaitingForOutAnimation = false;
+		DeactivateWidget();
+	}
+}
+
 FReply ULastFPSModalDialogBase::NativeOnKeyDown(
 	const FGeometry& InGeometry,
 	const FKeyEvent& InKeyEvent)
@@ -140,4 +167,26 @@ void ULastFPSModalDialogBase::CompleteDialog(
 	bResultCompleted = true;
 	FCommonMessagingResultDelegate Callback = MoveTemp(PendingResultCallback);
 	Callback.ExecuteIfBound(Result);
+}
+
+void ULastFPSModalDialogBase::DeactivateWithAnimation()
+{
+	if (bWaitingForOutAnimation)
+	{
+		return;
+	}
+
+	if (!OutAnimation)
+	{
+		DeactivateWidget();
+		return;
+	}
+
+	bWaitingForOutAnimation = true;
+	SetIsEnabled(false);
+	if (InAnimation && IsAnimationPlaying(InAnimation))
+	{
+		StopAnimation(InAnimation);
+	}
+	PlayAnimation(OutAnimation);
 }

@@ -8,12 +8,14 @@
 #include "Engine/StreamableManager.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "Game/Loading/LastFPSRenderWarmupSource.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/App.h"
 #include "NativeGameplayTags.h"
-#include "PipelineStateCache.h"
+#include "ShaderPipelineCache.h"
 #include "ShaderCompiler.h"
 #include "TimerManager.h"
+#include "UObject/UObjectIterator.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSDestinationContent, Log, All);
 
@@ -161,6 +163,63 @@ void ULastFPSDestinationContentComponent::StartContentLoad(
     BeginNextLoadPhase();
 }
 
+void ULastFPSDestinationContentComponent::StartContentLoad(
+    const FPrimaryAssetId& ContentSetId)
+{
+    if (LoadState != EContentLoadState::Unloaded)
+    {
+        UE_LOG(LogLastFPSDestinationContent, Warning,
+            TEXT("콘텐츠 로드가 이미 시작되어 원격 요청을 무시합니다: %s"),
+            *ContentSetId.ToString());
+        return;
+    }
+    if (!ContentSetId.IsValid())
+    {
+        UE_LOG(LogLastFPSDestinationContent, Error,
+            TEXT("유효하지 않은 목적지 Content Set ID가 복제되었습니다."));
+        return;
+    }
+
+    PendingContentSetId = ContentSetId;
+    LoadStartSeconds = FPlatformTime::Seconds();
+    LoadState = EContentLoadState::LoadingAssets;
+
+    TSharedPtr<FStreamableHandle> ContentSetHandle =
+        UAssetManager::Get().LoadPrimaryAsset(
+            ContentSetId,
+            TArray<FName>(),
+            FStreamableDelegate::CreateUObject(
+                this,
+                &ThisClass::HandleContentSetLoaded));
+    if (!ContentSetHandle.IsValid())
+    {
+        UE_LOG(LogLastFPSDestinationContent, Error,
+            TEXT("목적지 Content Set 로드 요청에 실패했습니다: %s"),
+            *ContentSetId.ToString());
+        HandleAssetsLoaded();
+        return;
+    }
+
+    LoadHandles.Add(MoveTemp(ContentSetHandle));
+}
+
+void ULastFPSDestinationContentComponent::HandleContentSetLoaded()
+{
+    ActiveContentSet = Cast<ULastFPSDestinationContentSet>(
+        UAssetManager::Get().GetPrimaryAssetObject(PendingContentSetId));
+    if (!ActiveContentSet)
+    {
+        UE_LOG(LogLastFPSDestinationContent, Error,
+            TEXT("로드된 Primary Asset이 목적지 Content Set이 아닙니다: %s"),
+            *PendingContentSetId.ToString());
+        HandleAssetsLoaded();
+        return;
+    }
+
+    RegisterLoadingProgress();
+    BeginNextLoadPhase();
+}
+
 void ULastFPSDestinationContentComponent::BeginNextLoadPhase()
 {
     TArray<FSoftObjectPath> RequiredPaths;
@@ -286,6 +345,15 @@ void ULastFPSDestinationContentComponent::HandleAssetsLoaded()
 
     OnAssetsLoaded.Broadcast();
 
+    // 원격 클라이언트에는 GameMode가 없으므로 데이터 계약만으로 로컬 PSO 준비를 진행한다.
+    if (LoadState == EContentLoadState::AwaitingRenderWarmup
+        && GetOwner()
+        && !GetOwner()->HasAuthority())
+    {
+        BeginRenderWarmup(TArray<AActor*>());
+        return;
+    }
+
     // 구독자가 없거나 렌더 준비를 시작하지 않은 맵은 기존처럼 에셋 로드만으로 완료한다.
     if (LoadState == EContentLoadState::AwaitingRenderWarmup)
     {
@@ -321,7 +389,15 @@ void ULastFPSDestinationContentComponent::BeginRenderWarmup(
     WarmupComponents.Reset();
     MaxObservedShaderWork = 0;
 
-    for (AActor* Actor : Actors)
+    TArray<AActor*> AllWarmupActors = Actors;
+    const FLastFPSRenderWarmupSettings Settings =
+        ActiveContentSet ? ActiveContentSet->RenderWarmup : FLastFPSRenderWarmupSettings();
+    if (Settings.bEnabled && FApp::CanEverRender())
+    {
+        CreateDataDrivenRenderWarmupActors(AllWarmupActors);
+    }
+
+    for (AActor* Actor : AllWarmupActors)
     {
         if (!IsValid(Actor))
         {
@@ -341,10 +417,7 @@ void ULastFPSDestinationContentComponent::BeginRenderWarmup(
         }
     }
 
-    const FLastFPSRenderWarmupSettings Settings =
-        ActiveContentSet ? ActiveContentSet->RenderWarmup : FLastFPSRenderWarmupSettings();
-
-    if (!Settings.bEnabled || !FApp::CanEverRender() || WarmupComponents.IsEmpty())
+    if (!Settings.bEnabled || !FApp::CanEverRender())
     {
         UE_LOG(LogLastFPSDestinationContent, Log,
             TEXT("렌더 준비 생략 — 활성=%s, 렌더 가능=%s, 컴포넌트=%d"),
@@ -400,7 +473,8 @@ bool ULastFPSDestinationContentComponent::IsRenderWarmupBusy(
     OutShaderJobs = GShaderCompilingManager
         ? GShaderCompilingManager->GetNumRemainingJobs()
         : 0;
-    OutPSORequests = PipelineStateCache::NumActivePrecacheRequests();
+    // Bundled PSO와 런타임 Component PSO 요청을 모두 포함해야 화면을 일찍 닫지 않는다.
+    OutPSORequests = FShaderPipelineCache::NumPrecompilesRemaining();
 
     return !RenderRegistrationFence.IsFenceComplete()
         || OutCompilingComponents > 0
@@ -494,6 +568,7 @@ void ULastFPSDestinationContentComponent::CompleteRenderWarmup()
     RenderStageProgress = 1.0f;
     ShaderStageProgress = 1.0f;
     UpdateLoadingProgress();
+    DestroyOwnedRenderWarmupActors();
 
     if (RenderWarmupCompletedDelegate.IsBound())
     {
@@ -612,6 +687,72 @@ void ULastFPSDestinationContentComponent::CompleteLoadingProgress()
     }
 }
 
+void ULastFPSDestinationContentComponent::CreateDataDrivenRenderWarmupActors(
+    TArray<AActor*>& OutActors)
+{
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    // Content Set 로드가 끝난 시점의 제공자만 대상으로 삼아 중앙 로더의 콘텐츠 타입 의존성을 없앤다.
+    TArray<UObject*> WarmupSources;
+    for (TObjectIterator<UObject> It; It; ++It)
+    {
+        UObject* Object = *It;
+        if (!IsValid(Object)
+            || Object->HasAnyFlags(
+                RF_ClassDefaultObject | RF_ArchetypeObject | RF_Transient)
+            || !Object->GetClass()->ImplementsInterface(
+                ULastFPSRenderWarmupSource::StaticClass()))
+        {
+            continue;
+        }
+        WarmupSources.Add(Object);
+    }
+
+    for (UObject* Object : WarmupSources)
+    {
+        const ILastFPSRenderWarmupSource* Source =
+            Cast<ILastFPSRenderWarmupSource>(Object);
+        if (!Source)
+        {
+            continue;
+        }
+
+        const int32 FirstNewActorIndex = OutActors.Num();
+        Source->CreateRenderWarmupActors(
+            *World,
+            GetOwner() ? GetOwner()->GetActorTransform() : FTransform::Identity,
+            OutActors);
+        for (int32 Index = FirstNewActorIndex; Index < OutActors.Num(); ++Index)
+        {
+            if (IsValid(OutActors[Index]))
+            {
+                OwnedRenderWarmupActors.AddUnique(OutActors[Index]);
+            }
+        }
+    }
+
+    UE_LOG(LogLastFPSDestinationContent, Log,
+        TEXT("데이터 기반 렌더 워밍업 준비: 제공자=%d, 임시 Actor=%d"),
+        WarmupSources.Num(),
+        OwnedRenderWarmupActors.Num());
+}
+
+void ULastFPSDestinationContentComponent::DestroyOwnedRenderWarmupActors()
+{
+    for (AActor* Actor : OwnedRenderWarmupActors)
+    {
+        if (IsValid(Actor))
+        {
+            Actor->Destroy();
+        }
+    }
+    OwnedRenderWarmupActors.Reset();
+}
+
 void ULastFPSDestinationContentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     OnAssetsLoaded.Clear();
@@ -627,6 +768,7 @@ void ULastFPSDestinationContentComponent::EndPlay(const EEndPlayReason::Type End
     LoadHandles.Reset();
     RequestedPaths.Reset();
     WarmupComponents.Reset();
+    DestroyOwnedRenderWarmupActors();
     RenderWarmupCompletedDelegate.Unbind();
     ActiveContentSet = nullptr;
     if (UWorld* World = GetWorld())

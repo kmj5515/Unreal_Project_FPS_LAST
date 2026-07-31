@@ -28,6 +28,10 @@ class LASTFPS_API ULastFPSCharacterDefinition : public UPrimaryDataAsset
 	GENERATED_BODY()
 
 public:
+	static const FPrimaryAssetType PrimaryAssetType;
+
+	virtual FPrimaryAssetId GetPrimaryAssetId() const override;
+
 	// ── 공유 식별/분류 ─────────────────────────────────────────
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character")
 	FName CharacterId;

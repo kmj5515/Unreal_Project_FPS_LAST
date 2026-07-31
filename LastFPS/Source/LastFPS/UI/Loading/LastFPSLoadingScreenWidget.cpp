@@ -124,16 +124,11 @@ void ULastFPSLoadingScreenWidget::RefreshFromTravelSubsystem()
 
 void ULastFPSLoadingScreenWidget::ApplyRandomTip()
 {
-    // 프리로드(GameInstance)와 동일한 DT를 단일 소스로 사용 → 표시 텍스처가 항상 상주 캐시와 일치.
-    // GI를 못 얻으면 위젯 자체 TipTable로 폴백.
+    // GameDataSet의 로딩 팁 테이블을 단일 소스로 사용해 프리로드와 표시 데이터가 항상 일치하게 한다.
     UDataTable* Table = nullptr;
     if (ULastFPSGameInstance* GI = Cast<ULastFPSGameInstance>(GetGameInstance()))
     {
         Table = GI->GetLoadingTipTable();
-    }
-    if (!Table)
-    {
-        Table = TipTable.LoadSynchronous();
     }
     if (!Table)
     {

@@ -36,9 +36,6 @@ public:
 
 protected:
 	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Status Effect")
-	TSoftObjectPtr<UDataTable> StatusEffectUITable;
-
-	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Status Effect")
 	TSoftObjectPtr<UTexture2D> FallbackIcon;
 
 private:

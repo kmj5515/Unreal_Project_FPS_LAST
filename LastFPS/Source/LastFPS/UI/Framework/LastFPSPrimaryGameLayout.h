@@ -7,8 +7,8 @@ class UCommonActivatableWidgetContainerBase;
 class UCanvasPanel;
 
 /**
- * Root UI layout with four CommonUI layers (Game / GameMenu / Menu / Modal).
- * Layers are created in C++ so a WBP child is optional; override in WBP to customize layout.
+ * 프로젝트 공통 UI 레이어(Game / GameMenu / Menu / Modal / Overlay)를 소유하는 루트 레이아웃이다.
+ * C++에서 기본 레이어를 생성하며 필요하면 파생 WBP가 각 컨테이너를 제공할 수 있다.
  */
 UCLASS(Blueprintable)
 class LASTFPS_API ULastFPSPrimaryGameLayout : public UPrimaryGameLayout
@@ -44,6 +44,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UCommonActivatableWidgetContainerBase> LayerStack_Modal;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UCommonActivatableWidgetContainerBase> LayerStack_Overlay;
+
 private:
 	void EnsureLayersRegistered();
 
@@ -61,4 +64,7 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UCommonActivatableWidgetContainerBase> AutoLayer_Modal;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCommonActivatableWidgetContainerBase> AutoLayer_Overlay;
 };

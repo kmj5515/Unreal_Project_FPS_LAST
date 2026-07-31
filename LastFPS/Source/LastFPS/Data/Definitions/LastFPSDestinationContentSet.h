@@ -4,6 +4,7 @@
 #include "GameplayTagContainer.h"
 #include "Data/Definitions/LastFPSDestinationFeature.h"
 #include "Engine/DataAsset.h"
+#include "UObject/PrimaryAssetId.h"
 #include "LastFPSDestinationContentSet.generated.h"
 
 /** 목적지 콘텐츠 준비 과정이 전체 로딩 바에서 차지할 비율과 내부 단계 가중치다. */
@@ -69,6 +70,10 @@ class LASTFPS_API ULastFPSDestinationContentSet : public UPrimaryDataAsset
     GENERATED_BODY()
 
 public:
+    static const FPrimaryAssetType PrimaryAssetType;
+
+    virtual FPrimaryAssetId GetPrimaryAssetId() const override;
+
     /** 팝업과 같은 로컬 콘텐츠 수명 정책이 현재 목적지를 식별할 때 사용한다. */
     UPROPERTY(
         EditDefaultsOnly,

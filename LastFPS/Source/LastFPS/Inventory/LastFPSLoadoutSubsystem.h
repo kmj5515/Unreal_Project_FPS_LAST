@@ -85,12 +85,9 @@ protected:
 	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Loadout", meta=(ClampMin=0))
 	int32 MaxCapacity = 10;
 
-	/** 모듈 기능 정의 테이블 (DT_ModuleData) — DefaultGame.ini 로 지정 */
-	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Loadout")
-	TSoftObjectPtr<UDataTable> ModuleTable;
-
 private:
 	ULastFPSEconomySubsystem* GetEconomy() const;
+	const UDataTable* GetModuleTable() const;
 
 	/**
 	 * 시작 시 DT_ModuleData 의 모든 행이 DT_ItemData 에 대응 행을 갖는지 검증(에러 로그).

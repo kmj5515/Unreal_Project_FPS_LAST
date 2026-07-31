@@ -103,6 +103,7 @@ void ALastFPSGameModeBase::InitGameState()
             ? DestinationContentSet->ContextTags
             : FGameplayTagContainer();
         LastFPSGameState->SetDestinationContextTags(ContextTags);
+        LastFPSGameState->SetDestinationContentSet(DestinationContentSet);
     }
 
     // 실패 구독은 콘텐츠 로딩과 무관한 책임이다 — 아래 조기 반환에 가려지지 않도록 먼저 건다.
@@ -485,7 +486,19 @@ bool ALastFPSGameModeBase::ApplyCharacterDefinitionToAbilitySystem(
 
 void ALastFPSGameModeBase::ApplyLevelRestrictionsToAbilitySystem(UAbilitySystemComponent* ASC) const
 {
-    if (!ASC || !LevelRestrictionEffect)
+    if (!ASC)
+    {
+        return;
+    }
+
+    ALastFPSPlayerState* PS = Cast<ALastFPSPlayerState>(ASC->GetOwnerActor());
+    if (PS && PS->LevelRestrictionHandle.IsValid())
+    {
+        ASC->RemoveActiveGameplayEffect(PS->LevelRestrictionHandle);
+        PS->LevelRestrictionHandle.Invalidate();
+    }
+
+    if (!LevelRestrictionEffect)
     {
         return;
     }
@@ -496,7 +509,11 @@ void ALastFPSGameModeBase::ApplyLevelRestrictionsToAbilitySystem(UAbilitySystemC
     const FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(LevelRestrictionEffect, 1.f, Context);
     if (Spec.IsValid())
     {
-        ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+        FActiveGameplayEffectHandle NewHandle = ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+        if (PS)
+        {
+            PS->LevelRestrictionHandle = NewHandle;
+        }
     }
 }
 

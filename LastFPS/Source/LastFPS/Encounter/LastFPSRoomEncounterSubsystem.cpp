@@ -1,9 +1,12 @@
 #include "Encounter/LastFPSRoomEncounterSubsystem.h"
 
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Data/Definitions/LastFPSDestinationContentSet.h"
 #include "Data/Definitions/LastFPSRoomEncounterProfile.h"
 #include "Data/Tables/LastFPSRoomEncounterData.h"
 #include "Engine/DataTable.h"
+#include "Engine/GameInstance.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/TriggerBox.h"
 #include "Engine/World.h"
@@ -129,15 +132,21 @@ void ULastFPSRoomEncounterSubsystem::HandleDestinationContentReady()
 		return;
 	}
 
-	UDataTable* EncounterTable = ActiveProfile->EncounterTable.Get();
+	UGameInstance* GameInstance = World->GetGameInstance();
+	ULastFPSGameDataSubsystem* GameData = GameInstance
+		? GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>()
+		: nullptr;
+	LoadedEncounterTable = GameData
+		? GameData->FindTable(LastFPSGameDataTags::Data_Table_Encounter_Room)
+		: nullptr;
+	UDataTable* EncounterTable = LoadedEncounterTable;
 	if (!EncounterTable)
 	{
 		UE_LOG(
 			LogLastFPSRoomEncounterSubsystem,
 			Error,
-			TEXT("중앙 콘텐츠 로딩이 완료됐지만 EncounterTable이 메모리에 없습니다: Profile=%s, Path=%s"),
-			*GetNameSafe(ActiveProfile),
-			*ActiveProfile->EncounterTable.ToString());
+			TEXT("Battle GameDataSet에서 EncounterTable을 찾지 못했습니다: Profile=%s"),
+			*GetNameSafe(ActiveProfile));
 		return;
 	}
 
@@ -157,6 +166,7 @@ void ULastFPSRoomEncounterSubsystem::Deinitialize()
 	DestinationContentComponent.Reset();
 	RuntimeEncounters.Reset();
 	ActiveProfile = nullptr;
+	LoadedEncounterTable = nullptr;
 	bRuntimeEncountersInitialized = false;
 	Super::Deinitialize();
 }
@@ -460,7 +470,5 @@ void ULastFPSRoomEncounterSubsystem::NotifyEncounterFailed(
 
 const UDataTable* ULastFPSRoomEncounterSubsystem::GetEncounterTable() const
 {
-	return ActiveProfile
-		? ActiveProfile->EncounterTable.Get()
-		: nullptr;
+	return LoadedEncounterTable;
 }

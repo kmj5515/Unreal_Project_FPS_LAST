@@ -50,7 +50,7 @@ void ULastFPSNoticeWidget::KillDialog()
 {
 	CompleteDialog(ECommonMessagingResult::Killed);
 	OnNoticeClosed.Broadcast();
-	DeactivateWidget();
+	DeactivateWithAnimation();
 }
 
 void ULastFPSNoticeWidget::HandleOkClicked()
@@ -62,5 +62,5 @@ void ULastFPSNoticeWidget::CloseNotice()
 {
 	CompleteDialog(CloseResult);
 	OnNoticeClosed.Broadcast();
-	DeactivateWidget();
+	DeactivateWithAnimation();
 }

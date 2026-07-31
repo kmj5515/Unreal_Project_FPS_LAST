@@ -1,14 +1,18 @@
 #include "Economy/LastFPSEconomySubsystem.h"
 
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Data/Tables/LastFPSItemData.h"
 #include "Data/Tables/LastFPSShopData.h"
 #include "Engine/DataTable.h"
+#include "Engine/GameInstance.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSEconomy, Log, All);
 
 void ULastFPSEconomySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	Collection.InitializeDependency<ULastFPSGameDataSubsystem>();
 
 	Credits = FMath::Max(0, StartingCredits);
 
@@ -34,7 +38,9 @@ void ULastFPSEconomySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 const UDataTable* ULastFPSEconomySubsystem::GetItemTable() const
 {
-	return ItemTable.LoadSynchronous();
+	UGameInstance* GameInstance = GetGameInstance();
+	ULastFPSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>() : nullptr;
+	return GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_Economy_Item) : nullptr;
 }
 
 bool ULastFPSEconomySubsystem::IsItemTableConfigured() const
@@ -51,7 +57,7 @@ bool ULastFPSEconomySubsystem::HasItemDefinition(FName ItemRowId) const
 	const UDataTable* Table = GetItemTable();
 	if (!Table)
 	{
-		return false; // 테이블 미설정 → 검증 불가(호출부에서 미설정 상황을 따로 처리)
+		return false;
 	}
 	static const FString Context(TEXT("ULastFPSEconomySubsystem::HasItemDefinition"));
 	return Table->FindRow<FLastFPSItemData>(ItemRowId, Context, /*bWarnIfRowMissing=*/false) != nullptr;
@@ -136,7 +142,7 @@ void ULastFPSEconomySubsystem::AddItem(FName ItemRowId, int32 Count)
 		return;
 	}
 
-	// 정의 없는 아이템은 지급하지 않는다(유령 아이템 방지). ItemTable 미설정 시엔 통과.
+	// 정의 없는 아이템은 지급하지 않는다. GameDataSet 로드 실패 시에는 런타임 진행을 허용한다.
 	if (GetItemTable() && !HasItemDefinition(ItemRowId))
 	{
 		UE_LOG(LogLastFPSEconomy, Error,
@@ -160,15 +166,16 @@ void ULastFPSEconomySubsystem::ValidateReferences() const
 	const UDataTable* Items = GetItemTable();
 	if (!Items)
 	{
-		UE_LOG(LogLastFPSEconomy, Warning,
-			TEXT("ItemTable(DT_ItemData) 미설정 — 참조 검증을 건너뜀. Project Settings/DefaultGame.ini 에서 지정 필요."));
+		UE_LOG(LogLastFPSEconomy, Warning, TEXT("GameDataSet에서 DT_ItemData를 찾지 못해 참조 검증을 건너뜁니다."));
 		return;
 	}
 
 	int32 Broken = 0;
 
 	// 상점 판매 항목의 GrantItemRowId 가 모두 DT_ItemData 에 존재하는지.
-	if (const UDataTable* Shop = ShopTable.LoadSynchronous())
+	UGameInstance* GameInstance = GetGameInstance();
+	ULastFPSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>() : nullptr;
+	if (const UDataTable* Shop = GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_Economy_Shop) : nullptr)
 	{
 		static const FString Ctx(TEXT("ULastFPSEconomySubsystem::ValidateReferences|Shop"));
 		Shop->ForeachRow<FLastFPSShopItemData>(Ctx,

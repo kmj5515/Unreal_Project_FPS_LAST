@@ -56,6 +56,8 @@ void UGA_Projectile::ActivateAbility(
         return;
     }
 
+    PlayActivationSound();
+
     Hero->SetWantsToSprint(false);
     if (UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr)
     {

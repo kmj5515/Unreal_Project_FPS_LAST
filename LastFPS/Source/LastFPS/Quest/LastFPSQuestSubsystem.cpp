@@ -1,5 +1,7 @@
 #include "Quest/LastFPSQuestSubsystem.h"
 
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Economy/LastFPSEconomySubsystem.h"
 #include "Game/LastFPSPlayerController.h"
 #include "Data/Tables/LastFPSRoomEncounterData.h"
@@ -28,7 +30,11 @@ namespace
 		{
 			return Ctx.Economy ? Ctx.Economy->GetItemCount(Obj.TargetId) : 0;
 		}
-		virtual bool RecomputeProgress(const FLastFPSQuestObjective& Obj, int32 Baseline, const FLastFPSObjectiveEvalContext& Ctx, int32& OutProgress) const override
+		virtual bool RecomputeProgress(
+			const FLastFPSQuestObjective& Obj,
+			int32 Baseline,
+			const FLastFPSObjectiveEvalContext& Ctx,
+			int32& OutProgress) const override
 		{
 			const int32 Current = Ctx.Economy ? Ctx.Economy->GetItemCount(Obj.TargetId) : 0;
 			OutProgress = Current - Baseline; // 클램프는 호출부가 일괄 처리
@@ -45,7 +51,11 @@ namespace
 	public:
 		virtual bool IsProgressMonotonic() const override { return true; }
 
-		virtual bool RecomputeProgress(const FLastFPSQuestObjective& Obj, int32 Baseline, const FLastFPSObjectiveEvalContext& Ctx, int32& OutProgress) const override
+		virtual bool RecomputeProgress(
+			const FLastFPSQuestObjective& Obj,
+			int32 Baseline,
+			const FLastFPSObjectiveEvalContext& Ctx,
+			int32& OutProgress) const override
 		{
 			OutProgress = 0;
 			if (!Ctx.Subsystem)
@@ -132,6 +142,7 @@ void ULastFPSQuestSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	// Economy 를 먼저 초기화(진행 판정/보상 지급이 Economy 를 사용). 시드 아이템도 이 시점엔 이미 채워져 있음.
 	Collection.InitializeDependency<ULastFPSEconomySubsystem>();
+	Collection.InitializeDependency<ULastFPSGameDataSubsystem>();
 
 	Super::Initialize(Collection);
 
@@ -184,7 +195,7 @@ ULastFPSEconomySubsystem* ULastFPSQuestSubsystem::GetEconomy() const
 
 const UDataTable* ULastFPSQuestSubsystem::GetEncounterTable() const
 {
-	const UGameInstance* GameInstance = GetGameInstance();
+	UGameInstance* GameInstance = GetGameInstance();
 	const UWorld* World = GameInstance ? GameInstance->GetWorld() : nullptr;
 	const ULastFPSRoomEncounterSubsystem* EncounterSubsystem = World
 		? World->GetSubsystem<ULastFPSRoomEncounterSubsystem>()
@@ -308,11 +319,9 @@ FLastFPSObjectiveEvalContext ULastFPSQuestSubsystem::MakeEvalContext() const
 
 const UDataTable* ULastFPSQuestSubsystem::GetQuestTable() const
 {
-	if (const UDataTable* LoadedTable = QuestTable.Get())
-	{
-		return LoadedTable;
-	}
-	return QuestTable.LoadSynchronous();
+	UGameInstance* GameInstance = GetGameInstance();
+	ULastFPSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>() : nullptr;
+	return GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_Quest_Definition) : nullptr;
 }
 
 const FLastFPSQuestData* ULastFPSQuestSubsystem::FindQuest(FName QuestId) const
@@ -331,8 +340,7 @@ void ULastFPSQuestSubsystem::SeedRuntimeStates()
 	const UDataTable* Table = GetQuestTable();
 	if (!Table)
 	{
-		UE_LOG(LogLastFPSQuest, Warning,
-			TEXT("QuestTable(DT_QuestData) 미설정 — DefaultGame.ini 의 [/Script/LastFPS.LastFPSQuestSubsystem] QuestTable 확인."));
+		UE_LOG(LogLastFPSQuest, Warning, TEXT("GameDataSet에서 DT_QuestData를 찾지 못해 런타임 상태를 만들 수 없습니다."));
 		return;
 	}
 
@@ -827,7 +835,9 @@ void ULastFPSQuestSubsystem::HandlePostWorldInitialization(const FActorsInitiali
 
 const UDataTable* ULastFPSQuestSubsystem::GetRadioTable() const
 {
-	return RadioTable.LoadSynchronous();
+	UGameInstance* GameInstance = GetGameInstance();
+	ULastFPSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>() : nullptr;
+	return GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_Radio_Transmission) : nullptr;
 }
 
 const FLastFPSRadioTransmissionData* ULastFPSQuestSubsystem::FindRadioTransmission(FName RadioId) const
@@ -1386,12 +1396,16 @@ void ULastFPSQuestSubsystem::AcceptDungeonQuestForMap(UWorld& World)
 		return;
 	}
 
-	// 진행할 퀘스트는 맵 키워드 매핑이 단일 소스다 — 코드에 맵 이름을 하드코딩하지 않는다.
-	const FString MapName = World.GetMapName();
+	// PIE 접두사를 제거한 정확한 영속 월드 경로만 비교해 이름이 비슷한 테스트 맵의 오작동을 막는다.
+	const FString CurrentPackageName =
+		UWorld::RemovePIEPrefix(World.GetOutermost()->GetName());
 	const FLastFPSDungeonQuestMapping* Mapping = DungeonMapQuestMap.FindByPredicate(
-		[&MapName](const FLastFPSDungeonQuestMapping& Candidate)
+		[&CurrentPackageName](const FLastFPSDungeonQuestMapping& Candidate)
 		{
-			return !Candidate.MapKeyword.IsEmpty() && MapName.Contains(Candidate.MapKeyword);
+			const FString ConfiguredPackageName =
+				Candidate.World.ToSoftObjectPath().GetLongPackageName();
+			return !ConfiguredPackageName.IsEmpty()
+				&& ConfiguredPackageName == CurrentPackageName;
 		});
 
 	if (!Mapping)
@@ -1415,7 +1429,7 @@ void ULastFPSQuestSubsystem::AcceptDungeonQuestForMap(UWorld& World)
 			Log,
 			TEXT("[Quest] 던전 맵 진입 — 퀘스트 '%s' 자동 수락: %s"),
 			*TargetQuestId.ToString(),
-			*MapName);
+			*CurrentPackageName);
 		AcceptQuest(TargetQuestId);
 		return;
 	}

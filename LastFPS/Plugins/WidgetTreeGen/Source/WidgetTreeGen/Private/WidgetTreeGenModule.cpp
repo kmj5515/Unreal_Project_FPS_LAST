@@ -5,9 +5,12 @@
 #include "WidgetTreeGenRequest.h"
 #include "NPCPresetGenLibrary.h"
 
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
+#include "Data/AssetManagement/LastFPSPrimaryAssetTypes.h"
+#include "Data/Definitions/LastFPSGameDataSet.h"
+#include "Engine/AssetManager.h"
 #include "Engine/DataTable.h"
-#include "UObject/SoftObjectPtr.h"
-#include "UObject/UnrealType.h"
+#include "Engine/StreamableManager.h"
 
 #include "Core/EditorUtility.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
@@ -88,17 +91,20 @@ void FWidgetTreeGenModule::ExtendLastFPSMenu(FMenuBuilder& MenuBuilder)
 
 void FWidgetTreeGenModule::GenerateNPCPresets()
 {
-	// Project Settings → Game → LastFPS NPC 의 NPCDataTable 을 리플렉션으로 읽는다
-	// (게임 모듈에 링크하지 않기 위해 클래스 경로 + 프로퍼티 리플렉션 사용).
+	// 런타임과 같은 GameDataSet 계약을 사용해 에디터 도구의 데이터 경로 중복을 막는다.
+	const FPrimaryAssetId HubDataSetId(LastFPSPrimaryAssetTypes::GameDataSet, TEXT("DA_DataSet_Hub"));
+	UAssetManager& AssetManager = UAssetManager::Get();
 	UDataTable* NPCTable = nullptr;
-	if (UClass* SettingsClass = LoadObject<UClass>(nullptr, TEXT("/Script/LastFPS.LastFPSNPCSettings")))
+	const TArray<FName> BundlesToLoad{LastFPSAssetBundles::Game};
+	TSharedPtr<FStreamableHandle> Handle = AssetManager.LoadPrimaryAsset(HubDataSetId, BundlesToLoad);
+	if (Handle.IsValid())
 	{
-		if (const UObject* Settings = SettingsClass->GetDefaultObject())
+		Handle->WaitUntilComplete();
+		if (const ULastFPSGameDataSet* DataSet = Cast<ULastFPSGameDataSet>(AssetManager.GetPrimaryAssetObject(HubDataSetId)))
 		{
-			if (const FSoftObjectProperty* Prop = FindFProperty<FSoftObjectProperty>(SettingsClass, TEXT("NPCDataTable")))
+			if (const FLastFPSDataTableReference* Reference = DataSet->FindTable(LastFPSGameDataTags::Data_Table_NPC_Definition))
 			{
-				const FSoftObjectPtr& SoftPtr = Prop->GetPropertyValue_InContainer(Settings);
-				NPCTable = Cast<UDataTable>(SoftPtr.ToSoftObjectPath().TryLoad());
+				NPCTable = Reference->Table.Get();
 			}
 		}
 	}
@@ -106,7 +112,7 @@ void FWidgetTreeGenModule::GenerateNPCPresets()
 	if (!NPCTable)
 	{
 		FNotificationInfo Info(LOCTEXT("NPCNoTable",
-			"DT_NPCData를 찾지 못했습니다. Project Settings → Game → LastFPS NPC 에서 NPCDataTable을 지정하세요."));
+			"DA_DataSet_Hub에서 Data.Table.NPC.Definition 테이블을 찾지 못했습니다."));
 		Info.ExpireDuration = 8.0f;
 		FSlateNotificationManager::Get().AddNotification(Info);
 		return;

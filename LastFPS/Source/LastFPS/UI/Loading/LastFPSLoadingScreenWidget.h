@@ -8,7 +8,6 @@ class UImage;
 class UProgressBar;
 class UTextBlock;
 class UTexture2D;
-class UDataTable;
 class ULastFPSLoadingProcessSubsystem;
 class ULastFPSLevelTravelSubsystem;
 struct FGameplayTag;
@@ -61,13 +60,6 @@ protected:
 
     UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
     TObjectPtr<UTextBlock> Text_TipBody;
-
-    /**
-     * 로딩 팁 테이블 (FLastFPSLoadingTipData, JSON) — 로딩 팁의 단일 소스.
-     * 제목/본문/이미지 전부 여기서 랜덤 선택. WBP 클래스 디폴트에서 지정.
-     */
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Loading", meta=(AllowedClasses="/Script/Engine.DataTable"))
-    TSoftObjectPtr<UDataTable> TipTable;
 
 private:
     void HandleTravelPresentationChanged(const FText& StatusText, const FText& MapNameText);

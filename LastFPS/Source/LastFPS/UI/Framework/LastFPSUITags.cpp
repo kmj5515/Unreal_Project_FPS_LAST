@@ -33,6 +33,12 @@ namespace LastFPSUITags
 		return Tag;
 	}
 
+	FGameplayTag Layer_Overlay()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Layer.Overlay"));
+		return Tag;
+	}
+
 	FGameplayTag Screen_Inventory()
 	{
 		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.Inventory"));

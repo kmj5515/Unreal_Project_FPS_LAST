@@ -25,11 +25,11 @@ protected:
 	virtual void NativeDestruct() override;
 
 	/** 판매 항목 테이블 (RowType = FLastFPSShopItemData) */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Shop", meta=(RequiredAssetDataTags="RowStructure=/Script/LastFPS.LastFPSShopItemData"))
+	UPROPERTY(Transient)
 	TObjectPtr<UDataTable> ShopTable;
 
 	/** 아이템 정의 테이블 (RowType = FLastFPSItemData) — 스택 한도(MaxStackSize) 조회용 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Shop", meta=(RequiredAssetDataTags="RowStructure=/Script/LastFPS.LastFPSItemData"))
+	UPROPERTY(Transient)
 	TObjectPtr<UDataTable> ItemTable;
 
 	/** 행 하나를 그릴 위젯 클래스 (WBP_ShopEntry) */

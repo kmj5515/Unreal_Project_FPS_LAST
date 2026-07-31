@@ -23,7 +23,6 @@
 #include "Styling/SlateStyle.h"
 #include "Styling/SlateStyleRegistry.h"
 #include "ToolMenus.h"
-#include "UI/Framework/LastFPSUISettings.h"
 #include "Widgets/Docking/SDockTab.h"
 
 #define LOCTEXT_NAMESPACE "FEditorUtilityModule"
@@ -109,15 +108,6 @@ void FEditorUtilityModule::RegisterProjectSettings()
 	SettingsModule->RegisterSettings(
 		TEXT("Project"),
 		ToolName,
-		TEXT("UI"),
-		LOCTEXT("UISettingsName", "UI"),
-		LOCTEXT("UISettingsDescription", "Configure LastFPS UI settings."),
-		GetMutableDefault<ULastFPSUISettings>()
-	);
-
-	SettingsModule->RegisterSettings(
-		TEXT("Project"),
-		ToolName,
 		TEXT("NPC"),
 		LOCTEXT("NPCSettingsName", "NPC"),
 		LOCTEXT("NPCSettingsDescription", "Configure LastFPS NPC settings."),
@@ -139,7 +129,6 @@ void FEditorUtilityModule::UnregisterProjectSettings()
 	if (ISettingsModule* SettingsModule = FModuleManager::GetModulePtr<ISettingsModule>(TEXT("Settings")))
 	{
 		SettingsModule->UnregisterSettings(TEXT("Project"), ToolName, TEXT("EditorTools"));
-		SettingsModule->UnregisterSettings(TEXT("Project"), ToolName, TEXT("UI"));
 		SettingsModule->UnregisterSettings(TEXT("Project"), ToolName, TEXT("NPC"));
 		SettingsModule->UnregisterSettings(TEXT("Project"), ToolName, TEXT("BattleLevels"));
 	}

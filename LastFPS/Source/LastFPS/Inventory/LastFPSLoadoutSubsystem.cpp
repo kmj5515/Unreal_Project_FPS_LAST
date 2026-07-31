@@ -1,10 +1,13 @@
 #include "Inventory/LastFPSLoadoutSubsystem.h"
 
 #include "AbilitySystemComponent.h"
-#include "GameplayEffect.h"
-#include "Engine/DataTable.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Economy/LastFPSEconomySubsystem.h"
+#include "Engine/DataTable.h"
+#include "Engine/GameInstance.h"
+#include "GameplayEffect.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSLoadout, Log, All);
 
@@ -12,6 +15,7 @@ void ULastFPSLoadoutSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	// Economy 를 먼저 초기화하도록 순서를 명시(모듈 검증이 Economy->HasItemDefinition 를 사용).
 	Collection.InitializeDependency<ULastFPSEconomySubsystem>();
+	Collection.InitializeDependency<ULastFPSGameDataSubsystem>();
 
 	Super::Initialize(Collection);
 
@@ -24,18 +28,17 @@ void ULastFPSLoadoutSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void ULastFPSLoadoutSubsystem::ValidateModuleReferences() const
 {
 #if !UE_BUILD_SHIPPING
-	const UDataTable* Table = ModuleTable.LoadSynchronous();
+	const UDataTable* Table = GetModuleTable();
 	if (!Table)
 	{
-		UE_LOG(LogLastFPSLoadout, Warning,
-			TEXT("ModuleTable(DT_ModuleData) 미설정 — 모듈 참조 검증을 건너뜀."));
+		UE_LOG(LogLastFPSLoadout, Warning, TEXT("GameDataSet에서 DT_ModuleData를 찾지 못해 모듈 참조 검증을 건너뜁니다."));
 		return;
 	}
 
 	const ULastFPSEconomySubsystem* Economy = GetEconomy();
 	if (!Economy || !Economy->IsItemTableConfigured())
 	{
-		// ItemTable 미설정 시 HasItemDefinition 이 전부 false 라 오탐이 되므로 검증을 건너뛴다.
+		// 아이템 테이블 로드 실패 시 모든 참조를 오류로 판단하는 오탐을 막는다.
 		return;
 	}
 
@@ -62,6 +65,13 @@ ULastFPSEconomySubsystem* ULastFPSLoadoutSubsystem::GetEconomy() const
 	return GetGameInstance() ? GetGameInstance()->GetSubsystem<ULastFPSEconomySubsystem>() : nullptr;
 }
 
+const UDataTable* ULastFPSLoadoutSubsystem::GetModuleTable() const
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	ULastFPSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>() : nullptr;
+	return GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_Economy_Module) : nullptr;
+}
+
 const FLastFPSModuleData* ULastFPSLoadoutSubsystem::FindModule(FName ModuleRowId) const
 {
 	if (ModuleRowId.IsNone())
@@ -69,7 +79,7 @@ const FLastFPSModuleData* ULastFPSLoadoutSubsystem::FindModule(FName ModuleRowId
 		return nullptr;
 	}
 
-	const UDataTable* Table = ModuleTable.LoadSynchronous();
+	const UDataTable* Table = GetModuleTable();
 	if (!Table)
 	{
 		return nullptr;

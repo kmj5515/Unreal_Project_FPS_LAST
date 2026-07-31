@@ -1,6 +1,8 @@
 #include "UI/Shop/LastFPSShopScreenWidget.h"
 
 #include "UI/Shop/LastFPSShopEntryWidget.h"
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Data/Tables/LastFPSShopData.h"
 #include "Data/Tables/LastFPSItemData.h"
 #include "Economy/LastFPSEconomySubsystem.h"
@@ -14,6 +16,14 @@
 void ULastFPSShopScreenWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (ULastFPSGameDataSubsystem* GameData = GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>())
+		{
+			ShopTable = GameData->FindTable(LastFPSGameDataTags::Data_Table_Economy_Shop);
+			ItemTable = GameData->FindTable(LastFPSGameDataTags::Data_Table_Economy_Item);
+		}
+	}
 
 	RebuildShopList();
 
@@ -109,7 +119,10 @@ int32 ULastFPSShopScreenWidget::ComputeMaxPurchasable(const FLastFPSShopItemData
 	int32 MaxStack = 1;
 	if (ItemTable)
 	{
-		if (const FLastFPSItemData* Item = ItemTable->FindRow<FLastFPSItemData>(Row.GrantItemRowId, TEXT("ULastFPSShopScreenWidget::ComputeMaxPurchasable"), /*bWarnIfRowMissing=*/false))
+		if (const FLastFPSItemData* Item = ItemTable->FindRow<FLastFPSItemData>(
+			Row.GrantItemRowId,
+			TEXT("ULastFPSShopScreenWidget::ComputeMaxPurchasable"),
+			/*bWarnIfRowMissing=*/false))
 		{
 			MaxStack = FMath::Max(1, Item->MaxStackSize);
 		}
@@ -126,7 +139,10 @@ void ULastFPSShopScreenWidget::HandleBuyRequested(FName RowName, ULastFPSShopEnt
 		return;
 	}
 
-	const FLastFPSShopItemData* Row = ShopTable->FindRow<FLastFPSShopItemData>(RowName, TEXT("ULastFPSShopScreenWidget::HandleBuyRequested"), /*bWarnIfRowMissing=*/false);
+	const FLastFPSShopItemData* Row = ShopTable->FindRow<FLastFPSShopItemData>(
+		RowName,
+		TEXT("ULastFPSShopScreenWidget::HandleBuyRequested"),
+		/*bWarnIfRowMissing=*/false);
 	if (!Row)
 	{
 		return;
@@ -180,7 +196,10 @@ void ULastFPSShopScreenWidget::HandleQuantityChosen(int32 Quantity)
 		return;
 	}
 
-	const FLastFPSShopItemData* Row = ShopTable->FindRow<FLastFPSShopItemData>(RowName, TEXT("ULastFPSShopScreenWidget::HandleQuantityChosen"), /*bWarnIfRowMissing=*/false);
+	const FLastFPSShopItemData* Row = ShopTable->FindRow<FLastFPSShopItemData>(
+		RowName,
+		TEXT("ULastFPSShopScreenWidget::HandleQuantityChosen"),
+		/*bWarnIfRowMissing=*/false);
 	if (!Row)
 	{
 		return;
@@ -221,7 +240,10 @@ void ULastFPSShopScreenWidget::RefreshEntryStates()
 		{
 			continue;
 		}
-		const FLastFPSShopItemData* Row = ShopTable->FindRow<FLastFPSShopItemData>(Pair.Key, TEXT("ULastFPSShopScreenWidget::RefreshEntryStates"), /*bWarnIfRowMissing=*/false);
+		const FLastFPSShopItemData* Row = ShopTable->FindRow<FLastFPSShopItemData>(
+			Pair.Key,
+			TEXT("ULastFPSShopScreenWidget::RefreshEntryStates"),
+			/*bWarnIfRowMissing=*/false);
 		Pair.Value->SetAffordable(Row && ComputeMaxPurchasable(*Row) > 0);
 	}
 }

@@ -1,10 +1,44 @@
 #include "AbilitySystem/Abilities/LastFPSActiveGameplayAbility.h"
 
+#include "Components/SceneComponent.h"
 #include "GameplayEffect.h"
 #include "Data/Tables/LastFPSSkillBalanceData.h"
+#include "Kismet/GameplayStatics.h"
 
 ULastFPSActiveGameplayAbility::ULastFPSActiveGameplayAbility()
 {
+}
+
+void ULastFPSActiveGameplayAbility::PlayActivationSound() const
+{
+	if (!ActivationSound)
+	{
+		return;
+	}
+
+	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+	AActor* AvatarActor =
+		ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+	if (!ActorInfo || !ActorInfo->IsLocallyControlled() || !AvatarActor)
+	{
+		return;
+	}
+
+	USceneComponent* AttachComponent = AvatarActor->GetRootComponent();
+	if (!AttachComponent)
+	{
+		return;
+	}
+
+	UGameplayStatics::SpawnSoundAttached(
+		ActivationSound,
+		AttachComponent,
+		NAME_None,
+		FVector::ZeroVector,
+		EAttachLocation::KeepRelativeOffset,
+		true,
+		FMath::Max(ActivationSoundVolumeMultiplier, 0.f),
+		FMath::Max(ActivationSoundPitchMultiplier, 0.01f));
 }
 
 void ULastFPSActiveGameplayAbility::ApplyCooldown(

@@ -13,6 +13,7 @@
 #include "Engine/StreamableManager.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/TargetPoint.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/TriggerBox.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
@@ -798,8 +799,7 @@ void ALastFPSStreamingLevelTransitionRuntime::ReleaseArrivalHold()
 	}
 }
 
-void ALastFPSStreamingLevelTransitionRuntime::
-	ScheduleDelayedEnemySpawn()
+void ALastFPSStreamingLevelTransitionRuntime::ScheduleDelayedEnemySpawn()
 {
 	if (!HasAuthority()
 		|| bDelayedEnemySpawnScheduled
@@ -940,11 +940,27 @@ void ALastFPSStreamingLevelTransitionRuntime::SpawnDelayedEnemy()
 
 		FVector AdjustedLocation = SpawnTransform.GetLocation();
 		const FRotator AdjustedRotation = SpawnTransform.Rotator();
+
+		if (UCapsuleComponent* Capsule = SpawnedEnemy->GetCapsuleComponent())
+		{
+			AdjustedLocation.Z += Capsule->GetScaledCapsuleHalfHeight();
+		}
+
 		if (World->FindTeleportSpot(
 			SpawnedEnemy,
 			AdjustedLocation,
 			AdjustedRotation))
 		{
+			SpawnedEnemy->SetActorLocationAndRotation(
+				AdjustedLocation,
+				AdjustedRotation,
+				false,
+				nullptr,
+				ETeleportType::TeleportPhysics);
+		}
+		else
+		{
+			// TeleportSpot을 찾지 못한 경우에도 최소한 바닥에 파묻히지 않도록 강제 적용한다.
 			SpawnedEnemy->SetActorLocationAndRotation(
 				AdjustedLocation,
 				AdjustedRotation,

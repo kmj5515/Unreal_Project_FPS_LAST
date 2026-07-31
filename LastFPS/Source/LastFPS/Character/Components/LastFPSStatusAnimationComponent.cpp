@@ -76,7 +76,7 @@ void ULastFPSStatusAnimationComponent::BindStatusTags()
 
 		FDelegateHandle DelegateHandle = AbilitySystem->RegisterGameplayTagEvent(
 			StatusData->StatusTag,
-			EGameplayTagEventType::NewOrRemoved).AddUObject(
+			EGameplayTagEventType::AnyCountChange).AddUObject(
 				this,
 				&ULastFPSStatusAnimationComponent::HandleStatusTagChanged);
 		StatusTagDelegateHandles.Add(StatusData->StatusTag, DelegateHandle);
@@ -89,7 +89,7 @@ void ULastFPSStatusAnimationComponent::UnbindStatusTags()
 	{
 		for (const TPair<FGameplayTag, FDelegateHandle>& Entry : StatusTagDelegateHandles)
 		{
-			AbilitySystem->RegisterGameplayTagEvent(Entry.Key, EGameplayTagEventType::NewOrRemoved)
+			AbilitySystem->RegisterGameplayTagEvent(Entry.Key, EGameplayTagEventType::AnyCountChange)
 				.Remove(Entry.Value);
 		}
 	}

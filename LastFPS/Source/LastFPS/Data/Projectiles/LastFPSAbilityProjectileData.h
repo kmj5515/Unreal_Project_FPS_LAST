@@ -4,12 +4,30 @@
 #include "AbilitySystem/ProjectileRules/LastFPSProjectileImpactRule.h"
 #include "Engine/DataAsset.h"
 #include "Engine/CollisionProfile.h"
+#include "Game/Loading/LastFPSRenderWarmupSource.h"
 #include "LastFPSAbilityProjectileData.generated.h"
 
 class ALastFPSProjectile;
 class UAnimMontage;
 class UGameplayEffect;
 class ULastFPSProjectileVisualData;
+class USoundBase;
+
+/** 발사체에 부착해 재생할 오디오 설정이다. 반복 여부와 감쇠는 Sound Cue가 소유한다. */
+USTRUCT(BlueprintType)
+struct LASTFPS_API FLastFPSProjectileAudioSettings
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Audio")
+    TObjectPtr<USoundBase> FlightSound;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Audio", meta=(ClampMin="0.0"))
+    float VolumeMultiplier = 1.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Audio", meta=(ClampMin="0.01"))
+    float PitchMultiplier = 1.f;
+};
 
 /** 투사체 클래스에 종속되지 않고 충돌 형태와 채널 응답을 구성하는 데이터 계약이다. */
 USTRUCT(BlueprintType)
@@ -33,11 +51,18 @@ struct LASTFPS_API FLastFPSProjectileCollisionSettings
 };
 
 UCLASS(BlueprintType)
-class LASTFPS_API ULastFPSAbilityProjectileData : public UPrimaryDataAsset
+class LASTFPS_API ULastFPSAbilityProjectileData
+    : public UPrimaryDataAsset
+    , public ILastFPSRenderWarmupSource
 {
     GENERATED_BODY()
 
 public:
+    virtual void CreateRenderWarmupActors(
+        UWorld& World,
+        const FTransform& SpawnTransform,
+        TArray<AActor*>& OutActors) const override;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile")
     TSubclassOf<ALastFPSProjectile> ProjectileClass;
 
@@ -64,6 +89,9 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Visual")
     TObjectPtr<ULastFPSProjectileVisualData> VisualData;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Audio")
+    FLastFPSProjectileAudioSettings AudioSettings;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Projectile|Animation")
     TObjectPtr<UAnimMontage> CastMontage;

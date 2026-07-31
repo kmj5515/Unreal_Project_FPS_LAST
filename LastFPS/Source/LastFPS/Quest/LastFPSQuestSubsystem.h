@@ -65,7 +65,7 @@ struct FLastFPSDungeonQuestMapping
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
-	FString MapKeyword;
+	TSoftObjectPtr<UWorld> World;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	FName QuestId;
@@ -219,15 +219,7 @@ public:
 	FOnLastFPSRadioTransmission OnRadioTransmission;
 
 protected:
-	/** 퀘스트 정의 테이블 (DT_QuestData) — DefaultGame.ini 로 지정 */
-	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Quest")
-	TSoftObjectPtr<UDataTable> QuestTable;
-
-	/** 무전 대사 테이블 (DT_RadioTransmission) — DefaultGame.ini 로 지정 */
-	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Quest|Radio")
-	TSoftObjectPtr<UDataTable> RadioTable;
-
-	/** 던전 맵 키워드와 자동 진행할 퀘스트 ID 매핑 (DefaultGame.ini 로 확장 가능) */
+	/** 정확한 영속 월드와 자동 진행할 퀘스트 ID 매핑 (DefaultGame.ini 로 확장 가능) */
 	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Quest|Dungeon")
 	TArray<FLastFPSDungeonQuestMapping> DungeonMapQuestMap;
 
@@ -280,7 +272,7 @@ private:
 	void BindEncounterEvents(UWorld& World);
 	void UnbindEncounterEvents();
 
-	/** 맵 키워드에 매핑된 던전 퀘스트를 1회 자동 수락한다. */
+	/** 현재 영속 월드에 정확히 매핑된 던전 퀘스트를 1회 자동 수락한다. */
 	void AcceptDungeonQuestForMap(UWorld& World);
 
 	/** 던전 퀘스트를 이미 자동 수락한 월드 (동일 월드 중복 처리 방지, 재입장 시 재수행 허용). */

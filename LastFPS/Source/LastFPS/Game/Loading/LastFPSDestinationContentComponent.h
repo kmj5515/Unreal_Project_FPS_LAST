@@ -40,6 +40,9 @@ public:
     /** GameMode가 InitGameState에서 호출한다. 단계별 에셋 의존성을 비동기로 준비한다. */
     void StartContentLoad(ULastFPSDestinationContentSet* ContentSet);
 
+    /** 원격 클라이언트가 복제된 Primary Asset ID로 같은 콘텐츠 준비를 시작한다. */
+    void StartContentLoad(const FPrimaryAssetId& ContentSetId);
+
     /**
      * 에셋 준비 콜백에서 실제로 생성한 Actor를 전달한다.
      * 등록된 렌더 컴포넌트의 PSO와 렌더 스레드 반영을 기다린 뒤 최종 Ready로 전환한다.
@@ -71,6 +74,7 @@ private:
     };
 
     void BeginNextLoadPhase();
+    void HandleContentSetLoaded();
     void PollAssetLoadProgress();
     void HandleLoadPhaseCompleted();
     void HandleAssetsLoaded();
@@ -82,6 +86,8 @@ private:
     void RegisterLoadingProgress();
     void UpdateLoadingProgress();
     void CompleteLoadingProgress();
+    void CreateDataDrivenRenderWarmupActors(TArray<AActor*>& OutActors);
+    void DestroyOwnedRenderWarmupActors();
 
     /** 단계가 바뀌어도 앞 단계의 에셋을 목적지를 떠날 때까지 상주시킨다. */
     TArray<TSharedPtr<FStreamableHandle>> LoadHandles;
@@ -93,7 +99,12 @@ private:
     UPROPERTY(Transient)
     TArray<TWeakObjectPtr<UPrimitiveComponent>> WarmupComponents;
 
+    /** 데이터 계약이 만든 일시적인 Actor이며 PSO 준비가 끝나면 중앙 로더가 제거한다. */
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<AActor>> OwnedRenderWarmupActors;
+
     TSet<FSoftObjectPath> RequestedPaths;
+    FPrimaryAssetId PendingContentSetId;
 
     EContentLoadState LoadState = EContentLoadState::Unloaded;
     double LoadStartSeconds = 0.0;

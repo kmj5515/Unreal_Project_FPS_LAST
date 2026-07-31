@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/ProjectileRules/LastFPSProjectileImpactRule.h"
 #include "AbilitySystemInterface.h"
+#include "Components/AudioComponent.h"
 #include "Components/BoxComponent.h"
 #include "Data/Projectiles/LastFPSAbilityProjectileData.h"
 #include "Data/Projectiles/LastFPSProjectileImpactTypes.h"
@@ -52,6 +53,11 @@ ALastFPSProjectile::ALastFPSProjectile()
     TrailNiagara->SetupAttachment(CollisionComp);
     TrailNiagara->bAutoActivate = false;
 
+    FlightAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("FlightAudio"));
+    FlightAudio->SetupAttachment(CollisionComp);
+    FlightAudio->bAutoActivate = false;
+    FlightAudio->bAllowSpatialization = true;
+
     ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
     ProjectileMovement->InitialSpeed = 30000.f;
     ProjectileMovement->MaxSpeed = 30000.f;
@@ -76,7 +82,8 @@ void ALastFPSProjectile::InitializeGameplayProjectile(
     const TArray<TSubclassOf<UGameplayEffect>>& InLegacyEffectsOnHit,
     ULastFPSProjectileVisualData* InVisualData,
     const float InBaseDamageOverride,
-    const FLastFPSProjectileCollisionSettings* InCollisionSettings)
+    const FLastFPSProjectileCollisionSettings* InCollisionSettings,
+    const FLastFPSProjectileAudioSettings* InAudioSettings)
 {
     SourceActor = InSourceActor;
     ImpactRules = InImpactRules;
@@ -84,6 +91,7 @@ void ALastFPSProjectile::InitializeGameplayProjectile(
     VisualData = InVisualData;
     BaseDamageOverride = FMath::Max(InBaseDamageOverride, 0.f);
     ApplyVisualData();
+    ApplyFlightAudio(InAudioSettings);
     EnableGameplayCollision(InCollisionSettings);
     SetGameplayLifeSpan(DefaultGameplayLifeSpan);
 }
@@ -99,6 +107,31 @@ void ALastFPSProjectile::SetGameplayLifeSpan(const float LifeSeconds)
             &ThisClass::FinishProjectile,
             LifeSeconds,
             false);
+    }
+}
+
+void ALastFPSProjectile::PrepareRenderWarmup(
+    ULastFPSProjectileVisualData* InVisualData)
+{
+    GetWorldTimerManager().ClearTimer(GameplayLifeTimerHandle);
+    SetActorEnableCollision(false);
+    if (ProjectileMovement)
+    {
+        ProjectileMovement->StopMovementImmediately();
+        ProjectileMovement->Deactivate();
+    }
+
+    VisualData = InVisualData;
+    ApplyVisualData();
+    AddRenderWarmupEffectComponents();
+
+    if (TrailNiagara)
+    {
+        TrailNiagara->PrecachePSOs();
+    }
+    if (TrailParticle)
+    {
+        TrailParticle->PrecachePSOs();
     }
 }
 
@@ -329,6 +362,125 @@ void ALastFPSProjectile::ApplyVisualData()
     }
 }
 
+void ALastFPSProjectile::AddRenderWarmupEffectComponents()
+{
+    ClearRenderWarmupComponents();
+    if (!VisualData)
+    {
+        return;
+    }
+
+    if (VisualData->ImpactNiagaraSystem)
+    {
+        UNiagaraComponent* ImpactNiagara =
+            NewObject<UNiagaraComponent>(this);
+        ImpactNiagara->bAutoActivate = false;
+        ImpactNiagara->SetAsset(VisualData->ImpactNiagaraSystem);
+        ImpactNiagara->SetupAttachment(GetRootComponent());
+        AddInstanceComponent(ImpactNiagara);
+        ImpactNiagara->RegisterComponent();
+        ImpactNiagara->PrecachePSOs();
+        RenderWarmupComponents.Add(ImpactNiagara);
+    }
+
+    if (VisualData->ImpactEffect)
+    {
+        UParticleSystemComponent* ImpactParticle =
+            NewObject<UParticleSystemComponent>(this);
+        ImpactParticle->bAutoActivate = false;
+        ImpactParticle->SetTemplate(VisualData->ImpactEffect);
+        ImpactParticle->SetupAttachment(GetRootComponent());
+        AddInstanceComponent(ImpactParticle);
+        ImpactParticle->RegisterComponent();
+        ImpactParticle->PrecachePSOs();
+        RenderWarmupComponents.Add(ImpactParticle);
+    }
+}
+
+void ALastFPSProjectile::ClearRenderWarmupComponents()
+{
+    for (UActorComponent* Component : RenderWarmupComponents)
+    {
+        if (IsValid(Component))
+        {
+            RemoveInstanceComponent(Component);
+            Component->DestroyComponent();
+        }
+    }
+    RenderWarmupComponents.Reset();
+}
+
+void ALastFPSProjectile::ApplyFlightAudio(
+    const FLastFPSProjectileAudioSettings* AudioSettings)
+{
+    USoundBase* FlightSound =
+        AudioSettings ? AudioSettings->FlightSound.Get() : nullptr;
+    const float VolumeMultiplier = AudioSettings
+        ? FMath::Max(AudioSettings->VolumeMultiplier, 0.f)
+        : 1.f;
+    const float PitchMultiplier = AudioSettings
+        ? FMath::Max(AudioSettings->PitchMultiplier, 0.01f)
+        : 1.f;
+
+    if (HasAuthority() && GetIsReplicated())
+    {
+        Multicast_ApplyFlightAudio(
+            FlightSound,
+            VolumeMultiplier,
+            PitchMultiplier);
+        return;
+    }
+
+    SetFlightAudioLocal(
+        FlightSound,
+        VolumeMultiplier,
+        PitchMultiplier);
+}
+
+void ALastFPSProjectile::StopFlightAudio()
+{
+    if (HasAuthority() && GetIsReplicated())
+    {
+        Multicast_ApplyFlightAudio(nullptr, 1.f, 1.f);
+        return;
+    }
+
+    SetFlightAudioLocal(nullptr, 1.f, 1.f);
+}
+
+void ALastFPSProjectile::Multicast_ApplyFlightAudio_Implementation(
+    USoundBase* FlightSound,
+    const float VolumeMultiplier,
+    const float PitchMultiplier)
+{
+    SetFlightAudioLocal(
+        FlightSound,
+        VolumeMultiplier,
+        PitchMultiplier);
+}
+
+void ALastFPSProjectile::SetFlightAudioLocal(
+    USoundBase* FlightSound,
+    const float VolumeMultiplier,
+    const float PitchMultiplier)
+{
+    if (!FlightAudio)
+    {
+        return;
+    }
+
+    FlightAudio->Stop();
+    FlightAudio->SetSound(FlightSound);
+    if (!FlightSound)
+    {
+        return;
+    }
+
+    FlightAudio->SetVolumeMultiplier(FMath::Max(VolumeMultiplier, 0.f));
+    FlightAudio->SetPitchMultiplier(FMath::Max(PitchMultiplier, 0.01f));
+    FlightAudio->Play();
+}
+
 void ALastFPSProjectile::PlayImpactFeedback(const FHitResult& ImpactResult)
 {
     FVector ImpactLocation = GetActorLocation();
@@ -386,6 +538,7 @@ void ALastFPSProjectile::FinishProjectile()
 
 void ALastFPSProjectile::OnAcquiredFromPool_Implementation()
 {
+    ClearRenderWarmupComponents();
     bHasAppliedHit = false;
     SourceActor = nullptr;
     ImpactRules.Reset();
@@ -411,6 +564,8 @@ void ALastFPSProjectile::OnAcquiredFromPool_Implementation()
 
 void ALastFPSProjectile::OnReleasedToPool_Implementation()
 {
+    ClearRenderWarmupComponents();
+    StopFlightAudio();
     GetWorldTimerManager().ClearTimer(GameplayLifeTimerHandle);
     // 이동 컴포넌트 정지 과정에서 충돌 콜백이 들어와도 반환을 중복 실행하지 않게 잠근다.
     bHasAppliedHit = true;

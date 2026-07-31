@@ -1,8 +1,8 @@
 #include "UI/Framework/LastFPSUIManagerSubsystem.h"
 
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
 #include "UI/Framework/LastFPSActivatableWidget.h"
 #include "UI/Framework/LastFPSScreenRegistry.h"
-#include "UI/Framework/LastFPSUISettings.h"
 #include "UI/Framework/LastFPSUITags.h"
 
 #include "CommonActivatableWidget.h"
@@ -60,16 +60,17 @@ const ULastFPSScreenRegistry* ULastFPSUIManagerSubsystem::GetRegistry()
 		return CachedRegistry;
 	}
 
-	const ULastFPSUISettings* Settings = GetDefault<ULastFPSUISettings>();
-	if (Settings)
+	if (UGameInstance* GameInstance = GetGameInstance())
 	{
-		CachedRegistry = Settings->ScreenRegistry.LoadSynchronous();
+		if (ULastFPSGameDataSubsystem* GameData = GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>())
+		{
+			CachedRegistry = GameData->GetScreenRegistry();
+		}
 	}
 
 	if (!CachedRegistry)
 	{
-		UE_LOG(LogLastFPSUI, Error,
-			TEXT("ScreenRegistry 미지정 - Project Settings > MWTool > UI 에서 설정 필요"));
+		UE_LOG(LogLastFPSUI, Error, TEXT("Startup GameDataSet에서 ScreenRegistry를 찾지 못했습니다."));
 	}
 	return CachedRegistry;
 }

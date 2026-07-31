@@ -1,5 +1,7 @@
 #include "Hub/LastFPSNPC.h"
 
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Hub/LastFPSInteractionComponent.h"
 #include "Hub/LastFPSNPCSettings.h"
 #include "Hub/LastFPSNPCSpawnData.h"
@@ -13,6 +15,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Engine/DataTable.h"
+#include "Engine/GameInstance.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSNPC, Log, All);
@@ -122,13 +125,12 @@ void ALastFPSNPC::ApplyDataFromTable()
 		return; // 행 미지정 → BP/컴포넌트에 직접 설정한 값 사용
 	}
 
-	const ULastFPSNPCSettings* Settings = GetDefault<ULastFPSNPCSettings>();
-	UDataTable* NPCTable = Settings ? Settings->NPCDataTable.LoadSynchronous() : nullptr;
+	UGameInstance* GameInstance = GetGameInstance();
+	ULastFPSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>() : nullptr;
+	UDataTable* NPCTable = GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_NPC_Definition) : nullptr;
 	if (!NPCTable)
 	{
-		UE_LOG(LogLastFPSNPC, Warning,
-			TEXT("'%s': NPCDataTable 미설정. Project Settings > MWTool > NPC 에서 지정하세요."),
-			*GetName());
+		UE_LOG(LogLastFPSNPC, Warning, TEXT("'%s': GameDataSet에서 NPCDataTable을 찾지 못했습니다."), *GetName());
 		return;
 	}
 
@@ -140,7 +142,7 @@ void ALastFPSNPC::ApplyDataFromTable()
 		return;
 	}
 
-	UDataTable* DialogueTable = Settings ? Settings->DialogueTable.LoadSynchronous() : nullptr;
+	UDataTable* DialogueTable = GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_NPC_Dialogue) : nullptr;
 	InteractionComp->ApplyData(
 		Row->DisplayName, Row->NPCRole, Row->InteractionLabel, Row->InteractionRadius,
 		Row->BuildRuntimeActions(DialogueTable));

@@ -2,12 +2,14 @@
 
 #include "CommonSessionSubsystem.h"
 #include "CommonUserTypes.h"
+#include "Data/AssetManagement/LastFPSPrimaryAssetTypes.h"
 #include "Data/Definitions/LastFPSBattleDefinition.h"
 #include "Data/Definitions/LastFPSDestinationContentSet.h"
 #include "AssetRegistry/AssetData.h"
 #include "Engine/AssetManager.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Game/Loading/LastFPSLoadingIndicatorSubsystem.h"
 #include "Game/Loading/LastFPSLoadingProcessSubsystem.h"
 #include "Game/Travel/LastFPSLevelTravelSettings.h"
 #include "GameFramework/PlayerController.h"
@@ -58,6 +60,7 @@ void ULastFPSLevelTravelSubsystem::Initialize(FSubsystemCollectionBase& Collecti
 	Super::Initialize(Collection);
 
 	Collection.InitializeDependency<UCommonSessionSubsystem>();
+	Collection.InitializeDependency<ULastFPSLoadingIndicatorSubsystem>();
 
 	if (UCommonSessionSubsystem* Sessions = GetCommonSessionSubsystem())
 	{
@@ -169,7 +172,7 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::TravelToMap(
 	{
 		return ELastFPSTravelRequestResult::Busy;
 	}
-	if (!MapId.IsValid() || MapId.PrimaryAssetType != FPrimaryAssetType(TEXT("Map")))
+	if (!MapId.IsValid() || MapId.PrimaryAssetType != LastFPSPrimaryAssetTypes::Map)
 	{
 		FailRequest(
 			ELastFPSTravelRequestResult::InvalidAssetId,
@@ -292,8 +295,13 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::QuickPlayBattle(
 	PendingBattleDefinitionId = BattleDefinitionId;
 	SetTravelState(ELastFPSTravelState::LoadingDefinition);
 
+	ULastFPSLoadingIndicatorSubsystem::Show(
+		this,
+		LocalPlayerController,
+		NSLOCTEXT("LastFPS", "BattleLoadingIndicator", "전투에 연결하는 중..."));
+
 	TArray<FName> BundlesToLoad;
-	BundlesToLoad.Add(TEXT("Game"));
+	BundlesToLoad.Add(LastFPSAssetBundles::Game);
 	PendingDefinitionLoadHandle = UAssetManager::Get().LoadPrimaryAsset(
 		BattleDefinitionId,
 		BundlesToLoad,
@@ -318,7 +326,7 @@ bool ULastFPSLevelTravelSubsystem::ResolveMapPackageName(
 	FString& OutPackageName) const
 {
 	OutPackageName.Reset();
-	if (!MapId.IsValid() || MapId.PrimaryAssetType != FPrimaryAssetType(TEXT("Map")))
+	if (!MapId.IsValid() || MapId.PrimaryAssetType != LastFPSPrimaryAssetTypes::Map)
 	{
 		return false;
 	}
@@ -501,6 +509,8 @@ void ULastFPSLevelTravelSubsystem::BeginSessionTravelLoading(
 		GetGameInstance()->GetSubsystem<ULastFPSLoadingProcessSubsystem>())
 	{
 		Loading->BeginTravelLoading(ELastFPSTravelReadiness::LevelControllerAndPawn);
+		// 배틀 준비 인디케이터의 책임을 전체 로딩 화면으로 넘긴다.
+		ULastFPSLoadingIndicatorSubsystem::Hide(this);
 	}
 }
 
@@ -637,6 +647,8 @@ void ULastFPSLevelTravelSubsystem::FailRequest(
 	{
 		Loading->CancelLoading(ErrorMessage.ToString());
 	}
+
+	ULastFPSLoadingIndicatorSubsystem::Hide(this);
 
 	ClearPresentation();
 	SetTravelState(ELastFPSTravelState::Idle);

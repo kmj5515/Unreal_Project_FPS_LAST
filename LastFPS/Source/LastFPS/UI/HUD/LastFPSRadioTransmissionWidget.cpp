@@ -1,14 +1,16 @@
 #include "UI/HUD/LastFPSRadioTransmissionWidget.h"
 
-#include "Components/AudioComponent.h"
 #include "Components/Border.h"
 #include "Components/TextBlock.h"
-#include "Kismet/GameplayStatics.h"
 #include "Quest/LastFPSQuestSubsystem.h"
+#include "UI/HUD/Audio/LastFPSRadioAudioPlayer.h"
 
 void ULastFPSRadioTransmissionWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+
+	RadioAudioPlayer = NewObject<ULastFPSRadioAudioPlayer>(this);
+	RadioAudioPlayer->Initialize(this);
 
 	SetVisibility(ESlateVisibility::Collapsed);
 	if (BackgroundPanel)
@@ -44,12 +46,16 @@ void ULastFPSRadioTransmissionWidget::NativeDestruct()
 		}
 	}
 
-	GetWorld()->GetTimerManager().ClearTimer(TypingTimerHandle);
-	GetWorld()->GetTimerManager().ClearTimer(DisplayDurationTimerHandle);
-
-	if (ActiveVoiceAudioComponent && ActiveVoiceAudioComponent->IsPlaying())
+	if (UWorld* World = GetWorld())
 	{
-		ActiveVoiceAudioComponent->Stop();
+		World->GetTimerManager().ClearTimer(TypingTimerHandle);
+		World->GetTimerManager().ClearTimer(DisplayDurationTimerHandle);
+	}
+
+	if (RadioAudioPlayer)
+	{
+		RadioAudioPlayer->Stop();
+		RadioAudioPlayer = nullptr;
 	}
 
 	Super::NativeDestruct();
@@ -123,19 +129,13 @@ void ULastFPSRadioTransmissionWidget::ProcessNextTransmission()
 		DialogueText->SetText(FText::GetEmpty());
 	}
 
-	// 음성 사운드 재생
-	if (ActiveVoiceAudioComponent && ActiveVoiceAudioComponent->IsPlaying())
+	if (RadioAudioPlayer)
 	{
-		ActiveVoiceAudioComponent->Stop();
-		ActiveVoiceAudioComponent = nullptr;
-	}
+		RadioAudioPlayer->Stop();
 
-	if (!CurrentTransmission.VoiceAudio.IsNull())
-	{
-		if (USoundBase* LoadedSound = CurrentTransmission.VoiceAudio.LoadSynchronous())
-		{
-			ActiveVoiceAudioComponent = UGameplayStatics::SpawnSound2D(this, LoadedSound);
-		}
+		// 라디오 음성 적용을 다시 시작할 때 아래 호출을 복원한다.
+		// RadioAudioPlayer->PlayTransmissionStart();
+		// RadioAudioPlayer->PlayVoice(CurrentTransmission.VoiceAudio);
 	}
 
 	BP_OnRadioTransmissionStarted(CurrentTransmission);
@@ -193,6 +193,12 @@ void ULastFPSRadioTransmissionWidget::FinishCurrentTransmission()
 {
 	GetWorld()->GetTimerManager().ClearTimer(TypingTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(DisplayDurationTimerHandle);
+
+	// 라디오 음성 적용을 다시 시작할 때 종료 신호 호출도 함께 복원한다.
+	// if (RadioAudioPlayer)
+	// {
+	// 	RadioAudioPlayer->PlayTransmissionEnd();
+	// }
 
 	ProcessNextTransmission();
 }

@@ -7,6 +7,7 @@
 #include "Utility/LastFPSDamageCalculation.h"
 #include "LastFPSProjectile.generated.h"
 
+class UAudioComponent;
 class UBoxComponent;
 class UGameplayEffect;
 class UNiagaraComponent;
@@ -14,8 +15,11 @@ class UParticleSystem;
 class UParticleSystemComponent;
 class UProjectileMovementComponent;
 class UPrimitiveComponent;
+class UActorComponent;
 class ULastFPSProjectileImpactRule;
 class ULastFPSProjectileVisualData;
+class USoundBase;
+struct FLastFPSProjectileAudioSettings;
 struct FLastFPSProjectileCollisionSettings;
 
 // VFX 전용 투사체 — 데미지는 GA_BasicShoot의 LineTrace가 처리
@@ -35,10 +39,14 @@ public:
         const TArray<TSubclassOf<UGameplayEffect>>& InLegacyEffectsOnHit,
         ULastFPSProjectileVisualData* InVisualData,
         float InBaseDamageOverride = 0.f,
-        const FLastFPSProjectileCollisionSettings* InCollisionSettings = nullptr);
+        const FLastFPSProjectileCollisionSettings* InCollisionSettings = nullptr,
+        const FLastFPSProjectileAudioSettings* InAudioSettings = nullptr);
 
     /** 풀링 Actor의 Destroy를 대신하는 수명 타이머를 설정한다. */
     void SetGameplayLifeSpan(float LifeSeconds);
+
+    /** 게임플레이를 시작하지 않고 지정한 비주얼 변형의 Trail과 Impact PSO를 요청한다. */
+    void PrepareRenderWarmup(ULastFPSProjectileVisualData* InVisualData);
 
     virtual void OnAcquiredFromPool_Implementation() override;
     virtual void OnReleasedToPool_Implementation() override;
@@ -58,6 +66,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, Category="Projectile")
     TObjectPtr<UNiagaraComponent> TrailNiagara;
+
+    UPROPERTY(VisibleAnywhere, Category="Projectile|Audio")
+    TObjectPtr<UAudioComponent> FlightAudio;
 
     UPROPERTY(EditDefaultsOnly, Category="Projectile")
     TObjectPtr<UParticleSystem> TrailEffect;
@@ -82,8 +93,22 @@ private:
     void ExecuteImpactRules(AActor* HitActor, const FHitResult& ImpactResult);
     void ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass);
     void ApplyVisualData();
+    void ClearRenderWarmupComponents();
+    void AddRenderWarmupEffectComponents();
+    void ApplyFlightAudio(const FLastFPSProjectileAudioSettings* AudioSettings);
+    void StopFlightAudio();
+    void SetFlightAudioLocal(
+        USoundBase* FlightSound,
+        float VolumeMultiplier,
+        float PitchMultiplier);
     void PlayImpactFeedback(const FHitResult& ImpactResult);
     void FinishProjectile();
+
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_ApplyFlightAudio(
+        USoundBase* FlightSound,
+        float VolumeMultiplier,
+        float PitchMultiplier);
 
     UPROPERTY()
     TObjectPtr<AActor> SourceActor;
@@ -96,6 +121,10 @@ private:
 
     UPROPERTY()
     TObjectPtr<ULastFPSProjectileVisualData> VisualData;
+
+    /** Impact처럼 평상시 Actor에 없는 효과를 PSO 수집용으로만 잠시 유지한다. */
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UActorComponent>> RenderWarmupComponents;
 
     float BaseDamageOverride = 0.f;
 

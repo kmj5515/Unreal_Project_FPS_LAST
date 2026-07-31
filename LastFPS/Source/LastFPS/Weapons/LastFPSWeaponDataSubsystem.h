@@ -48,9 +48,6 @@ public:
 	const FLastFPSWeaponAmmoSettings* FindAmmoSettings(FName WeaponId) const;
 
 protected:
-	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Weapons")
-	TSoftObjectPtr<UDataTable> WeaponBalanceTable;
-
 	/** 런타임 상태와 분리된 무기별 탄창 및 리로드 설정이다. */
 	UPROPERTY(Config, EditDefaultsOnly, Category="LastFPS|Weapons")
 	TArray<FLastFPSWeaponAmmoConfigEntry> WeaponAmmoConfigurations;

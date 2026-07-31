@@ -4,6 +4,8 @@
 #include "UI/Inventory/LastFPSWeaponPreviewWidget.h"
 #include "UI/Inventory/LastFPSWeaponPreviewRig.h"
 #include "UI/Framework/LastFPSUITags.h"
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Data/Tables/LastFPSItemData.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
 #include "Economy/LastFPSEconomySubsystem.h"
@@ -19,6 +21,13 @@
 void ULastFPSInventoryWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (ULastFPSGameDataSubsystem* GameData = GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>())
+		{
+			ItemTable = GameData->FindTable(LastFPSGameDataTags::Data_Table_Economy_Item);
+		}
+	}
 
 	if (ULastFPSEconomySubsystem* Econ = GetEconomy())
 	{
@@ -94,7 +103,10 @@ ALastFPSWeaponPreviewRig* ULastFPSInventoryWidget::EnsurePreviewRig()
 			Econ->GetOwnedItems().GetKeys(OwnedIds);
 			for (const FName& Id : OwnedIds)
 			{
-				const FLastFPSItemData* Row = ItemTable->FindRow<FLastFPSItemData>(Id, TEXT("ULastFPSInventoryWidget::EnsurePreviewRig"), /*bWarnIfRowMissing=*/false);
+				const FLastFPSItemData* Row = ItemTable->FindRow<FLastFPSItemData>(
+					Id,
+					TEXT("ULastFPSInventoryWidget::EnsurePreviewRig"),
+					/*bWarnIfRowMissing=*/false);
 				if (Row && Row->ItemType == ELastFPSItemType::Weapon)
 				{
 					if (ULastFPSWeaponDefinition* Def = Row->WeaponDefinition.LoadSynchronous())
@@ -202,7 +214,10 @@ void ULastFPSInventoryWidget::RebuildInventory()
 					continue;
 				}
 
-				if (const FLastFPSItemData* Row = ItemTable->FindRow<FLastFPSItemData>(RowId, TEXT("ULastFPSInventoryWidget::RebuildInventory"), /*bWarnIfRowMissing=*/false))
+				if (const FLastFPSItemData* Row = ItemTable->FindRow<FLastFPSItemData>(
+					RowId,
+					TEXT("ULastFPSInventoryWidget::RebuildInventory"),
+					/*bWarnIfRowMissing=*/false))
 				{
 					// 카테고리 탭 필터 — AllowedTypes 가 비어 있으면 전체 표시.
 					if (AllowedTypes.Num() > 0 && !AllowedTypes.Contains(Row->ItemType))

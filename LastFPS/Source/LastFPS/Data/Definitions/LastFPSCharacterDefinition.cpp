@@ -1,6 +1,15 @@
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
 
+#include "Data/AssetManagement/LastFPSPrimaryAssetTypes.h"
 #include "Data/Characters/LastFPSCharacterStatData.h"
+
+const FPrimaryAssetType ULastFPSCharacterDefinition::PrimaryAssetType =
+	LastFPSPrimaryAssetTypes::CharacterDefinition;
+
+FPrimaryAssetId ULastFPSCharacterDefinition::GetPrimaryAssetId() const
+{
+	return FPrimaryAssetId(PrimaryAssetType, GetFName());
+}
 
 bool ULastFPSCharacterDefinition::HasClassificationTag(const FGameplayTag TagToCheck) const
 {

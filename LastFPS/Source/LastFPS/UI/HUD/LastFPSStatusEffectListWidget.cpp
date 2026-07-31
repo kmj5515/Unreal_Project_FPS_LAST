@@ -40,7 +40,7 @@ void ULastFPSStatusEffectListWidget::InitializeWithAbilitySystem(
 			for (const FGameplayTag StatusTag : RegisteredTags)
 			{
 				FDelegateHandle DelegateHandle = InAbilitySystemComponent->RegisterGameplayTagEvent(
-					StatusTag, EGameplayTagEventType::NewOrRemoved).AddUObject(
+					StatusTag, EGameplayTagEventType::AnyCountChange).AddUObject(
 						this, &ULastFPSStatusEffectListWidget::HandleStatusTagChanged);
 				StatusTagDelegateHandles.Add(StatusTag, DelegateHandle);
 			}
@@ -55,7 +55,7 @@ void ULastFPSStatusEffectListWidget::UninitializeFromAbilitySystem()
 	{
 		for (const TPair<FGameplayTag, FDelegateHandle>& Entry : StatusTagDelegateHandles)
 		{
-			ASC->RegisterGameplayTagEvent(Entry.Key, EGameplayTagEventType::NewOrRemoved).Remove(Entry.Value);
+			ASC->RegisterGameplayTagEvent(Entry.Key, EGameplayTagEventType::AnyCountChange).Remove(Entry.Value);
 		}
 	}
 

@@ -34,47 +34,28 @@ void ULastFPSLobbyWidget::NativeConstruct()
 		}
 	};
 
-	BindButton(
-		Button_Inventory,
-		&ULastFPSLobbyWidget::HandleInventoryClicked);
-	BindButton(
-		Button_Consumable,
-		&ULastFPSLobbyWidget::HandleConsumableClicked);
-	BindButton(
-		Button_Missions,
-		&ULastFPSLobbyWidget::HandleMissionsClicked);
-	BindButton(
-		Button_Shop,
-		&ULastFPSLobbyWidget::HandleShopClicked);
-	BindButton(
-		Button_Module,
-		&ULastFPSLobbyWidget::HandleModuleClicked);
-	BindButton(
-		Button_Settings,
-		&ULastFPSLobbyWidget::HandleSettingsClicked);
-	BindButton(
-		Button_BackToMain,
-		&ULastFPSLobbyWidget::HandleBackToMainClicked);
+	BindButton(Button_Inventory, &ULastFPSLobbyWidget::HandleInventoryClicked);
+	BindButton(Button_Consumable, &ULastFPSLobbyWidget::HandleConsumableClicked);
+	BindButton(Button_Missions,&ULastFPSLobbyWidget::HandleMissionsClicked);
+	BindButton(Button_Shop,&ULastFPSLobbyWidget::HandleShopClicked);
+	BindButton(Button_Module,&ULastFPSLobbyWidget::HandleModuleClicked);
+	BindButton(Button_Settings,&ULastFPSLobbyWidget::HandleSettingsClicked);
+	BindButton(Button_BackToMain,&ULastFPSLobbyWidget::HandleBackToMainClicked);
+
 	if (Button_GotoDungeon)
 	{
-		Button_GotoDungeon->OnClicked().AddUObject(
-			this,
-			&ULastFPSLobbyWidget::HandleGotoDungeonClicked);
+		Button_GotoDungeon->OnClicked().AddUObject(this,&ULastFPSLobbyWidget::HandleGotoDungeonClicked);
 	}
 }
 
 void ULastFPSLobbyWidget::HandleInventoryClicked()
 {
-	OpenScreenOrNotice(
-		LastFPSUITags::Screen_Inventory(),
-		NSLOCTEXT("LastFPS", "Lobby_Inventory", "인벤토리"));
+	OpenScreenOrNotice(LastFPSUITags::Screen_Inventory(),NSLOCTEXT("LastFPS", "Lobby_Inventory", "인벤토리"));
 }
 
 void ULastFPSLobbyWidget::HandleConsumableClicked()
 {
-	OpenScreenOrNotice(
-		LastFPSUITags::Screen_Consumable(),
-		NSLOCTEXT("LastFPS", "Lobby_Consumable", "소모품"));
+	OpenScreenOrNotice(LastFPSUITags::Screen_Consumable(),NSLOCTEXT("LastFPS", "Lobby_Consumable", "소모품"));
 }
 
 void ULastFPSLobbyWidget::HandleMissionsClicked()
@@ -108,11 +89,10 @@ void ULastFPSLobbyWidget::HandleSettingsClicked()
 void ULastFPSLobbyWidget::HandleGotoDungeonClicked()
 {
 	APlayerController* PlayerController = GetOwningPlayer();
-	ULastFPSGameInstance* GameInstance =
-		GetGameInstance<ULastFPSGameInstance>();
+	ULastFPSGameInstance* GameInstance = GetGameInstance<ULastFPSGameInstance>();
 	ULastFPSLevelTravelSubsystem* TravelSubsystem = GameInstance
-		? GameInstance->GetSubsystem<ULastFPSLevelTravelSubsystem>()
-		: nullptr;
+		                                                ? GameInstance->GetSubsystem<ULastFPSLevelTravelSubsystem>()
+		                                                : nullptr;
 	if (!PlayerController || !TravelSubsystem || !Button_GotoDungeon)
 	{
 		UE_LOG(
@@ -128,12 +108,10 @@ void ULastFPSLobbyWidget::HandleGotoDungeonClicked()
 		return;
 	}
 
-	const FLastFPSTravelEntryRequest& Request =
-		Button_GotoDungeon->GetTravelRequest();
-	const ELastFPSTravelRequestResult Result =
-		TravelSubsystem->RequestTravel(
-			PlayerController,
-			Request);
+	const FLastFPSTravelEntryRequest& Request = Button_GotoDungeon->GetTravelRequest();
+	const ELastFPSTravelRequestResult Result = TravelSubsystem->RequestTravel(
+		PlayerController,
+		Request);
 	if (Result != ELastFPSTravelRequestResult::Accepted)
 	{
 		UE_LOG(
@@ -149,6 +127,8 @@ void ULastFPSLobbyWidget::HandleGotoDungeonClicked()
 			*StaticEnum<ELastFPSTravelRequestResult>()->GetNameStringByValue(
 				static_cast<int64>(Result)));
 	}
+
+	DeactivateWidget();
 }
 
 void ULastFPSLobbyWidget::HandleBackToMainClicked()

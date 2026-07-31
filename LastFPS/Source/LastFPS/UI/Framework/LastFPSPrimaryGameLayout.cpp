@@ -7,6 +7,15 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
 
+namespace LastFPSUILayerOrder
+{
+	constexpr int32 Game = 0;
+	constexpr int32 GameMenu = 100;
+	constexpr int32 Menu = 200;
+	constexpr int32 Modal = 300;
+	constexpr int32 Overlay = 400;
+}
+
 void ULastFPSPrimaryGameLayout::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
@@ -29,7 +38,8 @@ void ULastFPSPrimaryGameLayout::EnsureLayersRegistered()
 	auto RegisterStackLayer = [this](
 		TObjectPtr<UCommonActivatableWidgetContainerBase>& AutoSlot,
 		UCommonActivatableWidgetContainerBase* BoundSlot,
-		const FGameplayTag& LayerTag)
+		const FGameplayTag& LayerTag,
+		const int32 ZOrder)
 	{
 		if (!LayerTag.IsValid() || GetLayerWidget(LayerTag))
 		{
@@ -49,6 +59,7 @@ void ULastFPSPrimaryGameLayout::EnsureLayersRegistered()
 					{
 						Slot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
 						Slot->SetOffsets(FMargin(0.f));
+						Slot->SetZOrder(ZOrder);
 					}
 				}
 			}
@@ -57,14 +68,40 @@ void ULastFPSPrimaryGameLayout::EnsureLayersRegistered()
 
 		if (Container)
 		{
+			if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Container->Slot))
+			{
+				// 파생 WBP가 레이어를 제공해도 공통 레이어 순서가 뒤바뀌지 않도록 강제한다.
+				CanvasSlot->SetZOrder(ZOrder);
+			}
 			RegisterLayer(LayerTag, Container);
 		}
 	};
 
-	RegisterStackLayer(AutoLayer_Game, LayerStack_Game, LastFPSUITags::Layer_Game());
-	RegisterStackLayer(AutoLayer_GameMenu, LayerStack_GameMenu, LastFPSUITags::Layer_GameMenu());
-	RegisterStackLayer(AutoLayer_Menu, LayerStack_Menu, LastFPSUITags::Layer_Menu());
-	RegisterStackLayer(AutoLayer_Modal, LayerStack_Modal, LastFPSUITags::Layer_Modal());
+	RegisterStackLayer(
+		AutoLayer_Game,
+		LayerStack_Game,
+		LastFPSUITags::Layer_Game(),
+		LastFPSUILayerOrder::Game);
+	RegisterStackLayer(
+		AutoLayer_GameMenu,
+		LayerStack_GameMenu,
+		LastFPSUITags::Layer_GameMenu(),
+		LastFPSUILayerOrder::GameMenu);
+	RegisterStackLayer(
+		AutoLayer_Menu,
+		LayerStack_Menu,
+		LastFPSUITags::Layer_Menu(),
+		LastFPSUILayerOrder::Menu);
+	RegisterStackLayer(
+		AutoLayer_Modal,
+		LayerStack_Modal,
+		LastFPSUITags::Layer_Modal(),
+		LastFPSUILayerOrder::Modal);
+	RegisterStackLayer(
+		AutoLayer_Overlay,
+		LayerStack_Overlay,
+		LastFPSUITags::Layer_Overlay(),
+		LastFPSUILayerOrder::Overlay);
 }
 
 ULastFPSPrimaryGameLayout::ULastFPSPrimaryGameLayout(const FObjectInitializer& ObjectInitializer)

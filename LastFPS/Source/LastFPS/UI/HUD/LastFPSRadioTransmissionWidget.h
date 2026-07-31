@@ -7,7 +7,7 @@
 
 class UTextBlock;
 class UBorder;
-class UAudioComponent;
+class ULastFPSRadioAudioPlayer;
 
 /**
  * 퍼스트 디센던트 스타일 HUD 무전 대사 자막 오버레이 위젯 C++ 베이스 클래스이다.
@@ -67,5 +67,5 @@ private:
 	FTimerHandle DisplayDurationTimerHandle;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UAudioComponent> ActiveVoiceAudioComponent;
+	TObjectPtr<ULastFPSRadioAudioPlayer> RadioAudioPlayer;
 };

@@ -72,5 +72,5 @@ void ULastFPSDialogueWidget::ShowCurrentLine()
 
 void ULastFPSDialogueWidget::CloseDialogue()
 {
-	DeactivateWidget();
+	DeactivateWithAnimation();
 }
