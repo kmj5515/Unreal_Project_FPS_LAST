@@ -68,6 +68,8 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Skill2, "InputTag.Skill2", "Skill 2 input")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Skill3, "InputTag.Skill3", "Skill 3 input")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_Ultimate, "InputTag.Ultimate", "Ultimate input")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_GrapplingHook, "InputTag.GrapplingHook", "그래플링 훅 입력")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_WeaponSlot1, "InputTag.WeaponSlot1", "1번 무기 슬롯 전환 입력")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input_WeaponSlot2, "InputTag.WeaponSlot2", "2번 무기 슬롯 전환 입력")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Sprint, "Ability.Sprint", "Sprint ability")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ability_Jump, "Ability.Jump", "Jump ability")

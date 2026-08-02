@@ -15,6 +15,7 @@ class UecsCrosshairEditorAsset;
 class UParticleSystem;
 class USkeletalMesh;
 class USoundBase;
+class UTexture2D;
 class UUserWidget;
 
 USTRUCT(BlueprintType)
@@ -129,6 +130,14 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
     FText DisplayName;
+
+    /**
+     * HUD 무기 슬롯에 표시할 아이콘.
+     * DT_ItemData 의 아이콘과 별개로 무기 정의가 소유해, HUD 가 복제된 무기 정의만으로 표시를 완성할 수 있게 한다
+     * (아이템 행을 역으로 찾지 않아도 되고, 픽업으로 주운 무기처럼 아이템 행이 없는 경우도 표시된다).
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon", meta=(AssetBundles="UI"))
+    TSoftObjectPtr<UTexture2D> Icon;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
     EMMWeaponType WeaponType = EMMWeaponType::Unarmed;

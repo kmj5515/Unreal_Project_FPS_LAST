@@ -1,5 +1,6 @@
 #include "UI/Shop/LastFPSShopEntryWidget.h"
 
+#include "Localization/LastFPSLocalization.h"
 #include "UI/Inventory/LastFPSItemSlotWidget.h"
 #include "UI/Framework/LastFPSButtonBase.h"
 #include "Components/Image.h"
@@ -50,7 +51,9 @@ void ULastFPSShopEntryWidget::SetupShopItem(const FLastFPSShopItemData& InItem, 
 
 	if (TB_Rarity)
 	{
-		TB_Rarity->SetText(UEnum::GetDisplayValueAsText(InItem.Rarity));
+		TB_Rarity->SetText(FLastFPSLocalization::GetUIEnumText(
+			StaticEnum<ELastFPSItemRarity>(),
+			static_cast<int64>(InItem.Rarity)));
 		TB_Rarity->SetColorAndOpacity(FSlateColor(ULastFPSItemSlotWidget::RarityToColor(InItem.Rarity)));
 	}
 

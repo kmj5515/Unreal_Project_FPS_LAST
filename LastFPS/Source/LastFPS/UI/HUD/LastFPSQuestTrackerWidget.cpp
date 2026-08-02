@@ -31,7 +31,7 @@ void ULastFPSQuestTrackerWidget::NativeConstruct()
 
 	if (ULastFPSQuestSubsystem* Subsystem = GetTrackerQuestSubsystem(this))
 	{
-		Subsystem->OnQuestStateChanged.AddDynamic(this, &ULastFPSQuestTrackerWidget::HandleQuestStateChanged);
+		Subsystem->OnQuestStateChanged.AddUniqueDynamic(this, &ULastFPSQuestTrackerWidget::HandleQuestStateChanged);
 	}
 
 	RebuildTracker();

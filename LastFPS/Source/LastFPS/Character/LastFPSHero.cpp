@@ -3,6 +3,8 @@
 #include "Character/Components/LastFPSGrapplingTargetingComponent.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
+#include "Game/LastFPSGameModeBase.h"
+#include "Inventory/LastFPSEquipmentSubsystem.h"
 #include "Blueprint/UserWidget.h"
 #include "Input/LastFPSInputConfig.h"
 #include "Utility/LastFPSTags.h"
@@ -97,6 +99,46 @@ void ALastFPSHero::PossessedBy(AController* NewController)
 	RefreshMaxWalkSpeed();
 	BindSpeedBoostCameraTag();
 	EnsureDefaultInputMapping();
+	ApplyEquipmentWeaponLoadout();
+}
+
+void ALastFPSHero::ApplyEquipmentWeaponLoadout()
+{
+	// 서버 권한에서만 장착한다. 클라이언트는 WeaponComponent 복제로 결과를 받는다.
+	if (!HasAuthority() || !WeaponComponent)
+	{
+		return;
+	}
+
+	const ALastFPSGameModeBase* GameMode =
+		GetWorld() ? GetWorld()->GetAuthGameMode<ALastFPSGameModeBase>() : nullptr;
+	if (!GameMode || !GameMode->ShouldEquipWeaponLoadout())
+	{
+		// 허브처럼 무기를 들지 않는 맵. 이전 맵에서 들고 있던 무기가 남지 않도록 명시적으로 내려놓는다.
+		WeaponComponent->UnequipWeapon();
+		return;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULastFPSEquipmentSubsystem* Equipment =
+		GameInstance ? GameInstance->GetSubsystem<ULastFPSEquipmentSubsystem>() : nullptr;
+	if (!Equipment)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("%s: EquipmentSubsystem 을 찾지 못해 무기 로드아웃을 장착하지 못했습니다."),
+			*GetName());
+		return;
+	}
+
+	const int32 SlotCount = Equipment->GetSlotCount(ELastFPSEquipmentSlotType::Weapon);
+	TArray<ULastFPSWeaponDefinition*> SlotDefinitions;
+	SlotDefinitions.Reserve(SlotCount);
+	for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex)
+	{
+		SlotDefinitions.Add(Equipment->GetWeaponDefinitionForSlot(SlotIndex));
+	}
+
+	WeaponComponent->SetWeaponLoadout(SlotDefinitions);
 }
 
 void ALastFPSHero::PawnClientRestart()
@@ -638,6 +680,28 @@ bool ALastFPSHero::HasEquippedWeapon() const
     return WeaponComponent && WeaponComponent->HasWeapon();
 }
 
+void ALastFPSHero::SelectWeaponSlot(const int32 SlotIndex)
+{
+    if (!WeaponComponent || !IsAlive())
+    {
+        return;
+    }
+
+    if (SlotIndex == WeaponComponent->GetActiveWeaponSlot())
+    {
+        return;
+    }
+
+    // 리로드 도중 무기를 바꾸면 진행 중인 타이머가 새 무기의 탄창을 채워 버린다.
+    // 어빌리티를 먼저 취소해 몽타주·탄창 비주얼·전투 상태까지 EndAbility 경로로 정리한다.
+    if (CombatState == EMMCombatState::Reloading)
+    {
+        CancelAbilityByTag(LastFPSGameplayTags::Ability_Reload);
+    }
+
+    WeaponComponent->RequestWeaponSlot(SlotIndex);
+}
+
 void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -653,11 +717,15 @@ void ALastFPSHero::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_ADS), ETriggerEvent::Started, this, &ALastFPSHero::SetADS, true);
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_ADS), ETriggerEvent::Completed, this, &ALastFPSHero::SetADS, false);
     EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_ADS), ETriggerEvent::Canceled, this, &ALastFPSHero::SetADS, false);
-    
+
+    // 무기 슬롯 전환은 GAS 어빌리티가 아니라 컴포넌트 상태 변경이므로 네이티브 액션으로 처리한다.
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_WeaponSlot1), ETriggerEvent::Started, this, &ALastFPSHero::SelectWeaponSlot, 0);
+    EIC->BindAction(InputConfig->FindNativeInputActionByTag(LastFPSGameplayTags::Input_WeaponSlot2), ETriggerEvent::Started, this, &ALastFPSHero::SelectWeaponSlot, 1);
+
     // 어빌리티 전용
     for (const FLastFPSInputAction& Action : InputConfig->AbilityInputActions)
     {
-        EIC->BindAction(Action.InputAction, ETriggerEvent::Triggered, this, &ALastFPSHero::HandleAbilityInput, Action.InputTag);
+        EIC->BindAction(Action.InputAction, ETriggerEvent::Started, this, &ALastFPSHero::HandleAbilityInput, Action.InputTag);
         EIC->BindAction(Action.InputAction, ETriggerEvent::Completed, this, &ALastFPSHero::HandleAbilityInput, Action.InputTag);
         EIC->BindAction(Action.InputAction, ETriggerEvent::Canceled, this, &ALastFPSHero::HandleAbilityInput, Action.InputTag);
     }

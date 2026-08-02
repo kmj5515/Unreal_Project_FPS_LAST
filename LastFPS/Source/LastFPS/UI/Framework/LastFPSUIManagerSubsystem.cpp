@@ -31,6 +31,7 @@ void ULastFPSUIManagerSubsystem::Deinitialize()
 	}
 
 	OpenScreens.Reset();
+	ScreenTabHost.Reset();
 	CachedRegistry = nullptr;
 
 	Super::Deinitialize();
@@ -77,6 +78,14 @@ const ULastFPSScreenRegistry* ULastFPSUIManagerSubsystem::GetRegistry()
 
 UCommonActivatableWidget* ULastFPSUIManagerSubsystem::OpenScreen(FGameplayTag ScreenTag, APlayerController* OwningPlayer)
 {
+	return OpenScreenWithInit(ScreenTag, OwningPlayer, nullptr);
+}
+
+UCommonActivatableWidget* ULastFPSUIManagerSubsystem::OpenScreenWithInit(
+	FGameplayTag ScreenTag,
+	APlayerController* OwningPlayer,
+	TFunction<void(UCommonActivatableWidget&)> InitFunc)
+{
 	if (!ScreenTag.IsValid())
 	{
 		return nullptr;
@@ -105,6 +114,33 @@ UCommonActivatableWidget* ULastFPSUIManagerSubsystem::OpenScreen(FGameplayTag Sc
 		return nullptr;
 	}
 
+	// 표시 방식은 데이터가 정한다. 껍데기가 떠 있는지 여부로 갈리면 같은 호출이 상황마다 다르게 동작한다.
+	if (Def->Presentation == ELastFPSScreenPresentation::ShellTab)
+	{
+		if (ILastFPSScreenTabHost* TabHost = Cast<ILastFPSScreenTabHost>(ScreenTabHost.Get()))
+		{
+			if (TabHost->HostsScreenTab(ScreenTag))
+			{
+				return TabHost->ShowScreenTab(ScreenTag);
+			}
+		}
+
+		if (!Def->HostScreenTag.IsValid())
+		{
+			UE_LOG(LogLastFPSUI, Error,
+				TEXT("'%s' 는 ShellTab 인데 HostScreenTag 가 비어 있어 열 곳이 없습니다."),
+				*ScreenTag.ToString());
+			return nullptr;
+		}
+
+		// 껍데기를 먼저 연다. 껍데기가 같은 프레임에 준비되지 않을 수 있어 요청을 남겨 두고,
+		// 탭 호스트가 등록되는 시점에 이어서 적용한다.
+		PendingTabScreenTag = ScreenTag;
+		return OpenScreen(Def->HostScreenTag, OwningPlayer);
+	}
+
+	// 여기부터는 레이어 push 경로다.
+
 	APlayerController* PC = OwningPlayer ? OwningPlayer : GetGameInstance()->GetFirstLocalPlayerController();
 	if (!PC)
 	{
@@ -126,12 +162,61 @@ UCommonActivatableWidget* ULastFPSUIManagerSubsystem::OpenScreen(FGameplayTag Sc
 
 	const FGameplayTag LayerTag = Def->LayerTag.IsValid() ? Def->LayerTag : LastFPSUITags::Layer_Menu();
 
-	UCommonActivatableWidget* Widget = RootLayout->PushWidgetToLayerStack<UCommonActivatableWidget>(LayerTag, WidgetClass);
+	// 초기화는 construct 전에 넘겨야 화면이 첫 프레임부터 제 내용을 그린다.
+	UCommonActivatableWidget* Widget = RootLayout->PushWidgetToLayerStack<UCommonActivatableWidget>(
+		LayerTag,
+		WidgetClass,
+		[&InitFunc](UCommonActivatableWidget& PushedWidget)
+		{
+			if (InitFunc)
+			{
+				InitFunc(PushedWidget);
+			}
+		});
+
 	if (Widget)
 	{
 		OpenScreens.Add(ScreenTag, Widget);
 	}
 	return Widget;
+}
+
+void ULastFPSUIManagerSubsystem::RegisterScreenTabHost(TScriptInterface<ILastFPSScreenTabHost> InTabHost)
+{
+	if (!InTabHost)
+	{
+		return;
+	}
+
+	if (ScreenTabHost.IsValid() && ScreenTabHost.Get() != InTabHost.GetObject())
+	{
+		// shell 이 둘 이상 살아 있으면 어느 쪽으로 위임할지 결정할 근거가 없다. 조용히 덮지 않고 알린다.
+		UE_LOG(LogLastFPSUI, Warning,
+			TEXT("탭 shell 이 이미 등록돼 있습니다(%s). %s 로 교체합니다."),
+			*GetNameSafe(ScreenTabHost.Get()), *GetNameSafe(InTabHost.GetObject()));
+	}
+
+	ScreenTabHost = InTabHost.GetObject();
+
+	// 여기서 바로 적용하지 않는다. 등록은 껍데기가 탭 목록을 만들기 전에 일어나므로
+	// HostsScreenTab 이 아직 false 라 요청이 그대로 버려진다.
+	// 껍데기가 목록을 채운 뒤 ConsumePendingTabScreenTag 로 직접 가져가게 한다.
+}
+
+FGameplayTag ULastFPSUIManagerSubsystem::ConsumePendingTabScreenTag()
+{
+	const FGameplayTag PendingTag = PendingTabScreenTag;
+	PendingTabScreenTag = FGameplayTag();
+	return PendingTag;
+}
+
+void ULastFPSUIManagerSubsystem::UnregisterScreenTabHost(const TScriptInterface<ILastFPSScreenTabHost>& InTabHost)
+{
+	// 이미 다른 shell 이 등록된 뒤 늦게 들어온 해제 요청이 그것을 지우지 않게 한다.
+	if (InTabHost && ScreenTabHost.Get() == InTabHost.GetObject())
+	{
+		ScreenTabHost.Reset();
+	}
 }
 
 void ULastFPSUIManagerSubsystem::CloseScreen(FGameplayTag ScreenTag)

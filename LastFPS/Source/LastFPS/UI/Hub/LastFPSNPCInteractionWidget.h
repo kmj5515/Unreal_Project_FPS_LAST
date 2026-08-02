@@ -2,6 +2,7 @@
 
 #include "UI/Framework/LastFPSActivatableWidget.h"
 #include "Hub/LastFPSNPCTypes.h"
+#include "Localization/LastFPSLocalization.h"
 #include "LastFPSNPCInteractionWidget.generated.h"
 
 class UPanelWidget;
@@ -54,7 +55,7 @@ protected:
 
 	/** "나가기" 버튼 라벨 */
 	UPROPERTY(EditDefaultsOnly, Category="LastFPS|NPC")
-	FText ExitButtonLabel = NSLOCTEXT("LastFPS", "NPC_Exit", "나가기");
+	FText ExitButtonLabel = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::NPCExit);
 
 	/** 각 버튼 슬롯 여백. 세로 목록이면 Top/Bottom 값이 버튼 사이 간격이 된다. */
 	UPROPERTY(EditDefaultsOnly, Category="LastFPS|NPC")

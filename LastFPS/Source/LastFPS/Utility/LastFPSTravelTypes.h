@@ -78,4 +78,5 @@ enum class ELastFPSTravelRequestResult : uint8
 	InvalidWorld,
 	InvalidPlayer,
 	SessionUnavailable,
+	MissingRequiredWeapon,
 };

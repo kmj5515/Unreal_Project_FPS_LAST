@@ -3,6 +3,7 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "GameFramework/PlayerController.h"
+#include "Localization/LastFPSLocalization.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSScopeOverlay, Log, All);
@@ -81,7 +82,11 @@ void ULastFPSScopeOverlayWidget::UpdateRange()
     }
 
     DisplayedRangeMeters = Meters;
-    RangeText->SetText(FText::FromString(bHit ? FString::Printf(TEXT("%dm"), Meters) : TEXT("??m")));
+    RangeText->SetText(bHit
+        ? FText::Format(
+            FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::DistanceMetersFormat),
+            FText::AsNumber(Meters))
+        : FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::UnknownDistanceMeters));
 }
 
 void ULastFPSScopeOverlayWidget::ApplyAspectRatio(const FVector2D& LocalSize)

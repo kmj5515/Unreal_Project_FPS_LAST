@@ -4,6 +4,7 @@
 #include "UI/Framework/LastFPSButtonBase.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Localization/LastFPSLocalization.h"
 
 void ULastFPSModuleEntryWidget::NativeConstruct()
 {
@@ -61,7 +62,9 @@ void ULastFPSModuleEntryWidget::SetupModule(
 	{
 		if (Count > 1)
 		{
-			TB_Count->SetText(FText::FromString(FString::Printf(TEXT("x%d"), Count)));
+			TB_Count->SetText(FText::Format(
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::CountFormat),
+				FText::AsNumber(Count)));
 			TB_Count->SetVisibility(ESlateVisibility::HitTestInvisible);
 		}
 		else

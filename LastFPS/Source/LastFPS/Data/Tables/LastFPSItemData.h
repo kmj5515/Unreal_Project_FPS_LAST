@@ -14,6 +14,8 @@ enum class ELastFPSItemType : uint8
 	Module		UMETA(DisplayName="모듈"),
 	Consumable	UMETA(DisplayName="소모품"),
 	Material	UMETA(DisplayName="재료"),
+	Reactor		UMETA(DisplayName="리액터"),
+	ExternalComponent UMETA(DisplayName="외장 부품"),
 };
 
 UENUM(BlueprintType)

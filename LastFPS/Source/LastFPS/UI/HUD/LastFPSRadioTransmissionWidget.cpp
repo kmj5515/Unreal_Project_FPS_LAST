@@ -2,6 +2,7 @@
 
 #include "Components/Border.h"
 #include "Components/TextBlock.h"
+#include "Localization/LastFPSLocalization.h"
 #include "Quest/LastFPSQuestSubsystem.h"
 #include "UI/HUD/Audio/LastFPSRadioAudioPlayer.h"
 
@@ -116,8 +117,9 @@ void ULastFPSRadioTransmissionWidget::ProcessNextTransmission()
 
 	if (SpeakerNameText)
 	{
-		const FString FormattedSpeaker = FString::Printf(TEXT("%s:"), *CurrentTransmission.SpeakerName.ToString());
-		SpeakerNameText->SetText(FText::FromString(FormattedSpeaker));
+		SpeakerNameText->SetText(FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::SpeakerNameFormat),
+			CurrentTransmission.SpeakerName));
 		SpeakerNameText->SetColorAndOpacity(FSlateColor(CurrentTransmission.SpeakerColor));
 	}
 

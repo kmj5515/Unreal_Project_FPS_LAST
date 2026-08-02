@@ -1,6 +1,7 @@
 #include "UI/FrontEnd/LastFPSSettingsWidget.h"
 
 #include "Game/LastFPSGameUserSettings.h"
+#include "Localization/LastFPSLocalization.h"
 #include "UI/Framework/LastFPSButtonBase.h"
 #include "Components/Slider.h"
 #include "Components/TextBlock.h"
@@ -17,10 +18,10 @@ void ULastFPSSettingsWidget::NativeConstruct()
 	if (Button_Revert)        Button_Revert->OnClicked().AddUObject(this,        &ULastFPSSettingsWidget::HandleRevertClicked);
 
 	// 슬라이더가 움직일 때마다 옆 수치 텍스트 갱신
-	if (Slider_MasterVolume) Slider_MasterVolume->OnValueChanged.AddDynamic(this, &ULastFPSSettingsWidget::HandleSliderValueChanged);
-	if (Slider_MusicVolume)  Slider_MusicVolume->OnValueChanged.AddDynamic(this,  &ULastFPSSettingsWidget::HandleSliderValueChanged);
-	if (Slider_SFXVolume)    Slider_SFXVolume->OnValueChanged.AddDynamic(this,    &ULastFPSSettingsWidget::HandleSliderValueChanged);
-	if (Slider_Sensitivity)  Slider_Sensitivity->OnValueChanged.AddDynamic(this,  &ULastFPSSettingsWidget::HandleSliderValueChanged);
+	if (Slider_MasterVolume) Slider_MasterVolume->OnValueChanged.AddUniqueDynamic(this, &ULastFPSSettingsWidget::HandleSliderValueChanged);
+	if (Slider_MusicVolume)  Slider_MusicVolume->OnValueChanged.AddUniqueDynamic(this,  &ULastFPSSettingsWidget::HandleSliderValueChanged);
+	if (Slider_SFXVolume)    Slider_SFXVolume->OnValueChanged.AddUniqueDynamic(this,    &ULastFPSSettingsWidget::HandleSliderValueChanged);
+	if (Slider_Sensitivity)  Slider_Sensitivity->OnValueChanged.AddUniqueDynamic(this,  &ULastFPSSettingsWidget::HandleSliderValueChanged);
 
 	LoadCurrentSettings();
 }
@@ -49,7 +50,9 @@ void ULastFPSSettingsWidget::RefreshSliderLabels()
 {
 	auto AsPercent = [](float V01)
 	{
-		return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(FMath::Clamp(V01, 0.f, 1.f) * 100.f)));
+		return FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::PercentFormat),
+			FText::AsNumber(FMath::RoundToInt(FMath::Clamp(V01, 0.f, 1.f) * 100.f)));
 	};
 
 	if (Slider_MasterVolume && TB_MasterVolume) TB_MasterVolume->SetText(AsPercent(Slider_MasterVolume->GetValue()));

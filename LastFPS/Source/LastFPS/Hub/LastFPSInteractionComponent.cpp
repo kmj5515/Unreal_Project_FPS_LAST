@@ -1,6 +1,7 @@
 #include "Hub/LastFPSInteractionComponent.h"
 
 #include "Game/LastFPSPlayerController.h"
+#include "Localization/LastFPSLocalization.h"
 #include "UI/HUD/LastFPSNPCMarkerWidget.h"
 
 #include "Camera/CameraComponent.h"
@@ -61,7 +62,7 @@ void ULastFPSInteractionComponent::HandleInteract(APlayerController* InstigatorP
 		PC->ShowNotice(
 			DisplayName,
 			FText::Format(
-				NSLOCTEXT("LastFPS", "NPC_NoActions", "{0}(와)과 대화 내용이 아직 없습니다."),
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::NPCNoActions),
 				DisplayName));
 		return;
 	}

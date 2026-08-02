@@ -112,9 +112,21 @@ protected:
     /** 초기 스폰·지연 스폰·리스폰 모두에서 로컬 플레이어의 기본 입력 매핑을 보장한다. */
     void EnsureDefaultInputMapping();
 
+    /**
+     * 맵 규칙에 따라 EquipmentSubsystem 의 무기 로드아웃을 WeaponComponent 에 반영한다(서버 권한).
+     * 전투 맵이 아니면 맨손 상태로 되돌린다.
+     */
+    void ApplyEquipmentWeaponLoadout();
+
     void Move(const FInputActionValue& Value);
     void ClearMoveInput(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
+
+    /**
+     * 1·2번 키로 무기 슬롯을 전환한다.
+     * 리로드 중이면 어빌리티를 먼저 취소해 타이머가 새 무기에 탄약을 채우는 일을 막는다.
+     */
+    void SelectWeaponSlot(int32 SlotIndex);
     
     // 공통 GAS 입력 처리
     bool TryActivateAbilityByTag(FGameplayTag AbilityTag);

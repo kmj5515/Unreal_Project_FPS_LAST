@@ -1,6 +1,9 @@
 #include "UI/Common/LastFPSNoticeWidget.h"
 
+#include "Data/Definitions/LastFPSPopupCatalog.h"
 #include "UI/Framework/LastFPSButtonBase.h"
+#include "UI/Framework/LastFPSPopupSubsystem.h"
+#include "UI/Framework/LastFPSPopupTags.h"
 
 void ULastFPSNoticeWidget::NativeOnInitialized()
 {
@@ -18,23 +21,33 @@ bool ULastFPSNoticeWidget::NativeOnHandleBackAction()
 	return true;
 }
 
-void ULastFPSNoticeWidget::SetupNotice(const FText& InTitle, const FText& InBody)
+
+ULastFPSNoticeWidget* ULastFPSNoticeWidget::ShowPopup(const UObject* WorldContext, const FLastFPSNoticeParams& Params)
+{
+	ULastFPSNoticeWidget* Widget = ULastFPSPopupSubsystem::ShowPopup<ULastFPSNoticeWidget>(WorldContext, LastFPSPopupTags::Notice());
+	if (Widget)
+	{
+		Widget->SetupNotice(Params.Title, Params.Body, Params.OnResult);
+	}
+	
+	return Widget;
+}
+
+void ULastFPSNoticeWidget::SetupNotice(const FText& InTitle, const FText& InBody, FCommonMessagingResultDelegate ResultCallback)
 {
 	UCommonGameDialogDescriptor* Descriptor =
 		UCommonGameDialogDescriptor::CreateConfirmationOk(InTitle, InBody);
-	SetupDialog(Descriptor, FCommonMessagingResultDelegate());
+	SetupDialog(Descriptor, ResultCallback);
 }
 
 void ULastFPSNoticeWidget::SetupDialog(
 	UCommonGameDialogDescriptor* Descriptor,
 	FCommonMessagingResultDelegate ResultCallback)
 {
-	OnNoticeClosed.Clear();
 	CloseResult = ECommonMessagingResult::Confirmed;
 	if (Descriptor && Button_Ok && Descriptor->ButtonActions.IsValidIndex(0))
 	{
-		const FConfirmationDialogAction& CloseAction =
-			Descriptor->ButtonActions[0];
+		const FConfirmationDialogAction& CloseAction = Descriptor->ButtonActions[0];
 		CloseResult = CloseAction.Result;
 		const FText& DisplayText = CloseAction.OptionalDisplayText;
 		if (!DisplayText.IsEmpty())
@@ -43,13 +56,12 @@ void ULastFPSNoticeWidget::SetupDialog(
 		}
 	}
 
-	Super::SetupDialog(Descriptor, MoveTemp(ResultCallback));
+	Super::SetupDialog(Descriptor,ResultCallback );
 }
 
 void ULastFPSNoticeWidget::KillDialog()
 {
 	CompleteDialog(ECommonMessagingResult::Killed);
-	OnNoticeClosed.Broadcast();
 	DeactivateWithAnimation();
 }
 
@@ -61,6 +73,5 @@ void ULastFPSNoticeWidget::HandleOkClicked()
 void ULastFPSNoticeWidget::CloseNotice()
 {
 	CompleteDialog(CloseResult);
-	OnNoticeClosed.Broadcast();
 	DeactivateWithAnimation();
 }

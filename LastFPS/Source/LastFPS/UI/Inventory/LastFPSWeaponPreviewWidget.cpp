@@ -1,41 +1,48 @@
 #include "UI/Inventory/LastFPSWeaponPreviewWidget.h"
 
-#include "UI/Inventory/LastFPSWeaponPreviewRig.h"
+#include "UI/Preview/LastFPSPreviewStageActor.h"
+#include "UI/Preview/LastFPSPreviewStageSubsystem.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
+#include "Localization/LastFPSLocalization.h"
 
 #include "Components/TextBlock.h"
 #include "Components/Image.h"
 #include "UI/Framework/LastFPSButtonBase.h"
+#include "UI/Framework/LastFPSUITags.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 
-void ULastFPSWeaponPreviewWidget::Setup(ULastFPSWeaponDefinition* InWeaponDef, const FLastFPSItemData& InItem, FName InRowId, ALastFPSWeaponPreviewRig* InRig)
+void ULastFPSWeaponPreviewWidget::Setup(ULastFPSWeaponDefinition* InWeaponDef, const FLastFPSItemData& InItem, FName InRowId, ALastFPSPreviewStageActor* InStage)
 {
 	WeaponDef = InWeaponDef;
 	CachedItem = InItem;
 	CachedRowId = InRowId;
-	Rig = InRig;
+	PreviewStage = InStage;
 
 	// Setup 은 push 시점(위젯 construct 이전일 수 있음)에 호출된다. 실제 텍스트는
 	// 바인딩이 끝난 NativeConstruct 에서 채운다. 이미 construct 됐다면 즉시 반영.
 	if (IsConstructed())
 	{
 		PopulateStats();
-		BindPreviewRig();
+		BindPreviewStage();
 	}
 }
 
 void ULastFPSWeaponPreviewWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
-	PopulateStats();
-	BindPreviewRig();
 
-	if (Btn_Close)
+	// 이 화면이 뜨면 아래 껍데기는 같은 레이어 스택이라 비활성화된다. 껍데기가 쥐고 있던 무대도 함께
+	// 놓이므로, 여기서 따로 쥐지 않으면 정작 무기를 보여줄 때 무대가 꺼져 있다.
+	if (ULastFPSPreviewStageSubsystem* PreviewStageSubsystem = ULastFPSPreviewStageSubsystem::Get(this))
 	{
-		Btn_Close->OnClicked().AddUObject(this, &ULastFPSWeaponPreviewWidget::HandleCloseClicked);
+		PreviewStageSubsystem->AddStageUser();
+		bHoldingPreviewStage = true;
 	}
+
+	PopulateStats();
+	BindPreviewStage();
 }
 
 void ULastFPSWeaponPreviewWidget::HandleCloseClicked()
@@ -55,15 +62,25 @@ void ULastFPSWeaponPreviewWidget::NativeDestruct()
 	}
 	PrevViewTarget = nullptr;
 
-	// 리그는 인벤토리가 소유·재사용 → 여기서 파괴하지 않는다.
-	Rig = nullptr;
+	// 무대는 레벨이 소유·재사용 → 여기서 파괴하지 않는다. 다음 화면이 다른 대상을 올려 그대로 쓴다.
+	// 무대에 올려 둔 무기도 치우지 않는다. 껍데기가 다시 활성화되면서 캐릭터로 되돌린다.
+	PreviewStage = nullptr;
+
+	if (bHoldingPreviewStage)
+	{
+		if (ULastFPSPreviewStageSubsystem* PreviewStageSubsystem = ULastFPSPreviewStageSubsystem::Get(this))
+		{
+			PreviewStageSubsystem->RemoveStageUser();
+		}
+		bHoldingPreviewStage = false;
+	}
 
 	Super::NativeDestruct();
 }
 
-void ULastFPSWeaponPreviewWidget::BindPreviewRig()
+void ULastFPSWeaponPreviewWidget::BindPreviewStage()
 {
-	if (!Rig || !WeaponDef)
+	if (!PreviewStage || !WeaponDef)
 	{
 		return;
 	}
@@ -74,34 +91,46 @@ void ULastFPSWeaponPreviewWidget::BindPreviewRig()
 		return;
 	}
 
-	Rig->InitPreview(Mesh);
+	// 무기는 정지 상태라 애님 인스턴스 없이 레퍼런스 포즈로 충분하다.
+	FLastFPSPreviewSubject Subject;
+	Subject.Mesh = Mesh;
 
-	// 플레이어 뷰를 리그 카메라로 전환(SceneCapture 대신). 닫을 때 복구할 이전 뷰타깃을 캐시.
+	// 무기 자리에만 올린다. 캐릭터 자리는 건드리지 않으므로 닫을 때 다시 조립할 필요가 없다.
+	PreviewStage->SetSubject(LastFPSUITags::PreviewSlot_Weapon(), Subject);
+	PreviewStage->SetActiveView(LastFPSUITags::PreviewView_Weapon());
+
+	// 플레이어 뷰를 무대 카메라로 전환(SceneCapture 대신). 닫을 때 복구할 이전 뷰타깃을 캐시.
 	if (APlayerController* PC = GetOwningPlayer())
 	{
 		if (!PrevViewTarget.IsValid())
 		{
 			PrevViewTarget = PC->GetViewTarget();
 		}
-		PC->SetViewTarget(Rig);
+		PC->SetViewTarget(PreviewStage);
 	}
 }
 
 FReply ULastFPSWeaponPreviewWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && Rig)
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && PreviewStage)
 	{
 		bDragging = true;
-		return FReply::Handled().CaptureMouse(TakeWidget());
+
+		// 마우스를 캡처하면 키보드 포커스가 이 위젯에서 빠져 ESC 가 NativeOnKeyDown 까지 오지 않는다.
+		// 캡처와 함께 포커스를 이 위젯으로 되돌려 둔다.
+		return FReply::Handled()
+			.CaptureMouse(TakeWidget())
+			.SetUserFocus(TakeWidget(), EFocusCause::Mouse);
 	}
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
 FReply ULastFPSWeaponPreviewWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (bDragging && Rig)
+	if (bDragging && PreviewStage)
 	{
-		Rig->AddYaw(-InMouseEvent.GetCursorDelta().X * RotationSpeed);
+		PreviewStage->AddYaw(
+			LastFPSUITags::PreviewSlot_Weapon(), -InMouseEvent.GetCursorDelta().X * RotationSpeed);
 		return FReply::Handled();
 	}
 	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
@@ -125,7 +154,9 @@ void ULastFPSWeaponPreviewWidget::PopulateStats()
 	}
 	if (TB_Rarity)
 	{
-		TB_Rarity->SetText(UEnum::GetDisplayValueAsText(CachedItem.Rarity));
+		TB_Rarity->SetText(FLastFPSLocalization::GetUIEnumText(
+			StaticEnum<ELastFPSItemRarity>(),
+			static_cast<int64>(CachedItem.Rarity)));
 	}
 	if (TB_Description)
 	{
@@ -136,67 +167,115 @@ void ULastFPSWeaponPreviewWidget::PopulateStats()
 	if (TB_Type && WeaponDef)
 	{
 		TB_Type->SetText(FText::Format(
-			NSLOCTEXT("LastFPS", "WeaponPreview_Type", "타입: {0}"),
-			UEnum::GetDisplayValueAsText(WeaponDef->WeaponType)));
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponTypeFormat),
+			FLastFPSLocalization::GetUIEnumText(
+				StaticEnum<EMMWeaponType>(),
+				static_cast<int64>(WeaponDef->WeaponType))));
 	}
 
 	// 스탯 시트는 아이템 행의 표시용 스펙(DT_ItemData.WeaponStats)에서 읽는다.
 	// 라벨/값 두 열로 빌드(줄 수를 맞춰 정렬). 그룹 헤더 줄은 값 열이 비어 있다.
 	const FLastFPSWeaponDisplayStats& S = CachedItem.WeaponStats;
 
-	FString Labels;
-	FString Values;
-	bool bFirst = true;
-	auto AddLine = [&Labels, &Values, &bFirst](const FString& Label, const FString& Value)
+	FNumberFormattingOptions ZeroDecimals;
+	ZeroDecimals.SetMinimumFractionalDigits(0);
+	ZeroDecimals.SetMaximumFractionalDigits(0);
+	FNumberFormattingOptions OneDecimal;
+	OneDecimal.SetMinimumFractionalDigits(1);
+	OneDecimal.SetMaximumFractionalDigits(1);
+	FNumberFormattingOptions TwoDecimals;
+	TwoDecimals.SetMinimumFractionalDigits(2);
+	TwoDecimals.SetMaximumFractionalDigits(2);
+
+	TArray<FText> Labels;
+	TArray<FText> Values;
+	auto AddLine = [&Labels, &Values](const FText& Label, const FText& Value)
 	{
-		if (!bFirst)
-		{
-			Labels += TEXT("\n");
-			Values += TEXT("\n");
-		}
-		bFirst = false;
-		Labels += Label;
-		Values += Value;
+		Labels.Add(Label);
+		Values.Add(Value);
 	};
-	auto Head = [&AddLine](const TCHAR* Title) { AddLine(FString(TEXT("■ ")) + Title, FString()); };
-	auto Pct  = [](float V) { return FString::Printf(TEXT("%d%%"), FMath::RoundToInt(V * 100.f)); };
-	auto Mult = [](float V) { return FString::Printf(TEXT("x%.1f"), V); };
-	auto Mtr  = [](float Cm) { return FString::Printf(TEXT("%.0fm"), Cm / 100.f); };
+	auto Head = [&AddLine](const TCHAR* Key)
+	{
+		AddLine(
+			FText::Format(
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::SectionHeaderFormat),
+				FLastFPSLocalization::GetUIText(Key)),
+			FText::GetEmpty());
+	};
+	auto Pct = [&ZeroDecimals](const float Value)
+	{
+		return FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::PercentFormat),
+			FText::AsNumber(Value * 100.f, &ZeroDecimals));
+	};
+	auto Mult = [&OneDecimal](const float Value)
+	{
+		return FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::MultiplierFormat),
+			FText::AsNumber(Value, &OneDecimal));
+	};
+	auto Mtr = [&ZeroDecimals](const float Centimeters)
+	{
+		return FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::DistanceMetersFormat),
+			FText::AsNumber(Centimeters / 100.f, &ZeroDecimals));
+	};
 
-	Head(TEXT("공격"));
-	AddLine(TEXT("  공격력"),        FString::Printf(TEXT("%d ~ %d"), FMath::RoundToInt(S.MinDamage), FMath::RoundToInt(S.MaxDamage)));
-	AddLine(TEXT("  발사 속도"),      FString::Printf(TEXT("%.2fs"), S.FireRate));
-	AddLine(TEXT("  장탄량"),        FString::FromInt(S.MagazineSize));
-	AddLine(TEXT("  재장전 시간"),    FString::Printf(TEXT("%.1fs"), S.ReloadTime));
-	AddLine(TEXT("  관통력"),        FString::Printf(TEXT("%.1f"), S.Penetration));
+	Head(LastFPSUIStringKeys::WeaponStatsAttackSection);
+	AddLine(
+		FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsDamage),
+		FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::RangeFormat),
+			FText::AsNumber(S.MinDamage, &ZeroDecimals),
+			FText::AsNumber(S.MaxDamage, &ZeroDecimals)));
+	AddLine(
+		FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsFireRate),
+		FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::SecondsFormat),
+			FText::AsNumber(S.FireRate, &TwoDecimals)));
+	AddLine(
+		FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsMagazineSize),
+		FText::AsNumber(S.MagazineSize));
+	AddLine(
+		FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsReloadTime),
+		FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::SecondsFormat),
+			FText::AsNumber(S.ReloadTime, &OneDecimal)));
+	AddLine(
+		FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsPenetration),
+		FText::AsNumber(S.Penetration, &OneDecimal));
 
-	Head(TEXT("치명타·속성"));
-	AddLine(TEXT("  치명타 확률"),      Pct(S.CriticalChance));
-	AddLine(TEXT("  치명타 배율"),      Mult(S.CriticalMultiplier));
-	AddLine(TEXT("  약점 배율"),       Mult(S.WeakpointMultiplier));
-	AddLine(TEXT("  다중 타격 배율"),   Mult(S.MultiHitMultiplier));
-	AddLine(TEXT("  상태효과 부여확률"), Pct(S.StatusEffectChance));
-	AddLine(TEXT("  격파"),          FString::Printf(TEXT("%.0f"), S.BreakPower));
+	Head(LastFPSUIStringKeys::WeaponStatsCriticalSection);
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsCriticalChance), Pct(S.CriticalChance));
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsCriticalMultiplier), Mult(S.CriticalMultiplier));
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsWeakpointMultiplier), Mult(S.WeakpointMultiplier));
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsMultiHitMultiplier), Mult(S.MultiHitMultiplier));
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsStatusEffectChance), Pct(S.StatusEffectChance));
+	AddLine(
+		FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsBreakPower),
+		FText::AsNumber(S.BreakPower, &ZeroDecimals));
 
-	Head(TEXT("명중·사거리"));
-	AddLine(TEXT("  지향 정확도"),   Pct(S.HipFireAccuracy));
-	AddLine(TEXT("  조준 정확도"),   Pct(S.AdsAccuracy));
-	AddLine(TEXT("  유효 사거리"),   Mtr(S.EffectiveRange));
-	AddLine(TEXT("  최대 사거리"),   Mtr(S.MaxRange));
-	AddLine(TEXT("  거리 감소율"),   Pct(S.DamageFalloffPercent));
+	Head(LastFPSUIStringKeys::WeaponStatsAccuracySection);
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsHipFireAccuracy), Pct(S.HipFireAccuracy));
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsAdsAccuracy), Pct(S.AdsAccuracy));
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsEffectiveRange), Mtr(S.EffectiveRange));
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsMaxRange), Mtr(S.MaxRange));
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsDamageFalloff), Pct(S.DamageFalloffPercent));
 
-	Head(TEXT("기동"));
-	AddLine(TEXT("  이동 속도"),     FString::Printf(TEXT("%.0f"), S.MoveSpeed));
-	AddLine(TEXT("  사격 중 이동"),  FString::Printf(TEXT("%.0f"), S.MoveSpeedWhileFiring));
-	AddLine(TEXT("  조준 중 이동"),  FString::Printf(TEXT("%.0f"), S.MoveSpeedWhileAiming));
-	AddLine(TEXT("  전력 질주"),     FString::Printf(TEXT("%.0f"), S.SprintSpeed));
+	Head(LastFPSUIStringKeys::WeaponStatsMobilitySection);
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::StatMoveSpeed), FText::AsNumber(S.MoveSpeed, &ZeroDecimals));
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsMoveWhileFiring), FText::AsNumber(S.MoveSpeedWhileFiring, &ZeroDecimals));
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsMoveWhileAiming), FText::AsNumber(S.MoveSpeedWhileAiming, &ZeroDecimals));
+	AddLine(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::WeaponStatsSprintSpeed), FText::AsNumber(S.SprintSpeed, &ZeroDecimals));
+
+	const FText LineBreak = FText::FromString(TEXT("\n"));
 
 	if (TB_StatLabels)
 	{
-		TB_StatLabels->SetText(FText::FromString(Labels));
+		TB_StatLabels->SetText(FText::Join(LineBreak, Labels));
 	}
 	if (TB_StatValues)
 	{
-		TB_StatValues->SetText(FText::FromString(Values));
+		TB_StatValues->SetText(FText::Join(LineBreak, Values));
 	}
 }

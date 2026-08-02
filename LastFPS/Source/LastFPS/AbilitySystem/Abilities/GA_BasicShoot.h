@@ -58,6 +58,7 @@ protected:
     float SprintToFireDelay = 0.18f;
 
 private:
+    void BeginFiring();
     void Fire();
     void FinishAbility();
     void TryStartAutoReload(ALastFPSHero* Hero, UWeaponComponent* Weapon) const;

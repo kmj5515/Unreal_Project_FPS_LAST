@@ -1,5 +1,6 @@
 #include "UI/Quest/LastFPSQuestEntryWidget.h"
 
+#include "Localization/LastFPSLocalization.h"
 #include "Quest/LastFPSQuestSubsystem.h"
 
 #include "Components/TextBlock.h"
@@ -40,7 +41,7 @@ void ULastFPSQuestEntryWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, F
 	{
 		if (InQuest.Objectives.Num() > 0)
 		{
-			FString Progress;
+			TArray<FText> ProgressLines;
 			for (int32 i = 0; i < InQuest.Objectives.Num(); ++i)
 			{
 				const int32 Cur = InSubsystem ? InSubsystem->GetObjectiveProgress(InQuestId, i) : 0;
@@ -53,25 +54,23 @@ void ULastFPSQuestEntryWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, F
 					continue;
 				}
 
-				if (!Progress.IsEmpty())
-				{
-					Progress += LINE_TERMINATOR;
-				}
-
-				const FString Label = InQuest.Objectives[i].Label.ToString();
-				if (!Label.IsEmpty())
-				{
-					Progress += Label;
-					Progress += TEXT("  ");
-				}
-				Progress += FString::Printf(TEXT("%d/%d"), Cur, Req);
+				const FText ProgressValue = FText::Format(
+					FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::RatioFormat),
+					FText::AsNumber(Cur),
+					FText::AsNumber(Req));
+				ProgressLines.Add(InQuest.Objectives[i].Label.IsEmpty()
+					? ProgressValue
+					: FText::Format(
+						FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::ObjectiveProgressLineFormat),
+						InQuest.Objectives[i].Label,
+						ProgressValue));
 
 				if (InQuest.bSequentialObjectives)
 				{
 					break;
 				}
 			}
-			TB_Progress->SetText(FText::FromString(Progress));
+			TB_Progress->SetText(FText::Join(FText::FromString(TEXT("\n")), ProgressLines));
 			TB_Progress->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 		}
 		else
@@ -88,7 +87,7 @@ void ULastFPSQuestEntryWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, F
 		Btn_Claim->OnClicked.RemoveDynamic(this, &ULastFPSQuestEntryWidget::HandleClaimClicked);
 		if (bClaimable)
 		{
-			Btn_Claim->OnClicked.AddDynamic(this, &ULastFPSQuestEntryWidget::HandleClaimClicked);
+			Btn_Claim->OnClicked.AddUniqueDynamic(this, &ULastFPSQuestEntryWidget::HandleClaimClicked);
 		}
 	}
 
@@ -131,15 +130,15 @@ FText ULastFPSQuestEntryWidget::StatusToText(ELastFPSQuestStatus Status)
 	switch (Status)
 	{
 	case ELastFPSQuestStatus::InProgress:
-		return NSLOCTEXT("LastFPS", "Quest_Status_InProgress", "진행중");
+		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestStatusInProgress);
 	case ELastFPSQuestStatus::Completed:
-		return NSLOCTEXT("LastFPS", "Quest_Status_Completed", "완료");
+		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestStatusCompleted);
 	case ELastFPSQuestStatus::Claimed:
-		return NSLOCTEXT("LastFPS", "Quest_Status_Claimed", "수령완료");
+		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestStatusClaimed);
 	case ELastFPSQuestStatus::Locked:
-		return NSLOCTEXT("LastFPS", "Quest_Status_Locked", "잠김");
+		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestStatusLocked);
 	case ELastFPSQuestStatus::NotStarted:
 	default:
-		return NSLOCTEXT("LastFPS", "Quest_Status_NotStarted", "미시작");
+		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestStatusNotStarted);
 	}
 }

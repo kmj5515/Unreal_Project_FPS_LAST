@@ -2,6 +2,7 @@
 
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
+#include "Localization/LastFPSLocalization.h"
 #include "UI/Framework/LastFPSButtonBase.h"
 #include "UI/Framework/LastFPSUITags.h"
 
@@ -41,8 +42,8 @@ void ULastFPSMainMenuWidget::HandleSettingsClicked()
 		if (!PC->OpenScreen(LastFPSUITags::Screen_Settings()))
 		{
 			PC->ShowNotice(
-				NSLOCTEXT("LastFPS", "SettingsNoticeTitle", "설정"),
-				NSLOCTEXT("LastFPS", "SettingsNoticeBody", "설정 화면은 준비 중입니다."));
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::SettingsNoticeTitle),
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::SettingsNoticeBody));
 		}
 	}
 }
@@ -54,8 +55,8 @@ void ULastFPSMainMenuWidget::HandleQuitClicked()
 		FLastFPSConfirmResultDelegate ResultDelegate;
 		ResultDelegate.BindUFunction(this, FName("HandleQuitConfirmResult"));
 		PC->ShowConfirm(
-			NSLOCTEXT("LastFPS", "QuitConfirmTitle", "게임 종료"),
-			NSLOCTEXT("LastFPS", "QuitConfirmBody", "정말 종료하시겠습니까?"),
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuitGameTitle),
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuitGameMainMenuConfirmation),
 			ResultDelegate);
 	}
 }

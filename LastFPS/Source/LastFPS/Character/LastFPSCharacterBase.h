@@ -116,6 +116,12 @@ public:
     // 서버 사망 시 브로드캐스트. 드랍/미션 등이 구독한다.
     FOnLastFPSCharacterDeath OnDeath;
 
+    /**
+     * 이 캐릭터의 정의. 아웃게임 UI 가 표시용 데이터(시각 데이터 등)를 읽을 때도 쓴다.
+     * 조회 전용이라 공개해도 캐릭터의 상태를 밖에서 바꿀 수는 없다.
+     */
+    const ULastFPSCharacterDefinition* ResolveCharacterDefinition() const;
+
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -133,7 +139,6 @@ protected:
     virtual void UpdateAliveCollisionState(bool bAlive);
     virtual void OnMoveSpeedChanged(const FOnAttributeChangeData& Data);
     virtual float ResolveMaxWalkSpeed(float AttributeMoveSpeed) const;
-    const ULastFPSCharacterDefinition* ResolveCharacterDefinition() const;
     void ApplyCharacterVisuals(const ULastFPSCharacterDefinition* Definition);
     void ClearCombatEngaged();
     virtual void OnCombatEngagedChanged();

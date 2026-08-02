@@ -18,6 +18,8 @@ class ULastFPSQuestTrackerWidget;
 class ULastFPSObjectiveMarkerWidget;
 class ULastFPSDialogueWidget;
 class ULastFPSNPCInteractionWidget;
+class UInputAction;
+struct FInputActionInstance;
 
 DECLARE_DYNAMIC_DELEGATE_OneParam(FLastFPSConfirmResultDelegate, bool, bConfirmed);
 DECLARE_DYNAMIC_DELEGATE_OneParam(FLastFPSQuantityResultDelegate, int32, Quantity);
@@ -155,6 +157,22 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
     TSubclassOf<ULastFPSObjectiveMarkerWidget> QuestMarkerWidgetClass;
 
+    /**
+     * 화면 단축키 — 액션 하나가 화면 태그 하나를 연다. 행을 추가하는 것이 곧 단축키 추가다.
+     *
+     * 실제 키는 IMC_Default 가 정한다. 여기서 키를 직접 들지 않는 이유는, 키 배정이 바뀌어도
+     * C++ 과 PC 기본값이 그대로여야 하고 나중에 키 리바인딩 UI 를 붙일 여지를 남기기 위해서다.
+     *
+     * IMC_Default 는 NPC 상호작용 중 제거되므로 그동안 단축키도 함께 죽는다(의도된 동작).
+     * 메뉴가 열린 뒤에는 입력 모드가 Menu 라 게임 입력이 오지 않는다. 닫기는 ESC 가 담당한다.
+     */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI", meta=(Categories="UI.Screen"))
+    TMap<TObjectPtr<const UInputAction>, FGameplayTag> ScreenHotkeys;
+
+    /** NPC 상호작용 중에는 단축키로 화면을 열지 않는다(대화·상점 중 난입 방지). */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
+    bool bBlockScreenHotkeysDuringInteraction = true;
+
     // ── 내부 ────────────────────────────────────────────────────────
 
     /** GameMode에서 진입/ESC 화면 태그를 읽어 캐시 (BeginPlay) */
@@ -166,6 +184,13 @@ protected:
 
     /** ESC 입력 핸들러 — EscMenuScreenTag가 있으면 연다. 커서/입력 모드는 CommonUI 입력설정 스택이 관리 */
     void HandleEscMenu();
+
+    /**
+     * 단축키 입력 핸들러 — 발동한 액션으로 ScreenHotkeys 를 조회해 해당 화면을 연다.
+     * 액션마다 핸들러를 만들지 않으려고 인스턴스에서 소스 액션을 되읽는다.
+     */
+    void HandleScreenHotkey(const FInputActionInstance& ActionInstance);
+    void ShowQuitPopup();
 
     /** 인게임 HUD push (휴면). 레이아웃 준비 전이면 재시도. */
     void TryPushHUDToUILayout();

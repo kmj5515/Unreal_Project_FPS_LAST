@@ -4,6 +4,7 @@
 #include "Engine/DataTable.h"
 #include "GameplayTagContainer.h"
 #include "Hub/LastFPSNPCTypes.h"
+#include "Localization/LastFPSLocalization.h"
 #include "LastFPSNPCSpawnData.generated.h"
 
 class UDataTable;
@@ -52,7 +53,7 @@ struct FLastFPSNPCSpawnData : public FTableRowBase
 
 	/** 머리 위 마커의 G 힌트 텍스트 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|NPC")
-	FText InteractionLabel = NSLOCTEXT("LastFPS", "NPC_DefaultInteract", "대화");
+	FText InteractionLabel = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::NPCInteract);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|NPC", meta=(ClampMin="50"))
 	float InteractionRadius = 150.f;

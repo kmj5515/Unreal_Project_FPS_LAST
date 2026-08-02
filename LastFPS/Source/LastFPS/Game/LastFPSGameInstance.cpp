@@ -10,6 +10,7 @@
 #include "Engine/World.h"
 #include "Game/Travel/LastFPSLevelTravelSettings.h"
 #include "Game/Travel/LastFPSLevelTravelSubsystem.h"
+#include "Localization/LastFPSLocalization.h"
 #include "UI/Framework/LastFPSUIManagerSubsystem.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LastFPSGameInstance)
@@ -75,13 +76,13 @@ FText ULastFPSGameInstance::GetDefaultStatusTextForDestination(
 	switch (Destination)
 	{
 	case ELastFPSTravelDestination::MainMenu:
-		return NSLOCTEXT("LastFPS", "TravelStatus_MainMenu", "메인 메뉴로 이동 중...");
+		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelStatusMainMenu);
 	case ELastFPSTravelDestination::CharacterSelect:
-		return NSLOCTEXT("LastFPS", "TravelStatus_CharacterSelect", "캐릭터 선택으로 이동 중...");
+		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelStatusCharacterSelect);
 	case ELastFPSTravelDestination::Hub:
-		return NSLOCTEXT("LastFPS", "TravelStatus_Hub", "허브로 이동 중...");
+		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelStatusHub);
 	default:
-		return NSLOCTEXT("LastFPS", "TravelStatus_Generic", "맵 이동 중...");
+		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelStatusGeneric);
 	}
 }
 
@@ -91,11 +92,11 @@ FText ULastFPSGameInstance::GetDefaultMapNameTextForDestination(
 	switch (Destination)
 	{
 	case ELastFPSTravelDestination::MainMenu:
-		return NSLOCTEXT("LastFPS", "TravelMap_MainMenu", "Main Menu");
+		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelMapMainMenu);
 	case ELastFPSTravelDestination::CharacterSelect:
-		return NSLOCTEXT("LastFPS", "TravelMap_CharacterSelect", "Character Select");
+		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelMapCharacterSelect);
 	case ELastFPSTravelDestination::Hub:
-		return NSLOCTEXT("LastFPS", "TravelMap_Hub", "Hub");
+		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelMapHub);
 	default:
 		return FText::GetEmpty();
 	}

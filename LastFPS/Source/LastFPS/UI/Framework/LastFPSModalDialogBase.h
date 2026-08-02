@@ -31,6 +31,8 @@ protected:
 	virtual void NativeOnDeactivated() override;
 	virtual void OnAnimationFinished_Implementation(
 		const UWidgetAnimation* Animation) override;
+
+	/** ESC 로 닫기. ULastFPSActivatableWidget 과 파생이 달라 같은 처리를 여기에도 둔다. */
 	virtual FReply NativeOnKeyDown(
 		const FGeometry& InGeometry,
 		const FKeyEvent& InKeyEvent) override;
@@ -52,6 +54,7 @@ protected:
 	UPROPERTY(Transient, meta=(BindWidgetAnimOptional))
 	TObjectPtr<UWidgetAnimation> OutAnimation;
 
+	/** ESC 로 이 모달을 닫을지. */
 	UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
 	bool bCloseOnEscape = true;
 

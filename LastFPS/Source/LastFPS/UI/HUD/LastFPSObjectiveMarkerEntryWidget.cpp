@@ -2,6 +2,7 @@
 
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
+#include "Localization/LastFPSLocalization.h"
 
 void ULastFPSObjectiveMarkerEntryWidget::UpdateMarker(const FLastFPSObjectiveMarkerDisplay& Display)
 {
@@ -10,7 +11,7 @@ void ULastFPSObjectiveMarkerEntryWidget::UpdateMarker(const FLastFPSObjectiveMar
 	{
 		// "45m" 형태 — 정수 미터.
 		const FText MetersText = FText::Format(
-			NSLOCTEXT("LastFPS", "Quest_MarkerDistance", "{0}m"),
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::DistanceMetersFormat),
 			FText::AsNumber(FMath::RoundToInt(Display.DistanceMeters)));
 		Text_Distance->SetText(MetersText);
 	}

@@ -7,6 +7,7 @@
 #include "Data/Tables/LastFPSItemData.h"
 #include "Economy/LastFPSEconomySubsystem.h"
 #include "Game/LastFPSPlayerController.h"
+#include "Localization/LastFPSLocalization.h"
 
 #include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
@@ -30,8 +31,8 @@ void ULastFPSShopScreenWidget::NativeConstruct()
 	// 잔액/보유 변동 구독 + 최초 1회 동기화(잔액 표시 + 구매 가능 여부)
 	if (ULastFPSEconomySubsystem* Econ = GetEconomy())
 	{
-		Econ->OnCreditsChanged.AddDynamic(this, &ULastFPSShopScreenWidget::HandleCreditsChanged);
-		Econ->OnInventoryChanged.AddDynamic(this, &ULastFPSShopScreenWidget::HandleInventoryChanged);
+		Econ->OnCreditsChanged.AddUniqueDynamic(this, &ULastFPSShopScreenWidget::HandleCreditsChanged);
+		Econ->OnInventoryChanged.AddUniqueDynamic(this, &ULastFPSShopScreenWidget::HandleInventoryChanged);
 		HandleCreditsChanged(Econ->GetCredits());
 	}
 }
@@ -159,8 +160,8 @@ void ULastFPSShopScreenWidget::HandleBuyRequested(FName RowName, ULastFPSShopEnt
 	{
 		// 잔액 부족이거나 더 보유할 수 없는(스택이 찬) 아이템
 		PC->ShowNotice(
-			NSLOCTEXT("LastFPSShop", "CannotBuyTitle", "구매 불가"),
-			NSLOCTEXT("LastFPSShop", "CannotBuyBody", "잔액이 부족하거나 더 보유할 수 없는 아이템입니다."));
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::ShopCannotBuyTitle),
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::ShopCannotBuyBody));
 		return;
 	}
 
@@ -171,7 +172,7 @@ void ULastFPSShopScreenWidget::HandleBuyRequested(FName RowName, ULastFPSShopEnt
 	FLastFPSQuantityResultDelegate OnResult;
 	OnResult.BindDynamic(this, &ULastFPSShopScreenWidget::HandleQuantityChosen);
 	PC->ShowQuantityPrompt(
-		NSLOCTEXT("LastFPSShop", "BuyConfirmTitle", "구매하시겠습니까?"),
+		FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::ShopBuyConfirmTitle),
 		Row->ItemName,
 		FMath::Max(0, Row->Price),
 		MaxQty,

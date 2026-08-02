@@ -3,9 +3,7 @@
 #include "CommonButtonBase.h"
 #include "LastFPSButtonBase.generated.h"
 
-class USizeBox;
-class UTextBlock;
-class USoundBase;
+class UCommonTextBlock;
 
 /**
  * 프로젝트 공통 버튼 베이스.
@@ -31,22 +29,19 @@ public:
 protected:
 	virtual void NativePreConstruct() override;
 
+	/**
+	 * 버튼 상태(Normal/Selected/Disabled)에 맞는 텍스트 스타일을 라벨에 옮긴다.
+	 *
+	 * CommonUI 는 스타일이 바뀌었다는 통보만 하고 적용은 버튼에 맡긴다. 이 배선을 파생 WBP 마다
+	 * 넣으면 버튼 종류만큼 같은 그래프가 반복되므로 베이스에서 한 번만 처리한다.
+	 */
+	virtual void NativeOnCurrentTextStyleChanged() override;
+
 	/** WBP에 동일 이름으로 TextBlock을 두면 자동 바인딩 */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UTextBlock> TextBlock;
+	TObjectPtr<UCommonTextBlock> TextBlock;
 
 	/** 인스턴스별 라벨. 부모 WBP의 각 버튼 Details에서 입력. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|Button")
 	FText ButtonText;
-
-	/** 버튼의 크기를 조절 할 수 있게 한다**/
-	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<USizeBox> SizeBox;
-
-	UPROPERTY(EditAnywhere, Category="LastFPS|Button")
-	bool bOverrideSize = false;
-
-	UPROPERTY(EditAnywhere, Category="LastFPS|Button",
-		meta=(EditCondition="bOverrideSize", ClampMin="0.0"))
-	FVector2D ButtonSize = FVector2D::ZeroVector;
 };

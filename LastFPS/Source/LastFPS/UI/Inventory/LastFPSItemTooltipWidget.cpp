@@ -1,8 +1,10 @@
 #include "UI/Inventory/LastFPSItemTooltipWidget.h"
 
 #include "Components/TextBlock.h"
+#include "Data/Tables/LastFPSEquipmentStatTypes.h"
 #include "Data/Tables/LastFPSModuleData.h"
 #include "Inventory/LastFPSLoadoutSubsystem.h"
+#include "Localization/LastFPSLocalization.h"
 
 #include "Engine/GameInstance.h"
 
@@ -14,7 +16,9 @@ void ULastFPSItemTooltipWidget::SetupTooltip(const FLastFPSItemData& InItem, FNa
 	}
 	if (TB_Rarity)
 	{
-		TB_Rarity->SetText(UEnum::GetDisplayValueAsText(InItem.Rarity));
+		TB_Rarity->SetText(FLastFPSLocalization::GetUIEnumText(
+			StaticEnum<ELastFPSItemRarity>(),
+			static_cast<int64>(InItem.Rarity)));
 	}
 	if (TB_Description)
 	{
@@ -31,18 +35,19 @@ void ULastFPSItemTooltipWidget::SetupTooltip(const FLastFPSItemData& InItem, FNa
 			{
 				if (const FLastFPSModuleData* Module = Loadout->FindModule(InRowId))
 				{
-					FString Lines;
+					TArray<FText> Lines;
 					for (const FLastFPSModuleStatMod& Mod : Module->StatMods)
 					{
-						const FText StatName = UEnum::GetDisplayValueAsText(Mod.Stat);
-						const TCHAR* Sign = (Mod.Value >= 0.f) ? TEXT("+") : TEXT("");
-						if (!Lines.IsEmpty())
+						ELastFPSEquipmentStat EquipmentStat;
+						if (LastFPSEquipmentStats::ToEquipmentStat(Mod.Stat, EquipmentStat))
 						{
-							Lines += TEXT("\n");
+							Lines.Add(FText::Format(
+								FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::StatLineFormat),
+								LastFPSEquipmentStats::GetDisplayName(EquipmentStat),
+								LastFPSEquipmentStats::FormatValue(EquipmentStat, Mod.Value, true)));
 						}
-						Lines += FString::Printf(TEXT("%s %s%g"), *StatName.ToString(), Sign, Mod.Value);
 					}
-					StatsText = FText::FromString(Lines);
+					StatsText = FText::Join(FText::FromString(TEXT("\n")), Lines);
 				}
 			}
 		}

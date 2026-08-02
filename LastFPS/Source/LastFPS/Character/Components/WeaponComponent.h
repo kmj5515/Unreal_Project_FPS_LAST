@@ -26,6 +26,35 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponReserveAmmoChanged, int32, 
 // 리로드 표시용 신호. Duration은 리로드 총 소요 시간(초)이다.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponReloadStarted, float, ReloadDuration);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponReloadFinished, bool, bCompleted);
+// 활성 무기 슬롯이 바뀐 순간. HUD가 어떤 칸을 강조할지 판단한다.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponSlotChanged, int32, ActiveSlotIndex);
+// 슬롯 구성(어떤 무기를 어느 칸에 들었는지) 자체가 바뀐 순간.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnWeaponLoadoutChanged);
+
+/**
+ * 무기 슬롯 1칸의 상태.
+ *
+ * 비활성 슬롯의 탄약을 여기에 보관했다가 다시 꺼낼 때 복원한다. 활성 슬롯의 탄약은
+ * CurrentMagazineAmmo/CurrentReserveAmmo 가 단일 출처이며, 이 구조체의 값은 전환 순간에만 갱신된다.
+ */
+USTRUCT()
+struct FLastFPSWeaponSlotState
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    TObjectPtr<ULastFPSWeaponDefinition> Definition = nullptr;
+
+    UPROPERTY()
+    int32 StashedMagazineAmmo = 0;
+
+    UPROPERTY()
+    int32 StashedReserveAmmo = 0;
+
+    /** 한 번이라도 꺼낸 적이 있는지. 첫 장착에서만 밸런스 기본 탄약으로 채우기 위한 구분이다. */
+    UPROPERTY()
+    bool bAmmoInitialized = false;
+};
 
 UCLASS(BlueprintType, Blueprintable, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class LASTFPS_API UWeaponComponent : public UActorComponent
@@ -78,9 +107,38 @@ public:
     UFUNCTION(BlueprintCallable, Category="Weapon")
     void UnequipWeapon();
 
+    /**
+     * 슬롯 로드아웃 전체를 설정한다(서버 권한). 배틀 맵 스폰 시 EquipmentSubsystem 의 구성을 반영하는 진입점이다.
+     * 1번 슬롯을 기본 활성 슬롯으로 사용하며, 목록 또는 1번 슬롯이 비어 있으면 맨손으로 시작한다.
+     * 슬롯 수는 넘어온 배열 길이를 그대로 따른다.
+     */
+    void SetWeaponLoadout(const TArray<ULastFPSWeaponDefinition*>& SlotDefinitions);
+
+    /**
+     * 활성 슬롯 전환 요청. 소유 클라이언트에서 호출하면 서버 RPC 로 넘어가고,
+     * 서버 권한에서 호출하면 즉시 적용된다. 유효하지 않은 인덱스나 빈 슬롯은 무시한다.
+     */
+    UFUNCTION(BlueprintCallable, Category="Weapon|Slot")
+    void RequestWeaponSlot(int32 SlotIndex);
+
+    UFUNCTION(BlueprintPure, Category="Weapon|Slot")
+    int32 GetActiveWeaponSlot() const { return ActiveWeaponSlot; }
+
+    UFUNCTION(BlueprintPure, Category="Weapon|Slot")
+    int32 GetWeaponSlotCount() const { return WeaponSlots.Num(); }
+
+    UFUNCTION(BlueprintPure, Category="Weapon|Slot")
+    ULastFPSWeaponDefinition* GetWeaponDefinitionForSlot(int32 SlotIndex) const;
+
     // 무기 장착/해제 시 HUD에 알림
     UPROPERTY(BlueprintAssignable, Category="Weapon")
     FOnWeaponEquippedChanged OnWeaponEquippedChanged;
+
+    UPROPERTY(BlueprintAssignable, Category="Weapon|Slot")
+    FOnWeaponSlotChanged OnWeaponSlotChanged;
+
+    UPROPERTY(BlueprintAssignable, Category="Weapon|Slot")
+    FOnWeaponLoadoutChanged OnWeaponLoadoutChanged;
 
     UPROPERTY(BlueprintAssignable, Category="Weapon|Ammo")
     FOnWeaponAmmoChanged OnWeaponAmmoChanged;
@@ -208,6 +266,9 @@ public:
     UFUNCTION(Client, Reliable)
     void ClientCorrectMagazineAmmo(int32 ServerMagazineAmmo);
 
+    UFUNCTION(Server, Reliable)
+    void Server_RequestWeaponSlot(int32 SlotIndex);
+
     // 에디터에서 테스트할 픽업 BP 클래스 지정
     UPROPERTY(EditDefaultsOnly, Category="Weapon|Debug")
     TSubclassOf<AWeaponPickupActor> TestPickupClass;
@@ -229,6 +290,31 @@ private:
 
     UFUNCTION()
     void OnRep_WeaponDefinition();
+
+    /**
+     * 슬롯 구성. 소유 클라이언트에만 복제한다 — HUD 표기와 예비 탄약은 본인에게만 필요한 정보이고,
+     * 다른 클라이언트는 실제로 든 무기(CurrentWeapon)만 보면 충분하기 때문이다.
+     */
+    UPROPERTY(ReplicatedUsing=OnRep_WeaponSlots)
+    TArray<FLastFPSWeaponSlotState> WeaponSlots;
+
+    UFUNCTION()
+    void OnRep_WeaponSlots();
+
+    UPROPERTY(ReplicatedUsing=OnRep_ActiveWeaponSlot)
+    int32 ActiveWeaponSlot = 0;
+
+    UFUNCTION()
+    void OnRep_ActiveWeaponSlot();
+
+    /** 서버 권한에서 슬롯을 실제로 전환한다. 현재 슬롯의 탄약을 보관한 뒤 새 슬롯을 장착한다. */
+    void ApplyWeaponSlot(int32 SlotIndex);
+
+    /** 슬롯 배열은 유지한 채 현재 손에 든 무기 상태만 맨손으로 되돌린다. */
+    void ClearCurrentWeaponState();
+
+    /** 활성 슬롯의 현재 탄약을 슬롯 상태로 옮긴다. 전환·해제 직전에만 호출한다. */
+    void StashActiveSlotAmmo();
 
     UPROPERTY(ReplicatedUsing=OnRep_CurrentMagazineAmmo)
     int32 CurrentMagazineAmmo = 0;

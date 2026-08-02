@@ -31,7 +31,7 @@ void ULastFPSQuestScreenWidget::NativeConstruct()
 
 	if (ULastFPSQuestSubsystem* Subsystem = GetQuestSubsystem(this))
 	{
-		Subsystem->OnQuestStateChanged.AddDynamic(this, &ULastFPSQuestScreenWidget::HandleQuestStateChanged);
+		Subsystem->OnQuestStateChanged.AddUniqueDynamic(this, &ULastFPSQuestScreenWidget::HandleQuestStateChanged);
 	}
 
 	RebuildQuestList();

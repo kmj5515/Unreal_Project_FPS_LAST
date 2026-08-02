@@ -3,6 +3,7 @@
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Engine/World.h"
+#include "Localization/LastFPSLocalization.h"
 
 void ULastFPSCaptureObjectiveWidget::NativeConstruct()
 {
@@ -51,8 +52,9 @@ void ULastFPSCaptureObjectiveWidget::UpdateProgress(const float Progress01)
 
 	if (Text_Percent)
 	{
-		Text_Percent->SetText(FText::FromString(
-			FString::Printf(TEXT("%d%%"), FMath::FloorToInt(Clamped * 100.f))));
+		Text_Percent->SetText(FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::PercentFormat),
+			FText::AsNumber(FMath::FloorToInt(Clamped * 100.f))));
 	}
 
 	OnCaptureDisplayUpdated(Clamped, bStalled);

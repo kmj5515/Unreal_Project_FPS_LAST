@@ -21,6 +21,28 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPopup, Log, All);
 
+ULastFPSPopupSubsystem* ULastFPSPopupSubsystem::Get(const UObject* WorldContext)
+{
+	if (!GEngine || !WorldContext)
+	{
+		return nullptr;
+	}
+
+	const UWorld* World =
+		GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::LogAndReturnNull);
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	// LocalPlayer 서브시스템이라 "어느 플레이어의 팝업인가"가 정해져야 한다.
+	// 화면 분할이 없으므로 첫 로컬 플레이어로 충분하다. 분할이 생기면 호출부가 플레이어를 넘겨야 한다.
+	const ULocalPlayer* LocalPlayer = World->GetFirstLocalPlayerFromController();
+	return LocalPlayer
+		? const_cast<ULocalPlayer*>(LocalPlayer)->GetSubsystem<ULastFPSPopupSubsystem>()
+		: nullptr;
+}
+
 void ULastFPSPopupSubsystem::Initialize(
 	FSubsystemCollectionBase& Collection)
 {
@@ -79,6 +101,7 @@ void ULastFPSPopupSubsystem::Deinitialize()
 	ContextSource.Reset();
 
 	CloseAllActivePopups();
+	PendingRequests.Reset();
 	LoadHandles.Reset();
 	LoadedWidgetClasses.Reset();
 	EntryIndices.Reset();
@@ -267,6 +290,9 @@ void ULastFPSPopupSubsystem::HandleEntryLoadCompleted(
 	}
 
 	LoadedWidgetClasses.Add(PopupTag, LoadedClass);
+
+	// 이 태그를 기다리며 쌓여 있던 표시 요청을 여기서 한 번에 연다.
+	FlushPendingRequests(PopupTag, /*bAllowOpen=*/true);
 }
 
 UClass* ULastFPSPopupSubsystem::EnsureEntryClassLoaded(
@@ -315,9 +341,87 @@ UClass* ULastFPSPopupSubsystem::EnsureEntryClassLoaded(
 	return LoadedClass;
 }
 
+void ULastFPSPopupSubsystem::RequestPopupInternal(
+	const FGameplayTag& PopupTag, UClass* ExpectedClass, FOnPopupReady OnReady)
+{
+	// 이미 로드돼 있으면(미리 로드 대상이거나 앞서 한 번 열렸으면) 기다릴 이유가 없다.
+	if (LoadedWidgetClasses.Contains(PopupTag))
+	{
+		ULastFPSModalDialogBase* Popup = PushPopupInternal(PopupTag, ExpectedClass);
+		if (OnReady)
+		{
+			OnReady(Popup);
+		}
+		return;
+	}
+
+	const FLastFPSPopupEntry* Entry = FindEntry(PopupTag);
+	if (!Entry || !DoesEntryMatchContext(*Entry, ActiveContextTags))
+	{
+		UE_LOG(
+			LogLastFPSPopup,
+			Warning,
+			TEXT("비동기 요청을 처리할 수 없습니다(미등록이거나 현재 목적지에서 사용 불가): %s"),
+			*PopupTag.ToString());
+		if (OnReady)
+		{
+			OnReady(nullptr);
+		}
+		return;
+	}
+
+	// 레벨이 넘어가는 중에 로드를 시작하면 도착 후 엉뚱한 시점에 팝업이 튀어나온다.
+	if (bLevelTransitionInProgress)
+	{
+		if (OnReady)
+		{
+			OnReady(nullptr);
+		}
+		return;
+	}
+
+	PendingRequests.FindOrAdd(PopupTag).Add({ ExpectedClass, MoveTemp(OnReady) });
+
+	// 같은 태그를 연타해도 로드 핸들은 하나만 돈다. 완료 시 대기 목록을 한 번에 처리한다.
+	if (!LoadHandles.Contains(PopupTag))
+	{
+		BeginLoadEntry(*Entry);
+		if (!LoadHandles.Contains(PopupTag))
+		{
+			// 로드 시작 자체가 실패했으면 대기시키지 않고 즉시 실패를 알린다.
+			FlushPendingRequests(PopupTag, /*bAllowOpen=*/false);
+		}
+	}
+}
+
+void ULastFPSPopupSubsystem::FlushPendingRequests(
+	const FGameplayTag& PopupTag, const bool bAllowOpen)
+{
+	TArray<FPendingPopupRequest> Requests;
+	if (!PendingRequests.RemoveAndCopyValue(PopupTag, Requests))
+	{
+		return;
+	}
+
+	const bool bCanOpen = bAllowOpen && LoadedWidgetClasses.Contains(PopupTag);
+	for (FPendingPopupRequest& Request : Requests)
+	{
+		ULastFPSModalDialogBase* Popup =
+			bCanOpen ? PushPopupInternal(PopupTag, Request.ExpectedClass) : nullptr;
+
+		if (Request.OnReady)
+		{
+			Request.OnReady(Popup);
+		}
+	}
+}
+
 void ULastFPSPopupSubsystem::ReleaseEntry(
 	const FGameplayTag& PopupTag)
 {
+	// 해제되면 기다리던 요청은 성립하지 않는다. 응답 없이 버리지 않고 실패로 마무리한다.
+	FlushPendingRequests(PopupTag, /*bAllowOpen=*/false);
+
 	if (TSharedPtr<FStreamableHandle>* LoadHandle =
 		LoadHandles.Find(PopupTag))
 	{
@@ -331,12 +435,11 @@ void ULastFPSPopupSubsystem::ReleaseEntry(
 	LoadedWidgetClasses.Remove(PopupTag);
 }
 
-template<typename TPopupWidget>
-TPopupWidget* ULastFPSPopupSubsystem::PushPopup(
-	const FGameplayTag& PopupTag)
+ULastFPSModalDialogBase* ULastFPSPopupSubsystem::PushPopupInternal(
+	const FGameplayTag& PopupTag, UClass* ExpectedClass)
 {
 	UClass* LoadedClass = EnsureEntryClassLoaded(PopupTag);
-	if (!LoadedClass || !LoadedClass->IsChildOf(TPopupWidget::StaticClass()))
+	if (!LoadedClass || !ExpectedClass || !LoadedClass->IsChildOf(ExpectedClass))
 	{
 		UE_LOG(
 			LogLastFPSPopup,
@@ -358,10 +461,8 @@ TPopupWidget* ULastFPSPopupSubsystem::PushPopup(
 		return nullptr;
 	}
 
-	TPopupWidget* Popup =
-		RootLayout->PushWidgetToLayerStack<TPopupWidget>(
-			LastFPSUITags::Layer_Modal(),
-			LoadedClass);
+	ULastFPSModalDialogBase* Popup =
+		RootLayout->PushWidgetToLayerStack<ULastFPSModalDialogBase>(LastFPSUITags::Layer_Modal(), LoadedClass);
 	if (Popup)
 	{
 		ActivePopups.FindOrAdd(PopupTag).Add(Popup);
@@ -565,6 +666,15 @@ void ULastFPSPopupSubsystem::HandlePreLoadMap(
 
 	CloseEntriesForLevelTransition();
 	ReleaseEntriesForLevelTransition();
+
+	// 전환 중 도착할 로드 결과로 팝업이 뜨지 않도록 대기 요청을 모두 정리한다.
+	TArray<FGameplayTag> PendingTags;
+	PendingRequests.GetKeys(PendingTags);
+	for (const FGameplayTag& PendingTag : PendingTags)
+	{
+		FlushPendingRequests(PendingTag, /*bAllowOpen=*/false);
+	}
+
 	bLevelTransitionInProgress = true;
 }
 
@@ -582,9 +692,9 @@ void ULastFPSPopupSubsystem::ShowConfirmation(
 		return;
 	}
 
-	ULastFPSConfirmWidget* Popup =
-		PushPopup<ULastFPSConfirmWidget>(
-			LastFPSPopupTags::Confirmation());
+	// 자신이 곧 대상 서브시스템이라 Get() 을 거치지 않고 바로 연다.
+	ULastFPSConfirmWidget* Popup = Cast<ULastFPSConfirmWidget>(
+		PushPopupInternal(LastFPSPopupTags::Confirmation(), ULastFPSConfirmWidget::StaticClass()));
 	if (!Popup)
 	{
 		ResultCallback.ExecuteIfBound(ECommonMessagingResult::Unknown);
@@ -608,9 +718,8 @@ void ULastFPSPopupSubsystem::ShowError(
 		return;
 	}
 
-	ULastFPSNoticeWidget* Popup =
-		PushPopup<ULastFPSNoticeWidget>(
-			LastFPSPopupTags::Notice());
+	ULastFPSNoticeWidget* Popup = Cast<ULastFPSNoticeWidget>(
+		PushPopupInternal(LastFPSPopupTags::Notice(), ULastFPSNoticeWidget::StaticClass()));
 	if (!Popup)
 	{
 		ResultCallback.ExecuteIfBound(ECommonMessagingResult::Unknown);
@@ -618,39 +727,4 @@ void ULastFPSPopupSubsystem::ShowError(
 	}
 
 	Popup->SetupDialog(DialogDescriptor, MoveTemp(ResultCallback));
-}
-
-ULastFPSQuantityDialogWidget*
-ULastFPSPopupSubsystem::ShowQuantityPrompt(
-	const FText& Title,
-	const FText& ItemName,
-	const int32 UnitPrice,
-	const int32 MaxQuantity)
-{
-	ULastFPSQuantityDialogWidget* Popup =
-		PushPopup<ULastFPSQuantityDialogWidget>(
-			LastFPSPopupTags::Quantity());
-	if (Popup)
-	{
-		Popup->SetupQuantity(
-			Title,
-			ItemName,
-			UnitPrice,
-			MaxQuantity);
-	}
-	return Popup;
-}
-
-ULastFPSDialogueWidget* ULastFPSPopupSubsystem::ShowDialogue(
-	const FText& Speaker,
-	const TArray<FText>& Lines)
-{
-	ULastFPSDialogueWidget* Popup =
-		PushPopup<ULastFPSDialogueWidget>(
-			LastFPSPopupTags::Dialogue());
-	if (Popup)
-	{
-		Popup->SetupDialogue(Speaker, Lines);
-	}
-	return Popup;
 }

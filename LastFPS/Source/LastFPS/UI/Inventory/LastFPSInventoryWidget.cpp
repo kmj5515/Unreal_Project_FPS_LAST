@@ -2,8 +2,10 @@
 
 #include "UI/Inventory/LastFPSItemSlotWidget.h"
 #include "UI/Inventory/LastFPSWeaponPreviewWidget.h"
-#include "UI/Inventory/LastFPSWeaponPreviewRig.h"
+#include "UI/Preview/LastFPSPreviewStageActor.h"
+#include "UI/Preview/LastFPSPreviewStageSubsystem.h"
 #include "UI/Framework/LastFPSUITags.h"
+#include "UI/Framework/LastFPSUIManagerSubsystem.h"
 #include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
 #include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Data/Tables/LastFPSItemData.h"
@@ -16,7 +18,9 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "GameFramework/PlayerController.h"
-#include "PrimaryGameLayout.h"
+#include "CommonActivatableWidget.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogLastFPSInventory, Log, All);
 
 void ULastFPSInventoryWidget::NativeConstruct()
 {
@@ -31,13 +35,13 @@ void ULastFPSInventoryWidget::NativeConstruct()
 
 	if (ULastFPSEconomySubsystem* Econ = GetEconomy())
 	{
-		Econ->OnInventoryChanged.AddDynamic(this, &ULastFPSInventoryWidget::HandleInventoryChanged);
+		Econ->OnInventoryChanged.AddUniqueDynamic(this, &ULastFPSInventoryWidget::HandleInventoryChanged);
 	}
 
 	RebuildInventory();
 
-	// 첫 프리뷰 흰색 방지 — 인벤토리 열 때 리그를 미리 스폰·예열해 둔다.
-	EnsurePreviewRig();
+	// 프리뷰 무대는 레벨 시작에 이미 스폰돼 있다(ULastFPSPreviewStageSubsystem).
+	// 여기서 스폰하거나 예열하면 인벤토리를 여는 프레임에 무기 정의·메시 로드 비용을 그대로 낸다.
 }
 
 void ULastFPSInventoryWidget::NativeDestruct()
@@ -45,12 +49,6 @@ void ULastFPSInventoryWidget::NativeDestruct()
 	if (ULastFPSEconomySubsystem* Econ = GetEconomy())
 	{
 		Econ->OnInventoryChanged.RemoveDynamic(this, &ULastFPSInventoryWidget::HandleInventoryChanged);
-	}
-
-	if (PreviewRig)
-	{
-		PreviewRig->Destroy();
-		PreviewRig = nullptr;
 	}
 
 	Super::NativeDestruct();
@@ -67,67 +65,11 @@ void ULastFPSInventoryWidget::HandleInventoryChanged()
 	RebuildInventory();
 }
 
-ALastFPSWeaponPreviewRig* ULastFPSInventoryWidget::EnsurePreviewRig()
+FReply ULastFPSInventoryWidget::NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if (PreviewRig)
-	{
-		return PreviewRig;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return nullptr;
-	}
-
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	TSubclassOf<ALastFPSWeaponPreviewRig> RigClass = PreviewRigClass;
-	if (!RigClass)
-	{
-		RigClass = ALastFPSWeaponPreviewRig::StaticClass();
-	}
-	PreviewRig = World->SpawnActor<ALastFPSWeaponPreviewRig>(
-		RigClass, FVector(0.f, 0.f, 100000.f), FRotator::ZeroRotator, Params);
-	if (!PreviewRig)
-	{
-		return nullptr;
-	}
-
-	// 보유 무기 첫 스켈레탈 메시로 캡처를 미리 데워 둔다(있으면). 실제 무기는 F1 때 교체된다.
-	if (ULastFPSEconomySubsystem* Econ = GetEconomy())
-	{
-		if (ItemTable)
-		{
-			TArray<FName> OwnedIds;
-			Econ->GetOwnedItems().GetKeys(OwnedIds);
-			for (const FName& Id : OwnedIds)
-			{
-				const FLastFPSItemData* Row = ItemTable->FindRow<FLastFPSItemData>(
-					Id,
-					TEXT("ULastFPSInventoryWidget::EnsurePreviewRig"),
-					/*bWarnIfRowMissing=*/false);
-				if (Row && Row->ItemType == ELastFPSItemType::Weapon)
-				{
-					if (ULastFPSWeaponDefinition* Def = Row->WeaponDefinition.LoadSynchronous())
-					{
-						if (Def->SkeletalMesh)
-						{
-							PreviewRig->InitPreview(Def->SkeletalMesh);
-							break;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return PreviewRig;
-}
-
-FReply ULastFPSInventoryWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
-{
-	if (InKeyEvent.GetKey() == EKeys::F1)
+	// 툴팁이 떠 있다는 것은 hover 중인 아이템이 있다는 뜻이다. 그 상태면 어느 자식이 포커스를 쥐고 있든
+	// 같은 키가 같은 동작을 해야 한다. 열지 못하면 원래 경로로 넘겨 다른 위젯이 처리하게 둔다.
+	if (WeaponPreviewKey.IsValid() && InKeyEvent.GetKey() == WeaponPreviewKey)
 	{
 		if (TryOpenWeaponPreview())
 		{
@@ -135,12 +77,12 @@ FReply ULastFPSInventoryWidget::NativeOnKeyDown(const FGeometry& InGeometry, con
 		}
 	}
 
-	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
+	return Super::NativeOnPreviewKeyDown(InGeometry, InKeyEvent);
 }
 
 bool ULastFPSInventoryWidget::TryOpenWeaponPreview()
 {
-	if (HoveredItemRowId.IsNone() || !ItemTable || !PreviewWidgetClass)
+	if (HoveredItemRowId.IsNone() || !ItemTable)
 	{
 		return false;
 	}
@@ -159,26 +101,36 @@ bool ULastFPSInventoryWidget::TryOpenWeaponPreview()
 		return false;
 	}
 
-	APlayerController* PC = GetOwningPlayer();
-	UPrimaryGameLayout* Layout = PC ? UPrimaryGameLayout::GetPrimaryGameLayout(PC) : nullptr;
-	if (!Layout)
+	ULastFPSUIManagerSubsystem* UIManager = ULastFPSUIManagerSubsystem::Get(this);
+	if (!UIManager)
 	{
 		return false;
 	}
 
-	// Menu 레이어(스크린 스택)에 프리뷰 push. 같은 스택이라 CommonUI 가 아래 인벤토리를 자동 Collapsed 한다.
 	const FLastFPSItemData ItemCopy = *Row;
 	const FName RowId = HoveredItemRowId;
-	ALastFPSWeaponPreviewRig* Rig = EnsurePreviewRig();
-	Layout->PushWidgetToLayerStack<ULastFPSWeaponPreviewWidget>(
-		LastFPSUITags::Layer_Menu(),
-		PreviewWidgetClass,
-		[Def, ItemCopy, RowId, Rig](ULastFPSWeaponPreviewWidget& Widget)
-		{
-			Widget.Setup(Def, ItemCopy, RowId, Rig);
-		});
 
-	return true;
+	// 무대는 레벨이 소유한다. 화면은 빌려 쓰기만 하므로 여기서 스폰하거나 파괴하지 않는다.
+	ULastFPSPreviewStageSubsystem* PreviewStageSubsystem = ULastFPSPreviewStageSubsystem::Get(this);
+	ALastFPSPreviewStageActor* PreviewStage = PreviewStageSubsystem ? PreviewStageSubsystem->GetStage() : nullptr;
+	if (!PreviewStage)
+	{
+		UE_LOG(LogLastFPSInventory, Warning,
+			TEXT("%s: 프리뷰 무대가 준비되지 않아 프리뷰를 열지 못했습니다."), *GetName());
+		return false;
+	}
+
+	// 레이어·위젯 클래스·프리뷰 시점은 화면 정의가 정한다. 인벤토리는 무엇을 보여줄지만 넘긴다.
+	return UIManager->OpenScreenWithInit(
+		LastFPSUITags::Screen_WeaponPreview(),
+		GetOwningPlayer(),
+		[Def, ItemCopy, RowId, PreviewStage](UCommonActivatableWidget& Widget)
+		{
+			if (ULastFPSWeaponPreviewWidget* PreviewWidget = Cast<ULastFPSWeaponPreviewWidget>(&Widget))
+			{
+				PreviewWidget->Setup(Def, ItemCopy, RowId, PreviewStage);
+			}
+		}) != nullptr;
 }
 
 void ULastFPSInventoryWidget::SetAllowedTypes(const TArray<ELastFPSItemType>& InTypes)
@@ -243,6 +195,9 @@ void ULastFPSInventoryWidget::RebuildInventory()
 		SlotWidget->OnHovered.BindUObject(this, &ULastFPSInventoryWidget::HandleSlotHovered);
 		SlotWidget->OnUnhovered.BindUObject(this, &ULastFPSInventoryWidget::HandleSlotUnhovered);
 		SlotWidget->SetupSlot(*Owned.Get<1>(), Owned.Get<0>(), Owned.Get<2>());
+		
+		SlotWidget->SetPadding(FMargin(20.0f));
+		
 		Box_Slots->AddChild(SlotWidget);
 	}
 }

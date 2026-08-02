@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Hub/LastFPSNPCTypes.h"
+#include "Localization/LastFPSLocalization.h"
 #include "LastFPSInteractionComponent.generated.h"
 
 class APlayerController;
@@ -50,14 +51,14 @@ public:
 
 	// ── 설정 (NPC BP의 컴포넌트 Details에서 지정) ────────────────────
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC")
-	FText DisplayName = NSLOCTEXT("LastFPS", "NPC_DefaultName", "NPC");
+	FText DisplayName = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::NPCDefaultName);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC")
 	FText NPCRole;
 
 	/** 머리 위 마커의 G 힌트 텍스트. 기본값 "대화" */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC")
-	FText InteractionLabel = NSLOCTEXT("LastFPS", "NPC_DefaultInteract", "대화");
+	FText InteractionLabel = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::NPCInteract);
 
 	/** 근접 감지 반경 (cm) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|NPC", meta=(ClampMin="50"))

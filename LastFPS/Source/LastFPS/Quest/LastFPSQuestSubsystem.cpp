@@ -6,6 +6,7 @@
 #include "Game/LastFPSPlayerController.h"
 #include "Data/Tables/LastFPSRoomEncounterData.h"
 #include "Encounter/LastFPSRoomEncounterSubsystem.h"
+#include "Localization/LastFPSLocalization.h"
 
 #include "Engine/DataTable.h"
 #include "Engine/GameInstance.h"
@@ -1354,7 +1355,7 @@ void ULastFPSQuestSubsystem::NotifyRewardGranted(const FLastFPSQuestData& Def) c
 	}
 	if (ALastFPSPlayerController* PC = Cast<ALastFPSPlayerController>(GI->GetFirstLocalPlayerController()))
 	{
-		const FText Title = NSLOCTEXT("LastFPS", "Quest_RewardTitle", "보상 수령");
+		const FText Title = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestRewardTitle);
 		PC->ShowNotice(Title, BuildRewardMessage(Def));
 	}
 }
@@ -1362,30 +1363,40 @@ void ULastFPSQuestSubsystem::NotifyRewardGranted(const FLastFPSQuestData& Def) c
 FText ULastFPSQuestSubsystem::BuildRewardMessage(const FLastFPSQuestData& Def) const
 {
 	// 실제 지급된 구조화 보상(Reward)을 소스로 내역을 만든다 — RewardText 수기 표기와의 드리프트 방지.
-	TArray<FString> Lines;
+	TArray<FText> Lines;
 	if (Def.Reward.Credits > 0)
 	{
-		Lines.Add(FString::Printf(TEXT("크레딧 +%d"), Def.Reward.Credits));
+		Lines.Add(FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestRewardCreditsFormat),
+			FText::AsNumber(Def.Reward.Credits)));
 	}
 
 	const ULastFPSEconomySubsystem* Economy = GetEconomy();
 	for (const FLastFPSItemGrant& Grant : Def.Reward.Items)
 	{
 		const FText Name = Economy ? Economy->GetItemDisplayName(Grant.RowId) : FText::FromName(Grant.RowId);
-		Lines.Add(FString::Printf(TEXT("%s ×%d"), *Name.ToString(), Grant.Count));
+		Lines.Add(FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestRewardItemFormat),
+			Name,
+			FText::AsNumber(Grant.Count)));
 	}
 
-	FString RewardBlock = FString::Join(Lines, TEXT("\n"));
+	FText RewardBlock = Lines.IsEmpty()
+		? FText::GetEmpty()
+		: FText::Join(FText::FromString(TEXT("\n")), Lines);
 	if (RewardBlock.IsEmpty() && !Def.RewardText.IsEmpty())
 	{
-		RewardBlock = Def.RewardText.ToString();
+		RewardBlock = Def.RewardText;
 	}
 
 	if (RewardBlock.IsEmpty())
 	{
 		return Def.Title;
 	}
-	return FText::FromString(FString::Printf(TEXT("%s\n\n%s"), *Def.Title.ToString(), *RewardBlock));
+	return FText::Format(
+		FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestRewardMessageFormat),
+		Def.Title,
+		RewardBlock);
 }
 
 void ULastFPSQuestSubsystem::AcceptDungeonQuestForMap(UWorld& World)

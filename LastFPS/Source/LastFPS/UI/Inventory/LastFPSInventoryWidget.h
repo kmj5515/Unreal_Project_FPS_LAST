@@ -2,6 +2,7 @@
 
 #include "UI/Framework/LastFPSContentScreenWidget.h"
 #include "Data/Tables/LastFPSItemData.h"
+#include "InputCoreTypes.h"
 #include "LastFPSInventoryWidget.generated.h"
 
 class UDataTable;
@@ -9,7 +10,6 @@ class UPanelWidget;
 class ULastFPSItemSlotWidget;
 class ULastFPSEconomySubsystem;
 class ULastFPSWeaponPreviewWidget;
-class ALastFPSWeaponPreviewRig;
 
 /**
  * 인벤토리 화면 — ContentScreen 크롬 위에 보유 아이템 슬롯 나열.
@@ -28,8 +28,17 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	/** F1: 현재 hover 중인 무기 아이템의 상세 프리뷰를 연다. */
-	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+	/**
+	 * hover 중인 무기 아이템의 상세 프리뷰를 연다.
+	 *
+	 * OnKeyDown 이 아니라 Preview 단계에서 받는다. 슬롯이나 버튼처럼 자식 위젯이 포커스를 쥐고 있으면
+	 * 일반 경로로는 이 위젯까지 키가 올라오지 않아, 툴팁이 떠 있는데도 눌러도 반응이 없다.
+	 */
+	virtual FReply NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+
+	/** 상세 프리뷰를 여는 키. 하드코딩하지 않고 WBP 에서 바꿀 수 있게 둔다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory")
+	FKey WeaponPreviewKey = EKeys::F1;
 
 	/** 아이템 정의 테이블 (RowType = FLastFPSItemData) */
 	UPROPERTY(Transient)
@@ -39,13 +48,8 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory")
 	TSubclassOf<ULastFPSItemSlotWidget> SlotWidgetClass;
 
-	/** F1 상세 프리뷰로 열 위젯 클래스 (WBP_WeaponPreview). 미지정 시 F1 무시. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory")
-	TSubclassOf<ULastFPSWeaponPreviewWidget> PreviewWidgetClass;
-
-	/** 프리뷰 3D 리그로 스폰할 클래스 (BP_PreviewRig). 미지정 시 C++ 베이스로 폴백. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Inventory")
-	TSubclassOf<ALastFPSWeaponPreviewRig> PreviewRigClass;
+	// F1 프리뷰의 위젯 클래스는 ScreenRegistry 의 UI.Screen.WeaponPreview 행이 정한다.
+	// 여기에 또 두면 같은 지정이 두 곳으로 갈린다.
 
 	/** 슬롯을 담을 컨테이너 (WrapBox 권장) */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
@@ -83,13 +87,6 @@ private:
 	/** 현재 hover 아이템이 무기면 프리뷰 오버레이를 Modal 레이어에 push. 열었으면 true. */
 	bool TryOpenWeaponPreview();
 
-	/** 프리뷰용 리그를 인벤토리 수명 동안 유지·재사용 — 없으면 스폰·예열. 첫 프리뷰 흰색 방지. */
-	ALastFPSWeaponPreviewRig* EnsurePreviewRig();
-
 	/** 마우스가 올라가 있는 아이템 (F1 프리뷰 대상) */
 	FName HoveredItemRowId;
-
-	/** 프리뷰용 오프스크린 리그 (인벤토리 수명 동안 재사용). */
-	UPROPERTY(Transient)
-	TObjectPtr<ALastFPSWeaponPreviewRig> PreviewRig;
 };

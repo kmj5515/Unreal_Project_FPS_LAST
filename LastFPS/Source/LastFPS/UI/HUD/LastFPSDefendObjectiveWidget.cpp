@@ -2,6 +2,7 @@
 
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "Localization/LastFPSLocalization.h"
 
 void ULastFPSDefendObjectiveWidget::NativeConstruct()
 {
@@ -66,5 +67,11 @@ FText ULastFPSDefendObjectiveWidget::FormatRemaining(const float RemainingSecond
 	const int32 TotalWholeSeconds = FMath::Max(FMath::CeilToInt(RemainingSeconds), 0);
 	const int32 Minutes = TotalWholeSeconds / 60;
 	const int32 Seconds = TotalWholeSeconds % 60;
-	return FText::FromString(FString::Printf(TEXT("%02d:%02d"), Minutes, Seconds));
+	FNumberFormattingOptions TwoDigits;
+	TwoDigits.SetMinimumIntegralDigits(2);
+	TwoDigits.SetMaximumFractionalDigits(0);
+	return FText::Format(
+		FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TimerFormat),
+		FText::AsNumber(Minutes, &TwoDigits),
+		FText::AsNumber(Seconds, &TwoDigits));
 }

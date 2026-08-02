@@ -11,7 +11,7 @@
 #include "Game/LastFPSPlayerState.h"
 #include "Components/CapsuleComponent.h"
 #include "Game/LastFPSGameModeBase.h"
-#include "Inventory/LastFPSLoadoutSubsystem.h"
+#include "Inventory/LastFPSEquipmentSubsystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameplayEffect.h"
@@ -511,12 +511,13 @@ void ALastFPSCharacterBase::InitAbilitySystem()
                 GM->ApplyCharacterDefinitionToAbilitySystem(ASC, ResolvedDefinition);
             }
 
-            // 베이스 스탯 적용 직후, 장착 모듈 보정을 Infinite GE 로 얹는다 (서버 권위).
+            // 베이스 스탯 적용 직후, 장착 장비(모듈·리액터·외장 부품) 보정을 Infinite GE 로 얹는다 (서버 권위).
+            // EquipmentSubsystem 이 모듈까지 합산하므로 LoadoutSubsystem 을 따로 적용하면 이중 반영된다.
             if (UGameInstance* GI = GetGameInstance())
             {
-                if (ULastFPSLoadoutSubsystem* Loadout = GI->GetSubsystem<ULastFPSLoadoutSubsystem>())
+                if (ULastFPSEquipmentSubsystem* Equipment = GI->GetSubsystem<ULastFPSEquipmentSubsystem>())
                 {
-                    Loadout->ApplyToAbilitySystem(ASC);
+                    Equipment->ApplyToAbilitySystem(ASC);
                 }
             }
 

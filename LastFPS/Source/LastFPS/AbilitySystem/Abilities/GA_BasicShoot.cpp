@@ -90,7 +90,6 @@ void UGA_BasicShoot::ActivateAbility(
     {
         UE_LOG(LogTemp, Warning, TEXT("GA_BasicShoot: missing weapon or cannot fire"));
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-        TryStartAutoReload(Hero, Weapon);
         return;
     }
 
@@ -106,7 +105,7 @@ void UGA_BasicShoot::ActivateAbility(
         FireWorld->GetTimerManager().SetTimer(
             RaiseWeaponTimerHandle,
             this,
-            &UGA_BasicShoot::Fire,
+            &UGA_BasicShoot::BeginFiring,
             SprintToFireDelay,
             false);
     }
@@ -114,47 +113,55 @@ void UGA_BasicShoot::ActivateAbility(
     {
         UE_LOG(LogTemp, Warning, TEXT("[FIRE] immediate  (WasSprinting=%d Delay=%.2f World=%d)"),
             bWasSprinting ? 1 : 0, SprintToFireDelay, FireWorld ? 1 : 0);
-        Fire();
+        BeginFiring();
     }
+}
+
+void UGA_BasicShoot::BeginFiring()
+{
+    if (!IsActive())
+    {
+        return;
+    }
+
+    Fire();
 
     if (!IsActive())
     {
         return;
     }
 
+    UWorld* World = GetWorld();
+    UWeaponComponent* Weapon = CachedWeapon.Get();
+    if (!World || !Weapon)
+    {
+        FinishAbility();
+        return;
+    }
+
     if (bIsAutoFire)
     {
-        if (UWorld* World = GetWorld())
-        {
-            World->GetTimerManager().SetTimer(
-                FireTimerHandle,
-                this,
-                &UGA_BasicShoot::Fire,
-                Weapon->FireRate,
-                true);
-        }
+        World->GetTimerManager().SetTimer(
+            FireTimerHandle,
+            this,
+            &UGA_BasicShoot::Fire,
+            Weapon->FireRate,
+            true);
     }
     else
     {
-        if (UWorld* World = GetWorld())
-        {
-            World->GetTimerManager().SetTimer(
-                FinishAbilityTimerHandle,
-                this,
-                &UGA_BasicShoot::FinishAbility,
-                MinAttackStateDuration,
-                false);
-        }
-        else
-        {
-            EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-        }
+        World->GetTimerManager().SetTimer(
+            FinishAbilityTimerHandle,
+            this,
+            &UGA_BasicShoot::FinishAbility,
+            MinAttackStateDuration,
+            false);
     }
 }
 
 void UGA_BasicShoot::Fire()
 {
-    if (!GetWorld())
+    if (!IsActive() || !GetWorld())
     {
         return;
     }
@@ -172,7 +179,6 @@ void UGA_BasicShoot::Fire()
     if (!Weapon || !Weapon->CanFire())
     {
         EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
-        TryStartAutoReload(Hero, Weapon);
         return;
     }
 
@@ -191,7 +197,6 @@ void UGA_BasicShoot::Fire()
     if (!Weapon->TryConsumePredictedRound())
     {
         EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
-        TryStartAutoReload(Hero, Weapon);
         return;
     }
 
@@ -213,11 +218,10 @@ void UGA_BasicShoot::Fire()
 
     if (!Weapon->CanFire())
     {
-        // 연사 입력이 유지 중이면 다음 발사 주기에서 빈 탄창을 확인한 뒤 자동 리로드한다.
-        if (!bIsAutoFire)
-        {
-            EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
-        }
+        // 마지막 발이 차감된 즉시 사격 상태를 끝낸 뒤 리로드를 시작한다.
+        // 빈 탄창에서 FIRE를 한 번 더 눌러야 하는 입력 의존 경로는 사용하지 않는다.
+        EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
+        TryStartAutoReload(Hero, Weapon);
     }
 }
 
@@ -310,6 +314,7 @@ void UGA_BasicShoot::EndAbility(
     {
         GetWorld()->GetTimerManager().ClearTimer(FireTimerHandle);
         GetWorld()->GetTimerManager().ClearTimer(FinishAbilityTimerHandle);
+        GetWorld()->GetTimerManager().ClearTimer(RaiseWeaponTimerHandle);
     }
 
     if (bWasCancelled)

@@ -31,6 +31,7 @@ namespace
     constexpr float AimRecoilCompletionToleranceDegrees = 0.01f;
     constexpr float MaximumServerDebugShotDurationSeconds = 5.f;
     constexpr float MinimumServerFireIntervalSeconds = 0.01f;
+    constexpr int32 DefaultBattleWeaponSlotIndex = 0;
 }
 
 UWeaponComponent::UWeaponComponent()
@@ -49,6 +50,9 @@ void UWeaponComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
     DOREPLIFETIME(UWeaponComponent, WeaponDefinition);
     DOREPLIFETIME_CONDITION(UWeaponComponent, CurrentMagazineAmmo, COND_OwnerOnly);
     DOREPLIFETIME_CONDITION(UWeaponComponent, CurrentReserveAmmo, COND_OwnerOnly);
+    // 슬롯 구성과 보관 탄약은 소유자 HUD 전용 정보라 대역폭을 아껴 소유 클라이언트에만 보낸다.
+    DOREPLIFETIME_CONDITION(UWeaponComponent, WeaponSlots, COND_OwnerOnly);
+    DOREPLIFETIME(UWeaponComponent, ActiveWeaponSlot);
 }
 
 void UWeaponComponent::BeginPlay()
@@ -657,6 +661,19 @@ void UWeaponComponent::EquipWeaponDefinition(ULastFPSWeaponDefinition* NewDefini
     }
 
     ApplyWeaponDefinition(NewDefinition);
+
+    // 픽업으로 무기를 주우면 지금 든 슬롯의 내용이 바뀐 것이다.
+    // 슬롯을 갱신하지 않으면 1·2 키로 돌아왔을 때 주운 무기가 사라져 표시와 실제가 어긋난다.
+    if (WeaponSlots.IsValidIndex(ActiveWeaponSlot))
+    {
+        FLastFPSWeaponSlotState& ActiveSlot = WeaponSlots[ActiveWeaponSlot];
+        ActiveSlot.Definition = NewDefinition;
+        // 새 무기는 방금 가득 채워졌으므로 이전 무기의 보관 탄약은 버린다.
+        ActiveSlot.StashedMagazineAmmo = CurrentMagazineAmmo;
+        ActiveSlot.StashedReserveAmmo = CurrentReserveAmmo;
+        ActiveSlot.bAmmoInitialized = HasWeapon();
+        OnWeaponLoadoutChanged.Broadcast();
+    }
 }
 
 void UWeaponComponent::UnequipWeapon()
@@ -675,6 +692,20 @@ void UWeaponComponent::UnequipWeapon()
         return;
     }
 
+    ClearCurrentWeaponState();
+
+    // 명시적인 전체 해제는 슬롯 구성까지 제거한다.
+    if (WeaponSlots.Num() > 0)
+    {
+        WeaponSlots.Reset();
+        ActiveWeaponSlot = DefaultBattleWeaponSlotIndex;
+        OnWeaponLoadoutChanged.Broadcast();
+        OnWeaponSlotChanged.Broadcast(ActiveWeaponSlot);
+    }
+}
+
+void UWeaponComponent::ClearCurrentWeaponState()
+{
     WeaponDefinition = nullptr;
     WeaponSkeletalMesh = nullptr;
     WeaponType = EMMWeaponType::Unarmed;
@@ -682,6 +713,7 @@ void UWeaponComponent::UnequipWeapon()
     DestroyCurrentWeapon();
     SetCurrentMagazineAmmo(0);
     SetCurrentReserveAmmo(0);
+
     ApplyAnimLayerClass(UnarmedAnimLayerClass);
     OnWeaponEquippedChanged.Broadcast(false);
 }
@@ -689,6 +721,142 @@ void UWeaponComponent::UnequipWeapon()
 void UWeaponComponent::Server_UnequipWeapon_Implementation()
 {
     UnequipWeapon();
+}
+
+ULastFPSWeaponDefinition* UWeaponComponent::GetWeaponDefinitionForSlot(const int32 SlotIndex) const
+{
+    return WeaponSlots.IsValidIndex(SlotIndex) ? WeaponSlots[SlotIndex].Definition : nullptr;
+}
+
+void UWeaponComponent::SetWeaponLoadout(const TArray<ULastFPSWeaponDefinition*>& SlotDefinitions)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority())
+    {
+        return;
+    }
+
+    WeaponSlots.Reset(SlotDefinitions.Num());
+    for (ULastFPSWeaponDefinition* Definition : SlotDefinitions)
+    {
+        FLastFPSWeaponSlotState& Slot = WeaponSlots.AddDefaulted_GetRef();
+        Slot.Definition = Definition;
+    }
+
+    OnWeaponLoadoutChanged.Broadcast();
+
+    // 배틀 진입 시에는 HUD의 1번 키와 대응하는 첫 번째 슬롯을 기본 활성 슬롯으로 삼는다.
+    // 해당 슬롯이 비어 있으면 다른 슬롯을 임의로 선택하지 않고 2번 입력을 기다린다.
+    ActiveWeaponSlot = DefaultBattleWeaponSlotIndex;
+    if (!WeaponSlots.IsValidIndex(ActiveWeaponSlot) || !WeaponSlots[ActiveWeaponSlot].Definition)
+    {
+        ResetPendingAimRecoil();
+        ResetAimRecoilSequence();
+        // 빈 로드아웃도 슬롯 개수는 UI와 이후 픽업 장착 계약으로 유지한다.
+        ClearCurrentWeaponState();
+        OnWeaponSlotChanged.Broadcast(ActiveWeaponSlot);
+        return;
+    }
+
+    // 이전 로드아웃의 탄약이 새 구성으로 새지 않도록 보관값을 거치지 않고 곧바로 장착한다.
+    ApplyWeaponDefinition(WeaponSlots[ActiveWeaponSlot].Definition);
+    WeaponSlots[ActiveWeaponSlot].bAmmoInitialized = HasWeapon();
+    OnWeaponSlotChanged.Broadcast(ActiveWeaponSlot);
+}
+
+void UWeaponComponent::RequestWeaponSlot(const int32 SlotIndex)
+{
+    if (!GetOwner())
+    {
+        return;
+    }
+
+    if (!GetOwner()->HasAuthority())
+    {
+        Server_RequestWeaponSlot(SlotIndex);
+        return;
+    }
+
+    ApplyWeaponSlot(SlotIndex);
+}
+
+void UWeaponComponent::Server_RequestWeaponSlot_Implementation(const int32 SlotIndex)
+{
+    // 클라이언트가 보낸 인덱스를 그대로 믿지 않고 서버 상태로 검증한다(ApplyWeaponSlot 내부).
+    ApplyWeaponSlot(SlotIndex);
+}
+
+void UWeaponComponent::StashActiveSlotAmmo()
+{
+    if (!WeaponSlots.IsValidIndex(ActiveWeaponSlot))
+    {
+        return;
+    }
+
+    FLastFPSWeaponSlotState& Slot = WeaponSlots[ActiveWeaponSlot];
+    if (!Slot.Definition)
+    {
+        return;
+    }
+
+    Slot.StashedMagazineAmmo = CurrentMagazineAmmo;
+    Slot.StashedReserveAmmo = CurrentReserveAmmo;
+    Slot.bAmmoInitialized = true;
+}
+
+void UWeaponComponent::ApplyWeaponSlot(const int32 SlotIndex)
+{
+    if (!GetOwner() || !GetOwner()->HasAuthority())
+    {
+        return;
+    }
+
+    if (!WeaponSlots.IsValidIndex(SlotIndex) || SlotIndex == ActiveWeaponSlot)
+    {
+        return;
+    }
+
+    // 빈 슬롯으로는 전환하지 않는다. 맨손 전환은 UnequipWeapon 이 담당하는 별개의 동작이다.
+    if (!WeaponSlots[SlotIndex].Definition)
+    {
+        return;
+    }
+
+    StashActiveSlotAmmo();
+
+    ActiveWeaponSlot = SlotIndex;
+    FLastFPSWeaponSlotState& NewSlot = WeaponSlots[SlotIndex];
+
+    // ApplyWeaponDefinition 은 밸런스 기준으로 탄약을 가득 채운다.
+    // 이미 사용한 적이 있는 슬롯이면 그 위에 보관해 둔 값을 덮어써 소모 상태를 이어간다.
+    ApplyWeaponDefinition(NewSlot.Definition);
+
+    // 밸런스 행 누락 등으로 무기가 실제로 스폰되지 않았다면 보관 탄약을 되살리지 않는다.
+    // 들지도 않은 무기의 탄약이 HUD에 남는 것을 막는다.
+    if (HasWeapon())
+    {
+        if (NewSlot.bAmmoInitialized)
+        {
+            SetCurrentMagazineAmmo(NewSlot.StashedMagazineAmmo);
+            SetCurrentReserveAmmo(NewSlot.StashedReserveAmmo);
+        }
+        else
+        {
+            NewSlot.bAmmoInitialized = true;
+        }
+    }
+
+    GetOwner()->ForceNetUpdate();
+    OnWeaponSlotChanged.Broadcast(ActiveWeaponSlot);
+}
+
+void UWeaponComponent::OnRep_WeaponSlots()
+{
+    OnWeaponLoadoutChanged.Broadcast();
+}
+
+void UWeaponComponent::OnRep_ActiveWeaponSlot()
+{
+    OnWeaponSlotChanged.Broadcast(ActiveWeaponSlot);
 }
 
 void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefinition)

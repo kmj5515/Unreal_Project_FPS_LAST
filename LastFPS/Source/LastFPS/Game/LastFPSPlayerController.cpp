@@ -1,5 +1,4 @@
 #include "Game/LastFPSPlayerController.h"
-
 #include "Character/LastFPSHero.h"
 #include "Hub/ILastFPSInteractable.h"
 #include "Hub/LastFPSNPC.h"
@@ -12,17 +11,14 @@
 #include "UI/Dialogue/LastFPSDialogueWidget.h"
 #include "UI/Hub/LastFPSNPCInteractionWidget.h"
 #include "UI/Common/LastFPSQuantityDialogWidget.h"
-
-#include "Camera/CameraComponent.h"
 #include "UI/Framework/LastFPSPopupSubsystem.h"
+#include "UI/Framework/LastFPSPopupTags.h"
 #include "UI/Framework/LastFPSUIManagerSubsystem.h"
 #include "UI/Framework/LastFPSUITags.h"
-
 #include "CommonActivatableWidget.h"
 #include "UI/Framework/LastFPSPrimaryGameLayout.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
 #include "Input/CommonUIActionRouterBase.h"
-#include "Input/CommonUIInputTypes.h"
 #include "Messaging/CommonGameDialog.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
@@ -34,11 +30,16 @@
 #include "Game/LastFPSGameModeBase.h"
 #include "Game/LastFPSGameStateBase.h"
 #include "Game/LastFPSPlayerState.h"
+#include "EnhancedInputComponent.h"
 #include "HAL/IConsoleManager.h"
+#include "InputAction.h"
 #include "InputCoreTypes.h"
 #include "Net/UnrealNetwork.h"
 #include "PrimaryGameLayout.h"
 #include "TimerManager.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "Localization/LastFPSLocalization.h"
+#include "UI/Common/LastFPSConfirmWidget.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPlayerController, Log, All);
 
@@ -125,6 +126,7 @@ namespace
 ALastFPSPlayerController::ALastFPSPlayerController()
     : TeamId(FGenericTeamId::NoTeam)
 {
+    // 액션 ↔ 화면 짝은 PC 블루프린트에서 저작한다. 생성자에서 에셋을 찾으면 C++ 이 콘텐츠 경로에 묶인다.
 }
 
 void ALastFPSPlayerController::SetGenericTeamId(const FGenericTeamId& NewTeamId)
@@ -513,7 +515,61 @@ void ALastFPSPlayerController::SetupInputComponent()
         // ESC → 설정된 메뉴 화면 열기. 열려 있을 땐 Menu 입력모드라 PC까지 안 오고
         // CommonUI Back이 받아 닫으므로 같은 키로 토글이 성립한다.
         InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ALastFPSPlayerController::HandleEscMenu);
+
     }
+
+    // 화면 단축키는 Enhanced Input 으로 받는다. 실제 키는 IMC_Default 가 정하므로 여기엔 키가 없다.
+    if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent))
+    {
+        for (const TPair<TObjectPtr<const UInputAction>, FGameplayTag>& Hotkey : ScreenHotkeys)
+        {
+            if (!Hotkey.Key || !Hotkey.Value.IsValid())
+            {
+                UE_LOG(LogLastFPSPlayerController, Warning,
+                    TEXT("ScreenHotkeys 에 비어 있는 행이 있습니다(Action=%s, Tag=%s)."),
+                    *GetNameSafe(Hotkey.Key), *Hotkey.Value.ToString());
+                continue;
+            }
+
+            EnhancedInput->BindAction(
+                Hotkey.Key, ETriggerEvent::Started, this, &ALastFPSPlayerController::HandleScreenHotkey);
+        }
+    }
+}
+
+void ALastFPSPlayerController::HandleScreenHotkey(const FInputActionInstance& ActionInstance)
+{
+    // 대화·상점 중에 다른 화면이 위로 뜨면 상호작용 종료 흐름이 꼬인다.
+    if (bBlockScreenHotkeysDuringInteraction && InteractionSession.bActive)
+    {
+        return;
+    }
+
+    const FGameplayTag* ScreenTag = ScreenHotkeys.Find(ActionInstance.GetSourceAction());
+    if (!ScreenTag || !ScreenTag->IsValid())
+    {
+        return;
+    }
+
+    // 커서/입력 모드는 건드리지 않는다. ESC 메뉴와 같은 이유로 CommonUI 단일 소스에 맡긴다.
+    OpenScreen(*ScreenTag);
+}
+
+void ALastFPSPlayerController::ShowQuitPopup()
+{
+    FLastFPSConfirmParams Params;
+    Params.Title = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::NoticeTitle);
+    Params.Body = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuitGameConfirmation);
+    Params.OnResult = FCommonMessagingResultDelegate::CreateLambda([this](ECommonMessagingResult Result)
+    {
+        if (Result != ECommonMessagingResult::Confirmed) return;
+
+        UKismetSystemLibrary::QuitGame(
+            this, this
+            , EQuitPreference::Quit, false);
+    });
+
+    ULastFPSConfirmWidget::ShowPopup(GetWorld(), Params);
 }
 
 void ALastFPSPlayerController::HandleEscMenu()
@@ -541,6 +597,8 @@ void ALastFPSPlayerController::HandleEscMenu()
         // "위젯 보이는데 커서 없음/위젯 없는데 커서 남음" desync 가 생긴다.
         OpenScreen(EscMenuScreenTag);
     }
+
+    ShowQuitPopup();
 }
 
 void ALastFPSPlayerController::SetNearestInteractable(AActor* Interactable)
@@ -690,27 +748,13 @@ void ALastFPSPlayerController::ShowQuantityPrompt(
     int32 MaxQuantity,
     FLastFPSQuantityResultDelegate OnResult)
 {
-    ULocalPlayer* LocalPlayer = GetLocalPlayer();
-    ULastFPSPopupSubsystem* PopupSubsystem = LocalPlayer
-        ? LocalPlayer->GetSubsystem<ULastFPSPopupSubsystem>()
-        : nullptr;
-    if (!PopupSubsystem)
-    {
-        UE_LOG(
-            LogLastFPSPlayerController,
-            Warning,
-            TEXT("ShowQuantityPrompt: 로컬 플레이어의 PopupSubsystem을 찾지 못했습니다."));
-        OnResult.ExecuteIfBound(0);
-        return;
-    }
-
-    ULastFPSQuantityDialogWidget* Dialog = PopupSubsystem->ShowQuantityPrompt(
-        Title,
-        ItemName,
-        UnitPrice,
-        MaxQuantity);
+    ULastFPSQuantityDialogWidget* Dialog =
+        ULastFPSPopupSubsystem::ShowPopup<ULastFPSQuantityDialogWidget>(
+            this, LastFPSPopupTags::Quantity());
     if (Dialog)
     {
+        Dialog->SetupQuantity(Title, ItemName, UnitPrice, MaxQuantity);
+
         if (OnResult.IsBound())
         {
             Dialog->OnQuantityResult.Add(OnResult);
@@ -749,19 +793,20 @@ ULastFPSDialogueWidget* ALastFPSPlayerController::ShowDialogue(
     const FText& Speaker,
     const TArray<FText>& Lines)
 {
-    ULocalPlayer* LocalPlayer = GetLocalPlayer();
-    if (ULastFPSPopupSubsystem* PopupSubsystem = LocalPlayer
-        ? LocalPlayer->GetSubsystem<ULastFPSPopupSubsystem>()
-        : nullptr)
+    ULastFPSDialogueWidget* Dialogue =
+        ULastFPSPopupSubsystem::ShowPopup<ULastFPSDialogueWidget>(
+            this, LastFPSPopupTags::Dialogue());
+    if (!Dialogue)
     {
-        return PopupSubsystem->ShowDialogue(Speaker, Lines);
+        UE_LOG(
+            LogLastFPSPlayerController,
+            Warning,
+            TEXT("ShowDialogue: 대화 팝업을 열지 못했습니다."));
+        return nullptr;
     }
 
-    UE_LOG(
-        LogLastFPSPlayerController,
-        Warning,
-        TEXT("ShowDialogue: 로컬 플레이어의 PopupSubsystem을 찾지 못했습니다."));
-    return nullptr;
+    Dialogue->SetupDialogue(Speaker, Lines);
+    return Dialogue;
 }
 
 // ── NPC 상호작용 허브 (카메라 전환 + 액션 메뉴) ──────────────────────

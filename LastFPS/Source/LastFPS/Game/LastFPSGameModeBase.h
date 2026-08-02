@@ -68,6 +68,7 @@ public:
     FGameplayTag GetInitialScreenTag() const { return InitialScreenTag; }
     FGameplayTag GetEscMenuScreenTag() const { return EscMenuScreenTag; }
     bool ShouldShowQuestTracker() const { return bShowQuestTracker; }
+    bool ShouldShowCombatHUD() const { return bShowCombatHUD; }
     ULastFPSDestinationContentSet* GetDestinationContentSet()
     {
         return DestinationContentSet;
@@ -89,9 +90,29 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
     bool bShowQuestTracker = false;
 
+    /**
+     * 이 맵에서 전투 HUD 하단 레이어(무기 슬롯·스킬·체력바)를 표시할지.
+     *
+     * 허브에서는 무기를 들지 않으므로 무기 슬롯이 비어 있고 스킬도 쓸 수 없다. 빈 칸만 남는 UI 를
+     * 띄우면 장착 결과가 반영되지 않은 것처럼 보인다. 기본값은 끔이라 허브·로비는 설정 없이 숨겨진다.
+     * bShowQuestTracker 와 같은 성격의 맵별 규칙이라 GameMode 가 소유한다.
+     */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
+    bool bShowCombatHUD = false;
+
     /** 이 맵 진입 시 플레이어 ASC 에 적용할 제한 효과. 비우면 제한 없음(전투 맵). 허브 GameMode BP 에서 전투 금지 GE 지정. */
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Combat")
     TSubclassOf<UGameplayEffect> LevelRestrictionEffect;
+
+    /**
+     * 이 맵에서 플레이어에게 무기 로드아웃을 장착시킬지. 기본값은 끔이라
+     * 허브·로비처럼 전투가 없는 맵은 아무 설정 없이 맨손을 유지한다. 전투 맵 GameMode BP 에서만 켠다.
+     * "어떤 맵에서 무기를 드는가"는 InitialScreenTag / LevelRestrictionEffect 와 같은 성격의 맵별 규칙이므로 GameMode 가 소유한다.
+     */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Combat")
+    bool bEquipWeaponLoadout = false;
+
+    bool ShouldEquipWeaponLoadout() const { return bEquipWeaponLoadout; }
 
     /** 미션 실패 시 띄울 화면. 비우면 화면 없이 곧바로 귀환한다. */
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Mission", meta=(Categories="UI.Screen"))

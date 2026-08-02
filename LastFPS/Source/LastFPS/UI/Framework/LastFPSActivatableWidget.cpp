@@ -13,7 +13,9 @@
 ULastFPSActivatableWidget::ULastFPSActivatableWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	// CommonUI Back 액션 미구성 → back-handler 로 등록하지 않는다(닫기는 raw ESC).
+	// CommonUI Back 라우팅은 입력 config 적용 경로를 함께 쓰는데, 이 프로젝트는
+	// bEnableDefaultInputConfig=False 라 그 경로가 돌지 않는다. back-handler 로 등록해도
+	// 호출되지 않으므로 끄고, 닫기는 아래 raw ESC 로 처리한다.
 	bIsBackHandler = false;
 }
 
@@ -48,7 +50,7 @@ void ULastFPSActivatableWidget::NativeOnActivated()
 		UGameplayStatics::PlaySound2D(this, ActivateSound);
 	}
 
-	// 키 입력(ESC)을 받으려면 포커스가 필요. CommonUI Back이 미구성이라 직접 확보.
+	// 키 입력(ESC)을 받으려면 포커스가 필요. CommonUI Back 이 미구성이라 직접 확보.
 	SetIsFocusable(true);
 	SetKeyboardFocus();
 }
@@ -98,3 +100,4 @@ FReply ULastFPSActivatableWidget::NativeOnKeyDown(const FGeometry& InGeometry, c
 
 	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 }
+

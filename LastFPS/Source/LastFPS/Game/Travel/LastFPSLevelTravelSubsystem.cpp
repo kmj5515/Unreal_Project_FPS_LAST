@@ -8,12 +8,15 @@
 #include "AssetRegistry/AssetData.h"
 #include "Engine/AssetManager.h"
 #include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Game/Loading/LastFPSLoadingIndicatorSubsystem.h"
 #include "Game/Loading/LastFPSLoadingProcessSubsystem.h"
 #include "Game/Travel/LastFPSLevelTravelSettings.h"
 #include "GameFramework/PlayerController.h"
+#include "Inventory/LastFPSEquipmentSubsystem.h"
 #include "Kismet/GameplayStatics.h"
+#include "Localization/LastFPSLocalization.h"
 #include "Misc/PackageName.h"
 #include "Online/OnlineSessionNames.h"
 #include "TimerManager.h"
@@ -29,13 +32,13 @@ namespace LastFPSLevelTravelPresentation
 		switch (Destination)
 		{
 		case ELastFPSTravelDestination::MainMenu:
-			return NSLOCTEXT("LastFPS", "TravelStatus_MainMenu", "메인 메뉴로 이동 중...");
+			return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelStatusMainMenu);
 		case ELastFPSTravelDestination::CharacterSelect:
-			return NSLOCTEXT("LastFPS", "TravelStatus_CharacterSelect", "캐릭터 선택으로 이동 중...");
+			return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelStatusCharacterSelect);
 		case ELastFPSTravelDestination::Hub:
-			return NSLOCTEXT("LastFPS", "TravelStatus_Hub", "허브로 이동 중...");
+			return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelStatusHub);
 		default:
-			return NSLOCTEXT("LastFPS", "TravelStatus_Generic", "맵 이동 중...");
+			return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelStatusGeneric);
 		}
 	}
 
@@ -44,11 +47,11 @@ namespace LastFPSLevelTravelPresentation
 		switch (Destination)
 		{
 		case ELastFPSTravelDestination::MainMenu:
-			return NSLOCTEXT("LastFPS", "TravelMap_MainMenu", "Main Menu");
+			return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelMapMainMenu);
 		case ELastFPSTravelDestination::CharacterSelect:
-			return NSLOCTEXT("LastFPS", "TravelMap_CharacterSelect", "Character Select");
+			return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelMapCharacterSelect);
 		case ELastFPSTravelDestination::Hub:
-			return NSLOCTEXT("LastFPS", "TravelMap_Hub", "Hub");
+			return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelMapHub);
 		default:
 			return FText::GetEmpty();
 		}
@@ -61,6 +64,7 @@ void ULastFPSLevelTravelSubsystem::Initialize(FSubsystemCollectionBase& Collecti
 
 	Collection.InitializeDependency<UCommonSessionSubsystem>();
 	Collection.InitializeDependency<ULastFPSLoadingIndicatorSubsystem>();
+	Collection.InitializeDependency<ULastFPSEquipmentSubsystem>();
 
 	if (UCommonSessionSubsystem* Sessions = GetCommonSessionSubsystem())
 	{
@@ -121,17 +125,23 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::RequestTravel(
 		return TravelToDestination(Request.Destination);
 
 	case ELastFPSTravelEntryType::QuickPlayBattle:
+	{
+		const UGameInstance* GameInstance = GetGameInstance();
+		if (const ULastFPSEquipmentSubsystem* Equipment =
+			GameInstance ? GameInstance->GetSubsystem<ULastFPSEquipmentSubsystem>() : nullptr;
+			!Equipment || !Equipment->HasEquippedWeapon())
+		{
+			return ELastFPSTravelRequestResult::MissingRequiredWeapon;
+		}
 		return QuickPlayBattle(
 			LocalPlayerController,
 			Request.BattleDefinitionId);
+	}
 
 	default:
 		FailRequest(
 			ELastFPSTravelRequestResult::InvalidDefinition,
-			NSLOCTEXT(
-				"LastFPS",
-				"TravelUnsupportedEntryType",
-				"지원하지 않는 이동 요청입니다."));
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelUnsupportedEntryType));
 		return ELastFPSTravelRequestResult::InvalidDefinition;
 	}
 }
@@ -177,7 +187,7 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::TravelToMap(
 		FailRequest(
 			ELastFPSTravelRequestResult::InvalidAssetId,
 			FText::Format(
-				NSLOCTEXT("LastFPS", "TravelInvalidMapId", "맵 Primary Asset ID가 올바르지 않습니다: {0}"),
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelInvalidMapId),
 				FText::FromString(MapId.ToString())));
 		return ELastFPSTravelRequestResult::InvalidAssetId;
 	}
@@ -186,7 +196,7 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::TravelToMap(
 	if (!ResolveMapPackageName(MapId, PackageName))
 	{
 		const FText Error = FText::Format(
-			NSLOCTEXT("LastFPS", "TravelInvalidMap", "등록된 맵을 찾을 수 없습니다: {0}"),
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelInvalidMap),
 			FText::FromString(MapId.ToString()));
 		FailRequest(ELastFPSTravelRequestResult::AssetNotFound, Error);
 		return ELastFPSTravelRequestResult::AssetNotFound;
@@ -197,13 +207,13 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::TravelToMap(
 	{
 		FailRequest(
 			ELastFPSTravelRequestResult::InvalidWorld,
-			NSLOCTEXT("LastFPS", "TravelInvalidWorld", "이동할 월드를 찾을 수 없습니다."));
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelInvalidWorld));
 		return ELastFPSTravelRequestResult::InvalidWorld;
 	}
 
 	if (StatusText.IsEmpty())
 	{
-		StatusText = NSLOCTEXT("LastFPS", "TravelStatusGeneric", "맵 이동 중...");
+		StatusText = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelStatusGeneric);
 	}
 	if (MapNameText.IsEmpty())
 	{
@@ -235,7 +245,7 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::TravelToMap(
 			{
 				FailRequest(
 					ELastFPSTravelRequestResult::InvalidWorld,
-					NSLOCTEXT("LastFPS", "TravelWorldExpired", "이동 전에 월드가 종료되었습니다."));
+					FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelWorldExpired));
 				return;
 			}
 
@@ -267,7 +277,7 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::QuickPlayBattle(
 	{
 		FailRequest(
 			ELastFPSTravelRequestResult::InvalidPlayer,
-			NSLOCTEXT("LastFPS", "QuickPlayInvalidPlayer", "퀵플레이를 요청할 로컬 플레이어가 올바르지 않습니다."));
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuickPlayInvalidPlayer));
 		return ELastFPSTravelRequestResult::InvalidPlayer;
 	}
 	if (!BattleDefinitionId.IsValid()
@@ -276,10 +286,7 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::QuickPlayBattle(
 		FailRequest(
 			ELastFPSTravelRequestResult::InvalidAssetId,
 			FText::Format(
-				NSLOCTEXT(
-					"LastFPS",
-					"QuickPlayInvalidDefinitionId",
-					"BattleDefinition Primary Asset ID가 올바르지 않습니다: {0}"),
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuickPlayInvalidDefinitionId),
 				FText::FromString(BattleDefinitionId.ToString())));
 		return ELastFPSTravelRequestResult::InvalidAssetId;
 	}
@@ -287,7 +294,7 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::QuickPlayBattle(
 	{
 		FailRequest(
 			ELastFPSTravelRequestResult::SessionUnavailable,
-			NSLOCTEXT("LastFPS", "QuickPlayNoSessionSubsystem", "CommonSessionSubsystem을 사용할 수 없습니다."));
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuickPlayNoSessionSubsystem));
 		return ELastFPSTravelRequestResult::SessionUnavailable;
 	}
 
@@ -298,7 +305,7 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::QuickPlayBattle(
 	ULastFPSLoadingIndicatorSubsystem::Show(
 		this,
 		LocalPlayerController,
-		NSLOCTEXT("LastFPS", "BattleLoadingIndicator", "전투에 연결하는 중..."));
+		FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::BattleLoadingIndicator));
 
 	TArray<FName> BundlesToLoad;
 	BundlesToLoad.Add(LastFPSAssetBundles::Game);
@@ -313,7 +320,7 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::QuickPlayBattle(
 		FailRequest(
 			ELastFPSTravelRequestResult::AssetNotFound,
 			FText::Format(
-				NSLOCTEXT("LastFPS", "BattleDefinitionNotFound", "전투 정의를 불러올 수 없습니다: {0}"),
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::BattleDefinitionNotFound),
 				FText::FromString(BattleDefinitionId.ToString())));
 		return ELastFPSTravelRequestResult::AssetNotFound;
 	}
@@ -355,7 +362,7 @@ void ULastFPSLevelTravelSubsystem::HandleBattleDefinitionLoaded()
 		FailRequest(
 			ELastFPSTravelRequestResult::InvalidDefinition,
 			FText::Format(
-				NSLOCTEXT("LastFPS", "BattleDefinitionInvalid", "전투 정의의 필수 값이 올바르지 않습니다: {0}"),
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::BattleDefinitionInvalid),
 				FText::FromString(PendingBattleDefinitionId.ToString())));
 		return;
 	}
@@ -366,7 +373,7 @@ void ULastFPSLevelTravelSubsystem::HandleBattleDefinitionLoaded()
 		FailRequest(
 			ELastFPSTravelRequestResult::AssetNotFound,
 			FText::Format(
-				NSLOCTEXT("LastFPS", "BattleMapInvalid", "전투 맵이 Asset Manager에 등록되지 않았습니다: {0}"),
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::BattleMapInvalid),
 				FText::FromString(PendingBattleDefinition->MapId.ToString())));
 		return;
 	}
@@ -377,7 +384,7 @@ void ULastFPSLevelTravelSubsystem::HandleBattleDefinitionLoaded()
 	{
 		FailRequest(
 			ELastFPSTravelRequestResult::SessionUnavailable,
-			NSLOCTEXT("LastFPS", "BattleSessionUnavailable", "세션 시스템 또는 로컬 플레이어를 사용할 수 없습니다."));
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::BattleSessionUnavailable));
 		return;
 	}
 
@@ -387,7 +394,7 @@ void ULastFPSLevelTravelSubsystem::HandleBattleDefinitionLoaded()
 	{
 		FailRequest(
 			ELastFPSTravelRequestResult::SessionUnavailable,
-			NSLOCTEXT("LastFPS", "BattleSessionRequestInvalid", "세션 요청을 생성할 수 없습니다."));
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::BattleSessionRequestInvalid));
 		return;
 	}
 
@@ -416,7 +423,7 @@ void ULastFPSLevelTravelSubsystem::HandleQuickPlaySearchFinished(
 	{
 		FailRequest(
 			ELastFPSTravelRequestResult::InvalidDefinition,
-			NSLOCTEXT("LastFPS", "QuickPlayStateLost", "퀵플레이 요청 상태가 유실되었습니다."));
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuickPlayStateLost));
 		return;
 	}
 
@@ -433,7 +440,7 @@ void ULastFPSLevelTravelSubsystem::HandleQuickPlaySearchFinished(
 	{
 		FailRequest(
 			ELastFPSTravelRequestResult::SessionUnavailable,
-			NSLOCTEXT("LastFPS", "QuickPlayPlayerLost", "퀵플레이 중 로컬 플레이어가 종료되었습니다."));
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuickPlayPlayerLost));
 		return;
 	}
 
@@ -502,7 +509,7 @@ void ULastFPSLevelTravelSubsystem::BeginSessionTravelLoading(
 		? FText::FromName(Definition.MapId.PrimaryAssetName)
 		: Definition.DisplayName;
 	SetPresentation(
-		NSLOCTEXT("LastFPS", "BattleTravelStatus", "전투에 참가하는 중..."),
+		FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::BattleTravelStatus),
 		MapName);
 
 	if (ULastFPSLoadingProcessSubsystem* Loading =
@@ -526,7 +533,7 @@ void ULastFPSLevelTravelSubsystem::HandleCreateSessionComplete(
 		FailRequest(
 			ELastFPSTravelRequestResult::SessionUnavailable,
 			Result.ErrorText.IsEmpty()
-				? NSLOCTEXT("LastFPS", "HostSessionFailed", "전투 세션 생성에 실패했습니다.")
+				? FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::HostSessionFailed)
 				: Result.ErrorText);
 		return;
 	}
@@ -546,7 +553,7 @@ void ULastFPSLevelTravelSubsystem::HandleJoinSessionComplete(
 		FailRequest(
 			ELastFPSTravelRequestResult::SessionUnavailable,
 			Result.ErrorText.IsEmpty()
-				? NSLOCTEXT("LastFPS", "JoinSessionFailed", "전투 세션 참가에 실패했습니다.")
+				? FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::JoinSessionFailed)
 				: Result.ErrorText);
 		return;
 	}
@@ -599,7 +606,7 @@ void ULastFPSLevelTravelSubsystem::HandleTravelFailure(
 	FailRequest(
 		ELastFPSTravelRequestResult::InvalidWorld,
 		FText::Format(
-			NSLOCTEXT("LastFPS", "TravelFailure", "맵 이동에 실패했습니다. ({0}: {1})"),
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelFailure),
 			FText::AsNumber(static_cast<int32>(FailureType)),
 			FText::FromString(Reason)));
 }

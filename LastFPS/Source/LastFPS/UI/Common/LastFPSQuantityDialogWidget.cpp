@@ -1,5 +1,6 @@
 #include "UI/Common/LastFPSQuantityDialogWidget.h"
 
+#include "Localization/LastFPSLocalization.h"
 #include "UI/Framework/LastFPSButtonBase.h"
 #include "Components/TextBlock.h"
 
@@ -39,7 +40,9 @@ void ULastFPSQuantityDialogWidget::SetupQuantity(const FText& InTitle, const FTe
 
 	if (TB_MaxInfo)
 	{
-		TB_MaxInfo->SetText(FText::FromString(FString::Printf(TEXT("최대 %d개 구매 가능"), MaxQuantity)));
+		TB_MaxInfo->SetText(FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuantityMaxPurchaseFormat),
+			FText::AsNumber(MaxQuantity)));
 	}
 
 	RefreshDisplay();

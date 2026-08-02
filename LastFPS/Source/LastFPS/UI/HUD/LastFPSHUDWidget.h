@@ -19,6 +19,9 @@ class ULastFPSVitalsGaugePresenter;
 class ULastFPSReloadPresenter;
 class ULastFPSSkillCooldownPresenter;
 class ULastFPSAmmoPresenter;
+class ULastFPSWeaponSlotPresenter;
+class ULastFPSWeaponSlotWidget;
+class UPanelWidget;
 class ULastFPSObjectiveHudPresenter;
 class ULastFPSDefendObjectiveWidget;
 class ULastFPSCaptureObjectiveWidget;
@@ -89,6 +92,16 @@ public:
     TObjectPtr<ULastFPSStatusEffectListWidget> WBP_StatusEffectList;
 
 protected:
+    /** 맵 규칙에 따라 전투 HUD 하단 레이어를 접거나 편다. */
+    void ApplyCombatHUDVisibility();
+
+    /**
+     * 전투 HUD 하단 레이어(무기 슬롯·스킬·체력바). 표시 여부는 맵의 GameMode 가 정한다.
+     * WBP 에서 같은 이름의 패널로 선택 바인딩한다. 없으면 아무 일도 하지 않는다.
+     */
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Layout", meta=(BindWidgetOptional))
+    TObjectPtr<UWidget> BottomLayer;
+
     UPROPERTY(BlueprintReadOnly, Category="HUD|HitMarker", meta=(BindWidgetOptional))
     TObjectPtr<UImage> HitMarkerImage;
 
@@ -180,6 +193,13 @@ protected:
 
     UPROPERTY(BlueprintReadOnly, Category="HUD|Ammo", meta=(BindWidgetOptional))
     TObjectPtr<UOverlay> AmmonInfoLayer;
+
+    /** 무기 슬롯 칸이 채워질 패널(가로/세로 박스). 비어 있으면 슬롯 표기를 하지 않는다. */
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Weapon Slot", meta=(BindWidgetOptional))
+    TObjectPtr<UPanelWidget> WeaponSlotContainer;
+
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Weapon Slot")
+    TSubclassOf<ULastFPSWeaponSlotWidget> WeaponSlotWidgetClass;
 
     UPROPERTY(EditDefaultsOnly, Category="HUD|Reload")
     FName ReloadProgressParameterName = TEXT("ReloadProgress");
@@ -311,6 +331,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<ULastFPSAmmoPresenter> AmmoPresenter;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSWeaponSlotPresenter> WeaponSlotPresenter;
 
     /** 점령·방어·보스 표시를 배타적으로 전환한다. */
     UPROPERTY(Transient)

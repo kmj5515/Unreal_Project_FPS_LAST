@@ -2,6 +2,7 @@
 
 #include "Character/Components/WeaponComponent.h"
 #include "Components/TextBlock.h"
+#include "Localization/LastFPSLocalization.h"
 
 void ULastFPSAmmoPresenter::Initialize(
     UTextBlock* InCurrentAmmoText,
@@ -89,15 +90,18 @@ void ULastFPSAmmoPresenter::UpdateDisplay()
 {
     const FText CurrentText = bHasWeapon
        ? FText::AsNumber(CachedCurrentAmmo)
-       : FText::FromString(TEXT("-"));
+       : FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::NotAvailable);
 
     const FText ReserveText = bHasWeapon
         ? FText::AsNumber(CachedReserveAmmo)
-        : FText::FromString(TEXT("-"));
+        : FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::NotAvailable);
 
     const FText CombinedText = bHasWeapon
-        ? FText::Format(FText::FromString(TEXT("{0} / {1}")), FText::AsNumber(CachedCurrentAmmo), FText::AsNumber(CachedReserveAmmo))
-        : FText::FromString(TEXT("-"));
+        ? FText::Format(
+            FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::RatioFormat),
+            FText::AsNumber(CachedCurrentAmmo),
+            FText::AsNumber(CachedReserveAmmo))
+        : FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::NotAvailable);
 
     
     if (UTextBlock* CurrentWidget = CurrentAmmoText.Get())

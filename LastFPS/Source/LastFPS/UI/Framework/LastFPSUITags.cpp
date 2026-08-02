@@ -74,4 +74,46 @@ namespace LastFPSUITags
 		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.Module"));
 		return Tag;
 	}
+
+	FGameplayTag Screen_Equipment()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.Equipment"));
+		return Tag;
+	}
+
+	FGameplayTag Screen_WeaponPreview()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.WeaponPreview"));
+		return Tag;
+	}
+
+	FGameplayTag PreviewSlot_Character()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Preview.Slot.Character"));
+		return Tag;
+	}
+
+	FGameplayTag PreviewSlot_Weapon()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Preview.Slot.Weapon"));
+		return Tag;
+	}
+
+	FGameplayTag PreviewView_Character()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Preview.View.Character"));
+		return Tag;
+	}
+
+	FGameplayTag PreviewView_Weapon()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Preview.View.Weapon"));
+		return Tag;
+	}
+
+	FGameplayTag Screen_Map()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.Map"));
+		return Tag;
+	}
 }

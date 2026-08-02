@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Localization/LastFPSLocalization.h"
 #include "UI/Framework/LastFPSModalDialogBase.h"
 #include "LastFPSDialogueWidget.generated.h"
 
@@ -37,11 +38,11 @@ protected:
 
 	/** "다음" 라벨 텍스트 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|UI")
-	FText NextLabel = NSLOCTEXT("LastFPS", "Dialogue_Next", "다음");
+	FText NextLabel = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::DialogueNext);
 
 	/** 마지막 페이지에서의 라벨 텍스트 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|UI")
-	FText CloseLabel = NSLOCTEXT("LastFPS", "Dialogue_Close", "닫기");
+	FText CloseLabel = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::DialogueClose);
 
 private:
 	UFUNCTION()
