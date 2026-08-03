@@ -206,6 +206,7 @@ void ALastFPSHero::BeginPlay()
     if (WeaponComponent)
     {
         WeaponComponent->OnWeaponEquippedChanged.AddUniqueDynamic(this, &ALastFPSHero::HandleWeaponEquippedChanged);
+        WeaponComponent->OnWeaponReloadStarted.AddUniqueDynamic(this, &ALastFPSHero::HandleWeaponReloadStarted);
     }
 
 	ApplyRotationModeSettings();
@@ -220,6 +221,7 @@ void ALastFPSHero::EndPlay(const EEndPlayReason::Type EndPlayReason)
     if (WeaponComponent)
     {
         WeaponComponent->OnWeaponEquippedChanged.RemoveDynamic(this, &ALastFPSHero::HandleWeaponEquippedChanged);
+        WeaponComponent->OnWeaponReloadStarted.RemoveDynamic(this, &ALastFPSHero::HandleWeaponReloadStarted);
     }
 
     Super::EndPlay(EndPlayReason);
@@ -980,8 +982,23 @@ void ALastFPSHero::InputReleased(FGameplayTag InputID)
     CancelAbilityByTag(InputID);
 }
 
+void ALastFPSHero::HandleWeaponReloadStarted(float /*ReloadDuration*/)
+{
+    // 재장전 중에는 조준을 유지하지 않는다. 복구는 플레이어가 조준 입력을 다시 넣어야 한다.
+    if (bIsADS)
+    {
+        SetADS(false);
+    }
+}
+
 void ALastFPSHero::SetADS(bool bEnabled)
 {
+    // 재장전 중에는 조준 진입 자체를 막는다. 해제는 항상 허용해야 상태가 남지 않는다.
+    if (bEnabled && CombatState == EMMCombatState::Reloading)
+    {
+        return;
+    }
+
     if (bEnabled && TryCancelActiveAbility(LastFPSGameplayTags::Input_ADS))
     {
         return;
