@@ -14,8 +14,6 @@ class UCommonActivatableWidget;
 class ULastFPSCharacterDefinition;
 class ULastFPSCharacterRoster;
 class ULastFPSHUDWidget;
-class ULastFPSQuestTrackerWidget;
-class ULastFPSObjectiveMarkerWidget;
 class ULastFPSDialogueWidget;
 class ULastFPSNPCInteractionWidget;
 class UInputAction;
@@ -149,14 +147,6 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
     bool bPushHUDOnBeginPlay = false;
 
-    /** 상시 퀘스트 트래커 HUD (WBP_QuestTracker) — 표시 여부는 GameMode가 결정 */
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
-    TSubclassOf<ULastFPSQuestTrackerWidget> QuestTrackerWidgetClass;
-
-    /** 상시 목표 마커 오버레이 (WBP_ObjectiveMarkers) — ReachLocation 목표를 화면 마커+거리로 표시. 트래커와 같은 게이트(bShowQuestTracker)를 공유. */
-    UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
-    TSubclassOf<ULastFPSObjectiveMarkerWidget> QuestMarkerWidgetClass;
-
     /**
      * 화면 단축키 — 액션 하나가 화면 태그 하나를 연다. 행을 추가하는 것이 곧 단축키 추가다.
      *
@@ -194,12 +184,6 @@ protected:
 
     /** 인게임 HUD push (휴면). 레이아웃 준비 전이면 재시도. */
     void TryPushHUDToUILayout();
-
-    /** 퀘스트 트래커 push (GameMode가 표시 요청 시). 레이아웃 준비 전이면 재시도. */
-    void TryPushQuestTrackerToUILayout();
-
-    /** 목표 마커 오버레이를 뷰포트에 추가 (트래커와 같은 표시 게이트). 레이아웃 의존 없어 재시도 불필요. */
-    void TryAddQuestMarkerToViewport();
 
     /** 로컬 Pawn의 소유 및 BeginPlay 완료를 GameInstance의 로딩 흐름에 알린다. */
     void TryNotifyLocalPawnReady();
@@ -259,26 +243,15 @@ protected:
     UPROPERTY()
     TObjectPtr<ULastFPSHUDWidget> HUDWidget;
 
-    UPROPERTY()
-    TObjectPtr<ULastFPSQuestTrackerWidget> QuestTrackerWidget;
-
-    UPROPERTY()
-    TObjectPtr<ULastFPSObjectiveMarkerWidget> QuestMarkerWidget;
-
     UPROPERTY(ReplicatedUsing=OnRep_SelectedCharacterIndex, BlueprintReadOnly, Category="LastFPS|Character")
     int32 SelectedCharacterIndex = 0;
 
     FTimerHandle InitialScreenRetryTimerHandle;
     FTimerHandle HUDPushRetryTimerHandle;
-    FTimerHandle QuestTrackerPushRetryTimerHandle;
     FTimerHandle MenuLayerSyncBindRetryTimerHandle;
     FTimerHandle LocalPawnReadyRetryTimerHandle;
     bool bHUDWidgetPushed = false;
-    bool bQuestTrackerPushed = false;
     bool bMenuLayerSyncBound = false;
-
-    /** GameMode에서 읽어와 캐시한 트래커 표시 여부 */
-    bool bShowQuestTracker = false;
 
     FGenericTeamId TeamId;
 

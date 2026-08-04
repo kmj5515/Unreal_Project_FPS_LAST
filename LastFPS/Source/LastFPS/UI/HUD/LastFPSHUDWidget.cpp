@@ -15,6 +15,8 @@
 #include "UI/HUD/LastFPSDefendObjectiveWidget.h"
 #include "UI/LastFPSDamageNumberWidget.h"
 #include "UI/HUD/LastFPSStatusEffectListWidget.h"
+#include "UI/HUD/Quest/LastFPSQuestTrackerWidget.h"
+#include "UI/HUD/Quest/LastFPSObjectiveMarkerWidget.h"
 #include "UI/HUD/LastFPSHUDStyle.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
@@ -134,11 +136,39 @@ void ULastFPSHUDWidget::ApplyCombatHUDVisibility()
         bShowCombat ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 }
 
+void ULastFPSHUDWidget::ApplyQuestHUDVisibility()
+{
+    if (!WBP_QuestTracker && !WBP_ObjectiveMarkers)
+    {
+        return;
+    }
+
+    // 전투 HUD 와 같은 이유로 맵별 규칙은 GameMode 가 소유한다.
+    // 다만 기본값이 "숨김"이라 GameMode 를 못 찾으면 띄우지 않는다.
+    // 퀘스트가 없는 맵(메인 메뉴 등)에 빈 패널이 뜨는 쪽이 더 나쁘기 때문이다.
+    const UWorld* World = GetWorld();
+    const ALastFPSGameModeBase* GameMode = World ? World->GetAuthGameMode<ALastFPSGameModeBase>() : nullptr;
+    const bool bShowQuestHUD = GameMode && GameMode->ShouldShowQuestTracker();
+
+    const ESlateVisibility QuestHUDVisibility =
+        bShowQuestHUD ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed;
+
+    if (WBP_QuestTracker)
+    {
+        WBP_QuestTracker->SetVisibility(QuestHUDVisibility);
+    }
+    if (WBP_ObjectiveMarkers)
+    {
+        WBP_ObjectiveMarkers->SetVisibility(QuestHUDVisibility);
+    }
+}
+
 void ULastFPSHUDWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
     ApplyCombatHUDVisibility();
+    ApplyQuestHUDVisibility();
 
     if (!CrosshairPresenter)
     {

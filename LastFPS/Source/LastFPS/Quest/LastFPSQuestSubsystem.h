@@ -49,6 +49,61 @@ struct FLastFPSObjectiveWaypoint
 };
 
 /**
+ * 목표 1건의 표시 스냅샷.
+ * 요구량 해석·완료 판정·안내 위치 해석을 서브시스템이 끝낸 결과만 담아, HUD 가 목표 판정 규칙을
+ * 다시 구현하지 않게 한다. 거리(m)는 시청자 위치에 따라 바뀌므로 담지 않고 표시 측이 계산한다.
+ */
+USTRUCT(BlueprintType)
+struct FLastFPSTrackedObjective
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	FText Label;
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	ELastFPSObjectiveType Type = ELastFPSObjectiveType::AcquireItem;
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	int32 Progress = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	int32 RequiredCount = 1;
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	bool bCompleted = false;
+
+	/** 안내 위치가 해석된 목표만 거리를 표시할 수 있다. */
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	bool bHasGuidanceLocation = false;
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	FVector GuidanceLocation = FVector::ZeroVector;
+};
+
+/**
+ * 진행중 퀘스트 1건의 표시 스냅샷 — 테이블 행 순서대로 반환된다.
+ * 정렬 기준과 표시 개수 제한은 화면별 표시 정책이라 여기 담지 않는다.
+ */
+USTRUCT(BlueprintType)
+struct FLastFPSTrackedQuest
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	FName QuestId;
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	FText Title;
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	ELastFPSQuestType Type = ELastFPSQuestType::Main;
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	TArray<FLastFPSTrackedObjective> Objectives;
+};
+
+/**
  * 퀘스트 1건의 런타임 상태 — DataTable 정적 정의와 분리해 서브시스템이 소유한다.
  * Progress/Baseline 인덱스는 해당 행 Objectives 배열 순서와 1:1.
  */
@@ -212,6 +267,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	void GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint>& OutWaypoints) const;
 
+	/**
+	 * 진행중 퀘스트를 표시용 스냅샷으로 반환한다 — HUD 트래커/임무 화면 공용 읽기 계약.
+	 * 순차 퀘스트는 완료한 단계와 현재 단계까지만 담아 다음 단계를 미리 공개하지 않는다.
+	 */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
+	void GetTrackedQuests(TArray<FLastFPSTrackedQuest>& OutQuests) const;
+
 	UPROPERTY(BlueprintAssignable, Category="LastFPS|Quest")
 	FOnLastFPSQuestStateChanged OnQuestStateChanged;
 
@@ -266,6 +328,16 @@ private:
 
 	/** 동선의 마지막 지점(= 도달 지점). */
 	bool GetRouteDestination(FGameplayTag RouteTag, FVector& OutLocation) const;
+
+	/**
+	 * 목표를 화면에서 안내할 지점 1개 — 화면 마커와 트래커 거리가 같은 지점을 가리키도록 공용화했다.
+	 * ClearEncounter 는 등록된 인카운터 마커, 위치 목표는 현재 동선 지점(없으면 도달 지점)을 쓴다.
+	 * 안내할 지점이 없는 유형(아이템 획득 등)이면 false.
+	 */
+	bool ResolveObjectiveGuidanceLocation(
+		const FLastFPSQuestObjective& Objective,
+		FVector& OutLocation,
+		bool& bOutIsDestination) const;
 
 	FDelegateHandle OnWorldInitHandle;
 	void HandlePostWorldInitialization(const FActorsInitializedParams& Params);

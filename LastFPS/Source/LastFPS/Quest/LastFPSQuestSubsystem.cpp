@@ -1069,25 +1069,9 @@ void ULastFPSQuestSubsystem::GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint
 
 			FVector MarkerLocation = FVector::ZeroVector;
 			bool bIsDestination = true;
-			if (bIsClearEncounter)
+			if (!ResolveObjectiveGuidanceLocation(Obj, MarkerLocation, bIsDestination))
 			{
-				if (!GetTrackedEncounterLocation(
-					Obj.TargetId,
-					MarkerLocation))
-				{
-					continue;
-				}
-			}
-			else if (!GetCurrentRoutePoint(
-				Obj.TargetTag,
-				MarkerLocation,
-				bIsDestination))
-			{
-				if (!ResolveObjectiveLocation(Obj, MarkerLocation))
-				{
-					continue;
-				}
-				bIsDestination = true;
+				continue;
 			}
 
 			FLastFPSObjectiveWaypoint Waypoint;
@@ -1103,6 +1087,82 @@ void ULastFPSQuestSubsystem::GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint
 			}
 		}
 	}
+}
+
+bool ULastFPSQuestSubsystem::ResolveObjectiveGuidanceLocation(
+	const FLastFPSQuestObjective& Objective,
+	FVector& OutLocation,
+	bool& bOutIsDestination) const
+{
+	bOutIsDestination = true;
+
+	if (Objective.Type == ELastFPSObjectiveType::ClearEncounter)
+	{
+		return GetTrackedEncounterLocation(Objective.TargetId, OutLocation);
+	}
+
+	if (Objective.Type != ELastFPSObjectiveType::ReachLocation)
+	{
+		return false;
+	}
+
+	// 동선이 배치돼 있으면 지금 안내 중인 지점, 없으면 도달 지점을 가리킨다.
+	if (GetCurrentRoutePoint(Objective.TargetTag, OutLocation, bOutIsDestination))
+	{
+		return true;
+	}
+
+	bOutIsDestination = true;
+	return ResolveObjectiveLocation(Objective, OutLocation);
+}
+
+void ULastFPSQuestSubsystem::GetTrackedQuests(TArray<FLastFPSTrackedQuest>& OutQuests) const
+{
+	OutQuests.Reset();
+
+	const UDataTable* Table = GetQuestTable();
+	if (!Table)
+	{
+		return;
+	}
+
+	// 표시 순서가 갱신마다 흔들리지 않도록 런타임 상태 맵이 아니라 테이블 행 순서로 훑는다.
+	Table->ForeachRow<FLastFPSQuestData>(TEXT("ULastFPSQuestSubsystem::GetTrackedQuests"),
+		[this, &OutQuests](const FName& RowName, const FLastFPSQuestData& Row)
+		{
+			if (GetStatus(RowName) != ELastFPSQuestStatus::InProgress)
+			{
+				return;
+			}
+
+			FLastFPSTrackedQuest& Tracked = OutQuests.AddDefaulted_GetRef();
+			Tracked.QuestId = RowName;
+			Tracked.Title = Row.Title;
+			Tracked.Type = Row.Type;
+			Tracked.Objectives.Reserve(Row.Objectives.Num());
+
+			for (int32 ObjectiveIndex = 0; ObjectiveIndex < Row.Objectives.Num(); ++ObjectiveIndex)
+			{
+				const FLastFPSQuestObjective& Objective = Row.Objectives[ObjectiveIndex];
+
+				FLastFPSTrackedObjective& Snapshot = Tracked.Objectives.AddDefaulted_GetRef();
+				Snapshot.Label = Objective.Label;
+				Snapshot.Type = Objective.Type;
+				Snapshot.Progress = GetObjectiveProgress(RowName, ObjectiveIndex);
+				Snapshot.RequiredCount = ResolveObjectiveRequiredCount(Objective);
+				Snapshot.bCompleted = Snapshot.Progress >= Snapshot.RequiredCount;
+
+				bool bIsDestination = true;
+				Snapshot.bHasGuidanceLocation = !Snapshot.bCompleted
+					&& ResolveObjectiveGuidanceLocation(Objective, Snapshot.GuidanceLocation, bIsDestination);
+
+				// 순차 퀘스트는 현재 단계까지만 안내하고 다음 단계는 미리 공개하지 않는다.
+				if (Row.bSequentialObjectives && !Snapshot.bCompleted)
+				{
+					break;
+				}
+			}
+		});
 }
 
 void ULastFPSQuestSubsystem::BroadcastStateChanged()

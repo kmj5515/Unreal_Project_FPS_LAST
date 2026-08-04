@@ -22,4 +22,11 @@ namespace LastFPSHUDStyle
     inline FLinearColor KillFeedVictim()     { return FLinearColor(0.906f, 0.298f, 0.235f, 1.f); }  // #E74C3C
     inline FLinearColor KillFeedSeparator()   { return FLinearColor(0.584f, 0.647f, 0.651f, 1.f); }  // #95A5A6
     inline FLinearColor KillFeedLocalPlayer(){ return FLinearColor(0.365f, 0.678f, 0.886f, 1.f); }  // #5DADE2
+
+    // 퀘스트 트래커 — 카드 강조색과 목표 줄 상태색 (위젯에서 EditAnywhere로 덮어쓸 수 있음)
+    inline FLinearColor QuestMainAccent()        { return FLinearColor(1.000f, 0.843f, 0.000f, 1.f); }  // #FFD700
+    inline FLinearColor QuestSideAccent()        { return FLinearColor(0.365f, 0.678f, 0.886f, 1.f); }  // #5DADE2
+    inline FLinearColor QuestObjectiveActive()   { return FLinearColor(1.000f, 1.000f, 1.000f, 1.f); }  // #FFFFFF
+    inline FLinearColor QuestObjectiveDone()     { return FLinearColor(0.584f, 0.647f, 0.651f, 1.f); }  // #95A5A6
+    inline FLinearColor QuestProgressFill()      { return FLinearColor(1.000f, 0.843f, 0.000f, 1.f); }  // #FFD700
 }

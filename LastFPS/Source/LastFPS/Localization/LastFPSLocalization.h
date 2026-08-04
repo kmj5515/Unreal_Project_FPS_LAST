@@ -42,6 +42,7 @@ namespace LastFPSUIStringKeys
 	inline constexpr TCHAR QuestRewardCreditsFormat[] = TEXT("Quest.Reward.CreditsFormat");
 	inline constexpr TCHAR QuestRewardItemFormat[] = TEXT("Quest.Reward.ItemFormat");
 	inline constexpr TCHAR QuestRewardMessageFormat[] = TEXT("Quest.Reward.MessageFormat");
+	inline constexpr TCHAR QuestTrackerEmpty[] = TEXT("Quest.Tracker.Empty");
 	inline constexpr TCHAR WeaponTypeFormat[] = TEXT("Inventory.Weapon.TypeFormat");
 	inline constexpr TCHAR QuantityMaxPurchaseFormat[] = TEXT("Quantity.MaxPurchaseFormat");
 
