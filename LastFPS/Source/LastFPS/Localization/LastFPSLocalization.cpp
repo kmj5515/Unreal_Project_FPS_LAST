@@ -13,6 +13,11 @@ FText FLastFPSLocalization::GetUIText(const TCHAR* Key)
 	return FText::FromStringTable(UIStringTableId, FTextKey(Key));
 }
 
+FText FLastFPSLocalization::GetUIText(const FName Key)
+{
+	return FText::FromStringTable(UIStringTableId, FTextKey(Key.ToString()));
+}
+
 FText FLastFPSLocalization::GetUIEnumText(const UEnum* EnumType, int64 Value)
 {
 	if (!EnumType || !EnumType->IsValidEnumValue(Value))

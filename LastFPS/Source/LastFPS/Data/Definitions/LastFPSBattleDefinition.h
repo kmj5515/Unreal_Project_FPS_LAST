@@ -43,6 +43,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Presentation")
 	FText DisplayName;
 
+	/** String Table에서 전투 레벨 표시 이름을 조회할 키. 지정하면 DisplayName보다 우선한다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Presentation")
+	FName DisplayNameStringTableKey;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Presentation", meta=(MultiLine="true"))
 	FText Description;
 
