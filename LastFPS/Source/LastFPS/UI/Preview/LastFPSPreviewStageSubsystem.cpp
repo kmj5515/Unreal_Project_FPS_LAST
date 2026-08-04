@@ -5,7 +5,7 @@
 #include "UI/Preview/LastFPSPreviewStageActor.h"
 #include "UI/Theme/LastFPSUISettings.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPreviewStage, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPreviewStageSubsystem, Log, All);
 
 namespace
 {
@@ -78,7 +78,7 @@ ALastFPSPreviewStageActor* ULastFPSPreviewStageSubsystem::GetStage()
 			}
 			else
 			{
-				UE_LOG(LogLastFPSPreviewStage, Warning,
+				UE_LOG(LogLastFPSPreviewStageSubsystem, Warning,
 					TEXT("프리뷰 무대 클래스를 불러오지 못해 기본 클래스를 사용합니다: %s"),
 					*Settings->PreviewStageClass.ToString());
 			}
@@ -96,7 +96,7 @@ ALastFPSPreviewStageActor* ULastFPSPreviewStageSubsystem::GetStage()
 
 	if (!Stage)
 	{
-		UE_LOG(LogLastFPSPreviewStage, Error,
+		UE_LOG(LogLastFPSPreviewStageSubsystem, Error,
 			TEXT("프리뷰 무대를 스폰하지 못했습니다: 클래스=%s"), *GetNameSafe(StageClass));
 		return nullptr;
 	}
@@ -116,7 +116,7 @@ void ULastFPSPreviewStageSubsystem::RemoveStageUser()
 	if (StageUserCount <= 0)
 	{
 		// 짝이 맞지 않으면 무대가 계속 켜져 있거나 너무 일찍 꺼진다. 조용히 넘기지 않는다.
-		UE_LOG(LogLastFPSPreviewStage, Warning,
+		UE_LOG(LogLastFPSPreviewStageSubsystem, Warning,
 			TEXT("프리뷰 무대 사용자 해제가 등록보다 많습니다. AddStageUser 와 짝을 확인하세요."));
 		StageUserCount = 0;
 		return;
