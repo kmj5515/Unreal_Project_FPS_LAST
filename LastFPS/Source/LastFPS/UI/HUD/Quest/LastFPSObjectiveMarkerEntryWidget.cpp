@@ -1,4 +1,4 @@
-#include "UI/HUD/LastFPSObjectiveMarkerEntryWidget.h"
+#include "UI/HUD/Quest/LastFPSObjectiveMarkerEntryWidget.h"
 
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"

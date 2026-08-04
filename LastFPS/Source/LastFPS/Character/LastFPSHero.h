@@ -324,6 +324,9 @@ private:
 
     UFUNCTION()
     void HandleWeaponEquippedChanged(bool bEquipped);
+
+    UFUNCTION()
+    void HandleWeaponReloadStarted(float ReloadDuration);
 	void BindSpeedBoostCameraTag();
 	void UnbindSpeedBoostCameraTag();
 	void HandleSpeedBoostCameraTagChanged(FGameplayTag Tag, int32 NewCount);

@@ -1,4 +1,4 @@
-#include "UI/HUD/LastFPSScopeOverlayWidget.h"
+#include "UI/HUD/Scope/LastFPSScopeOverlayWidget.h"
 
 #include "Components/Image.h"
 #include "Components/TextBlock.h"

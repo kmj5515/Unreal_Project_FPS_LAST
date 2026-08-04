@@ -1,6 +1,6 @@
-#include "UI/HUD/LastFPSObjectiveMarkerWidget.h"
+#include "UI/HUD/Quest/LastFPSObjectiveMarkerWidget.h"
 
-#include "UI/HUD/LastFPSObjectiveMarkerEntryWidget.h"
+#include "UI/HUD/Quest/LastFPSObjectiveMarkerEntryWidget.h"
 #include "Quest/LastFPSQuestSubsystem.h"
 
 #include "Components/CanvasPanel.h"

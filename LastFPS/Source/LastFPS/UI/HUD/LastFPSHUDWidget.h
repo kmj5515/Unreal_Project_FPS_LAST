@@ -23,6 +23,8 @@ class ULastFPSWeaponSlotPresenter;
 class ULastFPSWeaponSlotWidget;
 class UPanelWidget;
 class ULastFPSObjectiveHudPresenter;
+class ULastFPSQuestTrackerWidget;
+class ULastFPSObjectiveMarkerWidget;
 class ULastFPSDefendObjectiveWidget;
 class ULastFPSCaptureObjectiveWidget;
 class UTextBlock;
@@ -95,12 +97,26 @@ protected:
     /** 맵 규칙에 따라 전투 HUD 하단 레이어를 접거나 편다. */
     void ApplyCombatHUDVisibility();
 
+    /** 맵 규칙에 따라 상시 퀘스트 HUD(트래커·목표 마커)를 접거나 편다. */
+    void ApplyQuestHUDVisibility();
+
     /**
      * 전투 HUD 하단 레이어(무기 슬롯·스킬·체력바). 표시 여부는 맵의 GameMode 가 정한다.
      * WBP 에서 같은 이름의 패널로 선택 바인딩한다. 없으면 아무 일도 하지 않는다.
      */
     UPROPERTY(BlueprintReadOnly, Category="HUD|Layout", meta=(BindWidgetOptional))
     TObjectPtr<UWidget> BottomLayer;
+
+    /**
+     * 진행중 퀘스트 트래커. 전투 HUD 와 함께 상시 노출되므로 HUD 의 자식으로 둔다.
+     * 위치·정렬은 WBP 디자이너가 소유하고, C++ 는 맵 게이트에 따른 표시 여부만 정한다.
+     */
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Quest", meta=(BindWidgetOptional))
+    TObjectPtr<ULastFPSQuestTrackerWidget> WBP_QuestTracker;
+
+    /** 목표 마커 오버레이. 트래커와 같은 맵 게이트를 공유한다. */
+    UPROPERTY(BlueprintReadOnly, Category="HUD|Quest", meta=(BindWidgetOptional))
+    TObjectPtr<ULastFPSObjectiveMarkerWidget> WBP_ObjectiveMarkers;
 
     UPROPERTY(BlueprintReadOnly, Category="HUD|HitMarker", meta=(BindWidgetOptional))
     TObjectPtr<UImage> HitMarkerImage;
