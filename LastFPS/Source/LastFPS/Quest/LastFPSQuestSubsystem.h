@@ -100,6 +100,9 @@ struct FLastFPSTrackedQuest
 	ELastFPSQuestType Type = ELastFPSQuestType::Main;
 
 	UPROPERTY(BlueprintReadOnly, Category="Quest")
+	FGameplayTag Category;
+
+	UPROPERTY(BlueprintReadOnly, Category="Quest")
 	TArray<FLastFPSTrackedObjective> Objectives;
 };
 

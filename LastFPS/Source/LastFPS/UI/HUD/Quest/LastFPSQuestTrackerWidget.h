@@ -34,6 +34,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	TSubclassOf<ULastFPSQuestTrackerCardWidget> QuestCardWidgetClass;
 
+	/** 이 트래커가 담을 퀘스트 분류. 비우면 분류를 가리지 않는다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(Categories="Quest.Category"))
+	FGameplayTagContainer TrackedCategories;
+
 	/** 표시할 최대 진행중 퀘스트 수. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(ClampMin="1"))
 	int32 MaxTrackedQuests = 3;

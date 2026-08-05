@@ -1,6 +1,7 @@
 #pragma once
 
 #include "UI/Framework/LastFPSContentScreenWidget.h"
+#include "GameplayTagContainer.h"
 #include "LastFPSQuestScreenWidget.generated.h"
 
 class UPanelWidget;
@@ -24,6 +25,10 @@ protected:
 	/** 행 하나를 그릴 위젯 클래스 (WBP_QuestEntry) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	TSubclassOf<ULastFPSQuestEntryWidget> EntryWidgetClass;
+
+	/** 이 목록에서 제외할 퀘스트 분류. 전체 임무 기록이라 기본값이 "전부 표시"여야 해서 포함이 아닌 제외 필터다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(Categories="Quest.Category"))
+	FGameplayTagContainer ExcludedCategories;
 
 	/** 엔트리를 담을 컨테이너 (VerticalBox / ScrollBox 등) */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))

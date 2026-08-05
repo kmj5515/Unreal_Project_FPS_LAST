@@ -27,6 +27,10 @@ namespace LastFPSGameplayTags
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Location_Quest_Reactor);		// 수호(DefendZone) - 리액터
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Location_Quest_Outpost);		// 점령(CaptureZone) - 전초기지
 
+	// 퀘스트 표시 채널 분류. 화면이 담을 분류를 고르는 필터 축이며 ELastFPSQuestType 과 독립이다.
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Quest_Category_Hub);			// 허브 임무 목록
+	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Quest_Category_Dungeon);		// 던전 임무 (HUD 트래커)
+
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill_Dash);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill1);
 	LASTFPS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill2);

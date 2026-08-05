@@ -71,6 +71,11 @@ void ULastFPSQuestScreenWidget::RebuildQuestList()
 		Table->ForeachRow<FLastFPSQuestData>(TEXT("ULastFPSQuestScreenWidget::RebuildQuestList"),
 			[this, Subsystem, &NumRows](const FName& RowName, const FLastFPSQuestData& Row)
 			{
+				if (Row.Category.MatchesAny(ExcludedCategories))
+				{
+					return;
+				}
+
 				ULastFPSQuestEntryWidget* Entry = CreateWidget<ULastFPSQuestEntryWidget>(this, EntryWidgetClass);
 				if (!Entry)
 				{

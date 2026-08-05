@@ -61,9 +61,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|Quest")
 	TSubclassOf<ULastFPSQuestObjectiveRowWidget> ObjectiveRowClass;
 
-	/** 카드 하나에 표시할 최대 목표 줄 수. */
+	/** 카드 하나에 표시할 최대 목표 줄 수. 순차 퀘스트는 완료 단계가 쌓이므로 가장 긴 퀘스트의 단계 수를 담아야 한다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|Quest", meta=(ClampMin="1"))
-	int32 MaxObjectiveRows = 4;
+	int32 MaxObjectiveRows = 6;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|Quest|Style")
 	FLinearColor MainAccentColor = LastFPSHUDStyle::QuestMainAccent();

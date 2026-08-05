@@ -1139,6 +1139,7 @@ void ULastFPSQuestSubsystem::GetTrackedQuests(TArray<FLastFPSTrackedQuest>& OutQ
 			Tracked.QuestId = RowName;
 			Tracked.Title = Row.Title;
 			Tracked.Type = Row.Type;
+			Tracked.Category = Row.Category;
 			Tracked.Objectives.Reserve(Row.Objectives.Num());
 
 			for (int32 ObjectiveIndex = 0; ObjectiveIndex < Row.Objectives.Num(); ++ObjectiveIndex)
