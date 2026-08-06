@@ -100,9 +100,6 @@ struct FLastFPSTrackedQuest
 	ELastFPSQuestType Type = ELastFPSQuestType::Main;
 
 	UPROPERTY(BlueprintReadOnly, Category="Quest")
-	FGameplayTag Category;
-
-	UPROPERTY(BlueprintReadOnly, Category="Quest")
 	TArray<FLastFPSTrackedObjective> Objectives;
 };
 
@@ -185,6 +182,14 @@ public:
 	/** 정적 정의 접근 (UI 목록 생성용 — 테이블 단일 소스) */
 	const UDataTable* GetQuestTable() const;
 	const FLastFPSQuestData* FindQuest(FName QuestId) const;
+
+	UFUNCTION(BlueprintPure, Category="LastFPS|Quest")
+	bool IsQuestMappedToCurrentMap(FName QuestId) const;
+
+	UFUNCTION(BlueprintPure, Category="LastFPS|Quest")
+	bool IsQuestMappedToAnyMap(FName QuestId) const;
+
+	bool IsQuestInScopeForCurrentMap(FName QuestId) const;
 
 	// ── 외부 이벤트 통지 (목표 진행 push) ────────────────────────────
 
@@ -352,6 +357,8 @@ private:
 
 	/** 던전 퀘스트를 이미 자동 수락한 월드 (동일 월드 중복 처리 방지, 재입장 시 재수행 허용). */
 	TWeakObjectPtr<UWorld> DungeonQuestAcceptedWorld;
+
+	TArray<FName> CurrentMapQuestIds;
 
 	/** 클라이언트는 복제된 Encounter 진행 이벤트에서 Mode별 실제 요구량을 받는다. */
 	TMap<FName, int32> EncounterRequiredCounts;

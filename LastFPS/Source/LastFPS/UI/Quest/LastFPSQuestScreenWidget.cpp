@@ -71,7 +71,7 @@ void ULastFPSQuestScreenWidget::RebuildQuestList()
 		Table->ForeachRow<FLastFPSQuestData>(TEXT("ULastFPSQuestScreenWidget::RebuildQuestList"),
 			[this, Subsystem, &NumRows](const FName& RowName, const FLastFPSQuestData& Row)
 			{
-				if (Row.Category.MatchesAny(ExcludedCategories))
+				if (Subsystem && Subsystem->IsQuestMappedToAnyMap(RowName))
 				{
 					return;
 				}

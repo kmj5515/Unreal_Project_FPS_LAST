@@ -175,10 +175,6 @@ struct FLastFPSQuestData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	ELastFPSQuestType Type = ELastFPSQuestType::Main;
 
-	/** 표시 채널 분류 — 어느 화면이 담을지 결정한다. 중요도 축인 Type 과 독립이라 별도 필드다. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(Categories="Quest.Category"))
-	FGameplayTag Category;
-
 	/**
 	 * 초기 시드 상태 — 부팅 시 서브시스템이 이 값으로 런타임 상태를 시드한다.
 	 * (예: InProgress = 시작부터 활성. 런타임 진행/완료/수령은 서브시스템이 관리하며 이 값을 덮지 않는다.)

@@ -71,19 +71,15 @@ void ULastFPSQuestTrackerWidget::RefreshTracker()
 	if (Subsystem)
 	{
 		Subsystem->GetTrackedQuests(TrackedQuests);
+
+		TrackedQuests.RemoveAll([Subsystem](const FLastFPSTrackedQuest& Quest)
+		{
+			return !Subsystem->IsQuestMappedToCurrentMap(Quest.QuestId);
+		});
 	}
 	else
 	{
 		TrackedQuests.Reset();
-	}
-
-	if (!TrackedCategories.IsEmpty())
-	{
-		// 상위 분류를 지정해도 하위 분류가 걸리도록 태그 쪽 부모 매칭(MatchesAny)을 쓴다.
-		TrackedQuests.RemoveAll([this](const FLastFPSTrackedQuest& Quest)
-		{
-			return !Quest.Category.MatchesAny(TrackedCategories);
-		});
 	}
 
 	// 메인 퀘스트를 위로 올리되 같은 분류 안에서는 테이블 행 순서를 지켜 목록이 튀지 않게 한다.
@@ -127,6 +123,8 @@ void ULastFPSQuestTrackerWidget::RefreshTracker()
 	{
 		TB_Empty->SetVisibility(CardCount > 0 ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 	}
+
+	SetVisibility(CardCount > 0 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 
 	UpdateDistanceRefreshTimer(bNeedsDistanceRefresh);
 }

@@ -21,9 +21,6 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(Location_Quest_Depot, "Location.Quest.Depot", "�
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Location_Quest_Reactor, "Location.Quest.Reactor", "퀘스트 수호 대상 구역 - 리액터")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Location_Quest_Outpost, "Location.Quest.Outpost", "퀘스트 점령 대상 구역 - 전초기지")
 
-UE_DEFINE_GAMEPLAY_TAG_COMMENT(Quest_Category_Hub, "Quest.Category.Hub", "퀘스트 분류 - 허브 임무 목록")
-UE_DEFINE_GAMEPLAY_TAG_COMMENT(Quest_Category_Dungeon, "Quest.Category.Dungeon", "퀘스트 분류 - 던전 임무 (HUD 트래커)")
-
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill_Dash, "Cooldown.Skill.Dash", "Dash cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill1, "Cooldown.Skill1", "Skill 1 cooldown")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_Skill2, "Cooldown.Skill2", "Skill 2 cooldown")
