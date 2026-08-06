@@ -71,6 +71,11 @@ void ULastFPSQuestScreenWidget::RebuildQuestList()
 		Table->ForeachRow<FLastFPSQuestData>(TEXT("ULastFPSQuestScreenWidget::RebuildQuestList"),
 			[this, Subsystem, &NumRows](const FName& RowName, const FLastFPSQuestData& Row)
 			{
+				if (Subsystem && Subsystem->IsQuestMappedToAnyMap(RowName))
+				{
+					return;
+				}
+
 				ULastFPSQuestEntryWidget* Entry = CreateWidget<ULastFPSQuestEntryWidget>(this, EntryWidgetClass);
 				if (!Entry)
 				{

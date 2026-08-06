@@ -1029,7 +1029,8 @@ void ULastFPSQuestSubsystem::GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint
 	// 안내 지점의 전진은 위치 폴이 담당하고, 여기서는 현재 지점을 읽기만 한다.
 	for (const TPair<FName, FLastFPSQuestRuntimeState>& Pair : RuntimeStates)
 	{
-		if (Pair.Value.Status != ELastFPSQuestStatus::InProgress)
+		if (Pair.Value.Status != ELastFPSQuestStatus::InProgress
+			|| !IsQuestInScopeForCurrentMap(Pair.Key))
 		{
 			continue;
 		}
@@ -1130,7 +1131,8 @@ void ULastFPSQuestSubsystem::GetTrackedQuests(TArray<FLastFPSTrackedQuest>& OutQ
 	Table->ForeachRow<FLastFPSQuestData>(TEXT("ULastFPSQuestSubsystem::GetTrackedQuests"),
 		[this, &OutQuests](const FName& RowName, const FLastFPSQuestData& Row)
 		{
-			if (GetStatus(RowName) != ELastFPSQuestStatus::InProgress)
+			if (GetStatus(RowName) != ELastFPSQuestStatus::InProgress
+				|| !IsQuestInScopeForCurrentMap(RowName))
 			{
 				return;
 			}
@@ -1459,6 +1461,31 @@ FText ULastFPSQuestSubsystem::BuildRewardMessage(const FLastFPSQuestData& Def) c
 		RewardBlock);
 }
 
+bool ULastFPSQuestSubsystem::IsQuestMappedToCurrentMap(const FName QuestId) const
+{
+	return !QuestId.IsNone() && CurrentMapQuestIds.Contains(QuestId);
+}
+
+bool ULastFPSQuestSubsystem::IsQuestMappedToAnyMap(const FName QuestId) const
+{
+	if (QuestId.IsNone())
+	{
+		return false;
+	}
+
+	return QuestId == DefaultDungeonQuestId
+		|| DungeonMapQuestMap.ContainsByPredicate(
+			[QuestId](const FLastFPSDungeonQuestMapping& Candidate)
+			{
+				return Candidate.QuestId == QuestId;
+			});
+}
+
+bool ULastFPSQuestSubsystem::IsQuestInScopeForCurrentMap(const FName QuestId) const
+{
+	return IsQuestMappedToCurrentMap(QuestId) || !IsQuestMappedToAnyMap(QuestId);
+}
+
 void ULastFPSQuestSubsystem::AcceptDungeonQuestForMap(UWorld& World)
 {
 	// 같은 월드에서 델리게이트가 여러 번 발사될 수 있어 1회만 처리한다(재입장 시엔 다시 수행).
@@ -1470,47 +1497,60 @@ void ULastFPSQuestSubsystem::AcceptDungeonQuestForMap(UWorld& World)
 	// PIE 접두사를 제거한 정확한 영속 월드 경로만 비교해 이름이 비슷한 테스트 맵의 오작동을 막는다.
 	const FString CurrentPackageName =
 		UWorld::RemovePIEPrefix(World.GetOutermost()->GetName());
-	const FLastFPSDungeonQuestMapping* Mapping = DungeonMapQuestMap.FindByPredicate(
-		[&CurrentPackageName](const FLastFPSDungeonQuestMapping& Candidate)
+	TArray<FName> MappedQuestIds;
+	for (const FLastFPSDungeonQuestMapping& Candidate : DungeonMapQuestMap)
+	{
+		const FString ConfiguredPackageName =
+			Candidate.World.ToSoftObjectPath().GetLongPackageName();
+		if (ConfiguredPackageName.IsEmpty() || ConfiguredPackageName != CurrentPackageName)
 		{
-			const FString ConfiguredPackageName =
-				Candidate.World.ToSoftObjectPath().GetLongPackageName();
-			return !ConfiguredPackageName.IsEmpty()
-				&& ConfiguredPackageName == CurrentPackageName;
-		});
+			continue;
+		}
 
-	if (!Mapping)
+		const FName QuestId = Candidate.QuestId.IsNone() ? DefaultDungeonQuestId : Candidate.QuestId;
+		if (!QuestId.IsNone())
+		{
+			MappedQuestIds.AddUnique(QuestId);
+		}
+	}
+
+	const bool bScopeChanged = CurrentMapQuestIds != MappedQuestIds;
+	CurrentMapQuestIds = MoveTemp(MappedQuestIds);
+
+	if (bScopeChanged)
+	{
+		BroadcastStateChanged();
+	}
+
+	if (CurrentMapQuestIds.IsEmpty())
 	{
 		return; // 던전 진행 대상 맵이 아니다.
 	}
 
 	DungeonQuestAcceptedWorld = &World;
 
-	const FName TargetQuestId = Mapping->QuestId.IsNone() ? DefaultDungeonQuestId : Mapping->QuestId;
-	if (TargetQuestId.IsNone())
+	for (const FName TargetQuestId : CurrentMapQuestIds)
 	{
-		return;
-	}
-
-	const ELastFPSQuestStatus Status = GetStatus(TargetQuestId);
-	if (Status == ELastFPSQuestStatus::NotStarted)
-	{
-		UE_LOG(
-			LogLastFPSQuest,
-			Log,
-			TEXT("[Quest] 던전 맵 진입 — 퀘스트 '%s' 자동 수락: %s"),
-			*TargetQuestId.ToString(),
-			*CurrentPackageName);
-		AcceptQuest(TargetQuestId);
-		return;
-	}
-
-	// 개발용 시드나 재진입으로 이미 진행 중이어도 해당 전투 레벨의 시작 브리핑은 재생한다.
-	if (Status == ELastFPSQuestStatus::InProgress)
-	{
-		if (const FLastFPSQuestData* Definition = FindQuest(TargetQuestId))
+		const ELastFPSQuestStatus Status = GetStatus(TargetQuestId);
+		if (Status == ELastFPSQuestStatus::NotStarted)
 		{
-			TriggerRadioByIds(Definition->RadioOnStart);
+			UE_LOG(
+				LogLastFPSQuest,
+				Log,
+				TEXT("[Quest] 던전 맵 진입 — 퀘스트 '%s' 자동 수락: %s"),
+				*TargetQuestId.ToString(),
+				*CurrentPackageName);
+			AcceptQuest(TargetQuestId);
+			continue;
+		}
+
+		// 개발용 시드나 재진입으로 이미 진행 중이어도 해당 전투 레벨의 시작 브리핑은 재생한다.
+		if (Status == ELastFPSQuestStatus::InProgress)
+		{
+			if (const FLastFPSQuestData* Definition = FindQuest(TargetQuestId))
+			{
+				TriggerRadioByIds(Definition->RadioOnStart);
+			}
 		}
 	}
 }

@@ -153,9 +153,9 @@ void ULastFPSHUDWidget::ApplyQuestHUDVisibility()
     const ESlateVisibility QuestHUDVisibility =
         bShowQuestHUD ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed;
 
-    if (WBP_QuestTracker)
+    if (WBP_QuestTracker && !bShowQuestHUD)
     {
-        WBP_QuestTracker->SetVisibility(QuestHUDVisibility);
+        WBP_QuestTracker->SetVisibility(ESlateVisibility::Collapsed);
     }
     if (WBP_ObjectiveMarkers)
     {
