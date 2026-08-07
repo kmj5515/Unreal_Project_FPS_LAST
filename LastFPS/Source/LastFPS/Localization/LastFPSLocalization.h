@@ -9,6 +9,7 @@ class LASTFPS_API FLastFPSLocalization final
 {
 public:
 	[[nodiscard]] static FText GetUIText(const TCHAR* Key);
+	[[nodiscard]] static FText GetUIText(FName Key);
 	[[nodiscard]] static FText GetUIEnumText(const UEnum* EnumType, int64 Value);
 };
 

@@ -27,6 +27,18 @@ DEFINE_LOG_CATEGORY_STATIC(LogLastFPSLevelTravel, Log, All);
 
 namespace LastFPSLevelTravelPresentation
 {
+	FText GetBattleMapNameText(const ULastFPSBattleDefinition& Definition)
+	{
+		if (!Definition.DisplayNameStringTableKey.IsNone())
+		{
+			return FLastFPSLocalization::GetUIText(Definition.DisplayNameStringTableKey);
+		}
+
+		return Definition.DisplayName.IsEmpty()
+			? FText::FromName(Definition.MapId.PrimaryAssetName)
+			: Definition.DisplayName;
+	}
+
 	FText GetStatusText(const ELastFPSTravelDestination Destination)
 	{
 		switch (Destination)
@@ -505,12 +517,9 @@ UCommonSession_SearchResult* ULastFPSLevelTravelSubsystem::FindBestMatchingSessi
 void ULastFPSLevelTravelSubsystem::BeginSessionTravelLoading(
 	const ULastFPSBattleDefinition& Definition)
 {
-	const FText MapName = Definition.DisplayName.IsEmpty()
-		? FText::FromName(Definition.MapId.PrimaryAssetName)
-		: Definition.DisplayName;
 	SetPresentation(
 		FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::BattleTravelStatus),
-		MapName);
+		LastFPSLevelTravelPresentation::GetBattleMapNameText(Definition));
 
 	if (ULastFPSLoadingProcessSubsystem* Loading =
 		GetGameInstance()->GetSubsystem<ULastFPSLoadingProcessSubsystem>())
