@@ -4,18 +4,21 @@
 #include "GameFramework/Actor.h"
 #include "Data/Tables/LastFPSItemData.h"
 #include "Pooling/LastFPSPoolableActor.h"
+#include "Templates/SubclassOf.h"
 #include "LastFPSItemPickupActor.generated.h"
 
+class ALastFPSHero;
 class USphereComponent;
 class UStaticMeshComponent;
 class URotatingMovementComponent;
 class UNiagaraComponent;
+class UGameplayEffect;
 class UMaterialInstanceDynamic;
 
 /**
- * 월드에 떨어지는 아이템 드랍. Hero가 밟으면 PlayerState로 지급을 위임하고 풀로 반환한다.
+ * 월드에 떨어지는 드랍 픽업. Hero가 밟으면 지정된 지급 수단을 적용하고 풀로 반환한다.
  * 등록된 풀이 없거나 소진된 경우에만 기존처럼 파괴한다.
- * (PlayerState 가 소유 클라의 로컬 Economy 에 넣어주므로 리슨서버 원격 클라도 올바른 대상에 지급.)
+ * 아이템·체력·탄약 픽업이 이 클래스를 공유하고, 무엇을 지급할지는 픽업 BP 의 값이 정한다.
  */
 UCLASS()
 class LASTFPS_API ALastFPSItemPickupActor
@@ -63,6 +66,14 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Pickup")
     TObjectPtr<UNiagaraComponent> SpawnVFX;
 
+    /** 밟았을 때 적용할 즉시 회복 GE. 비우면 회복 없음. 회복량은 이 GE 가 소유한다. */
+    UPROPERTY(EditDefaultsOnly, Category="Pickup|Grant")
+    TSubclassOf<UGameplayEffect> HealEffectClass;
+
+    /** 밟았을 때 보급할 예비 탄약. 0 이면 보급 없음. */
+    UPROPERTY(EditDefaultsOnly, Category="Pickup|Grant", meta=(ClampMin="0"))
+    int32 ReserveAmmoAmount = 0;
+
     UPROPERTY(EditDefaultsOnly, Category="Pickup")
     float PickupRadius = 100.f;
 
@@ -96,6 +107,11 @@ private:
                         bool bFromSweep, const FHitResult& SweepResult);
 
     void TryGrant(AActor* OtherActor);
+
+    // 실제로 지급했을 때만 true.
+    bool TryGrantItem(ALastFPSHero& Hero) const;
+    bool TryGrantHealth(ALastFPSHero& Hero) const;
+    bool TryGrantReserveAmmo(ALastFPSHero& Hero) const;
 
     // ItemRowId 등급을 조회해 픽업 메시 머티리얼의 발광색에 적용 (서버/클라 공통).
     void ApplyRarityVisual();

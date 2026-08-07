@@ -7,6 +7,7 @@
 #include "LastFPSBattleDefinition.generated.h"
 
 class ULastFPSDestinationContentSet;
+class ULastFPSDropProfile;
 class UTexture2D;
 
 /**
@@ -39,6 +40,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Battle",
 		meta=(AssetBundles="Game"))
 	TSoftObjectPtr<ULastFPSDestinationContentSet> ContentSet;
+
+	/** 이 전투 레벨의 적 처치 드랍 규칙. 비우면 드랍 없음. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Battle",
+		meta=(AssetBundles="Game"))
+	TSoftObjectPtr<ULastFPSDropProfile> DropProfile;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Presentation")
 	FText DisplayName;

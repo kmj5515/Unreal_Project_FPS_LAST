@@ -1439,6 +1439,23 @@ void UWeaponComponent::SetCurrentMagazineAmmo(const int32 NewMagazineAmmo)
     NotifyAmmoChanged();
 }
 
+int32 UWeaponComponent::Auth_AddReserveAmmo(const int32 Amount)
+{
+    const AActor* Owner = GetOwner();
+    if (Amount <= 0 || !Owner || !Owner->HasAuthority() || !HasWeapon())
+    {
+        return 0;
+    }
+
+    const int32 AddedAmmo = FMath::Min(Amount, FMath::Max(0, StartingReserveAmmo - CurrentReserveAmmo));
+    if (AddedAmmo > 0)
+    {
+        SetCurrentReserveAmmo(CurrentReserveAmmo + AddedAmmo);
+    }
+
+    return AddedAmmo;
+}
+
 void UWeaponComponent::SetCurrentReserveAmmo(const int32 NewReserveAmmo)
 {
     const int32 ClampedAmmo = FMath::Max(NewReserveAmmo, 0);

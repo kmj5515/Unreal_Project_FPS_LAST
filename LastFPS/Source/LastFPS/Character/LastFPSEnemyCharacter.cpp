@@ -9,12 +9,11 @@
 #include "Character/Components/WeaponComponent.h"
 #include "Data/Definitions/LastFPSEnemyDefinition.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
-#include "Economy/LastFPSItemPickupActor.h"
 #include "Engine/World.h"
+#include "Game/LastFPSGameModeBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayEffect.h"
 #include "Perception/AIPerceptionComponent.h"
-#include "Pooling/LastFPSActorPoolSpawn.h"
 #include "Pooling/LastFPSActorPoolSubsystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSEnemyCharacter, Log, All);
@@ -105,74 +104,12 @@ void ALastFPSEnemyCharacter::HandleOwnDeath(ALastFPSCharacterBase* /*DeadChar*/)
         FMath::Max(DeathRemovalDelay, 0.1f),
         false);
 
-    UWorld* World = GetWorld();
-    if (!DropPickupClass || !World)
+    if (const UWorld* World = GetWorld())
     {
-        return;
-    }
-
-    // 최종 스폰할 RowId 목록을 구성: (1) 확정분은 항상, (2) 남은 개수만 가중치 랜덤으로 채움.
-    TArray<FName> SpawnRowIds;
-    for (const FName& RowId : GuaranteedDropRowIds)
-    {
-        if (!RowId.IsNone())
+        if (const ALastFPSGameModeBase* GameMode = World->GetAuthGameMode<ALastFPSGameModeBase>())
         {
-            SpawnRowIds.Add(RowId);
+            GameMode->SpawnDropsForDeath(*this);
         }
-    }
-
-    const int32 RandomCount = FMath::Max(0, DropCount - SpawnRowIds.Num());
-    if (RandomCount > 0)
-    {
-        // 유효(가중치>0) 후보의 가중치 합. 0이면 랜덤분은 건너뛴다(확정분은 그대로 나감).
-        float TotalWeight = 0.f;
-        for (const FLastFPSEnemyDropEntry& Entry : DropTable)
-        {
-            if (!Entry.ItemRowId.IsNone() && Entry.Weight > 0.f)
-            {
-                TotalWeight += Entry.Weight;
-            }
-        }
-        if (TotalWeight > 0.f)
-        {
-            for (int32 i = 0; i < RandomCount; ++i)
-            {
-                const FName RowId = PickWeightedDropRowId(TotalWeight);
-                if (!RowId.IsNone())
-                {
-                    SpawnRowIds.Add(RowId);
-                }
-            }
-        }
-    }
-
-    const int32 Total = SpawnRowIds.Num();
-    if (Total <= 0)
-    {
-        return;
-    }
-
-    // 사망 위치를 중심으로 원주에 균등 간격으로 동시 스폰.
-    const FVector Center = GetActorLocation();
-    for (int32 i = 0; i < Total; ++i)
-    {
-        const float AngleRad = (2.f * PI * i) / Total;
-        const FVector Offset(FMath::Cos(AngleRad) * DropSpreadRadius,
-                             FMath::Sin(AngleRad) * DropSpreadRadius, 0.f);
-        const FTransform SpawnTransform(FRotator::ZeroRotator, Center + Offset);
-
-        // 착지 지점(링)에서 적 중심으로의 오프셋 = 발사 시작점. 중심에서 튀어나와 포물선으로 링에 안착.
-        const FVector LaunchOffset = Center - SpawnTransform.GetLocation();
-        LastFPSActorPool::AcquireOrSpawnDeferred<ALastFPSItemPickupActor>(
-            *World,
-            DropPickupClass,
-            SpawnTransform,
-            this,
-            nullptr,
-            [RowId = SpawnRowIds[i], LaunchOffset](ALastFPSItemPickupActor& Pickup)
-            {
-                Pickup.InitializePickup(RowId, 1, LaunchOffset);
-            });
     }
 }
 
@@ -359,26 +296,6 @@ void ALastFPSEnemyCharacter::Multicast_ApplyDeathRagdollImpulse_Implementation(
         DeathRagdollImpulseBoneName,
         /*bVelChange*/ true,
         /*bIncludeSelf*/ true);
-}
-
-FName ALastFPSEnemyCharacter::PickWeightedDropRowId(float TotalWeight) const
-{
-    float Roll = FMath::FRandRange(0.f, TotalWeight);
-    FName LastValid = NAME_None; // 부동소수 오차로 루프를 빠져나가는 경우의 폴백.
-    for (const FLastFPSEnemyDropEntry& Entry : DropTable)
-    {
-        if (Entry.ItemRowId.IsNone() || Entry.Weight <= 0.f)
-        {
-            continue;
-        }
-        LastValid = Entry.ItemRowId;
-        Roll -= Entry.Weight;
-        if (Roll <= 0.f)
-        {
-            return Entry.ItemRowId;
-        }
-    }
-    return LastValid;
 }
 
 void ALastFPSEnemyCharacter::PossessedBy(AController* NewController)

@@ -164,6 +164,9 @@ public:
     UFUNCTION(BlueprintPure, Category="Weapon|Ammo")
     bool HasReserveAmmo() const { return CurrentReserveAmmo > 0; }
 
+    /** 서버 권한: 예비 탄약을 StartingReserveAmmo 까지 보급하고 채워진 양을 반환한다. */
+    int32 Auth_AddReserveAmmo(int32 Amount);
+
     UFUNCTION(BlueprintPure, Category="Weapon|Ammo")
     float GetReloadDuration() const { return ReloadDuration; }
 

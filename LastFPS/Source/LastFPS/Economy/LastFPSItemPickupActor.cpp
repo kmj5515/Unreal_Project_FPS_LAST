@@ -1,5 +1,7 @@
 #include "Economy/LastFPSItemPickupActor.h"
 
+#include "AbilitySystemComponent.h"
+#include "Character/Components/WeaponComponent.h"
 #include "Character/LastFPSHero.h"
 #include "Data/Tables/LastFPSItemData.h"
 #include "Economy/LastFPSEconomySubsystem.h"
@@ -329,18 +331,85 @@ void ALastFPSItemPickupActor::TryGrant(AActor* OtherActor)
     }
 
     ALastFPSHero* Hero = Cast<ALastFPSHero>(OtherActor);
-    if (!Hero || ItemRowId.IsNone() || Count <= 0)
+    if (!Hero)
     {
         return;
     }
 
-    // 지급은 주운 플레이어의 PlayerState 로 위임 — 그 플레이어 소유 클라의 로컬 Economy 에 들어간다.
-    if (ALastFPSPlayerState* PS = Hero->GetPlayerState<ALastFPSPlayerState>())
+    const bool bItemGranted = TryGrantItem(*Hero);
+    const bool bHealthGranted = TryGrantHealth(*Hero);
+    const bool bAmmoGranted = TryGrantReserveAmmo(*Hero);
+
+    if (!bItemGranted && !bHealthGranted && !bAmmoGranted)
     {
-        PS->Auth_GrantItem(ItemRowId, Count);
+        return;
     }
 
     FinishPickup();
+}
+
+bool ALastFPSItemPickupActor::TryGrantItem(ALastFPSHero& Hero) const
+{
+    if (ItemRowId.IsNone() || Count <= 0)
+    {
+        return false;
+    }
+
+    // 지급은 주운 플레이어의 PlayerState 로 위임 — 그 플레이어 소유 클라의 로컬 Economy 에 들어간다.
+    ALastFPSPlayerState* PlayerState = Hero.GetPlayerState<ALastFPSPlayerState>();
+    if (!PlayerState)
+    {
+        UE_LOG(LogLastFPSPickup, Warning,
+            TEXT("[Pickup] 아이템 지급 실패 — %s 의 PlayerState 가 없다."), *Hero.GetName());
+        return false;
+    }
+
+    PlayerState->Auth_GrantItem(ItemRowId, Count);
+    return true;
+}
+
+bool ALastFPSItemPickupActor::TryGrantHealth(ALastFPSHero& Hero) const
+{
+    if (!HealEffectClass || Hero.GetHealth() >= Hero.GetMaxHealth())
+    {
+        return false;
+    }
+
+    UAbilitySystemComponent* ASC = Hero.GetAbilitySystemComponent();
+    if (!ASC)
+    {
+        return false;
+    }
+
+    FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
+    Context.AddSourceObject(this);
+
+    const FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(HealEffectClass, 1.f, Context);
+    if (!Spec.IsValid())
+    {
+        UE_LOG(LogLastFPSPickup, Warning,
+            TEXT("[Pickup] 체력 회복 실패 — %s 의 Spec 생성에 실패했다."), *HealEffectClass->GetName());
+        return false;
+    }
+
+    ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+    return true;
+}
+
+bool ALastFPSItemPickupActor::TryGrantReserveAmmo(ALastFPSHero& Hero) const
+{
+    if (ReserveAmmoAmount <= 0)
+    {
+        return false;
+    }
+
+    UWeaponComponent* WeaponComponent = Hero.GetWeaponComponent();
+    if (!WeaponComponent)
+    {
+        return false;
+    }
+
+    return WeaponComponent->Auth_AddReserveAmmo(ReserveAmmoAmount) > 0;
 }
 
 void ALastFPSItemPickupActor::FinishPickup()

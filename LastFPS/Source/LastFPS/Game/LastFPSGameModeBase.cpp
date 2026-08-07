@@ -1,9 +1,13 @@
 #include "Game/LastFPSGameModeBase.h"
 #include "AbilitySystemComponent.h"
+#include "Character/LastFPSCharacterBase.h"
 #include "Data/Characters/LastFPSCharacterStatData.h"
 #include "Data/Definitions/LastFPSActorPoolProfile.h"
 #include "Data/Definitions/LastFPSBattleDefinition.h"
 #include "Data/Definitions/LastFPSDestinationContentSet.h"
+#include "Data/Definitions/LastFPSDropProfile.h"
+#include "Economy/LastFPSItemPickupActor.h"
+#include "Pooling/LastFPSActorPoolSpawn.h"
 #include "Engine/AssetManager.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
@@ -22,6 +26,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Pooling/LastFPSActorPoolSubsystem.h"
+#include "Utility/LastFPSTags.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSGameMode, Log, All);
 
@@ -83,6 +88,17 @@ void ALastFPSGameModeBase::InitGame(
                     *BattleDefinitionValue);
             }
         }
+    }
+
+    const ULastFPSBattleDefinition* DropRuleSource = ActiveBattleDefinition.Get();
+    if (!DropRuleSource)
+    {
+        DropRuleSource = FallbackBattleDefinition.LoadSynchronous();
+    }
+
+    if (DropRuleSource)
+    {
+        ActiveDropProfile = DropRuleSource->DropProfile.LoadSynchronous();
     }
 
     if (!ErrorMessage.IsEmpty())
@@ -520,6 +536,52 @@ void ALastFPSGameModeBase::ApplyLevelRestrictionsToAbilitySystem(UAbilitySystemC
 int32 ALastFPSGameModeBase::GetTotalConnectedPlayers() const
 {
     return GameState ? GameState->PlayerArray.Num() : 0;
+}
+
+void ALastFPSGameModeBase::SpawnDropsForDeath(const ALastFPSCharacterBase& DeadCharacter) const
+{
+    UWorld* World = GetWorld();
+    if (!ActiveDropProfile || !World)
+    {
+        return;
+    }
+
+    const bool bIsBoss =
+        DeadCharacter.HasCharacterClassificationTag(LastFPSGameplayTags::Character_Type_Boss);
+
+    TArray<FLastFPSDropEntry> RolledEntries;
+    ActiveDropProfile->RollDrops(bIsBoss, RolledEntries);
+
+    const int32 Total = RolledEntries.Num();
+    if (Total <= 0)
+    {
+        return;
+    }
+
+    const FVector Center = DeadCharacter.GetActorLocation();
+    for (int32 Index = 0; Index < Total; ++Index)
+    {
+        const FLastFPSDropEntry& Entry = RolledEntries[Index];
+
+        const float AngleRad = (2.f * PI * Index) / Total;
+        const FVector Offset(FMath::Cos(AngleRad) * ActiveDropProfile->DropSpreadRadius,
+                             FMath::Sin(AngleRad) * ActiveDropProfile->DropSpreadRadius, 0.f);
+        const FTransform SpawnTransform(FRotator::ZeroRotator, Center + Offset);
+
+        const FVector LaunchOffset = Center - SpawnTransform.GetLocation();
+
+        // 사망한 적은 곧 풀로 반환되므로 픽업의 Owner 가 될 수 없다.
+        LastFPSActorPool::AcquireOrSpawnDeferred<ALastFPSItemPickupActor>(
+            *World,
+            Entry.PickupClass,
+            SpawnTransform,
+            nullptr,
+            nullptr,
+            [RowId = Entry.ItemRowId, Count = Entry.Count, LaunchOffset](ALastFPSItemPickupActor& Pickup)
+            {
+                Pickup.InitializePickup(RowId, Count, LaunchOffset);
+            });
+    }
 }
 
 void ALastFPSGameModeBase::DebugFlow(const FString& Message, FColor Color) const
