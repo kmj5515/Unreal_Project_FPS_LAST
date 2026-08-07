@@ -71,14 +71,6 @@ void ULastFPSItemSlotWidget::SetupSlot(const FLastFPSItemData& InItem, FName InR
 		TB_ItemName->SetText(InItem.ItemName);
 	}
 
-	if (TB_Rarity)
-	{
-		TB_Rarity->SetText(FLastFPSLocalization::GetUIEnumText(
-			StaticEnum<ELastFPSItemRarity>(),
-			static_cast<int64>(InItem.Rarity)));
-		TB_Rarity->SetColorAndOpacity(FSlateColor(RarityToColor(InItem.Rarity)));
-	}
-
 	if (TB_Count)
 	{
 		if (Count > 1)
@@ -173,10 +165,6 @@ void ULastFPSItemSlotWidget::SetEmpty()
 	if (TB_ItemName)
 	{
 		TB_ItemName->SetText(FText::GetEmpty());
-	}
-	if (TB_Rarity)
-	{
-		TB_Rarity->SetText(FText::GetEmpty());
 	}
 	if (TB_Count)
 	{

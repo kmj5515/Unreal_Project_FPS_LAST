@@ -24,7 +24,6 @@ DECLARE_DELEGATE_OneParam(FOnItemSlotInteraction, FName /*RowId*/);
  *   Img_RarityBorder — 희귀도 테두리/배경 (아이템 없으면 Hidden)
  *   Image_Icon      — 아이템 아이콘
  *   TB_ItemName     — 아이템 이름
- *   TB_Rarity       — 희귀도 텍스트
  */
 UCLASS()
 class LASTFPS_API ULastFPSItemSlotWidget : public UUserWidget
@@ -79,9 +78,6 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_ItemName;
-
-	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UTextBlock> TB_Rarity;
 
 	/** 보유 수량 (예: "x3"). 1개면 숨김. */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
