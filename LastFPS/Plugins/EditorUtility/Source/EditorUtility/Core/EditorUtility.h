@@ -34,14 +34,18 @@ private:
 	TSharedRef<class SDockTab> OnSpawnCharacterDataAssetTab(const class FSpawnTabArgs& Args);
 	TSharedRef<class SDockTab> OnSpawnRuntimeStatsEditorTab(const class FSpawnTabArgs& Args);
 	TSharedRef<class SDockTab> OnSpawnBattleLevelToolTab(const class FSpawnTabArgs& Args);
+	TSharedRef<class SDockTab> OnSpawnDataTableImportToolTab(const class FSpawnTabArgs& Args);
 	void OpenLevelSelectionTool();
 	
 	void OpenCharacterDataAssetTool();
 	void OpenRuntimeStatsTool();
 	void OpenBattleLevelTool();
+	void OpenDataTableImportTool();
+	void ImportAllDataTableWorkbooks();
 	
 	static const FName LevelSelectionTabName;
 	static const FName CharacterDataAssetTabName;
 	static const FName BattleLevelToolTabName;
+	static const FName DataTableImportToolTabName;
 	TSharedPtr<class FSlateStyleSet> StyleSetInstance;
 };

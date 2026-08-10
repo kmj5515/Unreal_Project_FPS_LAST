@@ -1,4 +1,5 @@
 ﻿Name,ItemName,Description,Icon,ItemType,Rarity,MaxStackSize,WeaponDefinition,WeaponStats
+# 자동 생성됨 - 직접 수정하지 말고 원본 xlsx를 편집하세요.,,,,,,,,
 Mod_Armor_01,강화 장갑판,외골격에 덧대는 합금 장갑. 방어력을 끌어올린다.,/Game/UI/OutUI/Inventory/Icons/T_Mod_Armor_01.T_Mod_Armor_01,Module,Rare,99,,
 Mod_Amp_01,고출력 증폭기,무기 출력 회로를 과부하시켜 공격력을 높인다.,/Game/UI/OutUI/Inventory/Icons/T_Mod_Amp_01.T_Mod_Amp_01,Module,Rare,99,,
 Mod_Regen_01,나노 재생막,손상 조직을 실시간 복원하는 나노막. 최대 체력 증가.,/Game/UI/OutUI/Inventory/Icons/T_Mod_Regen_01.T_Mod_Regen_01,Module,Epic,99,,

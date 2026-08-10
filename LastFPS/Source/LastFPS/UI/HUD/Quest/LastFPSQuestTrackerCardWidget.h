@@ -3,12 +3,14 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Data/Tables/LastFPSQuestData.h"
+#include "Engine/TimerHandle.h"
 #include "UI/HUD/LastFPSHUDStyle.h"
 #include "LastFPSQuestTrackerCardWidget.generated.h"
 
 class UImage;
 class UPanelWidget;
 class UTextBlock;
+class UWidget;
 class ULastFPSQuestObjectiveRowWidget;
 struct FLastFPSTrackedQuest;
 
@@ -38,6 +40,8 @@ public:
 	void UpdateQuest(const FLastFPSTrackedQuest& Quest, const FLastFPSQuestTrackerViewer& Viewer);
 
 protected:
+	virtual void NativeDestruct() override;
+
 	/** BP 확장 훅 — 카드가 다른 퀘스트로 바뀌었을 때(bQuestChanged) 등장 연출을 걸 수 있다. */
 	UFUNCTION(BlueprintImplementableEvent, Category="LastFPS|Quest")
 	void OnQuestCardUpdated(ELastFPSQuestType QuestType, bool bQuestChanged);
@@ -71,15 +75,35 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|Quest|Style")
 	FLinearColor SideAccentColor = LastFPSHUDStyle::QuestSideAccent();
 
+	/** 새 퀘스트나 다음 목표가 표시될 때 교체된 목표 행에 갱신 애니메이션을 재생한다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|Quest|Animation")
+	bool bPlayUpdateAnimation = true;
+
+	/** 갱신 애니메이션 재생 시간이다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|Quest|Animation", meta=(ClampMin="0.0", Units="s"))
+	float UpdateAnimationDuration = 0.2f;
+
+	/** 갱신 텍스트가 시작하는 위치 오프셋이다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|Quest|Animation")
+	FVector2D UpdateAnimationOffset = FVector2D(-12.f, 0.f);
+
 private:
 	/** 필요한 만큼 목표 줄을 확보한다 (부족한 만큼만 생성). */
 	ULastFPSQuestObjectiveRowWidget* AcquireObjectiveRow(int32 RowIndex);
+
+	void StartUpdateAnimation();
+	void UpdateAnimationFrame();
+	void FinishUpdateAnimation();
+	UWidget* GetUpdateAnimationTarget();
 
 	/** 재사용 줄 풀 — 목표 수에 맞춰 늘어나고, 남는 줄은 접어 둔다. */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ULastFPSQuestObjectiveRowWidget>> ObjectiveRows;
 
 	FName DisplayedQuestId;
+	int32 DisplayedObjectiveIndex = INDEX_NONE;
+	double UpdateAnimationStartTime = 0.0;
+	FTimerHandle UpdateAnimationTimerHandle;
 
 	bool bObjectiveRowClassWarningLogged = false;
 };

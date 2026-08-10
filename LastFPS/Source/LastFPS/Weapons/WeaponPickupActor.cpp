@@ -108,9 +108,9 @@ void AWeaponPickupActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
 USkeletalMesh* AWeaponPickupActor::ResolveWeaponMesh() const
 {
-    if (WeaponDefinition && WeaponDefinition->SkeletalMesh)
+    if (WeaponDefinition && !WeaponDefinition->SkeletalMesh.IsNull())
     {
-        return WeaponDefinition->SkeletalMesh;
+        return WeaponDefinition->SkeletalMesh.LoadSynchronous();
     }
 
     if (WeaponActorClass)

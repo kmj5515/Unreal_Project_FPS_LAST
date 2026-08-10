@@ -117,6 +117,11 @@ public:
 		meta=(ClampMin="1", UIMin="1", UIMax="8"))
 	int32 MaxSpawnedActorsPerFrame = 1;
 
+	/** 웨이브 스폰 완료 후 생존 적이 이 수 이하이면 머리 위 마커를 표시한다. 0이면 사용하지 않는다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Wave Presentation",
+		meta=(ClampMin="0", UIMin="0", UIMax="10"))
+	int32 RemainingEnemyMarkerThreshold = 3;
+
 	virtual void CollectRequiredPaths(TArray<FSoftObjectPath>& OutPaths) const override;
 
 	bool IsConfigurationValid(FString& OutFailureReason) const;

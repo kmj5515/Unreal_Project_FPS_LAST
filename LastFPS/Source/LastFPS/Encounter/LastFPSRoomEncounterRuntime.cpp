@@ -2,6 +2,7 @@
 
 #include "Algo/AllOf.h"
 #include "Character/LastFPSCharacterBase.h"
+#include "Character/LastFPSEnemyCharacter.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
@@ -94,6 +95,7 @@ void ALastFPSRoomEncounterRuntime::InitializeEncounter(
 		: FMath::Max(InEncounterData.SpawnVFX.DelayBeforeSpawn, 0.f);
 	BarrierPresentationSettings = InProfile.BarrierPresentation;
 	MaxSpawnedActorsPerFrame = FMath::Max(InProfile.MaxSpawnedActorsPerFrame, 1);
+	RemainingEnemyMarkerThreshold = FMath::Max(InProfile.RemainingEnemyMarkerThreshold, 0);
 	SpawnPresentationComponent->Configure(InEncounterData.SpawnVFX);
 	ConfigureBarrierPresentation();
 
@@ -814,6 +816,7 @@ void ALastFPSRoomEncounterRuntime::FinishWaveSpawning()
 	ActiveWaveIndex = INDEX_NONE;
 	ActiveSpawnPointOrder.Reset();
 	PendingEnemySpawns.Reset();
+	RefreshRemainingEnemyMarkers();
 
 	UE_LOG(
 		LogLastFPSRoomEncounter,
@@ -857,7 +860,7 @@ ALastFPSCharacterBase* ALastFPSRoomEncounterRuntime::SpawnEnemy(
 		World->GetSubsystem<ULastFPSActorPoolSubsystem>())
 	{
 		SpawnedPawn = Cast<APawn>(Pool->AcquireActorByClass(
-			Definition.PawnClass,
+			Definition.PawnClass.LoadSynchronous(),
 			SpawnTransform,
 			this,
 			nullptr));
@@ -866,7 +869,7 @@ ALastFPSCharacterBase* ALastFPSRoomEncounterRuntime::SpawnEnemy(
 	if (!SpawnedPawn)
 	{
 		SpawnedPawn = World->SpawnActorDeferred<APawn>(
-			Definition.PawnClass,
+			Definition.PawnClass.LoadSynchronous(),
 			SpawnTransform,
 			this,
 			nullptr,
@@ -980,6 +983,11 @@ void ALastFPSRoomEncounterRuntime::RemoveTrackedEnemy(
 	ALastFPSCharacterBase& Enemy,
 	const bool bCountAsDefeated)
 {
+	if (ALastFPSEnemyCharacter* EnemyCharacter = Cast<ALastFPSEnemyCharacter>(&Enemy))
+	{
+		EnemyCharacter->SetWaveEnemyMarkerVisible(false);
+	}
+
 	Enemy.OnDeath.RemoveAll(this);
 	Enemy.OnDestroyed.RemoveDynamic(
 		this,
@@ -990,6 +998,42 @@ void ALastFPSRoomEncounterRuntime::RemoveTrackedEnemy(
 		DefeatedEnemyCount = FMath::Min(DefeatedEnemyCount + 1, TotalEnemyCount);
 		BroadcastEncounterProgress();
 		ForceNetUpdate();
+	}
+
+	if (RemovedCount > 0)
+	{
+		RefreshRemainingEnemyMarkers();
+	}
+}
+
+void ALastFPSRoomEncounterRuntime::RefreshRemainingEnemyMarkers()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	int32 ValidAliveEnemyCount = 0;
+	for (const TWeakObjectPtr<ALastFPSCharacterBase>& EnemyPtr : AliveEnemies)
+	{
+		if (const ALastFPSCharacterBase* Enemy = EnemyPtr.Get();
+			IsValid(Enemy) && Enemy->IsAlive())
+		{
+			++ValidAliveEnemyCount;
+		}
+	}
+
+	const bool bShowMarkers = !bWaveSpawning
+		&& RemainingEnemyMarkerThreshold > 0
+		&& ValidAliveEnemyCount > 0
+		&& ValidAliveEnemyCount <= RemainingEnemyMarkerThreshold;
+
+	for (const TWeakObjectPtr<ALastFPSCharacterBase>& EnemyPtr : AliveEnemies)
+	{
+		if (ALastFPSEnemyCharacter* Enemy = Cast<ALastFPSEnemyCharacter>(EnemyPtr.Get()))
+		{
+			Enemy->SetWaveEnemyMarkerVisible(bShowMarkers && Enemy->IsAlive());
+		}
 	}
 }
 

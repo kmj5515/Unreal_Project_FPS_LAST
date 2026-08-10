@@ -92,9 +92,9 @@ void ALastFPSWeaponActor::InitializeWeapon(USkeletalMesh* InMesh, ULastFPSWeapon
 
 USkeletalMesh* ALastFPSWeaponActor::GetDefaultWeaponMesh() const
 {
-    if (DefaultWeaponDefinition && DefaultWeaponDefinition->SkeletalMesh)
+    if (DefaultWeaponDefinition && DefaultWeaponDefinition->SkeletalMesh.Get())
     {
-        return DefaultWeaponDefinition->SkeletalMesh;
+        return DefaultWeaponDefinition->SkeletalMesh.Get();
     }
 
     return DefaultWeaponMesh;
@@ -169,24 +169,24 @@ bool ALastFPSWeaponActor::GetSocketTransformInBoneSpace(FName SocketName, USkele
     return true;
 }
 
-void ALastFPSWeaponActor::PlayFireEffects(FName MuzzleSocketName) const
+void ALastFPSWeaponActor::PlayFireEffects(FName SocketName) const
 {
-    if (!WeaponMesh || !WeaponDefinition)
+    if (!WeaponMesh)
     {
         return;
     }
 
-    if (USoundBase* FireSound = WeaponDefinition->FireSound)
+    if (USoundBase* FireSound = WeaponDefinition->FireSound.Get())
     {
-        UGameplayStatics::SpawnSoundAttached(FireSound, WeaponMesh, MuzzleSocketName);
+        UGameplayStatics::SpawnSoundAttached(FireSound, WeaponMesh, SocketName);
     }
 
-    if (UParticleSystem* MuzzleFlashEffect = WeaponDefinition->MuzzleFlashEffect)
+    if (UParticleSystem* MuzzleFlashEffect = WeaponDefinition->MuzzleFlashEffect.Get())
     {
         UGameplayStatics::SpawnEmitterAttached(
             MuzzleFlashEffect,
             WeaponMesh,
-            MuzzleSocketName,
+            SocketName,
             FVector::ZeroVector,
             FRotator::ZeroRotator,
             EAttachLocation::SnapToTarget);

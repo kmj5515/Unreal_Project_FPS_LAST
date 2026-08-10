@@ -732,7 +732,7 @@ UTexture2D* ALastFPSWeaponIconCaptureActor::CaptureWeapon(
 	};
 
 	ApplyCaptureSettings();
-	if (!PrepareWeapon(WeaponDefinition->SkeletalMesh))
+	if (!PrepareWeapon(WeaponDefinition->SkeletalMesh.LoadSynchronous()))
 	{
 		return nullptr;
 	}

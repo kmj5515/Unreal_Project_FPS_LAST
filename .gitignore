@@ -81,6 +81,8 @@
 .bkit/
 .gemini/
 .idea/
+.agents/
+.claude/
 
 # Local Unreal SOLID harness notes
 Docs/UnrealSOLIDHarness/
@@ -89,3 +91,4 @@ Docs/UnrealSOLIDHarness/
 LastFPS/Content/Editor/BattleScenarios/**
 LastFPS/Plugins/UnrealMCP/
 LastFPS/.mcp.json
+.claude/settings.local.json

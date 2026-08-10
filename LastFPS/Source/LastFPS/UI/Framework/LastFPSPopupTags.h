@@ -8,4 +8,5 @@ namespace LastFPSPopupTags
 	LASTFPS_API FGameplayTag Notice();
 	LASTFPS_API FGameplayTag Quantity();
 	LASTFPS_API FGameplayTag Dialogue();
+	LASTFPS_API FGameplayTag MissionResult();
 }

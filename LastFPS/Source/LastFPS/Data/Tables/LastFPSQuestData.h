@@ -125,6 +125,7 @@ struct FLastFPSQuestObjective
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Radio")
 	TArray<FName> RadioOnStart;
 
+
 	/** 목표 완료 시 재생할 무전 대사 행 참조 (DT_RadioTransmission) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Radio")
 	TArray<FName> RadioOnComplete;
@@ -174,6 +175,26 @@ struct FLastFPSQuestData : public FTableRowBase
 	/** 메인 / 서브 구분 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	ELastFPSQuestType Type = ELastFPSQuestType::Main;
+
+	/** 아코디언 메뉴의 그룹 제목 (예: "The Rohirrim") */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|UI")
+	FText QuestGroupTitle;
+
+	/** 아코디언 메뉴의 그룹 부제목 (예: "Chapter 1: Protection") */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|UI")
+	FText QuestGroupSubtitle;
+
+	/** 지역 이름 표시 (예: "Rohan") */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|UI")
+	FText LocationName;
+
+	/** 권장 레벨 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|UI")
+	int32 RecommendedLevel = 1;
+
+	/** 상세 화면에 표시될 가로 배너 이미지 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|UI")
+	TSoftObjectPtr<UTexture2D> BannerImage;
 
 	/**
 	 * 초기 시드 상태 — 부팅 시 서브시스템이 이 값으로 런타임 상태를 시드한다.

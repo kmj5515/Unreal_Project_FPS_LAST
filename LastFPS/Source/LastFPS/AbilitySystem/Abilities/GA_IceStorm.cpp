@@ -1,8 +1,8 @@
-#include "AbilitySystem/Abilities/GA_IceStorm.h"
+﻿#include "AbilitySystem/Abilities/GA_IceStorm.h"
 
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "AbilitySystemComponent.h"
-#include "AbilitySystem/Effects/GE_Skill3Cooldown.h"
+#include "AbilitySystem/Effects/GE_Cooldown.h"
 #include "Animation/AnimInstance.h"
 #include "Character/LastFPSHero.h"
 #include "Character/Components/WeaponComponent.h"
@@ -20,7 +20,7 @@ UGA_IceStorm::UGA_IceStorm()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
-	CooldownGameplayEffectClass = ULastFPSGE_Skill3Cooldown::StaticClass();
+	CooldownGameplayEffectClass = ULastFPSGE_Cooldown::StaticClass();
 
 	ConfirmEventTag = LastFPSGameplayTags::Event_Montage_AbilityCommit;
 	SpawnEventTag = LastFPSGameplayTags::Event_Montage_IceStormSpawn;

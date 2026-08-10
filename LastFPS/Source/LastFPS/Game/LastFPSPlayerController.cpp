@@ -38,6 +38,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Localization/LastFPSLocalization.h"
 #include "UI/Common/LastFPSConfirmWidget.h"
+#include "UI/Result/LastFPSMissionResultWidget.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPlayerController, Log, All);
 
@@ -715,6 +716,42 @@ void ALastFPSPlayerController::ShowNotice(const FText& Title, const FText& Messa
         TEXT("ShowNotice: 로컬 플레이어의 PopupSubsystem을 찾지 못했습니다."));
 }
 
+void ALastFPSPlayerController::ShowMissionResult(const FLastFPSMissionResult& InResult)
+{
+    // 임무 고유 정보는 호출부가, 플레이어에 종속된 값은 여기서 채운다.
+    // 이렇게 두면 결과를 만드는 쪽(퀘스트 등)이 PlayerState 나 로스터를 알지 않아도 된다.
+    FLastFPSMissionResult Result = InResult;
+
+    if (const ALastFPSPlayerState* LastFPSPlayerState = GetPlayerState<ALastFPSPlayerState>())
+    {
+        Result.CombatStats.DamageDealt = LastFPSPlayerState->GetStatDamageDealt();
+        Result.CombatStats.DamageTaken = LastFPSPlayerState->GetStatDamageTaken();
+        Result.CombatStats.Kills = LastFPSPlayerState->GetStatKills();
+        Result.CombatStats.Deaths = LastFPSPlayerState->GetStatDeaths();
+        Result.CombatStats.Assists = LastFPSPlayerState->GetStatAssists();
+    }
+
+    if (Result.CharacterPortrait.IsNull())
+    {
+        if (const ULastFPSCharacterRoster* Roster = GetCharacterRoster())
+        {
+            if (const ULastFPSCharacterDefinition* Definition =
+                    Roster->GetDefinition(SelectedCharacterIndex))
+            {
+                Result.CharacterPortrait = Definition->Icon;
+            }
+        }
+    }
+
+    if (!ULastFPSMissionResultWidget::ShowPopup(this, Result))
+    {
+        UE_LOG(
+            LogLastFPSPlayerController,
+            Warning,
+            TEXT("ShowMissionResult: 임무 결과 팝업을 열지 못했습니다. PopupCatalog 에 UI.Popup.MissionResult 항목이 있는지 확인하십시오."));
+    }
+}
+
 ULastFPSDialogueWidget* ALastFPSPlayerController::ShowDialogue(
     const FText& Speaker,
     const TArray<FText>& Lines)
@@ -936,9 +973,9 @@ const ULastFPSCharacterRoster* ALastFPSPlayerController::GetCharacterRoster() co
     return nullptr;
 }
 
-const TArray<TObjectPtr<ULastFPSCharacterDefinition>>& ALastFPSPlayerController::GetSelectableCharacterDefinitions() const
+const TArray<TSoftObjectPtr<ULastFPSCharacterDefinition>>& ALastFPSPlayerController::GetSelectableCharacterDefinitions() const
 {
-    static const TArray<TObjectPtr<ULastFPSCharacterDefinition>> EmptyDefinitions;
+    static const TArray<TSoftObjectPtr<ULastFPSCharacterDefinition>> EmptyDefinitions;
     const ULastFPSCharacterRoster* Roster = GetCharacterRoster();
     return Roster ? Roster->Characters : EmptyDefinitions;
 }
@@ -977,7 +1014,7 @@ TSubclassOf<APawn> ALastFPSPlayerController::GetSelectedCharacterClass() const
 {
     if (const ULastFPSCharacterDefinition* Definition = GetSelectedCharacterDefinition())
     {
-        return Definition->PawnClass;
+        return Definition->PawnClass.LoadSynchronous();
     }
     return nullptr;
 }

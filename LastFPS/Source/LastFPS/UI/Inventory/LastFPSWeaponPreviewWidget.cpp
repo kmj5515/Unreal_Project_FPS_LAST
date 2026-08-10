@@ -85,7 +85,7 @@ void ULastFPSWeaponPreviewWidget::BindPreviewStage()
 		return;
 	}
 
-	USkeletalMesh* Mesh = WeaponDef->SkeletalMesh;
+	USkeletalMesh* Mesh = WeaponDef->SkeletalMesh.LoadSynchronous();
 	if (!Mesh)
 	{
 		return;

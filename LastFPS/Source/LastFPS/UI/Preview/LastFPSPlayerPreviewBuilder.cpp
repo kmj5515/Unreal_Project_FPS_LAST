@@ -58,7 +58,7 @@ bool LastFPSPlayerPreview::BuildSubject(const UObject* WorldContext, FLastFPSPre
 	{
 		if (const ULastFPSCharacterDefinition* Definition = PlayerCharacter->ResolveCharacterDefinition())
 		{
-			if (const ULastFPSCharacterVisualData* VisualData = Definition->VisualData)
+			if (const ULastFPSCharacterVisualData* VisualData = Definition->VisualData.LoadSynchronous())
 			{
 				OutSubject.AnimInstanceClass = VisualData->PreviewAnimClass;
 				if (!OutSubject.AnimInstanceClass)
@@ -81,10 +81,10 @@ bool LastFPSPlayerPreview::BuildSubject(const UObject* WorldContext, FLastFPSPre
 	if (const ULastFPSWeaponDefinition* WeaponDefinition =
 		Equipment->GetWeaponDefinitionForSlot(PrimaryWeaponSlotIndex))
 	{
-		if (WeaponDefinition->SkeletalMesh)
+		if (!WeaponDefinition->SkeletalMesh.IsNull())
 		{
 			FLastFPSPreviewAttachment& Attachment = OutSubject.Attachments.AddDefaulted_GetRef();
-			Attachment.Mesh = WeaponDefinition->SkeletalMesh;
+			Attachment.Mesh = WeaponDefinition->SkeletalMesh.LoadSynchronous();
 			// 부착 소켓은 무기 정의가 이미 들고 있다. UI 가 소켓 이름을 따로 저작하지 않는다.
 			Attachment.SocketName = WeaponDefinition->AttachSocketName;
 		}

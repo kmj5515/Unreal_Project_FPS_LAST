@@ -20,6 +20,19 @@ void ULastFPSQuestEntryWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, F
 		TB_Title->SetText(InQuest.Title);
 	}
 
+	if (TB_Location)
+	{
+		TB_Location->SetText(InQuest.LocationName);
+	}
+
+	if (TB_Distance)
+	{
+		// 목표 액터 위치 기반 거리 계산이 아직 없다. 그럴듯한 가짜 수치 대신
+		// 미상 거리 표기를 써서 값이 비어 있다는 사실이 화면에 드러나게 한다.
+		// TODO: 목표 마커 거리 계산이 붙으면 DistanceMetersFormat 으로 교체한다.
+		TB_Distance->SetText(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::UnknownDistanceMeters));
+	}
+
 	if (TB_Summary)
 	{
 		TB_Summary->SetText(InQuest.Summary);
@@ -104,6 +117,12 @@ void ULastFPSQuestEntryWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, F
 		}
 	}
 
+	if (Btn_Select)
+	{
+		Btn_Select->OnClicked.RemoveDynamic(this, &ULastFPSQuestEntryWidget::HandleSelectClicked);
+		Btn_Select->OnClicked.AddUniqueDynamic(this, &ULastFPSQuestEntryWidget::HandleSelectClicked);
+	}
+
 	OnQuestDisplayed(InQuest.Type, RuntimeStatus);
 }
 
@@ -116,11 +135,20 @@ void ULastFPSQuestEntryWidget::HandleClaimClicked()
 	}
 }
 
+void ULastFPSQuestEntryWidget::HandleSelectClicked()
+{
+	OnQuestSelected.Broadcast(BoundQuestId);
+}
+
 void ULastFPSQuestEntryWidget::NativeDestruct()
 {
 	if (Btn_Claim)
 	{
 		Btn_Claim->OnClicked.RemoveDynamic(this, &ULastFPSQuestEntryWidget::HandleClaimClicked);
+	}
+	if (Btn_Select)
+	{
+		Btn_Select->OnClicked.RemoveDynamic(this, &ULastFPSQuestEntryWidget::HandleSelectClicked);
 	}
 	Super::NativeDestruct();
 }

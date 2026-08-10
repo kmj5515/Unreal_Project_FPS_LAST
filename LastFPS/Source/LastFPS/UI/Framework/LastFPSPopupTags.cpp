@@ -33,4 +33,10 @@ namespace LastFPSPopupTags
 		static const FGameplayTag Tag = RequestTag(TEXT("UI.Popup.Dialogue"));
 		return Tag;
 	}
+
+	FGameplayTag MissionResult()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Popup.MissionResult"));
+		return Tag;
+	}
 }

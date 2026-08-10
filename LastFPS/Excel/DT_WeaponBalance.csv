@@ -1,4 +1,5 @@
----,Damage,FireInterval,AimTraceRange,DamageElement,MagazineCapacity,StartingReserveAmmo,ReloadDuration,Parameters
+﻿---,Damage,FireInterval,AimTraceRange,DamageElement,MagazineCapacity,StartingReserveAmmo,ReloadDuration,Parameters
+# 자동 생성됨 - 직접 수정하지 말고 원본 xlsx를 편집하세요.,,,,,,,,
 Rifle,1100,0.1,10000,Physical,40,250,2.2,()
 Sniper,2000,0.5,10000,Physical,5,70,3,()
 Bazooka,2000,1,10000,Physical,1,6,3.5,()

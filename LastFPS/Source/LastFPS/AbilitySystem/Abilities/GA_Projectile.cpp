@@ -1,9 +1,9 @@
-#include "AbilitySystem/Abilities/GA_Projectile.h"
+﻿#include "AbilitySystem/Abilities/GA_Projectile.h"
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbilityTargetTypes.h"
 #include "Data/Projectiles/LastFPSAbilityProjectileData.h"
-#include "AbilitySystem/Effects/GE_Skill1Cooldown.h"
+#include "AbilitySystem/Effects/GE_Cooldown.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Animation/AnimInstance.h"
 #include "Character/LastFPSHero.h"
@@ -22,7 +22,7 @@ UGA_Projectile::UGA_Projectile()
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    CooldownGameplayEffectClass = ULastFPSGE_Skill1Cooldown::StaticClass();
+    CooldownGameplayEffectClass = ULastFPSGE_Cooldown::StaticClass();
 
     FGameplayTagContainer Tags;
     Tags.AddTag(LastFPSGameplayTags::Ability_Skill1);

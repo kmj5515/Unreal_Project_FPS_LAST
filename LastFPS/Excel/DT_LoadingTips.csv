@@ -1,4 +1,5 @@
 ﻿Name,Category,TipTitle,Image,Tip
+# 자동 생성됨 - 직접 수정하지 말고 원본 xlsx를 편집하세요.,,,,
 TIP_Control_Interact,Control,조작,/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot01.TheFirstDescendant_Screenshot01,NPC와 대화하려면 가까이 다가가 G키로 상호작용하세요.
 TIP_Control_Exit,Control,조작,/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot02.TheFirstDescendant_Screenshot02,NPC와 대화 중에는 ESC로 언제든 빠져나올 수 있습니다.
 TIP_Control_Reload,Control,조작,/Game/Assets/The_First_Descendant_Kit/04/TheFirstDescendant_Screenshot03.TheFirstDescendant_Screenshot03,총알이 부족하지 않도록 미리미리 장전하세요.

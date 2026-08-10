@@ -5,6 +5,8 @@
 #include "Data/Tables/LastFPSQuestData.h"
 #include "LastFPSQuestEntryWidget.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnQuestSelectedSignature, FName, QuestId);
+
 class UTextBlock;
 class UImage;
 class UButton;
@@ -24,6 +26,9 @@ public:
 	/** 정적 정의(행) + 런타임 상태(서브시스템)로 표시 내용 채우기. Btn_Claim → TryClaimReward 배선. */
 	void SetupQuest(ULastFPSQuestSubsystem* InSubsystem, FName InQuestId, const FLastFPSQuestData& InQuest);
 
+	UPROPERTY(BlueprintAssignable, Category="LastFPS|Quest")
+	FOnQuestSelectedSignature OnQuestSelected;
+
 protected:
 	virtual void NativeDestruct() override;
 
@@ -35,8 +40,20 @@ protected:
 	UFUNCTION()
 	void HandleClaimClicked();
 
+	UFUNCTION()
+	void HandleSelectClicked();
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UButton> Btn_Select;
+
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_Title;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> TB_Location;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> TB_Distance;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_Summary;

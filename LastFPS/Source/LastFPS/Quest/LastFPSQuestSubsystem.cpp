@@ -1,4 +1,4 @@
-#include "Quest/LastFPSQuestSubsystem.h"
+﻿#include "Quest/LastFPSQuestSubsystem.h"
 
 #include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
 #include "Data/AssetManagement/LastFPSGameDataTags.h"
@@ -1072,6 +1072,11 @@ void ULastFPSQuestSubsystem::GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint
 			bool bIsDestination = true;
 			if (!ResolveObjectiveGuidanceLocation(Obj, MarkerLocation, bIsDestination))
 			{
+				// 순차 퀘스트는 현재 목표의 안내 위치가 없어도 다음 목표를 미리 공개하지 않는다.
+				if (Def->bSequentialObjectives)
+				{
+					break;
+				}
 				continue;
 			}
 
@@ -1132,6 +1137,7 @@ void ULastFPSQuestSubsystem::GetTrackedQuests(TArray<FLastFPSTrackedQuest>& OutQ
 		[this, &OutQuests](const FName& RowName, const FLastFPSQuestData& Row)
 		{
 			if (GetStatus(RowName) != ELastFPSQuestStatus::InProgress
+				|| !IsQuestTracked(RowName)
 				|| !IsQuestInScopeForCurrentMap(RowName))
 			{
 				return;
@@ -1284,10 +1290,48 @@ bool ULastFPSQuestSubsystem::AcceptQuest(FName QuestId)
 	return true;
 }
 
+void ULastFPSQuestSubsystem::CancelQuest(FName QuestId)
+{
+	FLastFPSQuestRuntimeState* State = RuntimeStates.Find(QuestId);
+	if (!State || State->Status != ELastFPSQuestStatus::InProgress)
+	{
+		return;
+	}
+
+	State->Status = ELastFPSQuestStatus::NotStarted;
+	State->Progress.Empty();
+	State->Baseline.Empty();
+	State->bIsTracked = false;
+
+	BroadcastStateChanged();
+}
+
+void ULastFPSQuestSubsystem::SetQuestTracked(FName QuestId, bool bTrack)
+{
+	if (FLastFPSQuestRuntimeState* State = RuntimeStates.Find(QuestId))
+	{
+		if (State->bIsTracked != bTrack)
+		{
+			State->bIsTracked = bTrack;
+			BroadcastStateChanged();
+		}
+	}
+}
+
+bool ULastFPSQuestSubsystem::IsQuestTracked(FName QuestId) const
+{
+	if (const FLastFPSQuestRuntimeState* State = RuntimeStates.Find(QuestId))
+	{
+		return State->bIsTracked;
+	}
+	return false;
+}
+
 bool ULastFPSQuestSubsystem::AcceptQuestInternal(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def)
 {
 	State.Status = ELastFPSQuestStatus::InProgress;
 	State.Progress.Init(0, Def.Objectives.Num());
+	State.bIsTracked = true;
 	CaptureBaseline(Def, State);
 	RecomputeProgress(QuestId, State, Def); // 수락 즉시 충족되는 경우(목표 0개 등) 반영
 
@@ -1310,13 +1354,13 @@ bool ULastFPSQuestSubsystem::TryClaimReward(FName QuestId)
 
 	// 단조 래치: 지급 전에 상태를 먼저 올려 재진입 시 중복지급을 원천 차단.
 	State->Status = ELastFPSQuestStatus::Claimed;
-	GrantReward(*Def);
+	GrantReward(QuestId, *Def);
 	ProcessQuestTransitions(); // 다음 퀘스트 해금/자동수락 연쇄
 	BroadcastStateChanged();
 	return true;
 }
 
-void ULastFPSQuestSubsystem::GrantReward(const FLastFPSQuestData& Def)
+void ULastFPSQuestSubsystem::GrantReward(const FName QuestId, const FLastFPSQuestData& Def)
 {
 	if (ULastFPSEconomySubsystem* Economy = GetEconomy())
 	{
@@ -1329,7 +1373,7 @@ void ULastFPSQuestSubsystem::GrantReward(const FLastFPSQuestData& Def)
 			Economy->AddItem(Grant.RowId, Grant.Count);
 		}
 	}
-	NotifyRewardGranted(Def);
+	NotifyRewardGranted(QuestId, Def);
 }
 
 bool ULastFPSQuestSubsystem::ProcessQuestTransitions()
@@ -1360,7 +1404,7 @@ bool ULastFPSQuestSubsystem::ProcessQuestTransitions()
 			if (Pair.Value.Status == ELastFPSQuestStatus::Completed && Def->bAutoClaim)
 			{
 				Pair.Value.Status = ELastFPSQuestStatus::Claimed; // 래치 먼저
-				GrantReward(*Def);
+				GrantReward(Pair.Key, *Def);
 				bAny = bLoop = true;
 			}
 
@@ -1408,18 +1452,39 @@ bool ULastFPSQuestSubsystem::AdvanceToNext(FName NextQuestId)
 	return false;
 }
 
-void ULastFPSQuestSubsystem::NotifyRewardGranted(const FLastFPSQuestData& Def) const
+void ULastFPSQuestSubsystem::NotifyRewardGranted(const FName QuestId, const FLastFPSQuestData& Def) const
 {
 	UGameInstance* GI = GetGameInstance();
 	if (!GI)
 	{
 		return;
 	}
-	if (ALastFPSPlayerController* PC = Cast<ALastFPSPlayerController>(GI->GetFirstLocalPlayerController()))
+	ALastFPSPlayerController* PC = Cast<ALastFPSPlayerController>(GI->GetFirstLocalPlayerController());
+	if (!PC)
 	{
-		const FText Title = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestRewardTitle);
-		PC->ShowNotice(Title, BuildRewardMessage(Def));
+		return;
 	}
+
+	// 던전 퀘스트는 결과 화면으로, 그 외 일반 퀘스트는 기존 공지로 알린다.
+	// 어떤 퀘스트가 던전인지는 DungeonMapQuestMap 데이터가 정하므로 여기에 퀘스트 이름을 박지 않는다.
+	if (IsQuestMappedToAnyMap(QuestId))
+	{
+		FLastFPSMissionResult Result;
+		Result.MissionName = Def.Title;
+		Result.Credits = Def.Reward.Credits;
+		Result.Items = Def.Reward.Items;
+		if (MissionStartRealTimeSeconds >= 0.0)
+		{
+			Result.ElapsedSeconds =
+				static_cast<float>(FPlatformTime::Seconds() - MissionStartRealTimeSeconds);
+		}
+
+		PC->ShowMissionResult(Result);
+		return;
+	}
+
+	const FText Title = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestRewardTitle);
+	PC->ShowNotice(Title, BuildRewardMessage(Def));
 }
 
 FText ULastFPSQuestSubsystem::BuildRewardMessage(const FLastFPSQuestData& Def) const
@@ -1528,6 +1593,10 @@ void ULastFPSQuestSubsystem::AcceptDungeonQuestForMap(UWorld& World)
 	}
 
 	DungeonQuestAcceptedWorld = &World;
+
+	// 결과 화면의 클리어 시간 기준점. 재입장하면 다시 잰다.
+	// 월드 시간은 레벨을 넘나들며 초기화되므로 실시간(FPlatformTime)으로 측정한다.
+	MissionStartRealTimeSeconds = FPlatformTime::Seconds();
 
 	for (const FName TargetQuestId : CurrentMapQuestIds)
 	{

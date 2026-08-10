@@ -439,9 +439,9 @@ UClass* ALastFPSGameModeBase::GetDefaultPawnClassForController_Implementation(AC
 
         if (const ULastFPSCharacterDefinition* Definition = GetCharacterDefinitionForIndex(SelectedIndex))
         {
-            if (Definition->PawnClass)
+            if (!Definition->PawnClass.IsNull())
             {
-                return Definition->PawnClass;
+                return Definition->PawnClass.LoadSynchronous();
             }
         }
     }

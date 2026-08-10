@@ -5,6 +5,7 @@
 #include "Character/LastFPSAIProfile.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/WidgetComponent.h"
 #include "Character/Components/LastFPSCombatAimComponent.h"
 #include "Character/Components/WeaponComponent.h"
 #include "Data/Definitions/LastFPSEnemyDefinition.h"
@@ -16,6 +17,8 @@
 #include "Perception/AIPerceptionComponent.h"
 #include "Pooling/LastFPSActorPoolSpawn.h"
 #include "Pooling/LastFPSActorPoolSubsystem.h"
+#include "Net/UnrealNetwork.h"
+#include "UI/HUD/LastFPSWaveEnemyMarkerWidget.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSEnemyCharacter, Log, All);
 
@@ -28,6 +31,16 @@ ALastFPSEnemyCharacter::ALastFPSEnemyCharacter()
     AIPerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>("AIPerceptionComp");
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComp"));
     CombatAimComponent = CreateDefaultSubobject<ULastFPSCombatAimComponent>(TEXT("CombatAimComp"));
+
+    WaveEnemyMarkerComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("WaveEnemyMarker"));
+    WaveEnemyMarkerComponent->SetupAttachment(GetRootComponent());
+    WaveEnemyMarkerComponent->SetWidgetClass(ULastFPSWaveEnemyMarkerWidget::StaticClass());
+    WaveEnemyMarkerComponent->SetWidgetSpace(EWidgetSpace::Screen);
+    WaveEnemyMarkerComponent->SetDrawSize(FVector2D(64.f, 64.f));
+    WaveEnemyMarkerComponent->SetPivot(FVector2D(0.5f, 1.f));
+    WaveEnemyMarkerComponent->SetRelativeLocation(FVector(0.f, 0.f, 150.f));
+    WaveEnemyMarkerComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    WaveEnemyMarkerComponent->SetVisibility(false);
 
     // AI 는 컨트롤러가 SetFocus 로 준 방향(desired rotation)으로 몸을 돌린다.
     // 플레이어(Hero)와 달리 컨트롤러 Yaw 를 직접 쓰지 않고 이동 컴포넌트가 부드럽게 회전시킨다.
@@ -45,11 +58,43 @@ ALastFPSEnemyCharacter::ALastFPSEnemyCharacter()
     GetMesh()->SetCollisionResponseToChannel(ECC_Camera,ECR_Ignore);
 }
 
+void ALastFPSEnemyCharacter::GetLifetimeReplicatedProps(
+    TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(ALastFPSEnemyCharacter, bWaveEnemyMarkerVisible);
+}
+
+void ALastFPSEnemyCharacter::SetWaveEnemyMarkerVisible(const bool bVisible)
+{
+    if (!HasAuthority() || bWaveEnemyMarkerVisible == bVisible)
+    {
+        return;
+    }
+
+    bWaveEnemyMarkerVisible = bVisible;
+    ApplyWaveEnemyMarkerVisibility();
+    ForceNetUpdate();
+}
+
+void ALastFPSEnemyCharacter::OnRep_WaveEnemyMarkerVisible()
+{
+    ApplyWaveEnemyMarkerVisibility();
+}
+
+void ALastFPSEnemyCharacter::ApplyWaveEnemyMarkerVisibility()
+{
+    if (WaveEnemyMarkerComponent)
+    {
+        WaveEnemyMarkerComponent->SetVisibility(bWaveEnemyMarkerVisible, true);
+    }
+}
+
 const ULastFPSAIProfile* ALastFPSEnemyCharacter::GetAIProfile() const
 {
     if (const ULastFPSEnemyDefinition* EnemyDef = Cast<ULastFPSEnemyDefinition>(ResolveCharacterDefinition()))
     {
-        return EnemyDef->AIProfile;
+        return EnemyDef->AIProfile.LoadSynchronous();
     }
     return nullptr;
 }
@@ -74,6 +119,15 @@ void ALastFPSEnemyCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
+    if (WaveEnemyMarkerComponent && GetCapsuleComponent())
+    {
+        WaveEnemyMarkerComponent->SetRelativeLocation(FVector(
+            0.f,
+            0.f,
+            GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() + WaveEnemyMarkerVerticalOffset));
+    }
+    ApplyWaveEnemyMarkerVisibility();
+
     if (USkeletalMeshComponent* MeshComp = GetMesh();
         MeshComp && !bMeshRelativeTransformCaptured)
     {
@@ -87,9 +141,9 @@ void ALastFPSEnemyCharacter::BeginPlay()
 
         const ULastFPSEnemyDefinition* EnemyDefinition =
             Cast<ULastFPSEnemyDefinition>(ResolveCharacterDefinition());
-        if (WeaponComponent && EnemyDefinition && EnemyDefinition->InitialWeaponDefinition)
+        if (WeaponComponent && EnemyDefinition && !EnemyDefinition->InitialWeaponDefinition.IsNull())
         {
-            WeaponComponent->EquipWeaponDefinition(EnemyDefinition->InitialWeaponDefinition);
+            WeaponComponent->EquipWeaponDefinition(EnemyDefinition->InitialWeaponDefinition.LoadSynchronous());
         }
     }
 }
@@ -239,6 +293,15 @@ void ALastFPSEnemyCharacter::FinishDeathRemoval()
 void ALastFPSEnemyCharacter::ResetForPoolReuse(
     ULastFPSCharacterDefinition* InDefinition)
 {
+    if (HasAuthority())
+    {
+        SetWaveEnemyMarkerVisible(false);
+    }
+    else
+    {
+        ApplyWaveEnemyMarkerVisibility();
+    }
+
     GetWorldTimerManager().ClearTimer(DeathRemovalTimerHandle);
     ResetDeathRagdoll();
     Super::ResetForPoolReuse(InDefinition);
@@ -259,11 +322,11 @@ void ALastFPSEnemyCharacter::ResetForPoolReuse(
     if (HasAuthority()
         && WeaponComponent
         && EnemyDefinition
-        && EnemyDefinition->InitialWeaponDefinition
+        && !EnemyDefinition->InitialWeaponDefinition.IsNull()
         && !WeaponComponent->HasWeapon())
     {
         WeaponComponent->EquipWeaponDefinition(
-            EnemyDefinition->InitialWeaponDefinition);
+            EnemyDefinition->InitialWeaponDefinition.LoadSynchronous());
     }
 }
 
@@ -279,6 +342,15 @@ void ALastFPSEnemyCharacter::OnReleasedToPool_Implementation()
     GetWorldTimerManager().ClearTimer(DeathRemovalTimerHandle);
     ResetDeathRagdoll();
     ClearRecentAttackers();
+
+    if (HasAuthority())
+    {
+        SetWaveEnemyMarkerVisible(false);
+    }
+    else if (WaveEnemyMarkerComponent)
+    {
+        WaveEnemyMarkerComponent->SetVisibility(false, true);
+    }
 
     if (HasAuthority())
     {

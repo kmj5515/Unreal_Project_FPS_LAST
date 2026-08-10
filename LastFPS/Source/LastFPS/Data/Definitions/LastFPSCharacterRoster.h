@@ -20,8 +20,8 @@ class LASTFPS_API ULastFPSCharacterRoster : public UPrimaryDataAsset
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Roster")
-	TArray<TObjectPtr<ULastFPSCharacterDefinition>> Characters;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Roster", meta=(AssetBundles="Game"))
+	TArray<TSoftObjectPtr<ULastFPSCharacterDefinition>> Characters;
 
 	int32 Num() const { return Characters.Num(); }
 
@@ -29,5 +29,5 @@ public:
 	const ULastFPSCharacterDefinition* GetDefinition(int32 Index) const;
 
 	/** 해당 정의의 PawnClass. 정의가 없으면 nullptr */
-	TSubclassOf<APawn> GetPawnClass(int32 Index) const;
+	TSoftClassPtr<APawn> GetPawnClass(int32 Index) const;
 };

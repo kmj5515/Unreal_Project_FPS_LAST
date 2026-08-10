@@ -15,6 +15,9 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Particles/ParticleSystem.h"
+#include "Sound/SoundBase.h"
+#include "Camera/CameraShakeBase.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
@@ -278,7 +281,7 @@ void UWeaponComponent::PlayFireCameraShake() const
 	if (!OwnerCharacter
 		|| !OwnerCharacter->IsLocallyControlled()
 		|| !WeaponDefinition
-		|| !WeaponDefinition->FireCameraShakeClass
+		|| !WeaponDefinition->FireCameraShakeClass.Get()
 		|| WeaponDefinition->FireCameraShakeScale <= 0.f)
 	{
 		return;
@@ -291,7 +294,7 @@ void UWeaponComponent::PlayFireCameraShake() const
 	}
 
 	PlayerController->PlayerCameraManager->StartCameraShake(
-		WeaponDefinition->FireCameraShakeClass,
+		WeaponDefinition->FireCameraShakeClass.Get(),
 		WeaponDefinition->FireCameraShakeScale,
 		ECameraShakePlaySpace::CameraLocal);
 }
@@ -863,6 +866,19 @@ void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefini
 {
     ResetPendingAimRecoil();
     ResetAimRecoilSequence();
+
+    if (NewDefinition)
+    {
+        NewDefinition->SkeletalMesh.LoadSynchronous();
+        NewDefinition->WeaponActorClass.LoadSynchronous();
+        NewDefinition->ProjectileClass.LoadSynchronous();
+        NewDefinition->AnimLayerClass.LoadSynchronous();
+        NewDefinition->FireAnimation.LoadSynchronous();
+        NewDefinition->FireSound.LoadSynchronous();
+        NewDefinition->MuzzleFlashEffect.LoadSynchronous();
+        NewDefinition->FireCameraShakeClass.LoadSynchronous();
+    }
+
     WeaponDefinition = NewDefinition;
     const bool bHasRequiredWeaponData = ApplyWeaponDefinitionValues(NewDefinition);
 
@@ -906,11 +922,11 @@ bool UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
         return false;
     }
 
-    WeaponSkeletalMesh = NewDefinition->SkeletalMesh;
+    WeaponSkeletalMesh = NewDefinition->SkeletalMesh.Get();
     WeaponType = NewDefinition->WeaponType;
-    WeaponAnimLayerClass = NewDefinition->AnimLayerClass;
-    WeaponActorClass = NewDefinition->WeaponActorClass;
-    ProjectileClass = NewDefinition->ProjectileClass;
+    WeaponAnimLayerClass = NewDefinition->AnimLayerClass.Get();
+    WeaponActorClass = NewDefinition->WeaponActorClass.Get();
+    ProjectileClass = NewDefinition->ProjectileClass.Get();
     MuzzleSocketName = NewDefinition->MuzzleSocketName;
     AttachSocketName = NewDefinition->AttachSocketName;
     LeftHandIKSocketName = NewDefinition->LeftHandIKSocketName;

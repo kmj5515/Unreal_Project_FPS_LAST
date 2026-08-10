@@ -125,6 +125,12 @@ bool ULastFPSRoomEncounterProfile::IsConfigurationValid(
 		return false;
 	}
 
+	if (RemainingEnemyMarkerThreshold < 0)
+	{
+		OutFailureReason = TEXT("RemainingEnemyMarkerThreshold는 0 이상이어야 합니다.");
+		return false;
+	}
+
 	if (BarrierPresentation.Mode == ELastFPSRoomBarrierPresentationMode::Mesh
 		&& (BarrierPresentation.Mesh.IsNull()
 			|| BarrierPresentation.Material.IsNull()))

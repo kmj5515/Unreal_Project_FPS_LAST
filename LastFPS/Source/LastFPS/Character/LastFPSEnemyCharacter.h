@@ -11,6 +11,7 @@ class ALastFPSItemPickupActor;
 class ULastFPSAIProfile;
 class ULastFPSCombatAimComponent;
 class UWeaponComponent;
+class UWidgetComponent;
 
 /** 가중치 기반 드랍 항목 1종. Weight 가 클수록 자주 뽑힌다. */
 USTRUCT(BlueprintType)
@@ -36,6 +37,11 @@ class LASTFPS_API ALastFPSEnemyCharacter
 
 public:
     ALastFPSEnemyCharacter();
+
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+    /** 웨이브에 마지막으로 남은 적임을 알리는 머리 위 마커를 켜거나 끈다. 서버에서 호출한다. */
+    void SetWaveEnemyMarkerVisible(bool bVisible);
 
     virtual UWeaponComponent* GetWeaponComponent() const override { return WeaponComponent; }
 
@@ -70,6 +76,14 @@ protected:
     /** GA가 생산한 조준 상태를 AnimBP와 원격 클라이언트에 전달한다. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Enemy|Combat Aim")
     TObjectPtr<ULastFPSCombatAimComponent> CombatAimComponent;
+
+    /** 마지막 남은 적을 표시하는 화면 공간 화살표다. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Enemy|Wave Marker")
+    TObjectPtr<UWidgetComponent> WaveEnemyMarkerComponent;
+
+    /** 캡슐 상단에서 화살표까지의 추가 높이다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Enemy|Wave Marker", meta=(ClampMin="0.0", Units="cm"))
+    float WaveEnemyMarkerVerticalOffset = 45.f;
 
     // 사망 시 드랍할 픽업 (비우면 드랍 없음).
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Drop")
@@ -108,6 +122,11 @@ protected:
     FName DeathRagdollImpulseBoneName = NAME_None;
 
 private:
+    UFUNCTION()
+    void OnRep_WaveEnemyMarkerVisible();
+
+    void ApplyWaveEnemyMarkerVisibility();
+
     void ApplyAIControllerClassFromProfile();
     void HandleOwnDeath(ALastFPSCharacterBase* DeadChar);
     void StartDeathRagdoll();
@@ -124,4 +143,7 @@ private:
     bool bMeshRelativeTransformCaptured = false;
     FTransform InitialMeshRelativeTransform = FTransform::Identity;
     FTimerHandle DeathRemovalTimerHandle;
+
+    UPROPERTY(ReplicatedUsing=OnRep_WaveEnemyMarkerVisible)
+    bool bWaveEnemyMarkerVisible = false;
 };

@@ -6,6 +6,7 @@
 #include "GameplayTagContainer.h"
 #include "Hub/ILastFPSInteractable.h"
 #include "Hub/LastFPSNPCTypes.h"
+#include "UI/Result/LastFPSMissionResultTypes.h"
 #include "LastFPSPlayerController.generated.h"
 
 class APawn;
@@ -67,6 +68,12 @@ public:
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
     void ShowNotice(const FText& Title, const FText& Message);
 
+    /**
+     * 임무 결과 화면 표시. 전투 통계·사용 캐릭터는 이 컨트롤러가 PlayerState 에서 채우므로
+     * 호출부는 임무 고유 정보(이름·시간·보상)만 넘긴다.
+     */
+    void ShowMissionResult(const FLastFPSMissionResult& InResult);
+
     /** 수량 선택 모달 표시 — 결과(선택 수량, 취소 시 0)는 OnResult 로 전달. */
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI", meta=(AutoCreateRefTerm="OnResult"))
     void ShowQuantityPrompt(const FText& Title, const FText& ItemName, int32 UnitPrice, int32 MaxQuantity, FLastFPSQuantityResultDelegate OnResult);
@@ -108,7 +115,7 @@ public:
     const ULastFPSCharacterDefinition* GetSelectedCharacterDefinition() const;
 
     /** 선택 가능한 캐릭터 정의 목록 — GameInstance의 로스터(단일 소스)에서 읽는다. */
-    const TArray<TObjectPtr<ULastFPSCharacterDefinition>>& GetSelectableCharacterDefinitions() const;
+    const TArray<TSoftObjectPtr<ULastFPSCharacterDefinition>>& GetSelectableCharacterDefinitions() const;
 
     UFUNCTION(BlueprintImplementableEvent, Category="LastFPS|Character")
     void OnSelectedCharacterIndexChanged(int32 NewSelectedCharacterIndex);

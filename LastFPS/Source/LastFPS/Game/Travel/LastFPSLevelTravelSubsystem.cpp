@@ -27,6 +27,18 @@ DEFINE_LOG_CATEGORY_STATIC(LogLastFPSLevelTravel, Log, All);
 
 namespace LastFPSLevelTravelPresentation
 {
+	/**
+	 * 표시 이름이 없을 때 쓰는 최후 폴백.
+	 * PrimaryAssetName 은 맵 등록 규칙에 따라 전체 패키지 경로가 들어올 수 있어
+	 * 그대로 쓰면 로딩 화면에 "/Game/Maps/..." 가 노출된다. 경로는 항상 잘라낸다.
+	 */
+	FText GetMapIdFallbackText(const FPrimaryAssetId& MapId)
+	{
+		const FString AssetName = MapId.PrimaryAssetName.ToString();
+		return FText::FromString(
+			AssetName.Contains(TEXT("/")) ? FPackageName::GetShortName(AssetName) : AssetName);
+	}
+
 	FText GetBattleMapNameText(const ULastFPSBattleDefinition& Definition)
 	{
 		if (!Definition.DisplayNameStringTableKey.IsNone())
@@ -34,9 +46,16 @@ namespace LastFPSLevelTravelPresentation
 			return FLastFPSLocalization::GetUIText(Definition.DisplayNameStringTableKey);
 		}
 
-		return Definition.DisplayName.IsEmpty()
-			? FText::FromName(Definition.MapId.PrimaryAssetName)
-			: Definition.DisplayName;
+		if (!Definition.DisplayName.IsEmpty())
+		{
+			return Definition.DisplayName;
+		}
+
+		// 표시 이름이 비어 있으면 데이터 누락이다. 조용히 에셋 이름을 쓰면 원인을 못 찾는다.
+		UE_LOG(LogLastFPSLevelTravel, Warning,
+			TEXT("전투 정의 '%s' 에 표시 이름이 없어 맵 에셋 이름으로 대체합니다. DisplayName 또는 DisplayNameStringTableKey를 설정하세요."),
+			*Definition.GetPrimaryAssetId().ToString());
+		return GetMapIdFallbackText(Definition.MapId);
 	}
 
 	FText GetStatusText(const ELastFPSTravelDestination Destination)
@@ -229,7 +248,7 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::TravelToMap(
 	}
 	if (MapNameText.IsEmpty())
 	{
-		MapNameText = FText::FromName(MapId.PrimaryAssetName);
+		MapNameText = LastFPSLevelTravelPresentation::GetMapIdFallbackText(MapId);
 	}
 
 	SetPresentation(StatusText, MapNameText);

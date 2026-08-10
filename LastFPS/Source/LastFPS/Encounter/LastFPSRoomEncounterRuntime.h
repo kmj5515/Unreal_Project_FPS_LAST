@@ -127,6 +127,7 @@ private:
 	 * 강제 정리하는 경우가 처치로 집계되면 퀘스트 진행이 부풀기 때문이다.
 	 */
 	void RemoveTrackedEnemy(ALastFPSCharacterBase& Enemy, bool bCountAsDefeated = true);
+	void RefreshRemainingEnemyMarkers();
 	void BroadcastEncounterProgress() const;
 	void EvaluateWaveCompletion();
 	void CompleteEncounter();
@@ -237,6 +238,7 @@ private:
 	float SpawnPointRandomRadius = 600.f;
 	float SpawnDelayAfterVFX = 0.f;
 	int32 MaxSpawnedActorsPerFrame = 1;
+	int32 RemainingEnemyMarkerThreshold = 3;
 	int32 ActiveWaveIndex = INDEX_NONE;
 	int32 NextSpawnUnitIndex = 0;
 	int32 SpawnedCountInCurrentUnit = 0;

@@ -1,9 +1,9 @@
-#include "AbilitySystem/Abilities/GA_SkillHeal.h"
+﻿#include "AbilitySystem/Abilities/GA_SkillHeal.h"
 #include "Utility/LastFPSTags.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "AbilitySystem/Effects/GE_HealInstant.h"
-#include "AbilitySystem/Effects/GE_Skill2Cooldown.h"
+#include "AbilitySystem/Effects/GE_Cooldown.h"
 
 UGA_SkillHeal::UGA_SkillHeal()
 {
@@ -11,7 +11,7 @@ UGA_SkillHeal::UGA_SkillHeal()
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 
     HealEffect = ULastFPSGE_HealInstant::StaticClass();
-    CooldownGameplayEffectClass = ULastFPSGE_Skill2Cooldown::StaticClass();
+    CooldownGameplayEffectClass = ULastFPSGE_Cooldown::StaticClass();
 
     FGameplayTagContainer Tags;
     Tags.AddTag(LastFPSGameplayTags::Ability_Skill2);

@@ -40,6 +40,13 @@ namespace LastFPSUIStringKeys
 	inline constexpr TCHAR QuestStatusClaimed[] = TEXT("Quest.Status.Claimed");
 	inline constexpr TCHAR QuestStatusLocked[] = TEXT("Quest.Status.Locked");
 	inline constexpr TCHAR QuestStatusNotStarted[] = TEXT("Quest.Status.NotStarted");
+	inline constexpr TCHAR QuestActionAccept[] = TEXT("Quest.Action.Accept");
+	inline constexpr TCHAR QuestActionCancel[] = TEXT("Quest.Action.Cancel");
+	inline constexpr TCHAR QuestActionTrack[] = TEXT("Quest.Action.Track");
+	inline constexpr TCHAR QuestActionClaim[] = TEXT("Quest.Action.Claim");
+	inline constexpr TCHAR QuestHeaderProgress[] = TEXT("Quest.Header.Progress");
+	inline constexpr TCHAR QuestHeaderReward[] = TEXT("Quest.Header.Reward");
+	inline constexpr TCHAR QuestRecommendedLevelFormat[] = TEXT("Quest.Detail.RecommendedLevelFormat");
 	inline constexpr TCHAR QuestRewardCreditsFormat[] = TEXT("Quest.Reward.CreditsFormat");
 	inline constexpr TCHAR QuestRewardItemFormat[] = TEXT("Quest.Reward.ItemFormat");
 	inline constexpr TCHAR QuestRewardMessageFormat[] = TEXT("Quest.Reward.MessageFormat");

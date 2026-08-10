@@ -102,7 +102,7 @@ namespace
 		}
 
 		APawn* Pawn = World.SpawnActorDeferred<APawn>(
-			Definition->PawnClass,
+			Definition->PawnClass.LoadSynchronous(),
 			SpawnTransform,
 			nullptr,
 			nullptr,
@@ -127,7 +127,7 @@ namespace
 	bool SpawnScenarioPlayer(UWorld& World)
 	{
 		ULastFPSCharacterDefinition* Definition = Cast<ULastFPSCharacterDefinition>(GPendingBattleScenario.PlayerCharacterPath.TryLoad());
-		if (!Definition || !Definition->PawnClass)
+		if (!Definition || Definition->PawnClass.IsNull())
 		{
 			return false;
 		}
@@ -151,7 +151,7 @@ namespace
 		}
 
 		APawn* NewPawn = World.SpawnActorDeferred<APawn>(
-			Definition->PawnClass,
+			Definition->PawnClass.LoadSynchronous(),
 			SpawnTransform,
 			nullptr,
 			nullptr,

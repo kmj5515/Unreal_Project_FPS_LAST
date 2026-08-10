@@ -1,4 +1,4 @@
-#include "AbilitySystem/Abilities/GA_ViolaFrostStorm.h"
+﻿#include "AbilitySystem/Abilities/GA_ViolaFrostStorm.h"
 
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
@@ -6,7 +6,7 @@
 #include "AbilitySystem/Effects/GE_DamageInstant.h"
 #include "AbilitySystem/Effects/GE_StatusFreeze.h"
 #include "AbilitySystem/Effects/GE_StatusSlow.h"
-#include "AbilitySystem/Effects/GE_UltimateCooldown.h"
+#include "AbilitySystem/Effects/GE_Cooldown.h"
 #include "Character/LastFPSHero.h"
 #include "Data/Tables/LastFPSSkillBalanceData.h"
 #include "Engine/World.h"
@@ -18,7 +18,7 @@ UGA_ViolaFrostStorm::UGA_ViolaFrostStorm()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
-	CooldownGameplayEffectClass = ULastFPSGE_UltimateCooldown::StaticClass();
+	CooldownGameplayEffectClass = ULastFPSGE_Cooldown::StaticClass();
 	bDrawDebug = true;
 
 	FrostStormEffectEventTag = LastFPSGameplayTags::Event_Montage_ViolaFrostStormEffect;

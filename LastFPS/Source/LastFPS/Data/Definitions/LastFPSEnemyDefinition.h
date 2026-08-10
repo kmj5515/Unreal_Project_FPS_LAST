@@ -18,11 +18,11 @@ class LASTFPS_API ULastFPSEnemyDefinition : public ULastFPSCharacterDefinition
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|AI")
-	TObjectPtr<ULastFPSAIProfile> AIProfile;
+	TSoftObjectPtr<ULastFPSAIProfile> AIProfile;
 
 	/** 적이 스폰될 때 서버에서 자동 장착할 초기 무기다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Weapon")
-	TObjectPtr<ULastFPSWeaponDefinition> InitialWeaponDefinition;
+	TSoftObjectPtr<ULastFPSWeaponDefinition> InitialWeaponDefinition;
 
 	virtual void GiveToAbilitySystem(UAbilitySystemComponent* ASC) const override;
 };

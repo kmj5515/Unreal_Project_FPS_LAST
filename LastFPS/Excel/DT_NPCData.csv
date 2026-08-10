@@ -1,4 +1,5 @@
 ﻿Name,DisplayName,NPCRole,InteractionLabel,InteractionRadius,Actions
+# 자동 생성됨 - 직접 수정하지 말고 원본 xlsx를 편집하세요.,,,,,
 NPC_Mechanic,정비병 보로스,정비병,대화,150,"((Label=""대화하기"",Type=""Dialogue"",ScreenTag="""",DialogueRowName=""DLG_Mechanic""))"
 NPC_Janitor,청소병 핀,청소병,대화,150,"((Label=""대화하기"",Type=""Dialogue"",ScreenTag="""",DialogueRowName=""DLG_Janitor""))"
 NPC_ModuleManager,모듈 관리관 세라,모듈 관리,대화,150,"((Label=""대화하기"",Type=""Dialogue"",ScreenTag="""",DialogueRowName=""DLG_ModuleManager""),(Label=""모듈"",Type=""Screen"",ScreenTag=""UI.Screen.Module"",DialogueRowName=""None""))"

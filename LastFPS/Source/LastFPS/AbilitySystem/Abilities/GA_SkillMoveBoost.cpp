@@ -1,8 +1,8 @@
-#include "AbilitySystem/Abilities/GA_SkillMoveBoost.h"
+﻿#include "AbilitySystem/Abilities/GA_SkillMoveBoost.h"
 #include "Utility/LastFPSTags.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/Effects/GE_MoveSpeedBuff.h"
-#include "AbilitySystem/Effects/GE_Skill1Cooldown.h"
+#include "AbilitySystem/Effects/GE_Cooldown.h"
 
 UGA_SkillMoveBoost::UGA_SkillMoveBoost()
 {
@@ -10,7 +10,7 @@ UGA_SkillMoveBoost::UGA_SkillMoveBoost()
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
 
     SpeedBoostEffect = ULastFPSGE_MoveSpeedBuff::StaticClass();
-    CooldownGameplayEffectClass = ULastFPSGE_Skill1Cooldown::StaticClass();
+    CooldownGameplayEffectClass = ULastFPSGE_Cooldown::StaticClass();
 
     FGameplayTagContainer Tags;
     Tags.AddTag(LastFPSGameplayTags::Ability_Skill1);

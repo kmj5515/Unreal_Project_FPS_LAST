@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
@@ -112,6 +112,7 @@ struct FLastFPSQuestRuntimeState
 	ELastFPSQuestStatus Status = ELastFPSQuestStatus::NotStarted;
 	TArray<int32> Progress;   // 목표별 현재 진행 (0..RequiredCount)
 	TArray<int32> Baseline;   // 목표별 수락 시점 기준선 (AcquireItem: 수락 때 GetItemCount)
+	bool bIsTracked = true;   // HUD 추적 활성화 여부
 };
 
 USTRUCT(BlueprintType)
@@ -171,6 +172,22 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	bool AcceptQuest(FName QuestId);
+
+	/**
+	 * 퀘스트 취소 — 진행 중인 퀘스트를 초기화하고 미시작 상태로 되돌립니다.
+	 */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
+	void CancelQuest(FName QuestId);
+
+	/**
+	 * 퀘스트 추적 여부 설정 — HUD에 마커나 트래커를 표시할지 결정.
+	 */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
+	void SetQuestTracked(FName QuestId, bool bTrack);
+
+	/** 현재 퀘스트가 HUD 추적 활성화 상태인지 확인 */
+	UFUNCTION(BlueprintPure, Category="LastFPS|Quest")
+	bool IsQuestTracked(FName QuestId) const;
 
 	/**
 	 * 보상 수령 — Completed 일 때만 Claimed 로 1회 전이하며 Economy 에 크레딧/아이템 지급.
@@ -360,6 +377,12 @@ private:
 
 	TArray<FName> CurrentMapQuestIds;
 
+	/**
+	 * 던전 퀘스트를 수락한 실시간 시각(초). 결과 화면의 클리어 시간 산출에만 쓴다.
+	 * 음수면 측정 전이며, 결과 화면이 시간 표시를 접는다.
+	 */
+	double MissionStartRealTimeSeconds = -1.0;
+
 	/** 클라이언트는 복제된 Encounter 진행 이벤트에서 Mode별 실제 요구량을 받는다. */
 	TMap<FName, int32> EncounterRequiredCounts;
 
@@ -426,7 +449,7 @@ private:
 	bool AcceptQuestInternal(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def);
 
 	/** 보상 지급(크레딧/아이템) + 완료 토스트. 상태 래치/전이는 호출부 책임. */
-	void GrantReward(const FLastFPSQuestData& Def);
+	void GrantReward(FName QuestId, const FLastFPSQuestData& Def);
 
 	/**
 	 * 완료→(자동)수령→다음 퀘스트 해금/수락 연쇄를 안정될 때까지 처리. 변경 시 true.
@@ -447,7 +470,7 @@ private:
 	void UpdateLocationPollTimer();
 
 	/** 완료 토스트 (로컬 PC 의 ShowNotice). */
-	void NotifyRewardGranted(const FLastFPSQuestData& Def) const;
+	void NotifyRewardGranted(FName QuestId, const FLastFPSQuestData& Def) const;
 
 	/** 수령 알림 본문 — 제목 + 지급된 보상(크레딧/아이템) 내역. 구조화 보상이 비면 RewardText 폴백. */
 	FText BuildRewardMessage(const FLastFPSQuestData& Def) const;

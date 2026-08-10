@@ -21,8 +21,10 @@ public class EditorUtility : ModuleRules
 				Path.Combine(ModuleDirectory, "BattleLevelTool"),
 				Path.Combine(ModuleDirectory, "CharacterDatatAssetTool"),
 				Path.Combine(ModuleDirectory, "Core"),
+				Path.Combine(ModuleDirectory, "DataTableImportTool"),
 				Path.Combine(ModuleDirectory, "EditorPlay"),
 				Path.Combine(ModuleDirectory, "LevelSelection"),
+				Path.Combine(ModuleDirectory, "Localization"),
 				Path.Combine(ModuleDirectory, "RuntimeStats"),
 				Path.Combine(ModuleDirectory, "Settings")
 			}
@@ -65,7 +67,8 @@ public class EditorUtility : ModuleRules
 				"AssetTools",
 				"ContentBrowser",
 				"PropertyEditor",
-				"Projects"
+				"Projects",
+				"PythonScriptPlugin"
 			}
 			);
 		

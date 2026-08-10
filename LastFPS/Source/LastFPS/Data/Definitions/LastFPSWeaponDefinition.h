@@ -146,19 +146,19 @@ public:
     FLastFPSWeaponCrosshairSettings Crosshair;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
-    TObjectPtr<USkeletalMesh> SkeletalMesh;
+    TSoftObjectPtr<USkeletalMesh> SkeletalMesh;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
-    TSubclassOf<ALastFPSWeaponActor> WeaponActorClass;
+    TSoftClassPtr<ALastFPSWeaponActor> WeaponActorClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
-    TSubclassOf<ALastFPSProjectile> ProjectileClass;
+    TSoftClassPtr<ALastFPSProjectile> ProjectileClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Animation")
-    TSubclassOf<UAnimInstance> AnimLayerClass;
+    TSoftClassPtr<UAnimInstance> AnimLayerClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Animation")
-    TObjectPtr<UAnimationAsset> FireAnimation;
+    TSoftObjectPtr<UAnimationAsset> FireAnimation;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Animation", meta=(ClampMin="0.01"))
     float AnimationPlayRate = 1.f;
@@ -191,14 +191,14 @@ public:
     FLastFPSWeaponMagazineVisualSettings MagazineVisual;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Effects")
-    TObjectPtr<USoundBase> FireSound;
+    TSoftObjectPtr<USoundBase> FireSound;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Effects")
-    TObjectPtr<UParticleSystem> MuzzleFlashEffect;
+    TSoftObjectPtr<UParticleSystem> MuzzleFlashEffect;
 
 	/** 로컬 소유자가 발사할 때 재생할 무기 전용 카메라 셰이크입니다. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Effects|Camera Shake")
-	TSubclassOf<UCameraShakeBase> FireCameraShakeClass;
+	TSoftClassPtr<UCameraShakeBase> FireCameraShakeClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Effects|Camera Shake", meta=(ClampMin="0.0"))
 	float FireCameraShakeScale = 1.f;

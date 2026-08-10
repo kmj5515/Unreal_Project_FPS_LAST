@@ -50,24 +50,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character")
 	FText DisplayName;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character")
-	TObjectPtr<UTexture2D> Icon;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character", meta=(AssetBundles="UI"))
+	TSoftObjectPtr<UTexture2D> Icon;
 
 	// ── 공유 스폰/스탯/비주얼 ──────────────────────────────────
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character")
-	TSubclassOf<APawn> PawnClass;
+	TSoftClassPtr<APawn> PawnClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character|Stats")
-	TObjectPtr<ULastFPSCharacterStatData> StatData;
+	TSoftObjectPtr<ULastFPSCharacterStatData> StatData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character|Visual")
-	TObjectPtr<ULastFPSCharacterVisualData> VisualData;
+	TSoftObjectPtr<ULastFPSCharacterVisualData> VisualData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character|Accelerator")
-	TObjectPtr<ULastFPSCharacterAcceleratorData> AcceleratorData;
+	TSoftObjectPtr<ULastFPSCharacterAcceleratorData> AcceleratorData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Character|GAS")
-	TObjectPtr<ULastFPSAbilitySet> AbilitySet;
+	TSoftObjectPtr<ULastFPSAbilitySet> AbilitySet;
 
 	/**
 	 * 다이어그램의 "Override function from base class".

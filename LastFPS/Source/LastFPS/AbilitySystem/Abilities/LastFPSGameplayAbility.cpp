@@ -15,28 +15,68 @@ ULastFPSGameplayAbility::ULastFPSGameplayAbility()
 {
 }
 
+namespace
+{
+	/**
+	 * 아바타 → 캐릭터 정의 → 스킬 행 조회를 한 곳에 모은다.
+	 * 밸런스 조회와 쿨다운 신원 조회가 반드시 같은 행에서 나오도록 강제하기 위한 것이다.
+	 */
+	struct FLastFPSSkillLookup
+	{
+		const ULastFPSSkillDataSubsystem* Subsystem = nullptr;
+		const FLastFPSCharacterSkillData* SkillRow = nullptr;
+
+		bool IsValid() const { return Subsystem != nullptr && SkillRow != nullptr; }
+	};
+
+	FLastFPSSkillLookup FindSkillRow(const AActor* AvatarActor, const FGameplayTagContainer& AbilityTags)
+	{
+		const ALastFPSCharacterBase* Character = Cast<ALastFPSCharacterBase>(AvatarActor);
+		const ULastFPSCharacterDefinition* CharacterDefinition =
+			Character ? Character->GetCharacterDefinition() : nullptr;
+		const UGameInstance* GameInstance = Character ? Character->GetGameInstance() : nullptr;
+		const ULastFPSSkillDataSubsystem* SkillDataSubsystem =
+			GameInstance ? GameInstance->GetSubsystem<ULastFPSSkillDataSubsystem>() : nullptr;
+		if (!CharacterDefinition || !SkillDataSubsystem)
+		{
+			return FLastFPSSkillLookup();
+		}
+
+		FLastFPSSkillLookup Lookup;
+		Lookup.Subsystem = SkillDataSubsystem;
+		Lookup.SkillRow = SkillDataSubsystem->FindSkillByAbilityTags(
+			CharacterDefinition->CharacterId,
+			AbilityTags);
+		return Lookup.SkillRow ? Lookup : FLastFPSSkillLookup();
+	}
+}
+
 const FLastFPSSkillBalanceData* ULastFPSGameplayAbility::GetSkillBalanceData() const
 {
-	const ALastFPSCharacterBase* Character = Cast<ALastFPSCharacterBase>(GetAvatarActorFromActorInfo());
-	const ULastFPSCharacterDefinition* CharacterDefinition = Character ? Character->GetCharacterDefinition() : nullptr;
-	const UGameInstance* GameInstance = Character ? Character->GetGameInstance() : nullptr;
-	const ULastFPSSkillDataSubsystem* SkillDataSubsystem =
-		GameInstance ? GameInstance->GetSubsystem<ULastFPSSkillDataSubsystem>() : nullptr;
-	if (!CharacterDefinition || !SkillDataSubsystem)
+	const FLastFPSSkillLookup Lookup = FindSkillRow(GetAvatarActorFromActorInfo(), GetAssetTags());
+	return Lookup.IsValid() ? Lookup.Subsystem->FindBalance(Lookup.SkillRow->SkillId) : nullptr;
+}
+
+FLastFPSAbilityCooldownIdentity ULastFPSGameplayAbility::ResolveCooldownIdentity() const
+{
+	FLastFPSAbilityCooldownIdentity Identity;
+
+	const FLastFPSSkillLookup Lookup = FindSkillRow(GetAvatarActorFromActorInfo(), GetAssetTags());
+	if (!Lookup.IsValid())
 	{
-		return nullptr;
+		return Identity;
 	}
 
-	const FGameplayTagContainer& CurrentAbilityTags = GetAssetTags();
-	const FLastFPSCharacterSkillData* SkillData = SkillDataSubsystem->FindSkillByAbilityTags(
-		CharacterDefinition->CharacterId,
-		CurrentAbilityTags);
-	if (!SkillData)
+	const FLastFPSSkillBalanceData* Balance = Lookup.Subsystem->FindBalance(Lookup.SkillRow->SkillId);
+	if (!Balance)
 	{
-		return nullptr;
+		return Identity;
 	}
 
-	return SkillDataSubsystem->FindBalance(SkillData->SkillId);
+	// 태그와 시간을 같은 조회에서 함께 꺼낸다. 둘이 다른 경로로 오면 어긋날 수 있다.
+	Identity.CooldownTag = Lookup.SkillRow->CooldownTag;
+	Identity.CooldownSeconds = Balance->Cooldown;
+	return Identity;
 }
 
 float ULastFPSGameplayAbility::GetEquippedWeaponBaseDamage() const

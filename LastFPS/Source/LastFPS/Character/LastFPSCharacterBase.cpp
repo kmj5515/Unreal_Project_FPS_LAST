@@ -186,7 +186,7 @@ const ULastFPSCharacterDefinition* ALastFPSCharacterBase::ResolveCharacterDefini
 
 void ALastFPSCharacterBase::ApplyCharacterVisuals(const ULastFPSCharacterDefinition* Definition)
 {
-    if (!Definition || !Definition->VisualData)
+    if (!Definition || Definition->VisualData.IsNull())
     {
         return;
     }
@@ -197,14 +197,17 @@ void ALastFPSCharacterBase::ApplyCharacterVisuals(const ULastFPSCharacterDefinit
         return;
     }
 
-    if (Definition->VisualData->SkeletalMesh)
+    if (ULastFPSCharacterVisualData* VisualData = Definition->VisualData.LoadSynchronous())
     {
-        MeshComp->SetSkeletalMesh(Definition->VisualData->SkeletalMesh);
-    }
+        if (VisualData->SkeletalMesh)
+        {
+            MeshComp->SetSkeletalMesh(VisualData->SkeletalMesh);
+        }
 
-    if (Definition->VisualData->AnimClass)
-    {
-        MeshComp->SetAnimInstanceClass(Definition->VisualData->AnimClass);
+        if (VisualData->AnimClass)
+        {
+            MeshComp->SetAnimInstanceClass(VisualData->AnimClass);
+        }
     }
 }
 
@@ -618,9 +621,12 @@ void ALastFPSCharacterBase::GiveDefaultAbilities()
 
     const ULastFPSCharacterDefinition* ResolvedDefinition = ResolveCharacterDefinition();
     const TArray<TSubclassOf<UGameplayAbility>>* AbilitiesToGrant = &DefaultAbilities;
-    if (ResolvedDefinition && ResolvedDefinition->AbilitySet)
+    if (ResolvedDefinition && !ResolvedDefinition->AbilitySet.IsNull())
     {
-        AbilitiesToGrant = &ResolvedDefinition->AbilitySet->GrantedAbilities;
+        if (ULastFPSAbilitySet* AbilitySet = ResolvedDefinition->AbilitySet.LoadSynchronous())
+        {
+            AbilitiesToGrant = &AbilitySet->GrantedAbilities;
+        }
     }
 
     for (const TSubclassOf<UGameplayAbility>& AbilityClass : *AbilitiesToGrant)
@@ -640,9 +646,12 @@ void ALastFPSCharacterBase::ApplyDefaultEffects()
 
     const ULastFPSCharacterDefinition* ResolvedDefinition = ResolveCharacterDefinition();
     const TArray<TSubclassOf<UGameplayEffect>>* EffectsToApply = &DefaultEffects;
-    if (ResolvedDefinition && ResolvedDefinition->AbilitySet)
+    if (ResolvedDefinition && !ResolvedDefinition->AbilitySet.IsNull())
     {
-        EffectsToApply = &ResolvedDefinition->AbilitySet->StartupEffects;
+        if (ULastFPSAbilitySet* AbilitySet = ResolvedDefinition->AbilitySet.LoadSynchronous())
+        {
+            EffectsToApply = &AbilitySet->StartupEffects;
+        }
     }
 
     for (const TSubclassOf<UGameplayEffect>& EffectClass : *EffectsToApply)

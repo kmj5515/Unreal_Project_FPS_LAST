@@ -895,7 +895,7 @@ void ALastFPSStreamingLevelTransitionRuntime::SpawnDelayedEnemy()
 		World->GetSubsystem<ULastFPSActorPoolSubsystem>())
 	{
 		SpawnedPawn = Cast<APawn>(Pool->AcquireActorByClass(
-			LoadedDelayedEnemyDefinition->PawnClass,
+			LoadedDelayedEnemyDefinition->PawnClass.LoadSynchronous(),
 			SpawnTransform,
 			this,
 			nullptr));
@@ -904,7 +904,7 @@ void ALastFPSStreamingLevelTransitionRuntime::SpawnDelayedEnemy()
 	if (!SpawnedPawn)
 	{
 		SpawnedPawn = World->SpawnActorDeferred<APawn>(
-			LoadedDelayedEnemyDefinition->PawnClass,
+			LoadedDelayedEnemyDefinition->PawnClass.LoadSynchronous(),
 			SpawnTransform,
 			this,
 			nullptr,

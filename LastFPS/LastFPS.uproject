@@ -79,6 +79,13 @@
 			"Enabled": true
 		},
 		{
+			"Name": "PythonScriptPlugin",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
 			"Name": "EasyCrosshairSystem",
 			"Enabled": true
 		},

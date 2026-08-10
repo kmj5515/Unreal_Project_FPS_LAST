@@ -1,8 +1,8 @@
-#include "AbilitySystem/Abilities/GA_ViolaIceAura.h"
+﻿#include "AbilitySystem/Abilities/GA_ViolaIceAura.h"
 
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/Actors/LastFPSAreaEffectActor.h"
-#include "AbilitySystem/Effects/GE_Skill2Cooldown.h"
+#include "AbilitySystem/Effects/GE_Cooldown.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Character/LastFPSHero.h"
@@ -18,7 +18,7 @@ UGA_ViolaIceAura::UGA_ViolaIceAura()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
-	CooldownGameplayEffectClass = ULastFPSGE_Skill2Cooldown::StaticClass();
+	CooldownGameplayEffectClass = ULastFPSGE_Cooldown::StaticClass();
 
 	AuraEffectEventTag = LastFPSGameplayTags::Event_Montage_ViolaIceAuraEffect;
 	AuraAreaEffectClass = ALastFPSAreaEffectActor::StaticClass();

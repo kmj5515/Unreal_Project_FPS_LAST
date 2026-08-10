@@ -23,7 +23,6 @@
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "AbilitySystem/Abilities/LastFPSConfirmableAbility.h"
 #include "AbilitySystem/Abilities/GA_BasicShoot.h"
-#include "AbilitySystem/Abilities/GA_Ultimate.h"
 #include "Net/UnrealNetwork.h"
 
 ALastFPSHero::ALastFPSHero()

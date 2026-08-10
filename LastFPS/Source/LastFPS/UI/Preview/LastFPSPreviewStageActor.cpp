@@ -2,6 +2,7 @@
 
 #include "Animation/AnimationAsset.h"
 #include "Animation/AnimInstance.h"
+#include "Components/LightComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
@@ -562,6 +563,52 @@ void ALastFPSPreviewStageActor::ApplyLightingChannels(const FLastFPSPreviewSlotR
 	}
 }
 
+void ALastFPSPreviewStageActor::ApplyStageLightingIsolation()
+{
+	if (!bIsolateStageLighting)
+	{
+		return;
+	}
+
+	TArray<AActor*> StageActors;
+	StageActors.Add(this);
+	GetAttachedActors(StageActors, false, true);
+
+	for (AActor* StageActor : StageActors)
+	{
+		if (!StageActor)
+		{
+			continue;
+		}
+
+		TArray<UPrimitiveComponent*> PrimitiveComponents;
+		StageActor->GetComponents<UPrimitiveComponent>(PrimitiveComponents);
+		for (UPrimitiveComponent* PrimitiveComponent : PrimitiveComponents)
+		{
+			if (PrimitiveComponent)
+			{
+				PrimitiveComponent->SetLightingChannels(
+					StageLightingChannels.bChannel0,
+					StageLightingChannels.bChannel1,
+					StageLightingChannels.bChannel2);
+			}
+		}
+
+		TArray<ULightComponent*> LightComponents;
+		StageActor->GetComponents<ULightComponent>(LightComponents);
+		for (ULightComponent* LightComponent : LightComponents)
+		{
+			if (LightComponent)
+			{
+				LightComponent->SetLightingChannels(
+					StageLightingChannels.bChannel0,
+					StageLightingChannels.bChannel1,
+					StageLightingChannels.bChannel2);
+			}
+		}
+	}
+}
+
 void ALastFPSPreviewStageActor::RefreshAlignment()
 {
 	// 1) 대상이 카메라를 보게 돌린다. 이때 메시 바운드 중심이 움직인다.
@@ -762,6 +809,11 @@ void ALastFPSPreviewStageActor::ApplyTickState(
 void ALastFPSPreviewStageActor::SetStageActive(const bool bInActive)
 {
 	bStageActive = bInActive;
+	if (bInActive)
+	{
+		// 자식 액터의 프리뷰 조명과 배경도 전용 채널로 맞춰 레벨 조명과 분리한다.
+		ApplyStageLightingIsolation();
+	}
 
 	SetActorHiddenInGame(!bInActive);
 

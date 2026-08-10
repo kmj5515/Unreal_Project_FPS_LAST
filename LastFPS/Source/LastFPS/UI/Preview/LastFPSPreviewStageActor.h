@@ -246,6 +246,9 @@ private:
 	/** 자리에 올라온 모든 프리미티브를 무대 전용 라이팅 채널로 옮긴다. */
 	void ApplyLightingChannels(const FLastFPSPreviewSlotRuntime& SlotRuntime) const;
 
+	/** 무대와 자식 액터의 배경·조명을 전용 라이팅 채널로 통일한다. */
+	void ApplyStageLightingIsolation();
+
 	/**
 	 * 활성 시점의 위치를 각 자리의 애님 인스턴스에 알린다.
 	 * 계약을 구현하지 않은 애님 인스턴스는 건너뛴다 — 시선 추적은 선택 기능이다.
