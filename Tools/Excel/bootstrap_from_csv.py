@@ -90,13 +90,19 @@ def add_readme(workbook: Workbook) -> None:
         row[1].alignment = Alignment(wrap_text=True, vertical="top")
 
 
-def create_workbook(excel_directory: Path, workbook_name: str, sheet_names: tuple[str, ...]) -> Path:
+def create_workbook(
+    excel_directory: Path,
+    workbook_name: str,
+    sheet_names: tuple[str, ...],
+    csv_directory: Path | None = None,
+) -> Path:
     workbook = Workbook()
     workbook.remove(workbook.active)
     add_readme(workbook)
 
+    source_directory = csv_directory or excel_directory
     for sheet_name in sheet_names:
-        csv_path = excel_directory / f"{sheet_name}.csv"
+        csv_path = source_directory / f"{sheet_name}.csv"
         if not csv_path.is_file():
             raise FileNotFoundError(f"부트스트랩 원본 CSV를 찾을 수 없습니다: {csv_path}")
         rows = read_csv(csv_path)
@@ -119,15 +125,18 @@ def create_workbook(excel_directory: Path, workbook_name: str, sheet_names: tupl
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--excel-dir", type=Path, default=Path("LastFPS/Excel"))
+    # 생성된 CSV는 워크북과 분리된 폴더에 있으므로 원본 위치를 따로 받는다.
+    parser.add_argument("--csv-dir", type=Path, default=None)
     parser.add_argument("--force", action="store_true", help="기존 워크북을 덮어씁니다.")
     args = parser.parse_args()
 
     excel_directory = args.excel_dir.resolve()
+    csv_directory = (args.csv_dir.resolve() if args.csv_dir else excel_directory / "Csv")
     for workbook_name, sheet_names in WORKBOOK_SHEETS.items():
         output_path = excel_directory / workbook_name
         if output_path.exists() and not args.force:
             raise FileExistsError(f"기존 워크북을 덮어쓰지 않습니다: {output_path} (--force 필요)")
-        print(f"생성 완료: {create_workbook(excel_directory, workbook_name, sheet_names)}")
+        print(f"생성 완료: {create_workbook(excel_directory, workbook_name, sheet_names, csv_directory)}")
     return 0
 
 

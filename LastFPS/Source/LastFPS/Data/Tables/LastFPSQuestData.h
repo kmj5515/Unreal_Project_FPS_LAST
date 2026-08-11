@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
 #include "GameplayTagContainer.h"
+#include "Cinematics/LastFPSCinematicTypes.h"
 #include "LastFPSQuestData.generated.h"
 
 class USoundBase;
@@ -109,6 +110,14 @@ struct FLastFPSQuestObjective
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	FGameplayTag TargetTag;
 
+	/** 목표 수행 장소를 안내할 NPC 행. 비우면 목표 유형의 기본 대상만 사용한다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Guidance")
+	FName GuidanceNPCRowName;
+
+	/** 안내 NPC에서 목표 행을 선택했을 때 열 화면. 비우면 마커 안내만 수행한다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Guidance")
+	FGameplayTag GuidanceScreenTag;
+
 	/** ReachLocation 도달 판정 반경(m). 다른 유형은 무시. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(ClampMin=0.1, EditCondition="Type==ELastFPSObjectiveType::ReachLocation"))
 	float AcceptRadius = 3.f;
@@ -144,15 +153,50 @@ struct FLastFPSItemGrant
 	int32 Count = 1;
 };
 
-/** 퀘스트 완료 보상 — 크레딧 + 아이템 목록. 수령 시 EconomySubsystem 으로 1회 지급. */
+/** 구매 목표의 실결제액 환급 정책. 환급 대상은 같은 퀘스트의 AcquireItem 목표가 결정한다. */
+USTRUCT(BlueprintType)
+struct FLastFPSQuestPurchaseRefund
+{
+	GENERATED_BODY()
+
+	/** 실결제액 환급 비율. 0이면 환급을 사용하지 않고, 1이면 목표 수량의 실결제액을 전액 환급한다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(ClampMin=0.0, ClampMax=1.0))
+	float Rate = 0.f;
+
+	/** 퀘스트당 최대 환급액. 0이면 상한을 적용하지 않는다. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(ClampMin=0))
+	int32 MaxCredits = 0;
+
+	[[nodiscard]] bool IsEnabled() const { return Rate > 0.f; }
+
+	[[nodiscard]] int32 CalculateCredits(const int32 EligiblePurchaseSpend) const
+	{
+		if (!IsEnabled() || EligiblePurchaseSpend <= 0)
+		{
+			return 0;
+		}
+
+		const double SafeRate = static_cast<double>(FMath::Clamp(Rate, 0.f, 1.f));
+		const int32 Calculated = FMath::Max(
+			0,
+			FMath::RoundToInt(static_cast<double>(EligiblePurchaseSpend) * SafeRate));
+		return MaxCredits > 0 ? FMath::Min(Calculated, MaxCredits) : Calculated;
+	}
+};
+
+/** 퀘스트 완료 보상 — 구매액 환급 + 고정 크레딧 + 아이템 목록. 수령 시 EconomySubsystem 으로 1회 지급. */
 USTRUCT(BlueprintType)
 struct FLastFPSQuestReward
 {
 	GENERATED_BODY()
 
-	/** 지급 크레딧 (0 이면 미지급) */
+	/** 환급과 별도로 지급하는 고정 완료 보너스 크레딧 (0이면 미지급) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(ClampMin=0))
 	int32 Credits = 0;
+
+	/** 수락 이후 AcquireItem 목표 아이템을 상점에서 구매한 실결제액 환급 정책 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
+	FLastFPSQuestPurchaseRefund PurchaseRefund;
 
 	/** 지급 아이템 목록 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
@@ -207,6 +251,10 @@ struct FLastFPSQuestData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
 	FText Summary;
 
+	/** NPC 상호작용 화면의 짧은 클릭 행 문구를 조회할 ST_Localize 키. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|UI")
+	FName NPCButtonTextKey;
+
 	/** 상세 설명 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest", meta=(MultiLine=true))
 	FText Description;
@@ -226,6 +274,13 @@ struct FLastFPSQuestData : public FTableRowBase
 	/** 퀘스트 완료 시 재생할 무전 대사 행 참조 (DT_RadioTransmission) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Radio")
 	TArray<FName> RadioOnComplete;
+
+	/**
+	 * 퀘스트 수락 시 재생할 컷신. Sequence 가 비면 연출 없이 진행한다.
+	 * 무전(RadioOnStart)과 같은 시점에 걸리며, 재생 판정과 실제 재생은 컷신 재생 서브시스템이 소유한다.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Cinematic")
+	FLastFPSCinematicPlayback CinematicOnStart;
 
 	/** 완료 보상 (크레딧 + 아이템) — 수령 시 1회 지급 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest")
@@ -254,4 +309,13 @@ struct FLastFPSQuestData : public FTableRowBase
 	/** 목표 달성 즉시 보상 자동 지급(Completed→Claimed). false 면 수동 Claim 버튼 사용. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Chain")
 	bool bAutoClaim = false;
+
+	/**
+	 * 완료한 뒤에도 다시 수행할 수 있는가.
+	 * 퀘스트 상태는 원래 단조(NotStarted→…→Claimed)라 한 번 수령하면 끝난다. 던전처럼 같은 임무를
+	 * 재입장할 때마다 새로 시작해야 하는 경우에만 켠다. 켜면 임무 시작 시점에 진행도가 초기화된다.
+	 * 체인(PrereqQuestId/NextQuestId)과는 함께 쓰지 않는다 — 반복 퀘스트가 후속을 계속 다시 열게 된다.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Quest|Chain")
+	bool bRepeatable = false;
 };

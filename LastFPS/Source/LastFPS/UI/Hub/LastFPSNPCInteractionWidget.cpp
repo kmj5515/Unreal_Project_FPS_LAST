@@ -28,10 +28,12 @@ namespace
 void ULastFPSNPCInteractionWidget::Setup(
 	ALastFPSPlayerController* InPC,
 	const FText& InName,
-	const FText& InRole,
-	const TArray<FLastFPSNPCAction>& InActions)
+	const FText& InDescription,
+	const TArray<FLastFPSNPCAction>& InActions,
+	const TArray<FLastFPSNPCQuestOption>& InQuestOptions)
 {
 	OwningPC = InPC;
+	InitialFocusTarget.Reset();
 
 	if (TB_Name)
 	{
@@ -39,8 +41,8 @@ void ULastFPSNPCInteractionWidget::Setup(
 	}
 	if (TB_Role)
 	{
-		TB_Role->SetText(InRole);
-		TB_Role->SetVisibility(InRole.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+		TB_Role->SetText(InDescription);
+		TB_Role->SetVisibility(InDescription.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
 
 	if (!ButtonContainer)
@@ -57,9 +59,41 @@ void ULastFPSNPCInteractionWidget::Setup(
 		return;
 	}
 
+	// 레퍼런스의 하단 내용 행 자체가 수락/보고 입력이다. 별도의 확인 버튼을 만들지 않는다.
+	for (const FLastFPSNPCQuestOption& QuestOption : InQuestOptions)
+	{
+		ULastFPSButtonBase* Button = CreateWidget<ULastFPSButtonBase>(GetOwningPlayer(), ActionButtonClass);
+		if (!Button)
+		{
+			continue;
+		}
+
+		Button->SetButtonText(QuestOption.Content.IsEmpty() ? QuestOption.Title : QuestOption.Content);
+		if (!QuestOption.Description.IsEmpty())
+		{
+			Button->SetToolTipText(QuestOption.Description);
+		}
+		ApplyButtonSlotPadding(ButtonContainer->AddChild(Button), ButtonPadding);
+		if (!InitialFocusTarget.IsValid())
+		{
+			InitialFocusTarget = Button;
+		}
+
+		Button->OnClicked().AddWeakLambda(this, [this, QuestOption]()
+		{
+			if (ALastFPSPlayerController* PC = OwningPC.Get())
+			{
+				if (PC->ExecuteNPCQuestOption(QuestOption))
+				{
+					DeactivateWidget();
+				}
+			}
+		});
+	}
+
 	for (const FLastFPSNPCAction& Action : InActions)
 	{
-		ULastFPSButtonBase* Button = CreateWidget<ULastFPSButtonBase>(this, ActionButtonClass);
+		ULastFPSButtonBase* Button = CreateWidget<ULastFPSButtonBase>(GetOwningPlayer(), ActionButtonClass);
 		if (!Button)
 		{
 			continue;
@@ -67,6 +101,10 @@ void ULastFPSNPCInteractionWidget::Setup(
 
 		Button->SetButtonText(Action.Label);
 		ApplyButtonSlotPadding(ButtonContainer->AddChild(Button), ButtonPadding);
+		if (!InitialFocusTarget.IsValid())
+		{
+			InitialFocusTarget = Button;
+		}
 
 		// 클릭 시 해당 액션 실행. Action을 값으로 캡처해 각 버튼이 자기 동작을 기억.
 		Button->OnClicked().AddWeakLambda(this, [this, Action]()
@@ -81,16 +119,22 @@ void ULastFPSNPCInteractionWidget::Setup(
 	// 기본 "나가기" 버튼 — 항상 맨 아래에 자동 추가. 클릭 시 허브를 닫아 상호작용 종료(=ESC와 동일).
 	if (bShowExitButton)
 	{
-		if (ULastFPSButtonBase* ExitButton = CreateWidget<ULastFPSButtonBase>(this, ActionButtonClass))
+		if (ULastFPSButtonBase* ExitButton = CreateWidget<ULastFPSButtonBase>(GetOwningPlayer(), ActionButtonClass))
 		{
 			ExitButton->SetButtonText(ExitButtonLabel);
 			ApplyButtonSlotPadding(ButtonContainer->AddChild(ExitButton), ButtonPadding);
+			if (!InitialFocusTarget.IsValid())
+			{
+				InitialFocusTarget = ExitButton;
+			}
 			ExitButton->OnClicked().AddWeakLambda(this, [this]()
 			{
 				DeactivateWidget(); // 스택에서 pop → NativeDestruct → EndNPCInteraction
 			});
 		}
 	}
+
+	RequestRefreshFocus();
 }
 
 void ULastFPSNPCInteractionWidget::SetButtonsVisible(bool bVisible)
@@ -110,6 +154,13 @@ void ULastFPSNPCInteractionWidget::NativeDestruct()
 	}
 
 	Super::NativeDestruct();
+}
+
+UWidget* ULastFPSNPCInteractionWidget::NativeGetDesiredFocusTarget() const
+{
+	return InitialFocusTarget.IsValid()
+		? InitialFocusTarget.Get()
+		: Super::NativeGetDesiredFocusTarget();
 }
 
 TOptional<FUIInputConfig> ULastFPSNPCInteractionWidget::GetDesiredInputConfig() const

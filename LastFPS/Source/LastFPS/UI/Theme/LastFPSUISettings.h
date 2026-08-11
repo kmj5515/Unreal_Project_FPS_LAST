@@ -6,6 +6,7 @@
 
 class ALastFPSPreviewStageActor;
 class ULastFPSUIThemeAsset;
+class UUserWidget;
 
 /**
  * 아웃게임 UI 전역 설정 — 어떤 테마 에셋을 쓸지 프로젝트 설정에서 지정한다.
@@ -31,6 +32,10 @@ public:
 	 */
 	UPROPERTY(config, EditAnywhere, Category="Preview")
 	TSoftClassPtr<ALastFPSPreviewStageActor> PreviewStageClass;
+
+	/** 웨이브 종료 구간에서 남은 적의 머리 위에 표시할 화면 공간 마커 위젯. */
+	UPROPERTY(config, EditAnywhere, Category="HUD", meta=(AllowedClasses="/Script/UMG.UserWidget"))
+	TSoftClassPtr<UUserWidget> WaveEnemyMarkerWidgetClass;
 
 	// 프리뷰 자세(ABP·대기 애니메이션)는 여기 두지 않는다. ABP 는 스켈레톤에 묶여 영웅마다 달라야 하므로,
 	// 메시를 들고 있는 ULastFPSCharacterVisualData 에 함께 둔다.

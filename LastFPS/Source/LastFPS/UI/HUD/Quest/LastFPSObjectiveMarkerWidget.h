@@ -5,6 +5,7 @@
 #include "LastFPSObjectiveMarkerWidget.generated.h"
 
 class UCanvasPanel;
+class UCanvasPanelSlot;
 class ULastFPSQuestSubsystem;
 class ULastFPSObjectiveMarkerEntryWidget;
 struct FLastFPSObjectiveWaypoint;
@@ -71,11 +72,9 @@ private:
 
 	/** 위치 목표의 트리거 중심을 실제 바닥 좌표로 투영하고 결과를 캐시한다. */
 	FVector ResolveGroundLocation(
+		int32 WaypointIndex,
 		const FLastFPSObjectiveWaypoint& Waypoint,
 		class APlayerController* PlayerController);
-
-	/** 더 이상 활성 상태가 아닌 위치 목표의 바닥 캐시를 제거한다. */
-	void PruneGroundLocationCache(const TArray<FLastFPSObjectiveWaypoint>& Waypoints);
 
 	/** 월드 좌표를 화면(픽셀)로 투영 — 화면 밖이면 가장자리로 클램프하고 방향각을 낸다. */
 	static void ComputeScreenPosition(
@@ -91,5 +90,16 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ULastFPSObjectiveMarkerEntryWidget>> MarkerEntries;
 
-	TMap<FName, FLastFPSGroundedMarkerCacheEntry> GroundLocationCache;
+	/**
+	 * 엔트리와 1:1 로 대응하는 캔버스 슬롯 — 정렬/자동크기는 생성 시 한 번만 잡고,
+	 * 매 프레임에는 위치만 바꾸기 위해 보관한다(프레임마다 슬롯 캐스팅을 반복하지 않는다).
+	 */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UCanvasPanelSlot>> MarkerSlots;
+
+	/**
+	 * 바닥 투영 결과 — 웨이포인트 배열과 같은 인덱스로 유지한다.
+	 * 소스 좌표가 달라지면 무효화되므로 목표가 바뀌어도 잘못된 좌표를 재사용하지 않는다.
+	 */
+	TArray<FLastFPSGroundedMarkerCacheEntry> GroundLocationCache;
 };

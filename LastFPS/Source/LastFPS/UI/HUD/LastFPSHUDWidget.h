@@ -97,6 +97,13 @@ protected:
     /** 맵 규칙에 따라 전투 HUD 하단 레이어를 접거나 편다. */
     void ApplyCombatHUDVisibility();
 
+    /**
+     * 컷신 재생 중에도 계속 표시할 루트 자식 위젯 이름.
+     * 무전 자막은 컷신 대사를 실어 나르므로 숨기면 안 된다. 비우면 HUD 전체를 접는다.
+     */
+    UPROPERTY(EditDefaultsOnly, Category="HUD|Cinematic")
+    TArray<FName> CinematicPersistentWidgets;
+
     /** 맵 규칙에 따라 상시 퀘스트 HUD(트래커·목표 마커)를 접거나 편다. */
     void ApplyQuestHUDVisibility();
 
@@ -280,6 +287,27 @@ private:
 
     UFUNCTION()
     void RetryInitialize();
+
+    // ── 컷신 중 UI 숨김 ────────────────────────────────────────────────
+    // 시퀀서의 bHideHud 는 캔버스 AHUD 만 끄고 UMG 위젯은 그대로 남는다.
+    // HUD 는 자기 자식만 책임지고, 화면·팝업 레이어는 레이아웃에 위임한다.
+
+    void BindCinematicEvents();
+    void UnbindCinematicEvents();
+
+    UFUNCTION()
+    void HandleCinematicStarted(bool bSkippable);
+
+    UFUNCTION()
+    void HandleCinematicFinished(bool bSkipped);
+
+    /** 컷신 중 유지 목록에 없는 루트 자식을 접고, 종료 시 원래 표시 상태로 되돌린다. */
+    void SetCinematicUIHidden(bool bHidden);
+
+    /** 접기 전 표시 상태. 맵 규칙으로 이미 숨겨져 있던 위젯을 켜 버리지 않으려고 남긴다. */
+    TMap<TWeakObjectPtr<UWidget>, ESlateVisibility> CinematicRestoreVisibilities;
+
+    TWeakObjectPtr<class ULastFPSCinematicPlaybackSubsystem> BoundCinematicSubsystem;
 
     UFUNCTION()
     void HandleDamageDealt(

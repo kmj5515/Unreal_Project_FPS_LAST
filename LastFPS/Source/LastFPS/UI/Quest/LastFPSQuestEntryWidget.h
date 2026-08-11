@@ -82,4 +82,10 @@ private:
 public:
 	/** 상태 enum → 표시 텍스트 (목록/HUD 공용) */
 	static FText StatusToText(ELastFPSQuestStatus Status);
+
+	/** 미수락 퀘스트에는 상태 대신 의뢰인 안내를 포함해 목록과 상세 화면의 표현을 통일한다. */
+	static FText BuildStatusText(
+		const ULastFPSQuestSubsystem* QuestSubsystem,
+		FName QuestId,
+		ELastFPSQuestStatus Status);
 };

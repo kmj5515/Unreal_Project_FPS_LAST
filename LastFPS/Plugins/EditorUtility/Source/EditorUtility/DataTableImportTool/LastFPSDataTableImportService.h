@@ -2,6 +2,9 @@
 
 #include "CoreMinimal.h"
 
+// 임포트 로그는 서비스와 모듈 진입점이 함께 사용하므로 파일별 static 정의 대신 모듈 공용 카테고리로 선언한다.
+EDITORUTILITY_API DECLARE_LOG_CATEGORY_EXTERN(LogLastFPSDataTableImport, Log, All);
+
 enum class ELastFPSDataTableImportSheetState : uint8
 {
 	Ready,
@@ -53,6 +56,7 @@ public:
 		const FSoftObjectPath& TargetAssetPath,
 		FText& OutError);
 	static FString GetExcelDirectory();
+	static FString GetCsvDirectory();
 
 private:
 	static class ULastFPSDataTableImportRegistry* LoadRegistry(FText& OutError);

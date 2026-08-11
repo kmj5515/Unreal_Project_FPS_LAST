@@ -6,6 +6,7 @@
 #include "GameplayTagContainer.h"
 #include "Hub/ILastFPSInteractable.h"
 #include "Hub/LastFPSNPCTypes.h"
+#include "Quest/LastFPSNPCQuestOption.h"
 #include "UI/Result/LastFPSMissionResultTypes.h"
 #include "LastFPSPlayerController.generated.h"
 
@@ -68,11 +69,17 @@ public:
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
     void ShowNotice(const FText& Title, const FText& Message);
 
+    /** 공지 팝업이 완전히 비활성화된 뒤 후속 작업을 실행한다. */
+    void ShowNoticeAfterClosed(const FText& Title, const FText& Message, FSimpleDelegate OnClosed);
+
     /**
      * 임무 결과 화면 표시. 전투 통계·사용 캐릭터는 이 컨트롤러가 PlayerState 에서 채우므로
      * 호출부는 임무 고유 정보(이름·시간·보상)만 넘긴다.
      */
     void ShowMissionResult(const FLastFPSMissionResult& InResult);
+
+    /** 임무 결과 팝업이 완전히 비활성화된 뒤 후속 작업을 실행한다. */
+    void ShowMissionResultAfterClosed(const FLastFPSMissionResult& InResult, FSimpleDelegate OnClosed);
 
     /** 수량 선택 모달 표시 — 결과(선택 수량, 취소 시 0)는 OnResult 로 전달. */
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI", meta=(AutoCreateRefTerm="OnResult"))
@@ -91,14 +98,24 @@ public:
 
     // ── NPC 상호작용 허브 (카메라 전환 + 액션 메뉴) ──────────────────
 
-    /** NPC 상호작용 시작 — NPC 카메라로 블렌드 + 허브 메뉴 열기 (InteractionComponent가 호출) */
-    void BeginNPCInteraction(AActor* NPCActor, UCameraComponent* TalkCamera, const FText& Name, const FText& InRole, const TArray<FLastFPSNPCAction>& Actions);
+    /** 퀘스트 용건이 있는 NPC의 상호작용 시작 — NPC 카메라로 블렌드 + 허브 메뉴 열기 */
+    void BeginNPCInteraction(
+        AActor* NPCActor,
+        UCameraComponent* TalkCamera,
+        const FText& Name,
+        const FText& InDescription,
+        const TArray<FLastFPSNPCAction>& Actions,
+        const TArray<FLastFPSNPCQuestOption>& QuestOptions,
+        const FLinearColor& InDialogueRadioSpeakerColor);
 
     /** NPC 상호작용 종료 — 캐릭터 카메라로 복귀 (허브 위젯 닫힐 때 호출) */
     void EndNPCInteraction();
 
     /** 허브 버튼 클릭 → 대화/화면 실행 (허브 위젯이 호출) */
     void ExecuteNPCAction(const FLastFPSNPCAction& Action);
+
+	/** 퀘스트 내용 행 클릭 → 현재 NPC와 상태를 다시 검증한 뒤 수락 또는 보고한다. */
+	bool ExecuteNPCQuestOption(const FLastFPSNPCQuestOption& Option);
 
     // ── 캐릭터 선택 ─────────────────────────────────────────────────
 
@@ -125,6 +142,10 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
     ULastFPSHUDWidget* GetHUDWidget() const { return HUDWidget; }
+
+    /** 게임 메뉴에서 호출하는 종료 확인 진입점. 실제 종료는 확인 이후에만 수행한다. */
+    UFUNCTION(BlueprintCallable, Category="LastFPS|UI")
+    void RequestQuitGame();
 
     /** 개발용 콘솔 명령을 서버 권한의 인카운터 처리로 전달한다. Shipping 빌드에서는 동작하지 않는다. */
     void RequestDebugClearEncounter(FName EncounterId);
@@ -187,8 +208,6 @@ protected:
      * 액션마다 핸들러를 만들지 않으려고 인스턴스에서 소스 액션을 되읽는다.
      */
     void HandleScreenHotkey(const FInputActionInstance& ActionInstance);
-    void ShowQuitPopup();
-
     /** 인게임 HUD push (휴면). 레이아웃 준비 전이면 재시도. */
     void TryPushHUDToUILayout();
 
@@ -266,8 +285,13 @@ protected:
     FGameplayTag InitialScreenTag;
     FGameplayTag EscMenuScreenTag;
 
-    /** 현재 범위 안에 있는 인터랙터블 (NPC 등) */
+    /** 현재 범위 안에 있는 인터랙터블 후보. 겹친 범위에서도 실제 거리를 다시 계산한다. */
+    TSet<TWeakObjectPtr<AActor>> InteractableCandidates;
+
+    /** 후보 중 현재 Pawn에 가장 가까운 인터랙터블 */
     TWeakObjectPtr<AActor> NearestInteractableActor;
+
+	void RefreshNearestInteractable();
 
     // ── NPC 상호작용 세션 (PC가 소유 — 복구 불변식 보존) ─────────────
     /**
@@ -281,6 +305,7 @@ protected:
         TWeakObjectPtr<AActor> NPC;                      // 현재 상호작용 NPC
         TWeakObjectPtr<AActor> PreviousViewTarget;       // 진입 전 시점(복귀용)
         FText NPCName;                                   // 대화 화자 폴백용
+        FLinearColor DialogueRadioSpeakerColor = FLinearColor::White;
         TWeakObjectPtr<ULastFPSNPCInteractionWidget> HubWidget;
         TWeakObjectPtr<ULastFPSDialogueWidget> Dialogue; // orphan 방지용
 
@@ -291,6 +316,7 @@ protected:
             NPC.Reset();
             PreviousViewTarget.Reset();
             NPCName = FText::GetEmpty();
+            DialogueRadioSpeakerColor = FLinearColor::White;
             HubWidget.Reset();
             Dialogue.Reset();
         }

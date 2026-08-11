@@ -7,6 +7,17 @@
 class UDataTable;
 enum class ELastFPSItemRarity : uint8;
 
+/** 성공한 상점 구매의 불변 영수증. 구매 외 아이템 증가와 퀘스트 판정을 분리하는 데이터 계약이다. */
+struct LASTFPS_API FLastFPSPurchaseReceipt
+{
+	FName ItemRowId;
+	int32 Quantity = 0;
+	int32 UnitPrice = 0;
+	int32 TotalCost = 0;
+};
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnLastFPSPurchaseCommitted, const FLastFPSPurchaseReceipt&);
+
 /** 잔액 변동 시 브로드캐스트 (상점 잔액 표시 / 구매 버튼 활성화 갱신용) */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLastFPSCreditsChanged, int32, NewCredits);
 
@@ -79,6 +90,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category="LastFPS|Economy")
 	FOnLastFPSInventoryChanged OnInventoryChanged;
+
+	/** 결제 성공 후 아이템 보유량 변경 전에 발행한다. C++ 퀘스트 시스템이 실제 구매액만 추적하는 계약이다. */
+	FOnLastFPSPurchaseCommitted OnPurchaseCommitted;
 
 protected:
 	/** 세션 시작 잔액 (DefaultGame.ini 로 조정 가능) */

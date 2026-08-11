@@ -21,10 +21,6 @@ void ULastFPSQuestDetailWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (Btn_Accept)
-	{
-		Btn_Accept->SetButtonText(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestActionAccept));
-	}
 	if (Btn_Cancel)
 	{
 		Btn_Cancel->SetButtonText(FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestActionCancel));
@@ -50,10 +46,8 @@ void ULastFPSQuestDetailWidget::NativeConstruct()
 
 void ULastFPSQuestDetailWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, FName InQuestId, const FLastFPSQuestData& InQuest)
 {
-	OwningSubsystem = InSubsystem;
+	BindStateChanged(InSubsystem);
 	BoundQuestId = InQuestId;
-
-	const ELastFPSQuestStatus RuntimeStatus = InSubsystem ? InSubsystem->GetStatus(InQuestId) : InQuest.Status;
 
 	if (TB_Title)
 	{
@@ -85,6 +79,25 @@ void ULastFPSQuestDetailWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, 
 		TB_Description->SetText(InQuest.Description);
 	}
 
+	RefreshRewardSection(InQuest.Reward, InQuest.RewardText);
+
+	// 진행/버튼처럼 상태에 따라 바뀌는 부분은 통지에서도 같은 코드로 다시 그린다.
+	RefreshRuntimeState();
+}
+
+void ULastFPSQuestDetailWidget::RefreshRuntimeState()
+{
+	ULastFPSQuestSubsystem* InSubsystem = OwningSubsystem.Get();
+	const FLastFPSQuestData* Def = InSubsystem ? InSubsystem->FindQuest(BoundQuestId) : nullptr;
+	if (!Def)
+	{
+		return;
+	}
+
+	const FLastFPSQuestData& InQuest = *Def;
+	const FName InQuestId = BoundQuestId;
+	const ELastFPSQuestStatus RuntimeStatus = InSubsystem->GetStatus(InQuestId);
+
 	// 아래 목표 루프는 "첫 미완료 목표"를 찾을 때 빈 텍스트인지로 판별한다.
 	// 이전 선택의 텍스트가 남아 있으면 판별이 실패하므로 루프 전에 반드시 비운다.
 	if (TB_CurrentObjective)
@@ -98,18 +111,16 @@ void ULastFPSQuestDetailWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, 
 
 	if (TB_Status)
 	{
-		TB_Status->SetText(ULastFPSQuestEntryWidget::StatusToText(RuntimeStatus));
+		TB_Status->SetText(ULastFPSQuestEntryWidget::BuildStatusText(
+			InSubsystem,
+			InQuestId,
+			RuntimeStatus));
 	}
-
-	RefreshRewardSection(InQuest.Reward, InQuest.RewardText);
-
-	// 완료/수령 상태에서는 남은 목표가 없으므로 진행 상황 자체를 표시하지 않는다.
-	const bool bQuestFinished =
-		RuntimeStatus == ELastFPSQuestStatus::Completed || RuntimeStatus == ELastFPSQuestStatus::Claimed;
 
 	TArray<FText> ProgressLines;
 
-	if (!bQuestFinished)
+	// 일지는 수락 전 목표를 진행 중인 것처럼 0/N으로 표시하지 않는다.
+	if (RuntimeStatus == ELastFPSQuestStatus::InProgress)
 	{
 		for (int32 i = 0; i < InQuest.Objectives.Num(); ++i)
 		{
@@ -182,12 +193,9 @@ void ULastFPSQuestDetailWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, 
 
 	if (Btn_Accept)
 	{
-		Btn_Accept->SetVisibility(RuntimeStatus == ELastFPSQuestStatus::NotStarted ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		// 수락은 QuestGiverNPC 대화 또는 시스템 자동 연계 경로에서만 수행한다.
+		Btn_Accept->SetVisibility(ESlateVisibility::Collapsed);
 		Btn_Accept->OnClicked().RemoveAll(this);
-		if (RuntimeStatus == ELastFPSQuestStatus::NotStarted)
-		{
-			Btn_Accept->OnClicked().AddUObject(this, &ULastFPSQuestDetailWidget::HandleAcceptClicked);
-		}
 	}
 
 	if (Btn_Cancel)
@@ -212,7 +220,7 @@ void ULastFPSQuestDetailWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, 
 
 	if (Btn_Claim)
 	{
-		const bool bClaimable = InSubsystem && InSubsystem->IsClaimable(InQuestId);
+		const bool bClaimable = InSubsystem->IsClaimable(InQuestId);
 		Btn_Claim->SetVisibility(bClaimable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 		Btn_Claim->OnClicked().RemoveAll(this);
 		if (bClaimable)
@@ -221,10 +229,7 @@ void ULastFPSQuestDetailWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, 
 		}
 	}
 
-	if (InSubsystem)
-	{
-		OnQuestTrackStateChanged(InSubsystem->IsQuestTracked(InQuestId));
-	}
+	OnQuestTrackStateChanged(InSubsystem->IsQuestTracked(InQuestId));
 }
 
 void ULastFPSQuestDetailWidget::RefreshRewardSection(const FLastFPSQuestReward& InReward, const FText& InFallbackText)
@@ -287,20 +292,13 @@ void ULastFPSQuestDetailWidget::RefreshRewardSection(const FLastFPSQuestReward& 
 		WrapBox_RewardItems->SetVisibility(NumItemSlots > 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
 
-	// 구조화 보상이 하나도 없을 때만 자유 표기 문자열로 대체한다.
+	// 환급은 구매 전 실제 금액을 알 수 없으므로 RewardText의 정책 설명을 구조화 보상과 함께 표시한다.
 	if (TB_Reward)
 	{
-		const bool bUseFallback = InReward.Credits <= 0 && NumItemSlots == 0 && !InFallbackText.IsEmpty();
+		const bool bUseFallback = !InFallbackText.IsEmpty()
+			&& (InReward.PurchaseRefund.IsEnabled() || (InReward.Credits <= 0 && NumItemSlots == 0));
 		TB_Reward->SetText(bUseFallback ? InFallbackText : FText::GetEmpty());
 		TB_Reward->SetVisibility(bUseFallback ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-	}
-}
-
-void ULastFPSQuestDetailWidget::HandleAcceptClicked()
-{
-	if (ULastFPSQuestSubsystem* Subsystem = OwningSubsystem.Get())
-	{
-		Subsystem->AcceptQuest(BoundQuestId);
 	}
 }
 
@@ -316,9 +314,43 @@ void ULastFPSQuestDetailWidget::HandleTrackClicked()
 {
 	if (ULastFPSQuestSubsystem* Subsystem = OwningSubsystem.Get())
 	{
-		bool bCurrentlyTracked = Subsystem->IsQuestTracked(BoundQuestId);
-		Subsystem->SetQuestTracked(BoundQuestId, !bCurrentlyTracked);
-		OnQuestTrackStateChanged(!bCurrentlyTracked);
+		// 요청이 거부될 수도 있으므로(진행중이 아닌 퀘스트 등) 결과는 상태 변경 통지로만 반영한다.
+		Subsystem->SetQuestTracked(BoundQuestId, !Subsystem->IsQuestTracked(BoundQuestId));
+	}
+}
+
+void ULastFPSQuestDetailWidget::HandleQuestStateChanged()
+{
+	if (BoundQuestId.IsNone())
+	{
+		return;
+	}
+
+	// 수락/취소/추적/보상 수령 결과가 상세 패널에도 즉시 반영되도록 상태 의존 표시를 전부 다시 그린다.
+	RefreshRuntimeState();
+}
+
+void ULastFPSQuestDetailWidget::BindStateChanged(ULastFPSQuestSubsystem* InSubsystem)
+{
+	if (OwningSubsystem.Get() == InSubsystem)
+	{
+		return;
+	}
+
+	UnbindStateChanged();
+	OwningSubsystem = InSubsystem;
+
+	if (InSubsystem)
+	{
+		InSubsystem->OnQuestStateChanged.AddUniqueDynamic(this, &ULastFPSQuestDetailWidget::HandleQuestStateChanged);
+	}
+}
+
+void ULastFPSQuestDetailWidget::UnbindStateChanged()
+{
+	if (ULastFPSQuestSubsystem* Previous = OwningSubsystem.Get())
+	{
+		Previous->OnQuestStateChanged.RemoveDynamic(this, &ULastFPSQuestDetailWidget::HandleQuestStateChanged);
 	}
 }
 
@@ -336,6 +368,8 @@ void ULastFPSQuestDetailWidget::NativeDestruct()
 	if (Btn_Cancel) Btn_Cancel->OnClicked().RemoveAll(this);
 	if (Btn_Track) Btn_Track->OnClicked().RemoveAll(this);
 	if (Btn_Claim) Btn_Claim->OnClicked().RemoveAll(this);
+
+	BindStateChanged(nullptr); // 구독 해제 + 소유 참조 비움
 
 	Super::NativeDestruct();
 }

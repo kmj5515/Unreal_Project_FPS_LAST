@@ -3,7 +3,14 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
-#include "Engine/Texture2D.h"
+#include "UI/Framework/LastFPSIconLoader.h"
+
+void ULastFPSWeaponSlotWidget::NativeDestruct()
+{
+	LastFPSIconLoader::CancelRequest(IconLoadHandle);
+
+	Super::NativeDestruct();
+}
 
 void ULastFPSWeaponSlotWidget::SetupSlot(
 	const int32 SlotIndex, const ULastFPSWeaponDefinition* Definition, const bool bIsActive)
@@ -14,19 +21,27 @@ void ULastFPSWeaponSlotWidget::SetupSlot(
 		TB_SlotKey->SetText(FText::AsNumber(SlotIndex + 1));
 	}
 
-	if (TB_WeaponName)
-	{
-		TB_WeaponName->SetText(Definition ? Definition->DisplayName : EmptySlotText);
-	}
+	// if (TB_WeaponName)
+	// {
+	// 	TB_WeaponName->SetText(Definition ? Definition->DisplayName : EmptySlotText);
+	// }
 
 	if (Img_WeaponIcon)
 	{
-		// HUD 는 이미 표시 중이라 지연 로드를 기다릴 수 없다. 아이콘은 작은 UI 텍스처이므로 동기 로드한다.
-		UTexture2D* IconTexture = Definition ? Definition->Icon.LoadSynchronous() : nullptr;
-		if (IconTexture)
+		LastFPSIconLoader::CancelRequest(IconLoadHandle);
+
+		const TSoftObjectPtr<UTexture2D>* Icon = nullptr;
+		if (Definition)
 		{
-			Img_WeaponIcon->SetBrushFromTexture(IconTexture);
+			Icon = &Definition->Icon;
+		}
+
+		if (Icon && !Icon->IsNull())
+		{
+			// 재사용된 슬롯에서 이전 브러시가 비동기 로드 동안 노출되지 않도록 먼저 비운다.
+			Img_WeaponIcon->SetBrushFromTexture(nullptr);
 			Img_WeaponIcon->SetVisibility(ESlateVisibility::HitTestInvisible);
+			IconLoadHandle = LastFPSIconLoader::RequestIcon(*this, *Img_WeaponIcon, *Icon);
 		}
 		else
 		{

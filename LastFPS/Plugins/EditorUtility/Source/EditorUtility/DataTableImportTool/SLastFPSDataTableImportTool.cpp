@@ -156,9 +156,25 @@ void SLastFPSDataTableImportTool::Construct(const FArguments& InArgs)
 			.AutoHeight()
 			.Padding(0.f, 8.f, 0.f, 0.f)
 			[
-				SAssignNew(StatusText, STextBlock)
-				.Text(LOCTEXT("Ready", "로그: 준비됨"))
-				.AutoWrapText(true)
+				// 실패 메시지는 행마다 원인이 붙어 매우 길어지므로, 한 줄로 잘리지 않도록
+				// 경계가 분명한 스크롤 영역 안에서 줄바꿈해 보여준다.
+				SNew(SBorder)
+				.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
+				.Padding(6.f)
+				[
+					SNew(SBox)
+					.MinDesiredHeight(72.f)
+					.MaxDesiredHeight(180.f)
+					[
+						SNew(SScrollBox)
+						+ SScrollBox::Slot()
+						[
+							SAssignNew(StatusText, STextBlock)
+							.Text(LOCTEXT("Ready", "로그: 준비됨"))
+							.AutoWrapText(true)
+						]
+					]
+				]
 			]
 		]
 	];
@@ -416,7 +432,7 @@ FReply SLastFPSDataTableImportTool::AddMappingClicked(const FName SheetName)
 		if (!DesktopPlatform->SaveFileDialog(
 			ParentWindowHandle,
 			LOCTEXT("ChooseCsvFileName", "매핑에 사용할 CSV 파일명 지정").ToString(),
-			FLastFPSDataTableImportService::GetExcelDirectory(),
+			FLastFPSDataTableImportService::GetCsvDirectory(),
 			TEXT(""),
 			TEXT("CSV files (*.csv)|*.csv"),
 			EFileDialogFlags::None,
@@ -434,13 +450,14 @@ FReply SLastFPSDataTableImportTool::AddMappingClicked(const FName SheetName)
 		FPaths::NormalizeFilename(CsvPath);
 		FString CsvDirectory = FPaths::GetPath(CsvPath);
 		FPaths::NormalizeDirectoryName(CsvDirectory);
-		FString ExcelDirectory = FPaths::ConvertRelativePathToFull(FLastFPSDataTableImportService::GetExcelDirectory());
-		FPaths::NormalizeDirectoryName(ExcelDirectory);
-		if (!FPaths::IsSamePath(CsvDirectory, ExcelDirectory)
+		FString ExpectedCsvDirectory = FPaths::ConvertRelativePathToFull(FLastFPSDataTableImportService::GetCsvDirectory());
+		FPaths::NormalizeDirectoryName(ExpectedCsvDirectory);
+		if (!FPaths::IsSamePath(CsvDirectory, ExpectedCsvDirectory)
 			|| !FPaths::GetExtension(CsvPath).Equals(TEXT("csv"), ESearchCase::IgnoreCase))
 		{
 			SetStatus(FText::Format(
-				LOCTEXT("CsvFileOutsideExcelDirectory", "로그: CSV 파일은 Excel 폴더 바로 아래의 .csv 파일로 지정해야 합니다. 선택={0}"),
+				LOCTEXT("CsvFileOutsideCsvDirectory", "로그: CSV 파일은 CSV 폴더 바로 아래의 .csv 파일로 지정해야 합니다. 폴더={0}, 선택={1}"),
+				FText::FromString(ExpectedCsvDirectory),
 				FText::FromString(CsvPath)));
 			return FReply::Handled();
 		}
@@ -520,7 +537,8 @@ void SLastFPSDataTableImportTool::SetStatus(const FText& Message)
 {
 	if (StatusText)
 	{
-		StatusText->SetText(Message);
+		// 검증 실패 메시지는 행별 원인을 ' | '로 이어 붙이므로, 원인마다 줄을 나눠야 읽을 수 있다.
+		StatusText->SetText(FText::FromString(Message.ToString().Replace(TEXT(" | "), TEXT("\n"))));
 	}
 }
 

@@ -12,6 +12,7 @@ namespace LastFPSUITags
 	LASTFPS_API FGameplayTag Layer_Overlay();
 
 	// UI.Screen.* — C++에서 참조하는 화면 태그 (나머지는 데이터/태그로만 사용)
+	LASTFPS_API FGameplayTag Screen_GameMenu();
 	LASTFPS_API FGameplayTag Screen_Inventory();
 	LASTFPS_API FGameplayTag Screen_Consumable();
 	LASTFPS_API FGameplayTag Screen_Mission();

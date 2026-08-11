@@ -45,7 +45,15 @@ void ULastFPSObjectiveMarkerWidget::RefreshMarkers()
 	{
 		Quest->GetActiveWaypoints(Waypoints);
 	}
-	PruneGroundLocationCache(Waypoints);
+
+	// 추적이 없으면(마커 0건) 이미 접힌 엔트리를 다시 접느라 뷰포트/DPI 조회를 반복하지 않는다.
+	if (Waypoints.IsEmpty() && GroundLocationCache.IsEmpty())
+	{
+		return;
+	}
+
+	// 캐시는 웨이포인트와 같은 인덱스로만 유지한다(별도 키·정리 순회가 필요 없다).
+	GroundLocationCache.SetNum(Waypoints.Num());
 
 	// 거리 기준 위치(플레이어 폰, 없으면 카메라).
 	FVector ViewerLocation = FVector::ZeroVector;
@@ -79,8 +87,15 @@ void ULastFPSObjectiveMarkerWidget::RefreshMarkers()
 		{
 			break;
 		}
-		Canvas_Markers->AddChildToCanvas(Entry);
+		UCanvasPanelSlot* CanvasSlot = Canvas_Markers->AddChildToCanvas(Entry);
+		if (CanvasSlot)
+		{
+			// 정렬/자동크기는 변하지 않으므로 생성 시 한 번만 잡는다.
+			CanvasSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+			CanvasSlot->SetAutoSize(true);
+		}
 		MarkerEntries.Add(Entry);
+		MarkerSlots.Add(CanvasSlot);
 	}
 
 	for (int32 i = 0; i < MarkerEntries.Num(); ++i)
@@ -98,17 +113,15 @@ void ULastFPSObjectiveMarkerWidget::RefreshMarkers()
 		}
 
 		const FLastFPSObjectiveWaypoint& Waypoint = Waypoints[i];
-		const FVector MarkerWorldLocation = ResolveGroundLocation(Waypoint, PC);
+		const FVector MarkerWorldLocation = ResolveGroundLocation(i, Waypoint, PC);
 
 		FVector2D ScreenPos = FVector2D::ZeroVector;
 		bool bOffScreen = false;
 		float AngleDeg = 0.f;
 		ComputeScreenPosition(PC, MarkerWorldLocation, ViewportSize, EdgeMargin, ScreenPos, bOffScreen, AngleDeg);
 
-		if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Entry->Slot))
+		if (UCanvasPanelSlot* CanvasSlot = MarkerSlots.IsValidIndex(i) ? MarkerSlots[i].Get() : nullptr)
 		{
-			CanvasSlot->SetAlignment(FVector2D(0.5f, 0.5f));
-			CanvasSlot->SetAutoSize(true);
 			CanvasSlot->SetPosition(ScreenPos / SafeDPI); // 픽셀 → 캔버스(슬레이트) 단위
 		}
 
@@ -125,37 +138,33 @@ void ULastFPSObjectiveMarkerWidget::RefreshMarkers()
 }
 
 FVector ULastFPSObjectiveMarkerWidget::ResolveGroundLocation(
+	const int32 WaypointIndex,
 	const FLastFPSObjectiveWaypoint& Waypoint,
 	APlayerController* PlayerController)
 {
-	// 동선 지점은 레벨에 이미 바닥으로 배치돼 있어 재투영이 필요 없다(매 프레임 트레이스 회피).
+	// 동선 지점은 레벨에 이미 바닥으로 배치돼 있어 재투영·캐시를 타지 않는다(매 프레임 트레이스 회피).
 	if (Waypoint.bIsRoutePoint)
 	{
 		return Waypoint.WorldLocation;
 	}
 
 	UWorld* World = GetWorld();
-	const FName CacheKey = Waypoint.LocationTag.IsValid()
-		? Waypoint.LocationTag.GetTagName()
-		: Waypoint.QuestId;
-	if (!World || CacheKey.IsNone())
+	if (!World || !GroundLocationCache.IsValidIndex(WaypointIndex))
 	{
 		return Waypoint.WorldLocation;
 	}
 
 	const double CurrentTime = World->GetTimeSeconds();
-	if (const FLastFPSGroundedMarkerCacheEntry* Cached = GroundLocationCache.Find(CacheKey))
+	FLastFPSGroundedMarkerCacheEntry& Cache = GroundLocationCache[WaypointIndex];
+	// 같은 인덱스라도 다른 목표로 바뀌면 소스 좌표가 달라져 캐시가 자동으로 무효화된다.
+	if (Cache.SourceLocation.Equals(Waypoint.WorldLocation, 1.f)
+		&& (Cache.bHasGroundHit || CurrentTime < Cache.NextTraceTime))
 	{
-		if (Cached->SourceLocation.Equals(Waypoint.WorldLocation, 1.f)
-			&& (Cached->bHasGroundHit || CurrentTime < Cached->NextTraceTime))
-		{
-			return Cached->bHasGroundHit
-				? Cached->GroundLocation
-				: Waypoint.WorldLocation;
-		}
+		return Cache.bHasGroundHit
+			? Cache.GroundLocation
+			: Waypoint.WorldLocation;
 	}
 
-	FLastFPSGroundedMarkerCacheEntry& Cache = GroundLocationCache.FindOrAdd(CacheKey);
 	Cache.SourceLocation = Waypoint.WorldLocation;
 	Cache.GroundLocation = Waypoint.WorldLocation;
 	Cache.NextTraceTime = CurrentTime + FMath::Max(GroundTraceRetryInterval, 0.1f);
@@ -191,35 +200,6 @@ FVector ULastFPSObjectiveMarkerWidget::ResolveGroundLocation(
 	return Cache.bHasGroundHit
 		? Cache.GroundLocation
 		: Waypoint.WorldLocation;
-}
-
-void ULastFPSObjectiveMarkerWidget::PruneGroundLocationCache(
-	const TArray<FLastFPSObjectiveWaypoint>& Waypoints)
-{
-	TSet<FName> ActiveKeys;
-	for (const FLastFPSObjectiveWaypoint& Waypoint : Waypoints)
-	{
-		if (Waypoint.bIsRoutePoint)
-		{
-			continue; // 동선 지점은 캐시를 쓰지 않는다.
-		}
-
-		const FName CacheKey = Waypoint.LocationTag.IsValid()
-			? Waypoint.LocationTag.GetTagName()
-			: Waypoint.QuestId;
-		if (!CacheKey.IsNone())
-		{
-			ActiveKeys.Add(CacheKey);
-		}
-	}
-
-	for (auto CacheIt = GroundLocationCache.CreateIterator(); CacheIt; ++CacheIt)
-	{
-		if (!ActiveKeys.Contains(CacheIt.Key()))
-		{
-			CacheIt.RemoveCurrent();
-		}
-	}
 }
 
 void ULastFPSObjectiveMarkerWidget::ComputeScreenPosition(

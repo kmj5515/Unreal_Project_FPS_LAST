@@ -38,7 +38,7 @@ void ULastFPSAmmoPresenter::BindToWeaponComponent(UWeaponComponent* InWeaponComp
     CachedCurrentAmmo      = InWeaponComponent->GetCurrentMagazineAmmo();
     CachedMagazineCapacity = InWeaponComponent->GetMagazineCapacity();
     CachedReserveAmmo      = InWeaponComponent->GetCurrentReserveAmmo();
-    bHasWeapon             = true;
+    bHasWeapon             = InWeaponComponent->HasWeapon();
 
     UpdateDisplay();
 }

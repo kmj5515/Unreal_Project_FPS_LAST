@@ -19,6 +19,7 @@
 #include "Localization/LastFPSLocalization.h"
 #include "Misc/PackageName.h"
 #include "Online/OnlineSessionNames.h"
+#include "Quest/LastFPSQuestSubsystem.h"
 #include "TimerManager.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LastFPSLevelTravelSubsystem)
@@ -96,6 +97,7 @@ void ULastFPSLevelTravelSubsystem::Initialize(FSubsystemCollectionBase& Collecti
 	Collection.InitializeDependency<UCommonSessionSubsystem>();
 	Collection.InitializeDependency<ULastFPSLoadingIndicatorSubsystem>();
 	Collection.InitializeDependency<ULastFPSEquipmentSubsystem>();
+	Collection.InitializeDependency<ULastFPSQuestSubsystem>();
 
 	if (UCommonSessionSubsystem* Sessions = GetCommonSessionSubsystem())
 	{
@@ -150,6 +152,15 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::RequestTravel(
 	APlayerController* LocalPlayerController,
 	const FLastFPSTravelEntryRequest& Request)
 {
+	if (!IsTravelRequestUnlocked(Request))
+	{
+		UE_LOG(LogLastFPSLevelTravel, Log,
+			TEXT("퀘스트 조건이 충족되지 않아 이동 요청을 거부했습니다: Type=%s, BattleDefinition=%s"),
+			*StaticEnum<ELastFPSTravelEntryType>()->GetNameStringByValue(static_cast<int64>(Request.Type)),
+			*Request.BattleDefinitionId.ToString());
+		return ELastFPSTravelRequestResult::QuestLocked;
+	}
+
 	switch (Request.Type)
 	{
 	case ELastFPSTravelEntryType::LocalDestination:
@@ -175,6 +186,58 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::RequestTravel(
 			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::TravelUnsupportedEntryType));
 		return ELastFPSTravelRequestResult::InvalidDefinition;
 	}
+}
+
+bool ULastFPSLevelTravelSubsystem::IsTravelRequestUnlocked(
+	const FLastFPSTravelEntryRequest& Request) const
+{
+	if (Request.Type != ELastFPSTravelEntryType::QuickPlayBattle)
+	{
+		return true;
+	}
+
+	const ULastFPSLevelTravelSettings* Settings = GetDefault<ULastFPSLevelTravelSettings>();
+	const FLastFPSTravelQuestRequirement* Requirement = Settings
+		? Settings->FindQuestRequirement(Request.BattleDefinitionId)
+		: nullptr;
+	if (!Requirement || Requirement->RequiredQuestId.IsNone())
+	{
+		return true;
+	}
+
+	const ULastFPSQuestSubsystem* QuestSubsystem = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<ULastFPSQuestSubsystem>()
+		: nullptr;
+	if (!QuestSubsystem)
+	{
+		return false;
+	}
+
+	switch (QuestSubsystem->GetStatus(Requirement->RequiredQuestId))
+	{
+	case ELastFPSQuestStatus::InProgress:
+	case ELastFPSQuestStatus::Completed:
+		return true;
+	case ELastFPSQuestStatus::Claimed:
+		return Requirement->bAllowReplayAfterClaimed;
+	default:
+		return false;
+	}
+}
+
+TSoftObjectPtr<UTexture2D> ULastFPSLevelTravelSubsystem::GetTravelLockedIcon(
+	const FLastFPSTravelEntryRequest& Request) const
+{
+	if (Request.Type != ELastFPSTravelEntryType::QuickPlayBattle)
+	{
+		return TSoftObjectPtr<UTexture2D>();
+	}
+
+	const ULastFPSLevelTravelSettings* Settings = GetDefault<ULastFPSLevelTravelSettings>();
+	const FLastFPSTravelQuestRequirement* Requirement = Settings
+		? Settings->FindQuestRequirement(Request.BattleDefinitionId)
+		: nullptr;
+	return Requirement ? Requirement->LockedIcon : TSoftObjectPtr<UTexture2D>();
 }
 
 ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::TravelToDestination(

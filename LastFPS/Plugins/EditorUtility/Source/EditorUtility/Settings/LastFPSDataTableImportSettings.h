@@ -22,7 +22,12 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Excel", meta=(RelativeToGameDir))
 	FDirectoryPath ExcelDirectory;
 
+	// 생성된 CSV는 사람이 편집하는 워크북과 성격이 다르므로 폴더를 분리해 원본과 산출물을 눈으로 구분한다.
+	UPROPERTY(Config, EditAnywhere, Category="Excel", meta=(RelativeToGameDir))
+	FDirectoryPath CsvDirectory;
+
 	FString ResolveExcelDirectory() const;
+	FString ResolveCsvDirectory() const;
 	bool SetExcelDirectoryFromAbsolutePath(const FString& AbsolutePath, FText& OutError);
 
 	static const ULastFPSDataTableImportSettings* Get()

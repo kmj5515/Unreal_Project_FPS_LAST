@@ -70,6 +70,9 @@ protected:
 	bool bClampPanToView = true;
 
 private:
+	UFUNCTION()
+	void RefreshDestinationAccess();
+
 	/** @param DestinationButton 클릭된 버튼. 화면이 파괴된 뒤 호출될 수 있어 약참조로 넘긴다. */
 	void HandleDestinationClicked(TWeakObjectPtr<ULastFPSTravelEntryButton> DestinationButton);
 

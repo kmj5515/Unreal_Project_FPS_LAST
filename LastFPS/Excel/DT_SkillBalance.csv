@@ -1,7 +1,0 @@
-﻿---,Damage,Cooldown,Cost,Range,Radius,Duration,Parameters
-# 자동 생성됨 - 직접 수정하지 말고 원본 xlsx를 편집하세요.,,,,,,,
-Viola_IceProjectile,15.000000,4.000000,0.000000,0.000000,0.000000,0.000000,()
-Viola_IceAura,1000.000000,8.000000,0.000000,0.000000,250.000000,10.000000,"(((TagName=""Skill.Parameter.AreaDuration""), 10.000000),((TagName=""Skill.Parameter.DamageInterval""), 0.100000))"
-Viola_FrostStorm,65.000000,10.000000,0.000000,0.000000,1000.000000,10.000000,"(((TagName=""Skill.Parameter.DamageInterval""), 1.000000),((TagName=""Skill.Parameter.ConeAngle""), 70.000000))"
-Viola_IceStorm,15.000000,10.000000,0.000000,1500.000000,2000.000000,10.000000,"(((TagName=""Skill.Parameter.DamageInterval""), 0.200000))"
-Viola_ProbePassive,10.000000,0.000000,0.000000,0.000000,0.000000,0.000000,()

@@ -31,3 +31,13 @@ const FPrimaryAssetId& ULastFPSLevelTravelSettings::GetMapId(
 		return MainMenuMapId;
 	}
 }
+
+const FLastFPSTravelQuestRequirement* ULastFPSLevelTravelSettings::FindQuestRequirement(
+	const FPrimaryAssetId& BattleDefinitionId) const
+{
+	return BattleQuestRequirements.FindByPredicate(
+		[&BattleDefinitionId](const FLastFPSTravelQuestRequirement& Requirement)
+		{
+			return Requirement.BattleDefinitionId == BattleDefinitionId;
+		});
+}

@@ -16,8 +16,9 @@
 #include "Serialization/JsonSerializer.h"
 #include "Settings/LastFPSDataTableImportSettings.h"
 #include "Subsystems/EditorAssetSubsystem.h"
+#include "UObject/UnrealType.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogLastFPSDataTableImport, Log, All);
+DEFINE_LOG_CATEGORY(LogLastFPSDataTableImport);
 
 #define LOCTEXT_NAMESPACE "LastFPSDataTableImportService"
 
@@ -177,7 +178,7 @@ namespace
 		FString& OutCleanCsvPath,
 		FText& OutError)
 	{
-		const FString ExcelDirectory = FLastFPSDataTableImportService::GetExcelDirectory();
+		const FString CsvDirectory = FLastFPSDataTableImportService::GetCsvDirectory();
 		if (!FLastFPSDataTableImportMapping::IsValidCsvFileName(Mapping.CsvFileName))
 		{
 			OutError = FText::Format(
@@ -189,16 +190,64 @@ namespace
 			return false;
 		}
 
-		// 커밋용 CSV에는 자동 생성 안내 행을 남겨 직접 편집을 막지만, Unreal 임포터에는 스키마 행만 허용되므로 안내 행이 없는 clean CSV를 별도로 전달한다.
-		OutGeneratedCsvPath = FPaths::Combine(ExcelDirectory, Mapping.CsvFileName);
-		if (IFileManager::Get().FileExists(*OutGeneratedCsvPath))
+		// 커밋용 CSV는 저장소에 남는 산출물이고, Unreal 임포터에 넘기는 clean CSV는 Saved 아래의 임시본이다.
+		// 워크북과 산출물을 한 폴더에 섞으면 원본을 찾기 어려워지므로 CSV는 별도 폴더에 모은다.
+		IFileManager::Get().MakeDirectory(*CsvDirectory, true);
+		OutGeneratedCsvPath = FPaths::Combine(CsvDirectory, Mapping.CsvFileName);
+
+		const FString WorkingDirectory = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DataTableImport"));
+		const FString FilePrefix = Workbook.WorkbookName.ToString() + TEXT("_") + Mapping.SheetName.ToString() + TEXT(".csv");
+		const FString CleanDirectory = FPaths::Combine(WorkingDirectory, TEXT("Clean"));
+		const FString PendingDirectory = FPaths::Combine(WorkingDirectory, TEXT("Pending"));
+		IFileManager::Get().MakeDirectory(*CleanDirectory, true);
+		IFileManager::Get().MakeDirectory(*PendingDirectory, true);
+		OutCleanCsvPath = FPaths::Combine(CleanDirectory, FilePrefix);
+
+		// 커밋용 CSV를 곧바로 덮어쓰면 사람이 손댄 내용인지 판별할 기회가 사라지므로, 먼저 Pending에 만들어 두고 비교한 뒤 반영한다.
+		const FString PendingCsvPath = FPaths::Combine(PendingDirectory, FilePrefix);
+
+		TArray<FString> Arguments = {
+			TEXT("--project-dir"), FPaths::ProjectDir(),
+			TEXT("convert"),
+			TEXT("--workbook"), Workbook.WorkbookPath,
+			TEXT("--sheet"), Mapping.SheetName.ToString(),
+			TEXT("--output"), PendingCsvPath,
+			TEXT("--clean-output"), OutCleanCsvPath
+		};
+		if (bLocalize)
 		{
+			Arguments.Add(TEXT("--localize"));
+		}
+		if (!ExecutePython(Arguments, OutError))
+		{
+			return false;
+		}
+
+		FString PendingText;
+		if (!FFileHelper::LoadFileToString(PendingText, *PendingCsvPath))
+		{
+			OutError = FText::Format(
+				LOCTEXT("PendingCsvReadFailed", "변환 결과 CSV를 읽을 수 없습니다: {0}"),
+				FText::FromString(PendingCsvPath));
+			return false;
+		}
+
+		// 시각만으로 판단하면 임포트가 직접 만든 CSV까지 사람 편집으로 오인해 이후 임포트가 전부 거부된다.
+		// 내용이 실제로 달라졌을 때만 사람 편집으로 보고 거부한다.
+		FString ExistingText;
+		if (FFileHelper::LoadFileToString(ExistingText, *OutGeneratedCsvPath))
+		{
+			if (ExistingText.Equals(PendingText, ESearchCase::CaseSensitive))
+			{
+				return true;
+			}
+
 			const FDateTime CsvModifiedTime = IFileManager::Get().GetTimeStamp(*OutGeneratedCsvPath);
 			const FDateTime WorkbookModifiedTime = IFileManager::Get().GetTimeStamp(*Workbook.WorkbookPath);
 			if (CsvModifiedTime > WorkbookModifiedTime)
 			{
 				OutError = FText::Format(
-					LOCTEXT("CsvNewerThanWorkbook", "기존 CSV가 워크북보다 최신이므로 덮어쓰기를 거부했습니다. CSV={0}, 워크북={1}"),
+					LOCTEXT("CsvNewerThanWorkbook", "기존 CSV가 워크북보다 최신이고 내용도 달라 덮어쓰기를 거부했습니다. 워크북에 반영한 뒤 다시 시도하세요. CSV={0}, 워크북={1}"),
 					FText::FromString(OutGeneratedCsvPath),
 					FText::FromString(Workbook.WorkbookPath));
 				UE_LOG(
@@ -212,25 +261,14 @@ namespace
 			}
 		}
 
-		const FString CleanDirectory = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DataTableImport/Clean"));
-		IFileManager::Get().MakeDirectory(*CleanDirectory, true);
-		OutCleanCsvPath = FPaths::Combine(
-			CleanDirectory,
-			Workbook.WorkbookName.ToString() + TEXT("_") + Mapping.SheetName.ToString() + TEXT(".csv"));
-
-		TArray<FString> Arguments = {
-			TEXT("--project-dir"), FPaths::ProjectDir(),
-			TEXT("convert"),
-			TEXT("--workbook"), Workbook.WorkbookPath,
-			TEXT("--sheet"), Mapping.SheetName.ToString(),
-			TEXT("--output"), OutGeneratedCsvPath,
-			TEXT("--clean-output"), OutCleanCsvPath
-		};
-		if (bLocalize)
+		if (IFileManager::Get().Copy(*OutGeneratedCsvPath, *PendingCsvPath, true, true) != COPY_OK)
 		{
-			Arguments.Add(TEXT("--localize"));
+			OutError = FText::Format(
+				LOCTEXT("GeneratedCsvWriteFailed", "커밋용 CSV를 갱신하지 못했습니다. 파일이 열려 있는지 확인하세요: {0}"),
+				FText::FromString(OutGeneratedCsvPath));
+			return false;
 		}
-		return ExecutePython(Arguments, OutError);
+		return true;
 	}
 
 	bool SaveImportedAsset(UObject* Asset, FText& OutError)
@@ -248,16 +286,141 @@ namespace
 		return true;
 	}
 
+	// Unreal CSV 임포터는 구조체·태그컨테이너 컬럼의 빈 값을 거부하고 '()'를 요구한다.
+	// 기획자가 셀을 비워두는 것은 자연스러운 입력이므로, RowStruct에서 구조체로 확인된 컬럼에 한해 빈 값을 채운다.
+	// 컬럼 타입을 근거로 판단하므로 문자열 컬럼의 빈 값은 그대로 둔다.
+	FString FillEmptyStructCells(const FString& CsvText, const UScriptStruct* RowStruct)
+	{
+		if (!RowStruct || CsvText.IsEmpty())
+		{
+			return CsvText;
+		}
+
+		TSet<FString> StructColumnNames;
+		for (TFieldIterator<FProperty> PropertyIt(RowStruct); PropertyIt; ++PropertyIt)
+		{
+			if (PropertyIt->IsA<FStructProperty>())
+			{
+				StructColumnNames.Add(PropertyIt->GetName());
+				StructColumnNames.Add(PropertyIt->GetAuthoredName());
+			}
+		}
+		if (StructColumnNames.Num() == 0)
+		{
+			return CsvText;
+		}
+
+		FString Result;
+		Result.Reserve(CsvText.Len() + 64);
+
+		TArray<FString> HeaderNames;
+		TSet<int32> StructColumnIndexes;
+		FString Field;
+		int32 ColumnIndex = 0;
+		int32 RowIndex = 0;
+		bool bInQuotes = false;
+		bool bFieldOpen = true;
+
+		auto CloseField = [&Field, &Result, &HeaderNames, &StructColumnIndexes, &ColumnIndex, &RowIndex, &bFieldOpen]()
+		{
+			if (!bFieldOpen)
+			{
+				return;
+			}
+			if (RowIndex == 0)
+			{
+				HeaderNames.Add(Field);
+			}
+			else if (Field.IsEmpty() && StructColumnIndexes.Contains(ColumnIndex))
+			{
+				Result += TEXT("()");
+			}
+			Field.Reset();
+			bFieldOpen = false;
+		};
+
+		for (int32 Index = 0; Index < CsvText.Len(); ++Index)
+		{
+			const TCHAR Char = CsvText[Index];
+			if (bInQuotes)
+			{
+				Result.AppendChar(Char);
+				if (Char == TEXT('"'))
+				{
+					const bool bEscapedQuote = (Index + 1 < CsvText.Len()) && CsvText[Index + 1] == TEXT('"');
+					if (bEscapedQuote)
+					{
+						Result.AppendChar(CsvText[++Index]);
+						continue;
+					}
+					bInQuotes = false;
+					continue;
+				}
+				Field.AppendChar(Char);
+				continue;
+			}
+
+			if (Char == TEXT('"'))
+			{
+				// 인용된 필드는 내용이 비어 보여도 명시적으로 기록된 값이므로 치환 대상에서 제외한다.
+				bInQuotes = true;
+				bFieldOpen = true;
+				Field.AppendChar(Char);
+				Result.AppendChar(Char);
+				continue;
+			}
+			if (Char == TEXT(','))
+			{
+				CloseField();
+				Result.AppendChar(Char);
+				++ColumnIndex;
+				bFieldOpen = true;
+				continue;
+			}
+			if (Char == TEXT('\r') || Char == TEXT('\n'))
+			{
+				CloseField();
+				Result.AppendChar(Char);
+				if (Char == TEXT('\n'))
+				{
+					if (RowIndex == 0)
+					{
+						for (int32 HeaderIndex = 0; HeaderIndex < HeaderNames.Num(); ++HeaderIndex)
+						{
+							if (StructColumnNames.Contains(HeaderNames[HeaderIndex]))
+							{
+								StructColumnIndexes.Add(HeaderIndex);
+							}
+						}
+					}
+					++RowIndex;
+					ColumnIndex = 0;
+					bFieldOpen = true;
+				}
+				continue;
+			}
+
+			Field.AppendChar(Char);
+			Result.AppendChar(Char);
+			bFieldOpen = true;
+		}
+		CloseField();
+
+		return Result;
+	}
+
 	bool ImportDataTable(UDataTable* DataTable, const FString& CsvPath, FText& OutError)
 	{
-		FString CsvText;
-		if (!FFileHelper::LoadFileToString(CsvText, *CsvPath))
+		FString RawCsvText;
+		if (!FFileHelper::LoadFileToString(RawCsvText, *CsvPath))
 		{
 			OutError = FText::Format(
 				LOCTEXT("CsvReadFailed", "임포트용 CSV를 읽을 수 없습니다: {0}"),
 				FText::FromString(CsvPath));
 			return false;
 		}
+
+		const FString CsvText = FillEmptyStructCells(RawCsvText, DataTable->GetRowStruct());
 
 		UDataTable* ValidationCopy = DuplicateObject<UDataTable>(DataTable, GetTransientPackage());
 		if (!ValidationCopy)
@@ -295,6 +458,12 @@ FString FLastFPSDataTableImportService::GetExcelDirectory()
 {
 	const ULastFPSDataTableImportSettings* Settings = ULastFPSDataTableImportSettings::Get();
 	return Settings ? Settings->ResolveExcelDirectory() : FString();
+}
+
+FString FLastFPSDataTableImportService::GetCsvDirectory()
+{
+	const ULastFPSDataTableImportSettings* Settings = ULastFPSDataTableImportSettings::Get();
+	return Settings ? Settings->ResolveCsvDirectory() : FString();
 }
 
 ULastFPSDataTableImportRegistry* FLastFPSDataTableImportService::LoadRegistry(FText& OutError)

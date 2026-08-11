@@ -24,15 +24,34 @@ namespace
 ULastFPSDataTableImportSettings::ULastFPSDataTableImportSettings()
 {
 	ExcelDirectory.Path = TEXT("LastFPS/Excel");
+	CsvDirectory.Path = TEXT("LastFPS/Excel/Csv");
+}
+
+namespace
+{
+	FString ResolveConfiguredDirectory(const FString& ConfiguredPath)
+	{
+		if (FPaths::IsRelative(ConfiguredPath))
+		{
+			return FPaths::ConvertRelativePathToFull(FPaths::Combine(GetWorkspaceRoot(), ConfiguredPath));
+		}
+		return FPaths::ConvertRelativePathToFull(ConfiguredPath);
+	}
 }
 
 FString ULastFPSDataTableImportSettings::ResolveExcelDirectory() const
 {
-	if (FPaths::IsRelative(ExcelDirectory.Path))
+	return ResolveConfiguredDirectory(ExcelDirectory.Path);
+}
+
+FString ULastFPSDataTableImportSettings::ResolveCsvDirectory() const
+{
+	// 설정이 비어 있으면 워크북 폴더로 되돌려, 잘못 저장된 설정 때문에 산출물이 엉뚱한 곳에 쌓이지 않게 한다.
+	if (CsvDirectory.Path.IsEmpty())
 	{
-		return FPaths::ConvertRelativePathToFull(FPaths::Combine(GetWorkspaceRoot(), ExcelDirectory.Path));
+		return ResolveExcelDirectory();
 	}
-	return FPaths::ConvertRelativePathToFull(ExcelDirectory.Path);
+	return ResolveConfiguredDirectory(CsvDirectory.Path);
 }
 
 bool ULastFPSDataTableImportSettings::SetExcelDirectoryFromAbsolutePath(const FString& AbsolutePath, FText& OutError)

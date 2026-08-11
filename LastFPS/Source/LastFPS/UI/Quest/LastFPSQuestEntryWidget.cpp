@@ -40,7 +40,7 @@ void ULastFPSQuestEntryWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, F
 
 	if (TB_Status)
 	{
-		TB_Status->SetText(StatusToText(RuntimeStatus));
+		TB_Status->SetText(BuildStatusText(InSubsystem, InQuestId, RuntimeStatus));
 	}
 
 	if (TB_Reward)
@@ -52,7 +52,7 @@ void ULastFPSQuestEntryWidget::SetupQuest(ULastFPSQuestSubsystem* InSubsystem, F
 	// ClearEncounter 요구량은 QuestTable의 중복 숫자가 아니라 현재 Mode의 Encounter Profile이 제공한다.
 	if (TB_Progress)
 	{
-		if (InQuest.Objectives.Num() > 0)
+		if (RuntimeStatus == ELastFPSQuestStatus::InProgress && InQuest.Objectives.Num() > 0)
 		{
 			TArray<FText> ProgressLines;
 			for (int32 i = 0; i < InQuest.Objectives.Num(); ++i)
@@ -169,4 +169,23 @@ FText ULastFPSQuestEntryWidget::StatusToText(ELastFPSQuestStatus Status)
 	default:
 		return FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestStatusNotStarted);
 	}
+}
+
+FText ULastFPSQuestEntryWidget::BuildStatusText(
+	const ULastFPSQuestSubsystem* QuestSubsystem,
+	const FName QuestId,
+	const ELastFPSQuestStatus Status)
+{
+	if (Status == ELastFPSQuestStatus::NotStarted && QuestSubsystem)
+	{
+		const FText QuestGiverName = QuestSubsystem->GetQuestGiverDisplayName(QuestId);
+		if (!QuestGiverName.IsEmpty())
+		{
+			return FText::Format(
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestStatusAvailableFromNPCFormat),
+				QuestGiverName);
+		}
+	}
+
+	return StatusToText(Status);
 }

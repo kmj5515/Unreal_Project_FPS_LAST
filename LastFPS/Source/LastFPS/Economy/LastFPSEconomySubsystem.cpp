@@ -100,7 +100,9 @@ void ULastFPSEconomySubsystem::AddCredits(int32 Amount)
 		return;
 	}
 
-	Credits += Amount;
+	Credits = static_cast<int32>(FMath::Min<int64>(
+		MAX_int32,
+		static_cast<int64>(Credits) + static_cast<int64>(Amount)));
 	OnCreditsChanged.Broadcast(Credits);
 }
 
@@ -108,7 +110,19 @@ bool ULastFPSEconomySubsystem::TryPurchase(FName GrantItemRowId, int32 Price, in
 {
 	const int32 Qty       = FMath::Max(1, Count);
 	const int32 UnitCost  = FMath::Max(0, Price);
-	const int32 TotalCost = UnitCost * Qty;
+	const int64 TotalCost64 = static_cast<int64>(UnitCost) * static_cast<int64>(Qty);
+	if (TotalCost64 > MAX_int32)
+	{
+		UE_LOG(
+			LogLastFPSEconomy,
+			Warning,
+			TEXT("구매 거부: 총 결제액이 지원 범위를 초과했습니다. Item='%s', Price=%d, Count=%d"),
+			*GrantItemRowId.ToString(),
+			UnitCost,
+			Qty);
+		return false;
+	}
+	const int32 TotalCost = static_cast<int32>(TotalCost64);
 
 	// 차감 전에 정의 검증 — 깨진 참조에 크레딧만 날아가는 유령 구매 차단.
 	if (!GrantItemRowId.IsNone() && GetItemTable() && !HasItemDefinition(GrantItemRowId))
@@ -125,6 +139,15 @@ bool ULastFPSEconomySubsystem::TryPurchase(FName GrantItemRowId, int32 Price, in
 
 	Credits -= TotalCost;
 	OnCreditsChanged.Broadcast(Credits);
+
+	// 보유량 변경이 퀘스트를 완료·자동수령하기 전에 실제 결제 영수증을 먼저 기록한다.
+	// 이 이벤트는 검증과 차감이 끝난 성공 구매에만 발생한다.
+	FLastFPSPurchaseReceipt Receipt;
+	Receipt.ItemRowId = GrantItemRowId;
+	Receipt.Quantity = Qty;
+	Receipt.UnitPrice = UnitCost;
+	Receipt.TotalCost = TotalCost;
+	OnPurchaseCommitted.Broadcast(Receipt);
 
 	// 화폐 차감 후 아이템 지급 (AddItem 이 OnInventoryChanged 브로드캐스트)
 	if (!GrantItemRowId.IsNone())

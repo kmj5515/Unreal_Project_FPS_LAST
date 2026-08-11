@@ -56,6 +56,10 @@ struct LASTFPS_API FLastFPSMissionResult
 	UPROPERTY(BlueprintReadOnly, Category="MissionResult")
 	int32 Credits = 0;
 
+	/** 구매 퀘스트에서 실제 결제액을 기준으로 별도 환급된 크레딧. */
+	UPROPERTY(BlueprintReadOnly, Category="MissionResult")
+	int32 PurchaseRefundCredits = 0;
+
 	/** 지급된 아이템. 비어 있으면 획득 목록을 접는다. */
 	UPROPERTY(BlueprintReadOnly, Category="MissionResult")
 	TArray<FLastFPSItemGrant> Items;

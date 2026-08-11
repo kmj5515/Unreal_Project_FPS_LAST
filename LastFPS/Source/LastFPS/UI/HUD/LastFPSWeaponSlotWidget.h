@@ -7,6 +7,7 @@
 class UImage;
 class UTextBlock;
 class ULastFPSWeaponDefinition;
+struct FStreamableHandle;
 
 /**
  * WBP_HUDWeaponSlot 의 Parent — HUD 무기 슬롯 1칸.
@@ -31,11 +32,10 @@ public:
 	void SetActive(bool bIsActive);
 
 protected:
-	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UTextBlock> TB_SlotKey;
+	virtual void NativeDestruct() override;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UTextBlock> TB_WeaponName;
+	TObjectPtr<UTextBlock> TB_SlotKey;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UImage> Img_WeaponIcon;
@@ -51,4 +51,8 @@ protected:
 	/** 비활성 슬롯을 흐리게 보여 활성 슬롯이 눈에 띄게 한다. */
 	UPROPERTY(EditDefaultsOnly, Category="HUD|Weapon Slot", meta=(ClampMin="0.0", ClampMax="1.0"))
 	float InactiveOpacity = 0.45f;
+
+private:
+	/** 슬롯 내용이 바뀌거나 위젯이 제거될 때 이전 비동기 아이콘 요청을 취소하기 위해 보관한다. */
+	TSharedPtr<FStreamableHandle> IconLoadHandle;
 };

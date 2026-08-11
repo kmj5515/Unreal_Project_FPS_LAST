@@ -26,6 +26,10 @@ struct FLastFPSNPCActionData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|NPC")
 	ELastFPSNPCActionType Type = ELastFPSNPCActionType::Dialogue;
 
+	/** 이 버튼이 놓일 탭 (임무 탭은 진행 상황으로 자동 구성되므로 기본은 대화). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|NPC")
+	ELastFPSNPCActionTab Tab = ELastFPSNPCActionTab::Talk;
+
 	/** Type==Screen 일 때 열 화면 태그 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|NPC", meta=(Categories="UI.Screen"))
 	FGameplayTag ScreenTag;
@@ -50,6 +54,10 @@ struct FLastFPSNPCSpawnData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|NPC")
 	FText NPCRole;
+
+	/** 상호작용 화면 우측에 표시할 인물 소개문 (여러 줄). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|NPC", meta=(MultiLine=true))
+	FText Description;
 
 	/** 머리 위 마커의 G 힌트 텍스트 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|NPC")

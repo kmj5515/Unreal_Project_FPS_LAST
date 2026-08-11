@@ -3,12 +3,14 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Hub/ILastFPSInteractable.h"
+#include "Quest/LastFPSQuestMarkerTarget.h"
 #include "LastFPSNPC.generated.h"
 
 class USphereComponent;
 class UWidgetComponent;
 class UCameraComponent;
 class ULastFPSInteractionComponent;
+class ULastFPSQuestNPCMarkerComponent;
 
 /**
  * 통합 NPC — 상호작용 가능한 모든 NPC의 단일 베이스.
@@ -18,7 +20,7 @@ class ULastFPSInteractionComponent;
  * BP에서 상속해 메시/카메라/InteractionComponent의 Actions를 설정한다.
  */
 UCLASS(Blueprintable)
-class LASTFPS_API ALastFPSNPC : public ACharacter, public ILastFPSInteractable
+class LASTFPS_API ALastFPSNPC : public ACharacter, public ILastFPSInteractable, public ILastFPSQuestMarkerTarget
 {
 	GENERATED_BODY()
 
@@ -29,6 +31,10 @@ public:
 	virtual void Interact_Implementation(APlayerController* InstigatorPC) override;
 	virtual FText GetInteractionLabel_Implementation() const override;
 	virtual void SetInteractionProgress_Implementation(float Progress) override;
+
+	// ── ILastFPSQuestMarkerTarget ─────────────────────────────────────
+	/** 퀘스트 목표(TalkToNPC)의 TargetId 와 같은 값을 노출한다. */
+	virtual FName GetQuestMarkerId_Implementation() const override;
 
 	/** 상호작용 컴포넌트 접근 */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|NPC")
@@ -56,6 +62,7 @@ public:
 	int32 CurrentPatrolIndex = 0;
 
 protected:
+	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
 
 	/** 상호작용 능력 (설정/로직 보유) */
@@ -69,6 +76,10 @@ protected:
 	/** 머리 위 3D 마커 (WBP_NPCMarker 할당) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LastFPS|NPC")
 	TObjectPtr<UWidgetComponent> MarkerWidgetComp;
+
+	/** 퀘스트 수락 가능/진행 목표를 표시하는 전용 마커. 모든 NPC 파생 BP가 공통으로 소유한다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LastFPS|Quest")
+	TObjectPtr<ULastFPSQuestNPCMarkerComponent> QuestMarkerComp;
 
 	/** 대화 시 시점 전환용 카메라. BP에서 대화 구도로 배치. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LastFPS|NPC")

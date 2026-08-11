@@ -45,6 +45,12 @@ namespace LastFPSUITags
 		return Tag;
 	}
 
+	FGameplayTag Screen_GameMenu()
+	{
+		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.GameMenu"));
+		return Tag;
+	}
+
 	FGameplayTag Screen_Consumable()
 	{
 		static const FGameplayTag Tag = RequestTag(TEXT("UI.Screen.Consumable"));

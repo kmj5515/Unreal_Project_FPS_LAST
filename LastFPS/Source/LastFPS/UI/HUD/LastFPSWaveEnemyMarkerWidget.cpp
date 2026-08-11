@@ -3,9 +3,11 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/TextBlock.h"
 
-void ULastFPSWaveEnemyMarkerWidget::NativeConstruct()
+void ULastFPSWaveEnemyMarkerWidget::NativeOnInitialized()
 {
-	Super::NativeConstruct();
+	Super::NativeOnInitialized();
+
+	// Slate 루트가 만들어지기 전에 WidgetTree를 구성해야 네이티브 위젯이 실제 화면에 포함된다.
 	EnsureNativeWidget();
 }
 
@@ -21,7 +23,8 @@ void ULastFPSWaveEnemyMarkerWidget::EnsureNativeWidget()
 		TEXT("ArrowText"));
 	WidgetTree->RootWidget = ArrowText;
 
-	ArrowText->SetText(FText::FromString(TEXT("▼")));
+	// 소스 파일 인코딩과 무관하게 항상 동일한 아래쪽 삼각형 문자를 생성한다.
+	ArrowText->SetText(FText::FromString(FString::Chr(0x25BC)));
 	ArrowText->SetJustification(ETextJustify::Center);
 	ArrowText->SetColorAndOpacity(FSlateColor(FLinearColor(1.f, 0.015f, 0.01f, 1.f)));
 	ArrowText->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.8f));

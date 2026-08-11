@@ -1,9 +1,0 @@
-﻿---,CharacterId,CharacterType,ClassificationTags,DisplayName,Role,Description,Icon,PawnClass,TargetDefinition,DefinitionAssetName,bGenerateDefinition,StatData,VisualData,AcceleratorData,AbilitySet,AIProfile
-# 자동 생성됨 - 직접 수정하지 말고 원본 xlsx를 편집하세요.,,,,,,,,,,,,,,,,
-Viola,Viola,Player,,비올라,,,None,None,None,DA_Char_Viola,True,None,None,None,None,None
-Sniper,Sniper,Player,,스나이퍼,,,None,None,None,DA_Char_Sniper,True,None,None,None,None,None
-Engineer,Engineer,Player,,엔지니어,,,None,None,None,DA_Char_Engineer,True,None,None,None,None,None
-Dummy,Dummy,Dummy,,더미,Test Character,Dummy character for testing.,None,None,None,DA_Char_Dummy,True,None,None,None,None,None
-ShooterEnemy,ShooterEnemy,Enemy,,슈터,,원거리에서 총을 쏘는 적,None,None,None,DA_Char_ShooterEnemy,True,None,None,None,None,None
-AttackerEnemy,AttackerEnemy,Enemy,,어태커,,근거리에서 공격하는 적,None,None,None,DA_Char_AttackerEnemy,True,None,None,None,None,None
-ToiletBoss,ToiletBoss,Enemy,"(GameplayTags=((TagName=""Character.Type.Boss"")))",토일렛 보스,Boss,중장갑 토일렛 메카 보스,None,BlueprintGeneratedClass'/Game/Characters/Enemy/ToiletBoss/BP_ToiletBoss.BP_ToiletBoss_C',None,DA_Char_ToiletBoss,True,None,None,None,None,None

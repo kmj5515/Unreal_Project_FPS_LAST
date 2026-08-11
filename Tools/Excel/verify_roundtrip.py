@@ -51,8 +51,11 @@ def compare_rows(table_name: str, expected: list[list[str]], actual: list[list[s
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--excel-dir", type=Path, default=Path("LastFPS/Excel"))
+    # 생성된 CSV는 워크북과 섞이지 않도록 별도 폴더에 모아둔다. 에디터 설정의 CsvDirectory와 같은 기본값을 쓴다.
+    parser.add_argument("--csv-dir", type=Path, default=None)
     args = parser.parse_args()
     excel_directory = args.excel_dir.resolve()
+    csv_directory = (args.csv_dir.resolve() if args.csv_dir else excel_directory / "Csv")
 
     all_differences: list[str] = []
     verified: set[str] = set()
@@ -64,7 +67,7 @@ def main() -> int:
                 all_differences.append(f"워크북을 찾을 수 없습니다: {workbook_path}")
                 continue
             for sheet_name in sheet_names:
-                source_csv = excel_directory / f"{sheet_name}.csv"
+                source_csv = csv_directory / f"{sheet_name}.csv"
                 converted_csv = temp_root / f"{sheet_name}.csv"
                 convert_sheet(workbook_path, sheet_name, converted_csv, include_notice=True)
                 expected = read_csv_rows(source_csv)

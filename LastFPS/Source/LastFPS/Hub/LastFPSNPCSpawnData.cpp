@@ -10,6 +10,7 @@ TArray<FLastFPSNPCAction> FLastFPSNPCSpawnData::BuildRuntimeActions(UDataTable* 
 		FLastFPSNPCAction Action;
 		Action.Label = Data.Label;
 		Action.Type = Data.Type;
+		Action.Tab = Data.Tab;
 		Action.ScreenTag = Data.ScreenTag;
 
 		// 대화 액션은 행 이름을 DialogueTable 과 묶어 런타임 핸들로 만든다.

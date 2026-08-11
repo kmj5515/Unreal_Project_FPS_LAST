@@ -94,12 +94,26 @@ void ULastFPSMissionResultWidget::RefreshHeader(const FLastFPSMissionResult& InR
 
 	if (TB_Credits)
 	{
-		const bool bHasCredits = InResult.Credits > 0;
+		const bool bHasCredits = InResult.Credits > 0 || InResult.PurchaseRefundCredits > 0;
 		if (bHasCredits)
 		{
-			TB_Credits->SetText(FText::Format(
-				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestRewardCreditsFormat),
-				FText::AsNumber(InResult.Credits)));
+			TArray<FText> CreditLines;
+			if (InResult.PurchaseRefundCredits > 0)
+			{
+				CreditLines.Add(FText::Format(
+					FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestRewardPurchaseRefundFormat),
+					FText::AsNumber(InResult.PurchaseRefundCredits)));
+			}
+			if (InResult.Credits > 0)
+			{
+				CreditLines.Add(FText::Format(
+					FLastFPSLocalization::GetUIText(
+						InResult.PurchaseRefundCredits > 0
+							? LastFPSUIStringKeys::QuestRewardCompletionBonusFormat
+							: LastFPSUIStringKeys::QuestRewardCreditsFormat),
+					FText::AsNumber(InResult.Credits)));
+			}
+			TB_Credits->SetText(FText::Join(FText::FromString(TEXT("\n")), CreditLines));
 		}
 		TB_Credits->SetVisibility(
 			bHasCredits ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);

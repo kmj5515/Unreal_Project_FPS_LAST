@@ -38,9 +38,42 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Localization/LastFPSLocalization.h"
 #include "UI/Common/LastFPSConfirmWidget.h"
+#include "UI/Common/LastFPSNoticeWidget.h"
 #include "UI/Result/LastFPSMissionResultWidget.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSPlayerController, Log, All);
+
+namespace
+{
+	/**
+	 * 풀에서 재사용되는 팝업에 과거 후속 작업이 남지 않도록 비활성화 콜백을 1회만 실행한다.
+	 *
+	 * 브로드캐스트 도중 자기 바인딩을 Remove 하면 안 된다. Remove 는 락과 무관하게 델리게이트
+	 * 인스턴스를 즉시 파괴하는데, 그 인스턴스가 지금 실행 중인 이 람다이고 OnClosed 는 그 캡처다.
+	 * 파괴 후 캡처를 읽으면 해제된 메모리를 보게 되어 콜백이 unbound 로 보이고 후속 작업이 통째로
+	 * 유실된다(퀘스트 체인이 보상 팝업에서 멈추는 원인이었다).
+	 * 그래서 바인딩은 남겨 두고 공유 플래그로만 1회 실행을 보장한다. 바인딩은 위젯이 죽을 때 정리된다.
+	 */
+	void BindOneShotOnDeactivated(
+		UCommonActivatableWidget& Widget,
+		UObject& WeakOwner,
+		FSimpleDelegate OnClosed)
+	{
+		const TSharedRef<bool> bAlreadyFired = MakeShared<bool>(false);
+		Widget.OnDeactivated().AddWeakLambda(
+			&WeakOwner,
+			[bAlreadyFired, OnClosed = MoveTemp(OnClosed)]()
+			{
+				if (*bAlreadyFired)
+				{
+					return;
+				}
+				*bAlreadyFired = true;
+
+				OnClosed.ExecuteIfBound();
+			});
+	}
+}
 
 void ALastFPSPlayerController::ClientReturnToHub_Implementation()
 {
@@ -482,7 +515,7 @@ void ALastFPSPlayerController::HandleScreenHotkey(const FInputActionInstance& Ac
     OpenScreen(*ScreenTag);
 }
 
-void ALastFPSPlayerController::ShowQuitPopup()
+void ALastFPSPlayerController::RequestQuitGame()
 {
     FLastFPSConfirmParams Params;
     Params.Title = FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::NoticeTitle);
@@ -525,26 +558,60 @@ void ALastFPSPlayerController::HandleEscMenu()
         OpenScreen(EscMenuScreenTag);
     }
 
-    ShowQuitPopup();
 }
 
 void ALastFPSPlayerController::SetNearestInteractable(AActor* Interactable)
 {
-    NearestInteractableActor = Interactable;
+	if (IsValid(Interactable))
+	{
+		InteractableCandidates.Add(TWeakObjectPtr<AActor>(Interactable));
+	}
+	RefreshNearestInteractable();
 }
 
 void ALastFPSPlayerController::ClearNearestInteractable(AActor* Interactable)
 {
-    if (NearestInteractableActor.Get() == Interactable)
-    {
-        NearestInteractableActor.Reset();
-    }
+	InteractableCandidates.Remove(TWeakObjectPtr<AActor>(Interactable));
+	RefreshNearestInteractable();
 
     // 홀드 중이던 대상이 범위를 벗어나면 취소.
     if (bIsInteractHeld && HeldInteractable.Get() == Interactable)
     {
         CancelInteractHold();
     }
+}
+
+void ALastFPSPlayerController::RefreshNearestInteractable()
+{
+	const APawn* ControlledPawn = GetPawn();
+	if (ControlledPawn == nullptr)
+	{
+		NearestInteractableActor.Reset();
+		return;
+	}
+
+	AActor* Nearest = nullptr;
+	double NearestDistanceSquared = TNumericLimits<double>::Max();
+	for (auto It = InteractableCandidates.CreateIterator(); It; ++It)
+	{
+		AActor* Candidate = It->Get();
+		if (!IsValid(Candidate))
+		{
+			It.RemoveCurrent();
+			continue;
+		}
+
+		const double DistanceSquared = FVector::DistSquared(
+			ControlledPawn->GetActorLocation(),
+			Candidate->GetActorLocation());
+		if (DistanceSquared < NearestDistanceSquared)
+		{
+			NearestDistanceSquared = DistanceSquared;
+			Nearest = Candidate;
+		}
+	}
+
+	NearestInteractableActor = Nearest;
 }
 
 // ── 홀드 인터랙션 ────────────────────────────────────────────────────
@@ -581,6 +648,7 @@ void ALastFPSPlayerController::PlayerTick(float DeltaTime)
 
 void ALastFPSPlayerController::BeginInteractHold()
 {
+	RefreshNearestInteractable();
     AActor* Actor = NearestInteractableActor.Get();
     if (!Actor || !Actor->Implements<ULastFPSInteractable>())
     {
@@ -716,7 +784,37 @@ void ALastFPSPlayerController::ShowNotice(const FText& Title, const FText& Messa
         TEXT("ShowNotice: 로컬 플레이어의 PopupSubsystem을 찾지 못했습니다."));
 }
 
+void ALastFPSPlayerController::ShowNoticeAfterClosed(
+    const FText& Title,
+    const FText& Message,
+    FSimpleDelegate OnClosed)
+{
+    FLastFPSNoticeParams Params;
+    Params.Title = Title;
+    Params.Body = Message;
+
+    ULastFPSNoticeWidget* Notice = ULastFPSNoticeWidget::ShowPopup(this, Params);
+    if (!Notice)
+    {
+        UE_LOG(
+            LogLastFPSPlayerController,
+            Warning,
+            TEXT("ShowNoticeAfterClosed: 공지 팝업을 열지 못해 후속 작업을 즉시 실행합니다."));
+        OnClosed.ExecuteIfBound();
+        return;
+    }
+
+	BindOneShotOnDeactivated(*Notice, *this, MoveTemp(OnClosed));
+}
+
 void ALastFPSPlayerController::ShowMissionResult(const FLastFPSMissionResult& InResult)
+{
+	ShowMissionResultAfterClosed(InResult, FSimpleDelegate());
+}
+
+void ALastFPSPlayerController::ShowMissionResultAfterClosed(
+	const FLastFPSMissionResult& InResult,
+	FSimpleDelegate OnClosed)
 {
     // 임무 고유 정보는 호출부가, 플레이어에 종속된 값은 여기서 채운다.
     // 이렇게 두면 결과를 만드는 쪽(퀘스트 등)이 PlayerState 나 로스터를 알지 않아도 된다.
@@ -743,13 +841,19 @@ void ALastFPSPlayerController::ShowMissionResult(const FLastFPSMissionResult& In
         }
     }
 
-    if (!ULastFPSMissionResultWidget::ShowPopup(this, Result))
-    {
-        UE_LOG(
-            LogLastFPSPlayerController,
-            Warning,
-            TEXT("ShowMissionResult: 임무 결과 팝업을 열지 못했습니다. PopupCatalog 에 UI.Popup.MissionResult 항목이 있는지 확인하십시오."));
-    }
+	ULastFPSMissionResultWidget* ResultWidget =
+		ULastFPSMissionResultWidget::ShowPopup(this, Result);
+	if (!ResultWidget)
+	{
+		UE_LOG(
+			LogLastFPSPlayerController,
+			Warning,
+			TEXT("ShowMissionResultAfterClosed: 임무 결과 팝업을 열지 못해 후속 작업을 즉시 실행합니다."));
+		OnClosed.ExecuteIfBound();
+		return;
+	}
+
+	BindOneShotOnDeactivated(*ResultWidget, *this, MoveTemp(OnClosed));
 }
 
 ULastFPSDialogueWidget* ALastFPSPlayerController::ShowDialogue(
@@ -801,8 +905,10 @@ void ALastFPSPlayerController::BeginNPCInteraction(
     AActor* NPCActor,
     UCameraComponent* /*TalkCamera*/,
     const FText& Name,
-    const FText& InRole,
-    const TArray<FLastFPSNPCAction>& Actions)
+    const FText& InDescription,
+    const TArray<FLastFPSNPCAction>& Actions,
+    const TArray<FLastFPSNPCQuestOption>& QuestOptions,
+    const FLinearColor& InDialogueRadioSpeakerColor)
 {
     // 대상이 없거나 이미 상호작용 중이면 무시. (weak ptr이 아닌 bool로 판정 → 파괴/전환에도 안정)
     if (!NPCActor || InteractionSession.bActive)
@@ -833,19 +939,8 @@ void ALastFPSPlayerController::BeginNPCInteraction(
     InteractionSession.bDialogueOpen = false;
     InteractionSession.NPC = NPCActor;
     InteractionSession.NPCName = Name;
+    InteractionSession.DialogueRadioSpeakerColor = InDialogueRadioSpeakerColor;
     InteractionSession.PreviousViewTarget = GetViewTarget();
-
-    // TalkToNPC 목표 진행 — 상호작용이 확정된 시점에 로컬 퀘스트에 통지.
-    if (const ALastFPSNPC* NPC = Cast<ALastFPSNPC>(NPCActor))
-    {
-        if (UGameInstance* GI = GetGameInstance())
-        {
-            if (ULastFPSQuestSubsystem* Quest = GI->GetSubsystem<ULastFPSQuestSubsystem>())
-            {
-                Quest->NotifyTalkedToNPC(NPC->NPCRowName);
-            }
-        }
-    }
 
     // 상호작용 UI 모드 진입: 이동/회전 잠금 + 커서 표시(단일 진입점).
     SetInteractionInputMode(true);
@@ -853,7 +948,7 @@ void ALastFPSPlayerController::BeginNPCInteraction(
     // NPC 카메라로 블렌드. NPCActor의 UCameraComponent를 CalcCamera가 자동으로 뷰로 사용.
     SetViewTargetWithBlend(NPCActor, NPCCameraBlendTime);
 
-    Hub->Setup(this, Name, InRole, Actions);
+    Hub->Setup(this, Name, InDescription, Actions, QuestOptions);
     InteractionSession.HubWidget = Hub;
 }
 
@@ -902,56 +997,97 @@ void ALastFPSPlayerController::ExecuteNPCAction(const FLastFPSNPCAction& Action)
 
     case ELastFPSNPCActionType::Dialogue:
     {
-        if (InteractionSession.bDialogueOpen)
-        {
-            break; // 이미 대화 중 → 중복 오픈(더블클릭) 방지.
-        }
-
         const FLastFPSDialogueData* Dialogue = Action.DialogueRow.IsNull()
             ? nullptr
             : Action.DialogueRow.GetRow<FLastFPSDialogueData>(TEXT("NPC ExecuteNPCAction"));
 
-        // Lines가 비면 SetupDialogue가 동기적으로 DeactivateWidget을 호출해 OnDeactivated가
-        // 콜백 바인딩 전에 발화 → 버튼 영구 숨김/플래그 고착. 빈 대화는 아예 열지 않는다.
-        if (Dialogue && Dialogue->Lines.Num() > 0)
-        {
-            // 행에 화자 이름이 없으면 현재 NPC 이름을 사용.
-            const FText& Speaker = Dialogue->SpeakerName.IsEmpty() ? InteractionSession.NPCName : Dialogue->SpeakerName;
+		if (!Dialogue || Dialogue->Lines.IsEmpty())
+		{
+			UE_LOG(
+				LogLastFPSPlayerController,
+				Warning,
+				TEXT("ExecuteNPCAction: Dialogue 액션의 행이 없거나 대사가 비어 있습니다. Row=%s"),
+				*Action.DialogueRow.RowName.ToString());
+			break;
+		}
 
-            // 대화창은 Modal 레이어라 Menu 레이어의 허브가 안 가려진다 → 허브 버튼을 수동으로 숨긴다.
-            SetHubButtonsVisible(false);
-
-            ULastFPSDialogueWidget* DialogueWidget = ShowDialogue(Speaker, Dialogue->Lines);
-            if (DialogueWidget)
-            {
-                InteractionSession.bDialogueOpen = true;
-                InteractionSession.Dialogue = DialogueWidget;
-
-                // 대화 종료(DeactivateWidget) 시 버튼 복원 + 플래그 해제.
-                // 바인드 대상=대화창, PC/허브는 weak 캡처 → 어느 쪽이 파괴돼도 안전.
-                TWeakObjectPtr<ALastFPSPlayerController> WeakThis(this);
-                TWeakObjectPtr<ULastFPSNPCInteractionWidget> HubWeak = InteractionSession.HubWidget;
-                DialogueWidget->OnDeactivated().AddWeakLambda(DialogueWidget, [WeakThis, HubWeak]()
-                {
-                    if (ALastFPSPlayerController* PC = WeakThis.Get())
-                    {
-                        PC->InteractionSession.bDialogueOpen = false;
-                        PC->InteractionSession.Dialogue.Reset();
-                    }
-                    if (ULastFPSNPCInteractionWidget* Hub = HubWeak.Get())
-                    {
-                        Hub->SetButtonsVisible(true);
-                    }
-                });
-            }
-            else
-            {
-                SetHubButtonsVisible(true); // 대화창을 못 띄웠으면 버튼 복원.
-            }
-        }
+		if (ULastFPSQuestSubsystem* Quest = ULastFPSQuestSubsystem::Get(this))
+		{
+			// Dialogue Data는 유지하고, 표현 계층만 HUD 무전 WBP로 통일한다.
+			Quest->TriggerDialogueAsRadio(
+				*Dialogue,
+				InteractionSession.NPCName,
+				InteractionSession.DialogueRadioSpeakerColor);
+		}
+		else
+		{
+			UE_LOG(
+				LogLastFPSPlayerController,
+				Error,
+				TEXT("ExecuteNPCAction: 무전 대화를 재생할 QuestSubsystem을 찾지 못했습니다. Row=%s"),
+				*Action.DialogueRow.RowName.ToString());
+		}
         break;
     }
     }
+}
+
+bool ALastFPSPlayerController::ExecuteNPCQuestOption(const FLastFPSNPCQuestOption& Option)
+{
+	const ALastFPSNPC* NPC = Cast<ALastFPSNPC>(InteractionSession.NPC.Get());
+	ULastFPSQuestSubsystem* Quest = ULastFPSQuestSubsystem::Get(this);
+	if (NPC == nullptr || Quest == nullptr || Option.QuestId.IsNone() || NPC->NPCRowName.IsNone())
+	{
+		return false;
+	}
+
+	// 화면이 열린 뒤 상태가 바뀌었을 수 있으므로 클릭 시점의 실제 가능 목록으로 다시 검증한다.
+	TArray<FName> Acceptable;
+	TArray<FName> Reportable;
+	Quest->GetNPCQuestActions(NPC->NPCRowName, Acceptable, Reportable);
+
+	switch (Option.Type)
+	{
+	case ELastFPSNPCQuestOptionType::Accept:
+		return Acceptable.Contains(Option.QuestId) && Quest->AcceptQuest(Option.QuestId);
+
+	case ELastFPSNPCQuestOptionType::Report:
+		if (!Reportable.Contains(Option.QuestId)
+			|| !Quest->NotifyTalkedToNPCForQuest(Option.QuestId, NPC->NPCRowName))
+		{
+			return false;
+		}
+
+		// NPC에게 보고하는 클릭은 목표 완료와 보상 수령을 합친 명시적 턴인 동작이다.
+		// 아직 다른 목표가 남았다면 InProgress이므로 수령하지 않고, 이번 보고로 Completed가 된 경우만 지급한다.
+		if (Quest->IsClaimable(Option.QuestId))
+		{
+			return Quest->TryClaimReward(Option.QuestId);
+		}
+		return true;
+
+	case ELastFPSNPCQuestOptionType::OpenGuidanceScreen:
+	{
+		TArray<FLastFPSNPCQuestOption> CurrentOptions;
+		Quest->GetNPCQuestOptions(NPC->NPCRowName, CurrentOptions);
+		const bool bStillAvailable = CurrentOptions.ContainsByPredicate(
+			[&Option](const FLastFPSNPCQuestOption& Current)
+			{
+				return Current.Type == ELastFPSNPCQuestOptionType::OpenGuidanceScreen
+					&& Current.QuestId == Option.QuestId
+					&& Current.ScreenTag == Option.ScreenTag;
+			});
+		if (!bStillAvailable || !Option.ScreenTag.IsValid())
+		{
+			return false;
+		}
+
+		OpenScreen(Option.ScreenTag);
+		return true;
+	}
+	}
+
+	return false;
 }
 
 void ALastFPSPlayerController::ShowDamageDirection(const FVector& DamageSourceDirection)

@@ -16,7 +16,9 @@ public class LastFPS : ModuleRules
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
 			"UMG", "Json", "JsonUtilities", "AssetRegistry", "DeveloperSettings",
 			"CommonUI", "CommonInput", "CommonGame", "CommonUser", "ModularGameplayActors",
-			"AIModule", "NavigationSystem", "Niagara", "EasyCrosshairSystem", "Synthesis"
+			"AIModule", "NavigationSystem", "Niagara", "EasyCrosshairSystem", "Synthesis",
+			// 퀘스트 컷신 재생 (LastFPSCinematicPlaybackSubsystem)
+			"LevelSequence", "MovieScene"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {

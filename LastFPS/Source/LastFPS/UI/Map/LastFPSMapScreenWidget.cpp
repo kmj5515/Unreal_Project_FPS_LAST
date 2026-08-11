@@ -6,6 +6,7 @@
 #include "InputCoreTypes.h"
 #include "Game/Travel/LastFPSLevelTravelSubsystem.h"
 #include "Localization/LastFPSLocalization.h"
+#include "Quest/LastFPSQuestSubsystem.h"
 #include "UI/Framework/LastFPSTravelEntryButton.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSMapScreen, Log, All);
@@ -47,10 +48,23 @@ void ULastFPSMapScreenWidget::NativeConstruct()
 
 		BoundDestinations.Add(Destination);
 	}
+
+	if (ULastFPSQuestSubsystem* QuestSubsystem = ULastFPSQuestSubsystem::Get(this))
+	{
+		QuestSubsystem->OnQuestStateChanged.AddUniqueDynamic(
+			this, &ULastFPSMapScreenWidget::RefreshDestinationAccess);
+	}
+	RefreshDestinationAccess();
 }
 
 void ULastFPSMapScreenWidget::NativeDestruct()
 {
+	if (ULastFPSQuestSubsystem* QuestSubsystem = ULastFPSQuestSubsystem::Get(this))
+	{
+		QuestSubsystem->OnQuestStateChanged.RemoveDynamic(
+			this, &ULastFPSMapScreenWidget::RefreshDestinationAccess);
+	}
+
 	for (ULastFPSTravelEntryButton* Destination : BoundDestinations)
 	{
 		if (Destination)
@@ -61,6 +75,31 @@ void ULastFPSMapScreenWidget::NativeDestruct()
 	BoundDestinations.Reset();
 
 	Super::NativeDestruct();
+}
+
+void ULastFPSMapScreenWidget::RefreshDestinationAccess()
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	const ULastFPSLevelTravelSubsystem* TravelSubsystem = GameInstance
+		? GameInstance->GetSubsystem<ULastFPSLevelTravelSubsystem>()
+		: nullptr;
+	if (!TravelSubsystem)
+	{
+		return;
+	}
+
+	for (ULastFPSTravelEntryButton* Destination : BoundDestinations)
+	{
+		if (!Destination)
+		{
+			continue;
+		}
+
+		const FLastFPSTravelEntryRequest& Request = Destination->GetTravelRequest();
+		Destination->ApplyTravelAccess(
+			TravelSubsystem->IsTravelRequestUnlocked(Request),
+			TravelSubsystem->GetTravelLockedIcon(Request));
+	}
 }
 
 FReply ULastFPSMapScreenWidget::NativeOnMouseButtonDown(

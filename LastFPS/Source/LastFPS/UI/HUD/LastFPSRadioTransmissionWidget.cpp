@@ -5,10 +5,14 @@
 #include "Localization/LastFPSLocalization.h"
 #include "Quest/LastFPSQuestSubsystem.h"
 #include "UI/HUD/Audio/LastFPSRadioAudioPlayer.h"
+#include "UI/HUD/Audio/LastFPSRadioAudioSettings.h"
 
 void ULastFPSRadioTransmissionWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+
+	TransmissionQueue.Reset();
+	bIsPlaying = false;
 
 	RadioAudioPlayer = NewObject<ULastFPSRadioAudioPlayer>(this);
 	RadioAudioPlayer->Initialize(this);
@@ -59,33 +63,38 @@ void ULastFPSRadioTransmissionWidget::NativeDestruct()
 		RadioAudioPlayer = nullptr;
 	}
 
+	TransmissionQueue.Reset();
+	CurrentTransmission = FLastFPSRadioTransmissionData();
+	FullDialogueString.Reset();
+	CurrentCharIndex = 0;
+	bIsPlaying = false;
+
 	Super::NativeDestruct();
 }
 
-void ULastFPSRadioTransmissionWidget::HandleQuestRadioTransmission(const FLastFPSRadioTransmissionData& RadioData)
+void ULastFPSRadioTransmissionWidget::HandleQuestRadioTransmission(
+	const TArray<FLastFPSRadioTransmissionData>& RadioDataArray)
 {
-	QueueRadioTransmission(RadioData);
+	QueueRadioTransmissions(RadioDataArray);
 }
 
 void ULastFPSRadioTransmissionWidget::QueueRadioTransmission(const FLastFPSRadioTransmissionData& RadioData)
 {
-	TransmissionQueue.Add(RadioData);
-	if (!bIsPlaying)
-	{
-		ProcessNextTransmission();
-	}
+	QueueRadioTransmissions({RadioData});
 }
 
 void ULastFPSRadioTransmissionWidget::QueueRadioTransmissions(const TArray<FLastFPSRadioTransmissionData>& RadioDataArray)
 {
-	for (const FLastFPSRadioTransmissionData& Data : RadioDataArray)
+	if (RadioDataArray.IsEmpty())
 	{
-		TransmissionQueue.Add(Data);
+		return;
 	}
-	if (!bIsPlaying)
-	{
-		ProcessNextTransmission();
-	}
+
+	// 최신 퀘스트/대화 요청이 도착하면 이전 상황의 재생 중 대사와 대기열을 폐기한다.
+	// 같은 요청에 포함된 여러 대사는 배열 순서대로 계속 재생한다.
+	TransmissionQueue = RadioDataArray;
+	bIsPlaying = false;
+	ProcessNextTransmission();
 }
 
 void ULastFPSRadioTransmissionWidget::ProcessNextTransmission()
@@ -142,13 +151,16 @@ void ULastFPSRadioTransmissionWidget::ProcessNextTransmission()
 
 	BP_OnRadioTransmissionStarted(CurrentTransmission);
 
-	if (CurrentTransmission.TypingSpeed > KINDA_SMALL_NUMBER)
+	const ULastFPSRadioAudioSettings* RadioSettings = ULastFPSRadioAudioSettings::Get();
+	const float TypingSpeedScale = RadioSettings ? RadioSettings->TypingSpeedScale : 1.0f;
+	const float EffectiveTypingSpeed = CurrentTransmission.TypingSpeed * TypingSpeedScale;
+	if (EffectiveTypingSpeed > KINDA_SMALL_NUMBER)
 	{
 		GetWorld()->GetTimerManager().SetTimer(
 			TypingTimerHandle,
 			this,
 			&ULastFPSRadioTransmissionWidget::StartTypingNextChar,
-			CurrentTransmission.TypingSpeed,
+			EffectiveTypingSpeed,
 			true);
 	}
 	else

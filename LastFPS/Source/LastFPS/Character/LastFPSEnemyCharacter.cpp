@@ -19,6 +19,7 @@
 #include "Pooling/LastFPSActorPoolSubsystem.h"
 #include "Net/UnrealNetwork.h"
 #include "UI/HUD/LastFPSWaveEnemyMarkerWidget.h"
+#include "UI/Theme/LastFPSUISettings.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSEnemyCharacter, Log, All);
 
@@ -119,12 +120,39 @@ void ALastFPSEnemyCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
-    if (WaveEnemyMarkerComponent && GetCapsuleComponent())
+    if (WaveEnemyMarkerComponent)
     {
-        WaveEnemyMarkerComponent->SetRelativeLocation(FVector(
-            0.f,
-            0.f,
-            GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() + WaveEnemyMarkerVerticalOffset));
+        const ULastFPSUISettings* UISettings = ULastFPSUISettings::Get();
+        if (UISettings && !UISettings->WaveEnemyMarkerWidgetClass.IsNull())
+        {
+            if (UClass* MarkerWidgetClass = UISettings->WaveEnemyMarkerWidgetClass.LoadSynchronous())
+            {
+                WaveEnemyMarkerComponent->SetWidgetClass(MarkerWidgetClass);
+                WaveEnemyMarkerComponent->InitWidget();
+            }
+            else
+            {
+                static bool bLoggedMissingWaveMarkerClass = false;
+                if (!bLoggedMissingWaveMarkerClass)
+                {
+                    bLoggedMissingWaveMarkerClass = true;
+                    UE_LOG(
+                        LogLastFPSEnemyCharacter,
+                        Error,
+                        TEXT("'%s': 웨이브 적 마커 위젯을 불러오지 못했습니다. 설정 경로: '%s'"),
+                        *GetName(),
+                        *UISettings->WaveEnemyMarkerWidgetClass.ToSoftObjectPath().ToString());
+                }
+            }
+        }
+
+        if (GetCapsuleComponent())
+        {
+            WaveEnemyMarkerComponent->SetRelativeLocation(FVector(
+                0.f,
+                0.f,
+                GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() + WaveEnemyMarkerVerticalOffset));
+        }
     }
     ApplyWaveEnemyMarkerVisibility();
 

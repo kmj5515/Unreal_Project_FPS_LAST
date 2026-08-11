@@ -18,6 +18,8 @@
 #include "UI/HUD/Quest/LastFPSQuestTrackerWidget.h"
 #include "UI/HUD/Quest/LastFPSObjectiveMarkerWidget.h"
 #include "UI/HUD/LastFPSHUDStyle.h"
+#include "UI/Framework/LastFPSPrimaryGameLayout.h"
+#include "Cinematics/LastFPSCinematicPlaybackSubsystem.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/AttributeSets/LastFPSAttributeSet.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
@@ -54,6 +56,9 @@ ULastFPSHUDWidget::ULastFPSHUDWidget(const FObjectInitializer& ObjectInitializer
     StaminaLowFillColor      = LastFPSHUDStyle::StaminaLowFill();
     DamageNumberWidgetClass  = ULastFPSDamageNumberWidget::StaticClass();
     EnemyHealthBarSettings.WidgetClass = ULastFPSEnemyHealthBarWidget::StaticClass();
+
+    // 무전 자막은 컷신 대사를 실어 나르므로 기본으로 유지한다. WBP 에서 목록을 바꿀 수 있다.
+    CinematicPersistentWidgets.Add(TEXT("WBP_RadioTransmission"));
 }
 
 void ULastFPSHUDWidget::InitializePresenters()
@@ -169,6 +174,7 @@ void ULastFPSHUDWidget::NativeConstruct()
 
     ApplyCombatHUDVisibility();
     ApplyQuestHUDVisibility();
+    BindCinematicEvents();
 
     if (!CrosshairPresenter)
     {
@@ -189,8 +195,93 @@ void ULastFPSHUDWidget::NativeConstruct()
     }
 }
 
+void ULastFPSHUDWidget::BindCinematicEvents()
+{
+    ULastFPSCinematicPlaybackSubsystem* Cinematics =
+        ULastFPSCinematicPlaybackSubsystem::Get(this);
+    if (!Cinematics || BoundCinematicSubsystem.Get() == Cinematics)
+    {
+        return;
+    }
+
+    UnbindCinematicEvents();
+
+    Cinematics->OnCinematicStarted.AddDynamic(this, &ULastFPSHUDWidget::HandleCinematicStarted);
+    Cinematics->OnCinematicFinished.AddDynamic(this, &ULastFPSHUDWidget::HandleCinematicFinished);
+    BoundCinematicSubsystem = Cinematics;
+}
+
+void ULastFPSHUDWidget::UnbindCinematicEvents()
+{
+    if (ULastFPSCinematicPlaybackSubsystem* Cinematics = BoundCinematicSubsystem.Get())
+    {
+        Cinematics->OnCinematicStarted.RemoveDynamic(this, &ULastFPSHUDWidget::HandleCinematicStarted);
+        Cinematics->OnCinematicFinished.RemoveDynamic(this, &ULastFPSHUDWidget::HandleCinematicFinished);
+    }
+    BoundCinematicSubsystem.Reset();
+}
+
+void ULastFPSHUDWidget::HandleCinematicStarted(bool /*bSkippable*/)
+{
+    SetCinematicUIHidden(true);
+}
+
+void ULastFPSHUDWidget::HandleCinematicFinished(bool /*bSkipped*/)
+{
+    SetCinematicUIHidden(false);
+}
+
+void ULastFPSHUDWidget::SetCinematicUIHidden(const bool bHidden)
+{
+    // 화면·팝업 레이어는 HUD 의 소유가 아니므로 레이아웃이 처리한다.
+    if (ULastFPSPrimaryGameLayout* Layout =
+        Cast<ULastFPSPrimaryGameLayout>(UPrimaryGameLayout::GetPrimaryGameLayout(GetOwningPlayer())))
+    {
+        Layout->SetLayersHiddenForCinematic(bHidden);
+    }
+
+    if (!bHidden)
+    {
+        for (const TPair<TWeakObjectPtr<UWidget>, ESlateVisibility>& Entry : CinematicRestoreVisibilities)
+        {
+            if (UWidget* Child = Entry.Key.Get())
+            {
+                Child->SetVisibility(Entry.Value);
+            }
+        }
+        CinematicRestoreVisibilities.Reset();
+        return;
+    }
+
+    // 중복 진입 시 이미 접어 둔 상태를 "원래 상태"로 덮어써 복구가 깨지는 것을 막는다.
+    if (!CinematicRestoreVisibilities.IsEmpty())
+    {
+        return;
+    }
+
+    UPanelWidget* Root = Cast<UPanelWidget>(GetRootWidget());
+    if (!Root)
+    {
+        return;
+    }
+
+    for (int32 Index = 0; Index < Root->GetChildrenCount(); ++Index)
+    {
+        UWidget* Child = Root->GetChildAt(Index);
+        if (!Child || CinematicPersistentWidgets.Contains(Child->GetFName()))
+        {
+            continue;
+        }
+
+        CinematicRestoreVisibilities.Add(Child, Child->GetVisibility());
+        Child->SetVisibility(ESlateVisibility::Collapsed);
+    }
+}
+
 void ULastFPSHUDWidget::NativeDestruct()
 {
+    UnbindCinematicEvents();
+
     if (ALastFPSPlayerState* PlayerState = BoundPlayerState.Get())
     {
         PlayerState->OnDamageDealt.RemoveDynamic(this, &ULastFPSHUDWidget::HandleDamageDealt);

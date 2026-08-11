@@ -40,6 +40,7 @@ namespace LastFPSUIStringKeys
 	inline constexpr TCHAR QuestStatusClaimed[] = TEXT("Quest.Status.Claimed");
 	inline constexpr TCHAR QuestStatusLocked[] = TEXT("Quest.Status.Locked");
 	inline constexpr TCHAR QuestStatusNotStarted[] = TEXT("Quest.Status.NotStarted");
+	inline constexpr TCHAR QuestStatusAvailableFromNPCFormat[] = TEXT("Quest.Status.AvailableFromNPCFormat");
 	inline constexpr TCHAR QuestActionAccept[] = TEXT("Quest.Action.Accept");
 	inline constexpr TCHAR QuestActionCancel[] = TEXT("Quest.Action.Cancel");
 	inline constexpr TCHAR QuestActionTrack[] = TEXT("Quest.Action.Track");
@@ -48,6 +49,8 @@ namespace LastFPSUIStringKeys
 	inline constexpr TCHAR QuestHeaderReward[] = TEXT("Quest.Header.Reward");
 	inline constexpr TCHAR QuestRecommendedLevelFormat[] = TEXT("Quest.Detail.RecommendedLevelFormat");
 	inline constexpr TCHAR QuestRewardCreditsFormat[] = TEXT("Quest.Reward.CreditsFormat");
+	inline constexpr TCHAR QuestRewardPurchaseRefundFormat[] = TEXT("Quest.Reward.PurchaseRefundFormat");
+	inline constexpr TCHAR QuestRewardCompletionBonusFormat[] = TEXT("Quest.Reward.CompletionBonusFormat");
 	inline constexpr TCHAR QuestRewardItemFormat[] = TEXT("Quest.Reward.ItemFormat");
 	inline constexpr TCHAR QuestRewardMessageFormat[] = TEXT("Quest.Reward.MessageFormat");
 	inline constexpr TCHAR QuestTrackerEmpty[] = TEXT("Quest.Tracker.Empty");

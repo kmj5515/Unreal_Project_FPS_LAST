@@ -12,6 +12,7 @@ class UCommonSession_SearchResult;
 class UCommonSession_SearchSessionRequest;
 class UCommonSessionSubsystem;
 class ULastFPSBattleDefinition;
+class UTexture2D;
 struct FOnlineResultInformation;
 struct FStreamableHandle;
 namespace ETravelFailure { enum Type : int; }
@@ -69,6 +70,14 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
 	bool IsBusy() const { return TravelState != ELastFPSTravelState::Idle; }
+
+	/** 설정된 퀘스트 조건을 만족해 이 이동 요청을 실행할 수 있는지 조회한다. */
+	UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
+	bool IsTravelRequestUnlocked(const FLastFPSTravelEntryRequest& Request) const;
+
+	/** 잠금 상태를 표시할 목적지별 아이콘을 반환한다. 조건이 없으면 빈 참조다. */
+	UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
+	TSoftObjectPtr<UTexture2D> GetTravelLockedIcon(const FLastFPSTravelEntryRequest& Request) const;
 
 	UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
 	ELastFPSTravelState GetTravelState() const { return TravelState; }

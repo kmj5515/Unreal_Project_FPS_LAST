@@ -9,10 +9,21 @@
 UENUM(BlueprintType)
 enum class ELastFPSNPCActionType : uint8
 {
-	/** 단방향 대화창 표시 (DialogueRow) */
+	/** 대사를 무전 자막으로 재생 (DialogueRow) */
 	Dialogue	UMETA(DisplayName="대화"),
-	/** 태그로 화면 열기 (ScreenTag — 상점/모듈/임무 등) */
+	/** 태그로 화면 열기 (ScreenTag — 상점/모듈 등) */
 	Screen		UMETA(DisplayName="화면 열기")
+};
+
+/**
+ * 상호작용 화면에서 이 버튼이 놓일 탭.
+ * 임무 탭은 진행 상황에 따라 런타임으로 채워지므로, 데이터로 지정하는 버튼은 보통 대화 탭에 둔다.
+ */
+UENUM(BlueprintType)
+enum class ELastFPSNPCActionTab : uint8
+{
+	Talk	UMETA(DisplayName="대화"),
+	Quest	UMETA(DisplayName="임무")
 };
 
 /**
@@ -30,6 +41,10 @@ struct FLastFPSNPCAction
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|NPC")
 	ELastFPSNPCActionType Type = ELastFPSNPCActionType::Dialogue;
+
+	/** 이 버튼이 놓일 탭. 임무 탭은 진행 상황으로 자동 구성되므로 기본은 대화 탭이다. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|NPC")
+	ELastFPSNPCActionTab Tab = ELastFPSNPCActionTab::Talk;
 
 	/** Type==Screen 일 때 열 화면 태그 (UI.Screen.Shop, UI.Screen.Module ...) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LastFPS|NPC",

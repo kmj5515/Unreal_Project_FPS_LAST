@@ -57,12 +57,16 @@ def main() -> int:
         scan_workbook(args.workbook.resolve(), args.output.resolve())
     else:
         converter = load_converter(args.project_dir.resolve())
+        # 언리얼 CSV 임포터에는 주석 문법이 없어 안내 행도 데이터 행으로 읽힌다.
+        # 커밋용 CSV는 에셋의 리임포트 소스로도 쓰이므로, 안내 행을 넣으면
+        # 우클릭 Reimport가 '#자동 생성됨...' RowName을 가진 행을 만들어낸다.
+        # 편집 금지 안내는 각 워크북의 _README 시트가 담당한다.
         rows = converter.convert_sheet(
             args.workbook.resolve(),
             args.sheet,
             args.output.resolve(),
             localize=args.localize,
-            include_notice=True,
+            include_notice=False,
         )
         converter.write_csv(rows, args.clean_output.resolve(), include_notice=False)
     return 0

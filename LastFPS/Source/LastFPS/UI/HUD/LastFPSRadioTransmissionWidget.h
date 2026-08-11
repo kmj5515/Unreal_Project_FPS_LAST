@@ -51,7 +51,7 @@ protected:
 
 private:
 	UFUNCTION()
-	void HandleQuestRadioTransmission(const FLastFPSRadioTransmissionData& RadioData);
+	void HandleQuestRadioTransmission(const TArray<FLastFPSRadioTransmissionData>& RadioDataArray);
 
 	void ProcessNextTransmission();
 	void StartTypingNextChar();

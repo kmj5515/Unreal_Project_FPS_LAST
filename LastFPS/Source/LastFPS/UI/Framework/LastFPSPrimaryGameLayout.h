@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GameplayTagContainer.h"
 #include "PrimaryGameLayout.h"
 #include "LastFPSPrimaryGameLayout.generated.h"
 
@@ -28,8 +29,22 @@ public:
 	UCommonActivatableWidgetContainerBase* GetMenuLikeLayerContainer(int32 Index);
 	static constexpr int32 NumMenuLikeLayers = 3;
 
+	/**
+	 * 컷신 재생 동안 CinematicHiddenLayers 의 레이어를 숨긴다.
+	 * 화면을 닫지 않고 표시만 접으므로 컷신이 끝나면 보던 화면으로 그대로 돌아온다.
+	 * 게임 레이어(HUD)는 무전 자막처럼 남겨야 할 것이 있어 HUD 가 스스로 처리한다.
+	 */
+	void SetLayersHiddenForCinematic(bool bHidden);
+
 protected:
 	virtual void NativeOnInitialized() override;
+
+	/**
+	 * 컷신 중 숨길 레이어. 비워 두면 NativeOnInitialized 에서 기본값(게임 레이어를 뺀 전부)을 채운다.
+	 * 태그를 쓰는 이유는 레이어가 늘어도 이 클래스를 고치지 않기 위해서다.
+	 */
+	UPROPERTY(EditDefaultsOnly, Category="UI|Cinematic", meta=(Categories="UI.Layer"))
+	TArray<FGameplayTag> CinematicHiddenLayers;
 
 	/** Optional WBP overrides — if set, RegisterLayer uses these instead of auto-created stacks */
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
@@ -49,6 +64,9 @@ protected:
 
 private:
 	void EnsureLayersRegistered();
+
+	/** 컷신 진입 시 숨긴 레이어와 원래 표시 상태. 이미 숨겨져 있던 레이어를 켜 버리지 않으려고 남긴다. */
+	TMap<FGameplayTag, ESlateVisibility> CinematicRestoreVisibilities;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UCanvasPanel> RootCanvas;

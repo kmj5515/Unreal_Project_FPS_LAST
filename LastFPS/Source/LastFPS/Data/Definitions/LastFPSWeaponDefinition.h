@@ -139,6 +139,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon", meta=(AssetBundles="UI"))
     TSoftObjectPtr<UTexture2D> Icon;
 
+    /** HUD 무기 슬롯에서만 사용하는 아이콘이다. 비어 있으면 범용 Icon으로 대체한다. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|UI", meta=(AssetBundles="UI"))
+    TSoftObjectPtr<UTexture2D> HUDWeaponSlotIcon;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
     EMMWeaponType WeaponType = EMMWeaponType::Unarmed;
 

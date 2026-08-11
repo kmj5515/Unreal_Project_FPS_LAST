@@ -20,6 +20,55 @@ void ULastFPSPrimaryGameLayout::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 	EnsureLayersRegistered();
+
+	// 컷신 중에는 화면·팝업이 덮고 있으면 연출이 보이지 않으므로 접는다.
+	//
+	// Modal 은 일부러 제외한다. 퀘스트 보상 공지가 Modal 로 뜨는데, 퀘스트 체인은 그 팝업이
+	// 닫히는 콜백에서 이어진다. 컷신이 팝업을 접어 버리면 플레이어가 닫을 수 없어
+	// 완료 무전·다음 퀘스트 해금·상태 브로드캐스트가 통째로 멈춘다.
+	// 연출이 잠깐 가려지는 쪽이 진행이 영구히 막히는 것보다 낫다.
+	if (CinematicHiddenLayers.IsEmpty())
+	{
+		CinematicHiddenLayers = {
+			LastFPSUITags::Layer_GameMenu(),
+			LastFPSUITags::Layer_Menu(),
+			LastFPSUITags::Layer_Overlay(),
+		};
+	}
+}
+
+void ULastFPSPrimaryGameLayout::SetLayersHiddenForCinematic(const bool bHidden)
+{
+	if (!bHidden)
+	{
+		for (const TPair<FGameplayTag, ESlateVisibility>& Entry : CinematicRestoreVisibilities)
+		{
+			if (UWidget* Layer = GetLayerWidget(Entry.Key))
+			{
+				Layer->SetVisibility(Entry.Value);
+			}
+		}
+		CinematicRestoreVisibilities.Reset();
+		return;
+	}
+
+	// 중복 진입 시 이미 접어 둔 상태를 "원래 상태"로 덮어써 복구가 깨지는 것을 막는다.
+	if (!CinematicRestoreVisibilities.IsEmpty())
+	{
+		return;
+	}
+
+	for (const FGameplayTag& LayerTag : CinematicHiddenLayers)
+	{
+		UWidget* Layer = GetLayerWidget(LayerTag);
+		if (!Layer)
+		{
+			continue;
+		}
+
+		CinematicRestoreVisibilities.Add(LayerTag, Layer->GetVisibility());
+		Layer->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 void ULastFPSPrimaryGameLayout::EnsureLayersRegistered()

@@ -29,8 +29,6 @@
 #include "ToolMenus.h"
 #include "Widgets/Docking/SDockTab.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogLastFPSDataTableImport, Log, All);
-
 #define LOCTEXT_NAMESPACE "FEditorUtilityModule"
 
 #pragma region 툴 이름

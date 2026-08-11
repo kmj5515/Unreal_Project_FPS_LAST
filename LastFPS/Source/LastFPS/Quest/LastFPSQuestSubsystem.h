@@ -1,22 +1,30 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Engine/TimerHandle.h"
+#include "Templates/Function.h"
 #include "Data/Tables/LastFPSQuestData.h"
+#include "Data/Tables/LastFPSDialogueData.h"
 #include "Quest/LastFPSObjectiveTracker.h"
+#include "Quest/LastFPSQuestMarkerTypes.h"
+#include "Quest/LastFPSNPCQuestOption.h"
 #include "LastFPSQuestSubsystem.generated.h"
 
 class UDataTable;
 class USceneComponent;
 class ULastFPSEconomySubsystem;
 class ULastFPSRoomEncounterSubsystem;
+struct FLastFPSPurchaseReceipt;
 
 /** 퀘스트 상태/진행이 바뀔 때 브로드캐스트 — 임무 화면/트래커 UI 갱신용 */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLastFPSQuestStateChanged);
 
-/** 무전 자막/사운드 출력 요청 브로드캐스트 — HUD 무전 위젯 바인딩용 */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLastFPSRadioTransmission, const FLastFPSRadioTransmissionData&, RadioData);
+/** 무전 자막/사운드 출력 요청 브로드캐스트 — 한 요청에 포함된 대사 순서를 보존해 HUD에 전달한다. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FOnLastFPSRadioTransmission,
+	const TArray<FLastFPSRadioTransmissionData>&,
+	RadioDataArray);
 
 /**
  * 화면 마커 대상 1건 — 진행중 퀘스트의 안내 가능한 목표를 월드 좌표로 노출.
@@ -36,7 +44,7 @@ struct FLastFPSObjectiveWaypoint
 	UPROPERTY(BlueprintReadOnly, Category="Quest")
 	FName QuestId;
 
-	/** 바닥 투영 캐시를 구분하는 위치 목표 식별자이다. */
+	/** 표시 측이 목표를 구분할 때 쓰는 위치 목표 식별자이다. */
 	UPROPERTY(BlueprintReadOnly, Category="Quest")
 	FGameplayTag LocationTag;
 
@@ -46,6 +54,34 @@ struct FLastFPSObjectiveWaypoint
 	 */
 	UPROPERTY(BlueprintReadOnly, Category="Quest")
 	bool bIsRoutePoint = false;
+};
+
+/**
+ * 목표 1건의 안내 지점 해석 결과 — 위치와 함께 그 위치의 성격까지 한 번에 돌려준다.
+ * (서브시스템 내부 계약)
+ */
+struct FLastFPSObjectiveGuidance
+{
+	FVector Location = FVector::ZeroVector;
+
+	/**
+	 * 동선 중간 지점이 아니라 최종 도달 지점인가.
+	 * 중간 지점은 레벨에 이미 바닥으로 배치돼 있어 HUD 가 바닥 투영을 생략한다.
+	 */
+	bool bIsDestination = true;
+};
+
+/**
+ * 표시 대상 목표 1건의 해석 결과 — 진행/요구량/완료 판정을 끝낸 상태로 방문자에게 넘긴다.
+ * 목표 순회 규칙을 세 조회 함수가 각자 재작성하지 않게 하는 서브시스템 내부 계약이다.
+ */
+struct FLastFPSDisplayObjectiveEntry
+{
+	const FLastFPSQuestObjective* Objective = nullptr;
+	int32 Index = INDEX_NONE;
+	int32 Progress = 0;
+	int32 RequiredCount = 1;
+	bool bCompleted = false;
 };
 
 /**
@@ -73,7 +109,7 @@ struct FLastFPSTrackedObjective
 	UPROPERTY(BlueprintReadOnly, Category="Quest")
 	bool bCompleted = false;
 
-	/** 안내 위치가 해석된 목표만 거리를 표시할 수 있다. */
+	/** 안내 위치가 존재하여 목표까지 거리 표시가 가능한지. */
 	UPROPERTY(BlueprintReadOnly, Category="Quest")
 	bool bHasGuidanceLocation = false;
 
@@ -112,7 +148,8 @@ struct FLastFPSQuestRuntimeState
 	ELastFPSQuestStatus Status = ELastFPSQuestStatus::NotStarted;
 	TArray<int32> Progress;   // 목표별 현재 진행 (0..RequiredCount)
 	TArray<int32> Baseline;   // 목표별 수락 시점 기준선 (AcquireItem: 수락 때 GetItemCount)
-	bool bIsTracked = true;   // HUD 추적 활성화 여부
+	TArray<int32> RefundedPurchaseQuantity; // 목표별 환급 대상으로 기록한 실제 구매 수량
+	int32 EligiblePurchaseSpend = 0;        // 목표 수량 범위에서 발생한 실결제액 누계
 };
 
 USTRUCT(BlueprintType)
@@ -143,6 +180,9 @@ class LASTFPS_API ULastFPSQuestSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+	/** 월드 컨텍스트에서 서브시스템을 얻는 공용 접근자 (World→GameInstance 조회 중복 제거). */
+	static ULastFPSQuestSubsystem* Get(const UObject* WorldContextObject);
+
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
@@ -180,7 +220,8 @@ public:
 	void CancelQuest(FName QuestId);
 
 	/**
-	 * 퀘스트 추적 여부 설정 — HUD에 마커나 트래커를 표시할지 결정.
+	 * 퀘스트 추적 설정 — 추적 대상은 항상 최대 1건이라 새로 추적하면 기존 추적을 대체한다.
+	 * bTrack=true 는 진행중 퀘스트만 허용하고, false 는 지금 추적 중인 퀘스트일 때만 해제한다.
 	 */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	void SetQuestTracked(FName QuestId, bool bTrack);
@@ -196,9 +237,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	bool TryClaimReward(FName QuestId);
 
+#if !UE_BUILD_SHIPPING
+	/**
+	 * 개발용 — 대상 퀘스트에 도달하도록 선행 사슬을 전부 수령 완료로 만든다.
+	 * 체인 뒷부분(던전 개방 등)을 앞 퀘스트를 다 깨지 않고 확인하기 위한 치트다.
+	 * 보상 지급과 연출은 건너뛰고 상태만 진행시킨다.
+	 */
+	void DebugUnlockChainTo(FName QuestId);
+#endif
+
 	/** 정적 정의 접근 (UI 목록 생성용 — 테이블 단일 소스) */
 	const UDataTable* GetQuestTable() const;
 	const FLastFPSQuestData* FindQuest(FName QuestId) const;
+
+	/** 퀘스트 제공 NPC의 표시 이름을 데이터 테이블에서 조회한다. 제공자가 없으면 빈 텍스트를 반환한다. */
+	UFUNCTION(BlueprintPure, Category="LastFPS|Quest")
+	FText GetQuestGiverDisplayName(FName QuestId) const;
 
 	UFUNCTION(BlueprintPure, Category="LastFPS|Quest")
 	bool IsQuestMappedToCurrentMap(FName QuestId) const;
@@ -230,9 +284,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	void NotifyTaggedObjective(ELastFPSObjectiveType Type, FGameplayTag Tag);
 
-	/** 대화 통지 — NPC 상호작용 시작 시 호출. TalkToNPC 목표를 누적. */
+	/** 대화 통지 — 명시적으로 대화가 선택됐을 때 진행 중인 TalkToNPC 목표를 누적한다. */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	void NotifyTalkedToNPC(FName NPCRowName);
+
+	/** 선택한 퀘스트 하나의 TalkToNPC 목표만 진행한다. NPC 퀘스트 행 클릭에서 사용한다. */
+	bool NotifyTalkedToNPCForQuest(FName QuestId, FName NPCRowName);
 
 	/** 인카운터 클리어 통지 — RoomEncounterSubsystem 이벤트에서 호출. ClearEncounter 목표를 처리. */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
@@ -254,7 +311,29 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest|Radio")
 	void TriggerRadioByIds(const TArray<FName>& RadioIds);
 
-	/** HUD 무전 위젯이 준비되기 전에 발생한 무전을 등록 순서대로 전달한다. */
+	/**
+	 * NPC 대화 데이터를 무전 자막으로 재생한다 — 대사 출력 채널을 자막 하나로 통일하기 위한 다리.
+	 * 대화 테이블은 그대로 두고 표시만 무전 위젯을 쓰므로, 데이터 이관이 필요 없다.
+	 * SpeakerName 이 비어 있으면 FallbackSpeaker(보통 NPC 표시 이름)를 쓴다.
+	 */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest|Radio")
+	void TriggerDialogueAsRadio(
+		const FLastFPSDialogueData& Dialogue,
+		const FText& FallbackSpeaker,
+		FLinearColor SpeakerColor);
+
+	/**
+	 * 이 NPC 의 임무 탭을 구성할 퀘스트 목록.
+	 * OutAcceptable: 지금 이 NPC 에게서 수락할 수 있는 퀘스트, OutReportable: 이 NPC 에게 보고해야 하는 퀘스트.
+	 * 표시 규칙(체인 잠금/맵 범위/순차 목표)은 마커와 같은 해석을 쓴다.
+	 */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
+	void GetNPCQuestActions(FName NPCRowName, TArray<FName>& OutAcceptable, TArray<FName>& OutReportable) const;
+
+	/** NPC 화면이 그대로 그릴 수 있는 퀘스트 클릭 행 스냅샷을 구성한다. */
+	void GetNPCQuestOptions(FName NPCRowName, TArray<FLastFPSNPCQuestOption>& OutOptions) const;
+
+	/** HUD 무전 위젯이 준비되기 전에 발생한 요청 중 가장 최신 묶음을 전달한다. */
 	void FlushPendingRadioTransmissions();
 
 	// ── 위치 마커 등록소 (ReachLocation 위치 소스 / HUD 공용) ─────────
@@ -274,6 +353,16 @@ public:
 	bool GetTrackedEncounterLocation(FName EncounterId, FVector& OutLocation) const;
 
 	/**
+	 * NPC 1명의 마커 표시 상태 — 심볼(수락 가능/대화 목표)과 추적 강조 여부.
+	 * 표시 규칙(순차 목표/맵 범위/체인 잠금)을 여기 한 곳에서만 해석해 마커 위젯과 HUD 가 공유한다.
+	 *
+	 * 레벨의 모든 NPC 마커가 상태 변경마다 같은 판정을 각자 반복하지 않도록, 계산은 상태가
+	 * 바뀔 때 전체 NPC 분을 한 번에 하고 여기서는 그 결과만 돌려준다.
+	 */
+	UFUNCTION(BlueprintPure, Category="LastFPS|Quest")
+	FLastFPSQuestNPCMarkerInfo GetNPCMarkerInfo(FName NPCRowName) const;
+
+	/**
 	 * 위치 목표의 도달 지점 — 등록된 마커 컴포넌트를 우선 사용하고, 없으면
 	 * 레벨에 배치된 경로(TargetId)의 마지막 지점을 쓴다. 둘 다 없으면 false.
 	 */
@@ -286,7 +375,9 @@ public:
 	bool IsLocationTriggerActive(FGameplayTag LocationTag) const;
 
 	/**
-	 * 진행중 퀘스트의 미완료 ReachLocation과 위치가 등록된 ClearEncounter를 반환한다.
+	 * 추적 중인 퀘스트에서 안내 위치가 해석되는 미완료 목표를 반환한다.
+	 * 어떤 유형이 위치를 갖는지는 ResolveObjectiveGuidanceLocation 이 단독으로 정하며,
+	 * 여기서는 "위치가 나오면 웨이포인트"로만 판정한다.
 	 * ReachLocation은 목적지 앞에 배치한 경로 지점을 진행 순서대로 먼저 안내한다.
 	 */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
@@ -356,13 +447,34 @@ private:
 
 	/**
 	 * 목표를 화면에서 안내할 지점 1개 — 화면 마커와 트래커 거리가 같은 지점을 가리키도록 공용화했다.
-	 * ClearEncounter 는 등록된 인카운터 마커, 위치 목표는 현재 동선 지점(없으면 도달 지점)을 쓴다.
-	 * 안내할 지점이 없는 유형(아이템 획득 등)이면 false.
+	 * ClearEncounter 는 등록된 인카운터 마커, ReachLocation 은 현재 동선 지점(없으면 도달 지점)을 쓴다.
+	 * 그 밖의 유형은 false — 대화 목표는 NPC 머리 위 마커가, 아이템 획득 등은 트래커 목록이 안내한다.
 	 */
 	bool ResolveObjectiveGuidanceLocation(
 		const FLastFPSQuestObjective& Objective,
-		FVector& OutLocation,
-		bool& bOutIsDestination) const;
+		FLastFPSObjectiveGuidance& OutGuidance) const;
+
+	/** 지금 추적 중인 퀘스트라면 추적을 비운다(체인 승계 전에 자리를 비우는 용도). 변경 시 true. */
+	bool ClearTrackedQuestIfMatches(FName QuestId);
+
+	/**
+	 * 표시용으로 유효한 추적 퀘스트 1건(진행중 + 현재 맵 범위). 없으면 nullptr.
+	 * 화면 마커·트래커·NPC 마커가 같은 전제를 각자 재작성하지 않도록 한 곳에 모았다.
+	 */
+	const FLastFPSQuestData* GetTrackedQuestForDisplay(const FLastFPSQuestRuntimeState*& OutState) const;
+
+	/**
+	 * 표시 대상 목표를 배열 순서대로 방문한다. Visitor 가 false 를 반환하면 중단하며,
+	 * 순차 퀘스트는 첫 미완료 목표까지만 방문해 다음 단계를 미리 공개하지 않는다.
+	 * (완료/요구량 해석과 순차 규칙의 단일 소스)
+	 */
+	void ForEachDisplayObjective(
+		const FLastFPSQuestData& Def,
+		const FLastFPSQuestRuntimeState& State,
+		TFunctionRef<bool(const FLastFPSDisplayObjectiveEntry&)> Visitor) const;
+
+	/** 추적/진행이 바뀐 뒤 NPC 마커 표시 캐시를 다시 계산한다(퀘스트 테이블 1회 순회). */
+	void RebuildNPCMarkerCache();
 
 	FDelegateHandle OnWorldInitHandle;
 	void HandlePostWorldInitialization(const FActorsInitializedParams& Params);
@@ -371,6 +483,12 @@ private:
 
 	/** 현재 영속 월드에 정확히 매핑된 던전 퀘스트를 1회 자동 수락한다. */
 	void AcceptDungeonQuestForMap(UWorld& World);
+
+	/**
+	 * 반복 가능(bRepeatable) 임무가 이미 끝난 상태면 다시 수행할 수 있도록 초기화한다.
+	 * 진행 중인 임무는 건드리지 않는다.
+	 */
+	void ResetRepeatableQuest(FName QuestId);
 
 	/** 던전 퀘스트를 이미 자동 수락한 월드 (동일 월드 중복 처리 방지, 재입장 시 재수행 허용). */
 	TWeakObjectPtr<UWorld> DungeonQuestAcceptedWorld;
@@ -389,10 +507,19 @@ private:
 	/** 일반 RoomEncounter 밖에서 제공하는 Encounter 목표 위치다. */
 	TMap<FName, TWeakObjectPtr<USceneComponent>> EncounterMarkers;
 
+	/**
+	 * 지금 추적 중인 퀘스트 1건. "동시에 하나"라는 규칙을 자료구조로 강제하려고
+	 * 퀘스트별 플래그 대신 단일 값으로 소유한다. None 이면 추적 없음.
+	 */
+	FName TrackedQuestId;
+
+	/** NPC 행 이름 → 마커 표시 상태 (상태 변경 시에만 재계산). 없는 키는 마커를 띄우지 않는다. */
+	TMap<FName, FLastFPSQuestNPCMarkerInfo> NPCMarkerInfos;
+
 	const UDataTable* GetRadioTable() const;
 	const FLastFPSRadioTransmissionData* FindRadioTransmission(FName RadioId) const;
 
-	/** 월드 초기화와 HUD 생성 사이에 발생한 무전을 유실하지 않기 위한 대기열이다. */
+	/** 월드 초기화와 HUD 생성 사이에는 가장 최신 무전 요청만 보관한다. */
 	TArray<FLastFPSRadioTransmissionData> PendingRadioTransmissions;
 
 	/** 유형별 목표 트래커 구성 (Initialize 1회). */
@@ -415,6 +542,17 @@ private:
 	UFUNCTION()
 	void HandleInventoryChanged();
 
+	/** 성공 구매 영수증을 진행 중 구매 퀘스트 한정으로 배분해 실결제액을 기록한다. */
+	void HandlePurchaseCommitted(const FLastFPSPurchaseReceipt& Receipt);
+
+	/** 한 퀘스트의 남은 AcquireItem 목표 수량에 영수증을 배분하고 소비한 수량을 반환한다. */
+	int32 RecordPurchaseForQuest(
+		FName QuestId,
+		FLastFPSQuestRuntimeState& State,
+		const FLastFPSQuestData& Def,
+		const FLastFPSPurchaseReceipt& Receipt,
+		int32 AvailableQuantity);
+
 	/** 위치 폴 타이머 콜백 — 경로 안내 지점 갱신 후 pull형(위치 등) 재계산. */
 	void HandleLocationPoll();
 
@@ -430,10 +568,14 @@ private:
 	/** 외부 이벤트를 진행중 퀘스트들에 적용(push형 목표 누적). 변경 시 true(브로드캐스트/연쇄는 호출부). */
 	bool ApplyObjectiveEventToActive(const FLastFPSObjectiveEvent& Event);
 	/** 한 퀘스트에 이벤트 적용. 변경 시 true. */
-	bool ApplyEventToQuest(FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def, const FLastFPSObjectiveEvent& Event);
+	bool ApplyEventToQuest(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def, const FLastFPSObjectiveEvent& Event);
 
-	/** 모든 목표 충족 시 Completed 로 단조 승격. 승격했으면 true. */
-	bool CheckCompletion(FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def) const;
+	/**
+	 * 모든 목표 충족 시 Completed 로 단조 승격. 승격했으면 true.
+	 * 승격은 퀘스트당 한 번뿐이므로 완료 무전(RadioOnComplete)의 예약도 이 지점에서 함께 기록한다.
+	 * 실제 재생은 보상 팝업이 닫힌 뒤 수행한다.
+	 */
+	bool CheckCompletion(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def);
 
 	/**
 	 * 목표가 이번 변경으로 처음 충족됐다면 그 목표의 완료 무전을 재생한다.
@@ -469,13 +611,23 @@ private:
 	/** 진행중 ReachLocation 목표 유무에 따라 위치 폴 타이머를 켜고/끈다. */
 	void UpdateLocationPollTimer();
 
-	/** 완료 토스트 (로컬 PC 의 ShowNotice). */
-	void NotifyRewardGranted(FName QuestId, const FLastFPSQuestData& Def) const;
+	/** 완료 팝업. 닫힌 뒤 OnClosed를 실행해 후속 대사와 퀘스트 전이를 잇는다. */
+	void NotifyRewardGranted(
+		FName QuestId,
+		const FLastFPSQuestData& Def,
+		int32 PurchaseRefundCredits,
+		FSimpleDelegate OnClosed);
 
 	/** 수령 알림 본문 — 제목 + 지급된 보상(크레딧/아이템) 내역. 구조화 보상이 비면 RewardText 폴백. */
-	FText BuildRewardMessage(const FLastFPSQuestData& Def) const;
+	FText BuildRewardMessage(const FLastFPSQuestData& Def, int32 PurchaseRefundCredits) const;
+
+	/** 현재 기록된 실결제액에 데이터 정책을 적용한 최종 환급액. */
+	int32 ResolvePurchaseRefundCredits(FName QuestId, const FLastFPSQuestData& Def) const;
 
 	TMap<FName, FLastFPSQuestRuntimeState> RuntimeStates;
+
+	/** 정상 플레이 중 완료되어 보상 팝업 종료 뒤 재생해야 하는 퀘스트 완료 무전. */
+	TSet<FName> PendingCompletionRadioQuestIds;
 
 	/** 목표 유형 → 판정 트래커 (Initialize 에서 구성). */
 	TMap<ELastFPSObjectiveType, TUniquePtr<ILastFPSObjectiveTracker>> Trackers;
@@ -500,5 +652,6 @@ private:
 
 	FTimerHandle LocationPollTimerHandle;
 	bool bInventorySubscribed = false;
+	bool bPurchaseSubscribed = false;
 	TWeakObjectPtr<ULastFPSRoomEncounterSubsystem> BoundEncounterSubsystem;
 };

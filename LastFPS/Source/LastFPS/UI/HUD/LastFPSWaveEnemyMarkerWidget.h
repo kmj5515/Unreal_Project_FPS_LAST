@@ -13,7 +13,7 @@ class LASTFPS_API ULastFPSWaveEnemyMarkerWidget : public UUserWidget
 	GENERATED_BODY()
 
 protected:
-	virtual void NativeConstruct() override;
+	virtual void NativeOnInitialized() override;
 
 private:
 	void EnsureNativeWidget();

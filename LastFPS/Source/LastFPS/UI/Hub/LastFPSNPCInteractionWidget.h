@@ -2,11 +2,13 @@
 
 #include "UI/Framework/LastFPSActivatableWidget.h"
 #include "Hub/LastFPSNPCTypes.h"
+#include "Quest/LastFPSNPCQuestOption.h"
 #include "Localization/LastFPSLocalization.h"
 #include "LastFPSNPCInteractionWidget.generated.h"
 
 class UPanelWidget;
 class UTextBlock;
+class UWidget;
 class ULastFPSButtonBase;
 class ALastFPSPlayerController;
 
@@ -24,13 +26,19 @@ class LASTFPS_API ULastFPSNPCInteractionWidget : public ULastFPSActivatableWidge
 
 public:
 	/** 허브 구성 — 이름/역할 표시 + 액션 버튼 생성. */
-	void Setup(ALastFPSPlayerController* InPC, const FText& InName, const FText& InRole, const TArray<FLastFPSNPCAction>& InActions);
+	void Setup(
+		ALastFPSPlayerController* InPC,
+		const FText& InName,
+		const FText& InDescription,
+		const TArray<FLastFPSNPCAction>& InActions,
+		const TArray<FLastFPSNPCQuestOption>& InQuestOptions);
 
 	/** 액션 버튼 표시/숨김 (대화 중에는 숨겼다가 대화 종료 시 복원). */
 	void SetButtonsVisible(bool bVisible);
 
 protected:
 	virtual void NativeDestruct() override;
+	virtual UWidget* NativeGetDesiredFocusTarget() const override;
 	virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
 
 	/** NPC 이름 */
@@ -63,4 +71,5 @@ protected:
 
 private:
 	TWeakObjectPtr<ALastFPSPlayerController> OwningPC;
+	TWeakObjectPtr<UWidget> InitialFocusTarget;
 };

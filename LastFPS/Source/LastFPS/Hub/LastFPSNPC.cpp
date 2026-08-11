@@ -6,6 +6,7 @@
 #include "Hub/LastFPSNPCSettings.h"
 #include "Hub/LastFPSNPCSpawnData.h"
 #include "Hub/LastFPSPatrolAIController.h"
+#include "Quest/LastFPSQuestNPCMarkerComponent.h"
 
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
@@ -52,12 +53,54 @@ ALastFPSNPC::ALastFPSNPC()
 	MarkerWidgetComp->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
 	MarkerWidgetComp->SetupAttachment(RootComponent);
 
+	// 퀘스트 상태 마커는 상호작용 범위 마커와 수명 및 표시 조건이 다르므로 별도 컴포넌트로 유지한다.
+	QuestMarkerComp = CreateDefaultSubobject<ULastFPSQuestNPCMarkerComponent>(TEXT("QuestMarkerComp"));
+	QuestMarkerComp->SetupAttachment(RootComponent);
+
 	// 대화 구도 카메라 — 기본은 NPC 정면 앞쪽에서 NPC를 바라보게. BP에서 조정.
 	TalkCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("TalkCamera"));
 	TalkCamera->SetupAttachment(RootComponent);
 	TalkCamera->SetRelativeLocation(FVector(180.f, 0.f, 60.f));
 	TalkCamera->SetRelativeRotation(FRotator(0.f, 180.f, 0.f)); // NPC를 향해 뒤돌아봄
 	TalkCamera->bUsePawnControlRotation = false;
+}
+
+void ALastFPSNPC::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	if (!QuestMarkerComp)
+	{
+		return;
+	}
+
+	const ULastFPSNPCSettings* NPCSettings = GetDefault<ULastFPSNPCSettings>();
+	if (!NPCSettings)
+	{
+		UE_LOG(LogLastFPSNPC, Error, TEXT("'%s': LastFPSNPCSettings를 읽지 못해 퀘스트 마커를 초기화할 수 없습니다."), *GetName());
+		return;
+	}
+
+	QuestMarkerComp->SetMarkerHeight(NPCSettings->QuestMarkerHeight);
+
+	if (UClass* QuestMarkerClass = NPCSettings->QuestMarkerWidgetClass.LoadSynchronous())
+	{
+		QuestMarkerComp->SetWidgetClass(QuestMarkerClass);
+	}
+	else
+	{
+		static bool bLoggedMissingQuestMarkerClass = false;
+		if (!bLoggedMissingQuestMarkerClass)
+		{
+			bLoggedMissingQuestMarkerClass = true;
+			UE_LOG(
+				LogLastFPSNPC,
+				Error,
+				TEXT("'%s': 퀘스트 마커 위젯 클래스를 불러오지 못했습니다. 설정 경로: '%s'"),
+				*GetName(),
+				*NPCSettings->QuestMarkerWidgetClass.ToSoftObjectPath().ToString());
+		}
+	}
 }
 
 void ALastFPSNPC::BeginPlay()
@@ -116,6 +159,14 @@ void ALastFPSNPC::SetInteractionProgress_Implementation(float Progress)
 	}
 }
 
+// ── ILastFPSQuestMarkerTarget ─────────────────────────────────────────
+
+FName ALastFPSNPC::GetQuestMarkerId_Implementation() const
+{
+	// 퀘스트 목표는 DT_NPCData 행 이름으로 NPC 를 가리키므로 그 값을 그대로 키로 쓴다.
+	return NPCRowName;
+}
+
 // ── JSON 자기 설정 ────────────────────────────────────────────────────
 
 void ALastFPSNPC::ApplyDataFromTable()
@@ -144,7 +195,7 @@ void ALastFPSNPC::ApplyDataFromTable()
 
 	UDataTable* DialogueTable = GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_NPC_Dialogue) : nullptr;
 	InteractionComp->ApplyData(
-		Row->DisplayName, Row->NPCRole, Row->InteractionLabel, Row->InteractionRadius,
+		Row->DisplayName, Row->NPCRole, Row->Description, Row->InteractionLabel, Row->InteractionRadius,
 		Row->BuildRuntimeActions(DialogueTable));
 }
 
