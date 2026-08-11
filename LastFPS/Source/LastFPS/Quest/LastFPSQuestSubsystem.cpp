@@ -1239,25 +1239,86 @@ bool ULastFPSQuestSubsystem::GetTrackedEncounterLocation(
 }
 
 const FLastFPSQuestData* ULastFPSQuestSubsystem::GetTrackedQuestForDisplay(
+	FName& OutQuestId,
 	const FLastFPSQuestRuntimeState*& OutState) const
 {
 	OutState = nullptr;
+	OutQuestId = NAME_None;
 
-	// 추적은 동시에 1건이므로 전체 순회 없이 추적 대상만 확인한다(추적 규칙의 단일 소스).
-	if (TrackedQuestId.IsNone() || !IsQuestInScopeForCurrentMap(TrackedQuestId))
+	// 던전 맵(배틀 맵)에 있다면, 사용자가 다른 퀘스트를 추적했더라도 무조건 던전 퀘스트를 우선 표시한다.
+	for (const FName DungeonQuestId : CurrentMapQuestIds)
 	{
-		return nullptr;
+		const FLastFPSQuestRuntimeState* State = RuntimeStates.Find(DungeonQuestId);
+		const FLastFPSQuestData* Def = FindQuest(DungeonQuestId);
+		if (State && Def && State->Status == ELastFPSQuestStatus::InProgress)
+		{
+			OutState = State;
+			OutQuestId = DungeonQuestId;
+			return Def;
+		}
 	}
 
-	const FLastFPSQuestRuntimeState* State = RuntimeStates.Find(TrackedQuestId);
-	const FLastFPSQuestData* Def = FindQuest(TrackedQuestId);
-	if (!State || !Def || State->Status != ELastFPSQuestStatus::InProgress)
+	// 그 외의 경우(허브 등)에는 사용자가 명시적으로 지정한 추적 퀘스트를 표시한다.
+	// 맵 스코프(IsQuestInScopeForCurrentMap)와 무관하게, 명시적 추적 대상이면 완료/미시작 상태라도 무조건 표시한다.
+	if (!TrackedQuestId.IsNone())
 	{
-		return nullptr;
+		const FLastFPSQuestRuntimeState* State = RuntimeStates.Find(TrackedQuestId);
+		const FLastFPSQuestData* Def = FindQuest(TrackedQuestId);
+		if (State && Def && State->Status != ELastFPSQuestStatus::Claimed && State->Status != ELastFPSQuestStatus::Locked)
+		{
+			OutState = State;
+			OutQuestId = TrackedQuestId;
+			return Def;
+		}
 	}
 
-	OutState = State;
-	return Def;
+	// 만약 추적 중인 퀘스트가 없거나 이미 완료되었다면, 진행 중인 아무 퀘스트나 하나 찾아서 우선 표시한다.
+	// 1차: 현재 맵 스코프에 맞는 퀘스트 우선
+	for (const auto& Pair : RuntimeStates)
+	{
+		if ((Pair.Value.Status == ELastFPSQuestStatus::InProgress || Pair.Value.Status == ELastFPSQuestStatus::Completed) && IsQuestInScopeForCurrentMap(Pair.Key))
+		{
+			const FLastFPSQuestData* Def = FindQuest(Pair.Key);
+			if (Def)
+			{
+				OutState = &Pair.Value;
+				OutQuestId = Pair.Key;
+				return Def;
+			}
+		}
+	}
+
+	// 2차: 맵 스코프에 맞지 않더라도 진행 중인 퀘스트가 있다면 표시한다.
+	for (const auto& Pair : RuntimeStates)
+	{
+		if (Pair.Value.Status == ELastFPSQuestStatus::InProgress || Pair.Value.Status == ELastFPSQuestStatus::Completed)
+		{
+			const FLastFPSQuestData* Def = FindQuest(Pair.Key);
+			if (Def)
+			{
+				OutState = &Pair.Value;
+				OutQuestId = Pair.Key;
+				return Def;
+			}
+		}
+	}
+
+	// 3차: 진행 중인 퀘스트가 하나도 없다면, 아직 수락 전(NotStarted)인 메인 퀘스트라도 우선 표시하여 다음 행동(NPC 대화 등)을 안내한다.
+	for (const auto& Pair : RuntimeStates)
+	{
+		if (Pair.Value.Status == ELastFPSQuestStatus::NotStarted)
+		{
+			const FLastFPSQuestData* Def = FindQuest(Pair.Key);
+			if (Def && Def->Type == ELastFPSQuestType::Main)
+			{
+				OutState = &Pair.Value;
+				OutQuestId = Pair.Key;
+				return Def;
+			}
+		}
+	}
+
+	return nullptr;
 }
 
 void ULastFPSQuestSubsystem::ForEachDisplayObjective(
@@ -1620,7 +1681,8 @@ void ULastFPSQuestSubsystem::GetActiveWaypoints(TArray<FLastFPSObjectiveWaypoint
 	OutWaypoints.Reset();
 
 	const FLastFPSQuestRuntimeState* State = nullptr;
-	const FLastFPSQuestData* Def = GetTrackedQuestForDisplay(State);
+	FName DisplayQuestId = NAME_None;
+	const FLastFPSQuestData* Def = GetTrackedQuestForDisplay(DisplayQuestId, State);
 	if (!Def || !State)
 	{
 		return;
@@ -1688,14 +1750,15 @@ void ULastFPSQuestSubsystem::GetTrackedQuests(TArray<FLastFPSTrackedQuest>& OutQ
 
 	// 추적은 동시에 1건이므로 전체 순회 없이 추적 대상만 조회한다(반환형은 기존 계약대로 배열 유지).
 	const FLastFPSQuestRuntimeState* State = nullptr;
-	const FLastFPSQuestData* Row = GetTrackedQuestForDisplay(State);
+	FName DisplayQuestId = NAME_None;
+	const FLastFPSQuestData* Row = GetTrackedQuestForDisplay(DisplayQuestId, State);
 	if (!Row || !State)
 	{
 		return;
 	}
 
 	FLastFPSTrackedQuest& Tracked = OutQuests.AddDefaulted_GetRef();
-	Tracked.QuestId = TrackedQuestId;
+	Tracked.QuestId = DisplayQuestId;
 	Tracked.Title = Row->Title;
 	Tracked.Type = Row->Type;
 	Tracked.Objectives.Reserve(Row->Objectives.Num());
@@ -2386,14 +2449,12 @@ void ULastFPSQuestSubsystem::AcceptDungeonQuestForMap(UWorld& World)
 				*TargetQuestId.ToString(),
 				*CurrentPackageName);
 			AcceptQuest(TargetQuestId);
-			SetQuestTracked(TargetQuestId, true);
 			continue;
 		}
 
 		// 개발용 시드나 재진입으로 이미 진행 중이어도 해당 전투 레벨의 시작 브리핑은 재생한다.
 		if (Status == ELastFPSQuestStatus::InProgress)
 		{
-			SetQuestTracked(TargetQuestId, true);
 			if (const FLastFPSQuestData* Definition = FindQuest(TargetQuestId))
 			{
 				TriggerRadioByIds(Definition->RadioOnStart);

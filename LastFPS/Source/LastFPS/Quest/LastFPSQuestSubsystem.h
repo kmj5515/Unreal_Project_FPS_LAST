@@ -461,7 +461,9 @@ private:
 	 * 표시용으로 유효한 추적 퀘스트 1건(진행중 + 현재 맵 범위). 없으면 nullptr.
 	 * 화면 마커·트래커·NPC 마커가 같은 전제를 각자 재작성하지 않도록 한 곳에 모았다.
 	 */
-	const FLastFPSQuestData* GetTrackedQuestForDisplay(const FLastFPSQuestRuntimeState*& OutState) const;
+	const FLastFPSQuestData* GetTrackedQuestForDisplay(
+		FName& OutQuestId,
+		const FLastFPSQuestRuntimeState*& OutState) const;
 
 	/**
 	 * 표시 대상 목표를 배열 순서대로 방문한다. Visitor 가 false 를 반환하면 중단하며,

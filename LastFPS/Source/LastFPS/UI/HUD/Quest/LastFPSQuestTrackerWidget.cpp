@@ -71,11 +71,6 @@ void ULastFPSQuestTrackerWidget::RefreshTracker()
 	if (Subsystem)
 	{
 		Subsystem->GetTrackedQuests(TrackedQuests);
-
-		TrackedQuests.RemoveAll([Subsystem](const FLastFPSTrackedQuest& Quest)
-		{
-			return !Subsystem->IsQuestMappedToCurrentMap(Quest.QuestId);
-		});
 	}
 	else
 	{
@@ -124,7 +119,7 @@ void ULastFPSQuestTrackerWidget::RefreshTracker()
 		TB_Empty->SetVisibility(CardCount > 0 ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 	}
 
-	SetVisibility(CardCount > 0 ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 
 	UpdateDistanceRefreshTimer(bNeedsDistanceRefresh);
 }
