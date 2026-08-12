@@ -6,6 +6,7 @@
 #include "GameplayTagContainer.h"
 #include "LastFPSGameModeBase.generated.h"
 
+class ALastFPSCharacterBase;
 class ALastFPSPlayerState;
 class UAbilitySystemComponent;
 class UGameplayEffect;
@@ -14,6 +15,7 @@ class ULastFPSCharacterRoster;
 class ULastFPSBattleDefinition;
 class ULastFPSDestinationContentComponent;
 class ULastFPSDestinationContentSet;
+class ULastFPSDropProfile;
 
 UCLASS()
 class LASTFPS_API ALastFPSGameModeBase : public AGameModeBase
@@ -133,7 +135,14 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="LastFPS|Loading")
     TObjectPtr<ULastFPSDestinationContentSet> DestinationContentSet;
 
+    /** 서버: 전투 레벨의 드랍 규칙을 굴려 픽업을 스폰한다. */
+    void SpawnDropsForDeath(const ALastFPSCharacterBase& DeadCharacter) const;
+
 protected:
+    /** 이동 URL 없이 맵을 직접 재생할 때(PIE) 사용할 전투 레벨. */
+    UPROPERTY(EditDefaultsOnly, Category="LastFPS|Battle")
+    TSoftObjectPtr<ULastFPSBattleDefinition> FallbackBattleDefinition;
+
     // 화면 디버그 + 로그를 한 번에 — 파생 GameMode들의 공용 헬퍼
     void DebugFlow(const FString& Message, FColor Color = FColor::Green) const;
 
@@ -165,4 +174,7 @@ private:
     /** 이동 URL로 선택된 정의를 전투 월드 수명 동안 유지한다. */
     UPROPERTY(Transient)
     TObjectPtr<ULastFPSBattleDefinition> ActiveBattleDefinition;
+
+    UPROPERTY(Transient)
+    TObjectPtr<ULastFPSDropProfile> ActiveDropProfile;
 };

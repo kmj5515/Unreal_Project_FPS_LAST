@@ -7,25 +7,10 @@
 #include "Pooling/LastFPSPoolableActor.h"
 #include "LastFPSEnemyCharacter.generated.h"
 
-class ALastFPSItemPickupActor;
 class ULastFPSAIProfile;
 class ULastFPSCombatAimComponent;
 class UWeaponComponent;
 class UWidgetComponent;
-
-/** 가중치 기반 드랍 항목 1종. Weight 가 클수록 자주 뽑힌다. */
-USTRUCT(BlueprintType)
-struct FLastFPSEnemyDropEntry
-{
-    GENERATED_BODY()
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Drop")
-    FName ItemRowId;
-
-    // 추첨 가중치 (상대값). 0 이하면 후보에서 제외.
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Drop", meta=(ClampMin="0.0"))
-    float Weight = 1.f;
-};
 
 UCLASS()
 class LASTFPS_API ALastFPSEnemyCharacter
@@ -135,9 +120,6 @@ private:
 
     UFUNCTION(NetMulticast, Unreliable)
     void Multicast_ApplyDeathRagdollImpulse(FVector_NetQuantizeNormal ImpulseDirection);
-
-    // DropTable 에서 가중치로 RowId 1개 추첨. TotalWeight 는 유효 항목 가중치 합. 실패 시 NAME_None.
-    FName PickWeightedDropRowId(float TotalWeight) const;
 
     bool bDeathRagdollStarted = false;
     bool bMeshRelativeTransformCaptured = false;
