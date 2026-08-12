@@ -70,26 +70,6 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Enemy|Wave Marker", meta=(ClampMin="0.0", Units="cm"))
     float WaveEnemyMarkerVerticalOffset = 45.f;
 
-    // 사망 시 드랍할 픽업 (비우면 드랍 없음).
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Drop")
-    TSubclassOf<ALastFPSItemPickupActor> DropPickupClass;
-
-    // 확정 드랍. 여기 나열한 RowId 는 항상 1개씩 나온다(같은 걸 여러 번 나열하면 그 수만큼). 총량(DropCount)에 포함.
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Drop")
-    TArray<FName> GuaranteedDropRowIds;
-
-    // 확정분을 채우고 남은 개수를 채울 후보(가중치 랜덤). 비면 랜덤분 없음.
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Drop")
-    TArray<FLastFPSEnemyDropEntry> DropTable;
-
-    // 총 드랍 픽업 개수(확정 + 랜덤). 확정분이 이보다 많으면 확정분은 모두 나온다. 각 픽업은 1개씩 지급.
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Drop")
-    int32 DropCount = 1;
-
-    // 드랍을 뿌릴 원 반경 (cm).
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Drop")
-    float DropSpreadRadius = 150.f;
-
     /** 사망 후 랙돌이 월드에 남아 있는 시간이다. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Enemy|Death", meta=(ClampMin="0.1", Units="s"))
     float DeathRemovalDelay = 5.f;
