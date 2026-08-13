@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/TimerHandle.h"
 #include "Messaging/CommonGameDialog.h"
 #include "LastFPSModalDialogBase.generated.h"
 
@@ -39,6 +40,8 @@ protected:
 
 	void CompleteDialog(ECommonMessagingResult Result);
 	void DeactivateWithAnimation();
+	void CancelOutAnimationFallback();
+	void HandleOutAnimationFallbackElapsed();
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_Title;
@@ -54,6 +57,10 @@ protected:
 	UPROPERTY(Transient, meta=(BindWidgetAnimOptional))
 	TObjectPtr<UWidgetAnimation> OutAnimation;
 
+	/** 종료 애니메이션 완료 이벤트가 누락될 때 모달을 닫기 위해 실제 길이에 더하는 안전 여유 시간이다. */
+	UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI|Animation", meta=(ClampMin="0.0", UIMin="0.0"))
+	float OutAnimationFallbackPaddingSeconds = 0.25f;
+
 	/** ESC 로 이 모달을 닫을지. */
 	UPROPERTY(EditDefaultsOnly, Category="LastFPS|UI")
 	bool bCloseOnEscape = true;
@@ -66,6 +73,7 @@ protected:
 
 private:
 	FCommonMessagingResultDelegate PendingResultCallback;
+	FTimerHandle OutAnimationFallbackTimerHandle;
 	bool bResultCompleted = false;
 	bool bWaitingForOutAnimation = false;
 };

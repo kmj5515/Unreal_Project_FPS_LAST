@@ -7,9 +7,73 @@
 #include "LevelSequence.h"
 #include "LevelSequenceActor.h"
 #include "LevelSequencePlayer.h"
+#include "MovieSceneSequence.h"
+#include "MovieScene.h"
 #include "MovieSceneSequencePlaybackSettings.h"
+#include "Quest/LastFPSQuestSubsystem.h"
+#include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
+#include "Data/Tables/LastFPSDialogueData.h"
 #include "TimerManager.h"
+#include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "UObject/Package.h"
+#include "HAL/IConsoleManager.h"
+
+#if WITH_EDITOR
+//
+#endif
+
+static FAutoConsoleCommand CVarLastFPSAddMarks(
+	TEXT("LastFPS.AddMarksForRadios"),
+	TEXT("Adds radio marks to sequences"),
+	FConsoleCommandDelegate::CreateStatic([]()
+	{
+#if WITH_EDITOR
+		auto ReplaceMarks = [](const FString& Path, const TArray<TPair<FString, int32>>& NewMarks)
+		{
+			if (UObject* Obj = LoadObject<UMovieSceneSequence>(nullptr, *Path))
+			{
+				if (UMovieSceneSequence* Seq = Cast<UMovieSceneSequence>(Obj))
+				{
+					if (UMovieScene* MS = Seq->GetMovieScene())
+					{
+						MS->Modify();
+						MS->DeleteMarkedFrames();
+						
+						FFrameRate DisplayRate = MS->GetDisplayRate();
+						FFrameRate TickResolution = MS->GetTickResolution();
+						
+						for (const auto& Pair : NewMarks)
+						{
+							FMovieSceneMarkedFrame NewMark;
+							NewMark.FrameNumber = FFrameRate::TransformTime(FFrameTime(Pair.Value), DisplayRate, TickResolution).FrameNumber;
+							NewMark.Label = Pair.Key;
+							MS->AddMarkedFrame(NewMark);
+							UE_LOG(LogTemp, Warning, TEXT("MarkedFrame added: %s at DisplayFrame %d"), *Pair.Key, Pair.Value);
+						}
+						
+						Seq->MarkPackageDirty();
+					}
+				}
+			}
+		};
+
+		TArray<TPair<FString, int32>> HuntMarks = {
+			{TEXT("Dialogue:DLG_Hunt_Start_1"), 0},
+			{TEXT("Dialogue:DLG_Hunt_Start_2"), 57},
+			{TEXT("Dialogue:DLG_Hunt_Start_3"), 111}
+		};
+		ReplaceMarks(TEXT("/Game/Cinematics/Quest/Quest_Hunt/LS_Quest_Hunt_Start.LS_Quest_Hunt_Start"), HuntMarks);
+
+		TArray<TPair<FString, int32>> MobMarks = {
+			{TEXT("Dialogue:DLG_Mobility_Start_1"), 0},
+			{TEXT("Dialogue:DLG_Mobility_Start_2"), 54},
+			{TEXT("Dialogue:DLG_Mobility_Start_3"), 105}
+		};
+		ReplaceMarks(TEXT("/Game/Cinematics/Quest/Q_Mobility/LS_Q_Mobility_Start.LS_Q_Mobility_Start"), MobMarks);
+		UE_LOG(LogTemp, Warning, TEXT("Dialogues added to sequences!"));
+#endif
+	})
+);
 
 DEFINE_LOG_CATEGORY_STATIC(LogLastFPSCinematic, Log, All);
 
@@ -159,6 +223,10 @@ void ULastFPSCinematicPlaybackSubsystem::HandleSequenceLoaded()
 	}
 
 	SequencePlayer->OnFinished.AddDynamic(this, &ULastFPSCinematicPlaybackSubsystem::HandlePlayerFinished);
+	
+	// Initialize LastFrameNumber for mark tracking (subtract 1 so we catch markers at the very start frame)
+	LastFrameNumber = SequencePlayer->GetStartTime().Time.FrameNumber - 1;
+	
 	SequencePlayer->Play();
 
 	OnCinematicStarted.Broadcast(PendingRequest.bSkippable);
@@ -234,6 +302,18 @@ void ULastFPSCinematicPlaybackSubsystem::FinishPlayback(const bool bSkipped)
 
 	PendingRequest = FLastFPSCinematicPlayback();
 
+	// 시퀀스 재생이 끝났거나 스킵되었을 때 진행 중이던 라디오도 모두 종료한다.
+	if (UWorld* World = GetWorld())
+	{
+		if (UGameInstance* GameInstance = World->GetGameInstance())
+		{
+			if (ULastFPSQuestSubsystem* QuestSubsystem = GameInstance->GetSubsystem<ULastFPSQuestSubsystem>())
+			{
+				QuestSubsystem->StopAllRadioTransmissions();
+			}
+		}
+	}
+
 	OnCinematicFinished.Broadcast(bSkipped);
 }
 
@@ -241,4 +321,77 @@ void ULastFPSCinematicPlaybackSubsystem::Deinitialize()
 {
 	StopPlayback();
 	Super::Deinitialize();
+}
+
+void ULastFPSCinematicPlaybackSubsystem::Tick(float DeltaTime)
+{
+	if (IsPlaying() && SequencePlayer)
+	{
+		FQualifiedFrameTime CurrentTime = SequencePlayer->GetCurrentTime();
+		FFrameNumber CurrentFrame = CurrentTime.Time.FrameNumber;
+		
+		if (CurrentFrame != LastFrameNumber)
+		{
+			if (UMovieSceneSequence* Sequence = SequencePlayer->GetSequence())
+			{
+				if (UMovieScene* MovieScene = Sequence->GetMovieScene())
+				{
+					FFrameRate PlayerRate = CurrentTime.Rate;
+					FFrameRate TickResolution = MovieScene->GetTickResolution();
+					
+					const TArray<FMovieSceneMarkedFrame>& MarkedFrames = MovieScene->GetMarkedFrames();
+					for (const FMovieSceneMarkedFrame& Mark : MarkedFrames)
+					{
+						// Convert MarkFrame from TickResolution to PlayerRate
+						FFrameNumber MarkFrame = FFrameRate::TransformTime(FFrameTime(Mark.FrameNumber), TickResolution, PlayerRate).FrameNumber;
+						
+						bool bPassedForward = (LastFrameNumber < MarkFrame && CurrentFrame >= MarkFrame);
+						bool bPassedBackward = (LastFrameNumber > MarkFrame && CurrentFrame <= MarkFrame);
+						
+						if (bPassedForward || bPassedBackward)
+						{
+							FString LabelStr = Mark.Label;
+							if (LabelStr.StartsWith(TEXT("Radio:")))
+							{
+								FName RadioId = FName(*LabelStr.Mid(6));
+								if (UGameInstance* GameInstance = GetWorld()->GetGameInstance())
+								{
+									if (ULastFPSQuestSubsystem* QuestSubsystem = GameInstance->GetSubsystem<ULastFPSQuestSubsystem>())
+									{
+										QuestSubsystem->TriggerRadioByIds({RadioId});
+									}
+								}
+							}
+							else if (LabelStr.StartsWith(TEXT("Dialogue:")))
+							{
+								FName DialogueId = FName(*LabelStr.Mid(9));
+								if (UGameInstance* GameInstance = GetWorld()->GetGameInstance())
+								{
+									if (ULastFPSQuestSubsystem* QuestSubsystem = GameInstance->GetSubsystem<ULastFPSQuestSubsystem>())
+									{
+										if (ULastFPSGameDataSubsystem* GameData = GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>())
+										{
+											if (UDataTable* DT = GameData->FindTable(LastFPSGameDataTags::Data_Table_NPC_Dialogue))
+											{
+												if (FLastFPSDialogueData* DialogueRow = DT->FindRow<FLastFPSDialogueData>(DialogueId, TEXT("CinematicDialogue")))
+												{
+													QuestSubsystem->TriggerDialogueAsRadio(*DialogueRow, FText::GetEmpty(), FLinearColor::White);
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			LastFrameNumber = CurrentFrame;
+		}
+	}
+}
+
+TStatId ULastFPSCinematicPlaybackSubsystem::GetStatId() const
+{
+	RETURN_QUICK_DECLARE_CYCLE_STAT(ULastFPSCinematicPlaybackSubsystem, STATGROUP_Tickables);
 }

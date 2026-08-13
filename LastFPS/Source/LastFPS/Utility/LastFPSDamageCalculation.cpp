@@ -7,7 +7,7 @@
 
 namespace
 {
-	constexpr float DamageVarianceRatio = 0.2f;
+	constexpr float DamageVarianceRatio = 0.1f;
 }
 
 float FLastFPSDamageRange::Roll() const

@@ -34,10 +34,6 @@ struct FLastFPSRadioTransmissionData : public FTableRowBase
 	/** 자막 노출 유지 시간 (0 이면 기본 4.0초 적용) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Radio", meta=(ClampMin=0.0, Units="s"))
 	float DisplayDuration = 4.0f;
-
-	/** 글자당 타이핑 속도(초) (0 이면 즉시 출력) */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Radio", meta=(ClampMin=0.0, Units="s"))
-	float TypingSpeed = 0.03f;
 };
 
 /** 퀘스트 분류 — 목록에서 메인/서브 구분 표시용 */

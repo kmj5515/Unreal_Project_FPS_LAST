@@ -234,7 +234,7 @@ void ALastFPSRoomEncounterRuntime::StartEncounter()
 		if (bEnemyDefinitionsFailed)
 		{
 			bStartRequested = false;
-			AbortEncounterOnConfigurationError(TEXT("적 Character Definition 비동기 로드가 실패했습니다."));
+			AbortEncounterOnConfigurationError(TEXT("적 Character Definition 또는 PawnClass 비동기 로드가 실패했습니다."));
 		}
 		else
 		{
@@ -461,17 +461,17 @@ void ALastFPSRoomEncounterRuntime::BeginEnemyDefinitionPreload()
 		});
 	if (bAllDefinitionsLoaded)
 	{
-		HandleEnemyDefinitionPreloadCompleted();
+		HandleEnemyDefinitionAssetsLoaded();
 		return;
 	}
 
-	EnemyDefinitionLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+	EnemyDefinitionAssetLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
 		DefinitionPaths,
 		FStreamableDelegate::CreateUObject(
 			this,
-			&ALastFPSRoomEncounterRuntime::HandleEnemyDefinitionPreloadCompleted),
+			&ALastFPSRoomEncounterRuntime::HandleEnemyDefinitionAssetsLoaded),
 		FStreamableManager::AsyncLoadHighPriority);
-	if (!EnemyDefinitionLoadHandle.IsValid())
+	if (!EnemyDefinitionAssetLoadHandle.IsValid())
 	{
 		bEnemyDefinitionsFailed = true;
 		UE_LOG(
@@ -482,9 +482,71 @@ void ALastFPSRoomEncounterRuntime::BeginEnemyDefinitionPreload()
 	}
 }
 
-void ALastFPSRoomEncounterRuntime::HandleEnemyDefinitionPreloadCompleted()
+void ALastFPSRoomEncounterRuntime::HandleEnemyDefinitionAssetsLoaded()
 {
-	bEnemyDefinitionsReady = ResolveLoadedEnemyDefinitions();
+	LoadedEnemyDefinitions.Reset();
+
+	TArray<FSoftObjectPath> PawnClassPaths;
+	PawnClassPaths.Reserve(EnemyDefinitionAssets.Num());
+	for (const TSoftObjectPtr<ULastFPSCharacterDefinition>& DefinitionAsset
+		: EnemyDefinitionAssets)
+	{
+		ULastFPSCharacterDefinition* Definition = DefinitionAsset.Get();
+		if (!Definition)
+		{
+			bEnemyDefinitionsFailed = true;
+			UE_LOG(
+				LogLastFPSRoomEncounter,
+				Error,
+				TEXT("[%s] 적 Character Definition을 로드하지 못했습니다: %s"),
+				*EncounterId.ToString(),
+				*DefinitionAsset.ToString());
+			HandleEnemyPawnClassesLoaded();
+			return;
+		}
+
+		const FSoftObjectPath PawnClassPath =
+			Definition->PawnClass.ToSoftObjectPath();
+		if (!PawnClassPath.IsValid())
+		{
+			bEnemyDefinitionsFailed = true;
+			UE_LOG(
+				LogLastFPSRoomEncounter,
+				Error,
+				TEXT("[%s] 적 Character Definition의 PawnClass 경로가 비어 있습니다: %s"),
+				*EncounterId.ToString(),
+				*DefinitionAsset.ToString());
+			HandleEnemyPawnClassesLoaded();
+			return;
+		}
+
+		LoadedEnemyDefinitions.AddUnique(Definition);
+		PawnClassPaths.AddUnique(PawnClassPath);
+	}
+
+	// 이미 메모리에 있는 클래스도 핸들이 수명을 고정하도록 항상 로드를 요청한다.
+	EnemyPawnClassLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+		PawnClassPaths,
+		FStreamableDelegate::CreateUObject(
+			this,
+			&ALastFPSRoomEncounterRuntime::HandleEnemyPawnClassesLoaded),
+		FStreamableManager::AsyncLoadHighPriority);
+	if (!EnemyPawnClassLoadHandle.IsValid())
+	{
+		bEnemyDefinitionsFailed = true;
+		UE_LOG(
+			LogLastFPSRoomEncounter,
+			Error,
+			TEXT("[%s] 적 PawnClass 비동기 로드 요청을 시작하지 못했습니다."),
+			*EncounterId.ToString());
+		HandleEnemyPawnClassesLoaded();
+	}
+}
+
+void ALastFPSRoomEncounterRuntime::HandleEnemyPawnClassesLoaded()
+{
+	bEnemyDefinitionsReady = !bEnemyDefinitionsFailed
+		&& ResolveLoadedEnemyDefinitions();
 	bEnemyDefinitionsFailed = !bEnemyDefinitionsReady;
 
 	if (!bEnemyDefinitionsReady)
@@ -492,12 +554,12 @@ void ALastFPSRoomEncounterRuntime::HandleEnemyDefinitionPreloadCompleted()
 		UE_LOG(
 			LogLastFPSRoomEncounter,
 			Error,
-			TEXT("[%s] 적 Character Definition 비동기 로드 결과가 유효하지 않습니다."),
+			TEXT("[%s] 적 Character Definition 또는 PawnClass 비동기 로드 결과가 유효하지 않습니다."),
 			*EncounterId.ToString());
 		if (HasAuthority() && bStartRequested)
 		{
 			bStartRequested = false;
-			AbortEncounterOnConfigurationError(TEXT("적 Character Definition 비동기 로드 결과가 유효하지 않습니다."));
+			AbortEncounterOnConfigurationError(TEXT("적 Character Definition 또는 PawnClass 비동기 로드 결과가 유효하지 않습니다."));
 		}
 		return;
 	}
@@ -505,7 +567,7 @@ void ALastFPSRoomEncounterRuntime::HandleEnemyDefinitionPreloadCompleted()
 	UE_LOG(
 		LogLastFPSRoomEncounter,
 		Verbose,
-		TEXT("[%s] 적 Character Definition %d개를 비동기로 준비했습니다."),
+		TEXT("[%s] 적 Character Definition 및 PawnClass %d개를 비동기로 준비했습니다."),
 		*EncounterId.ToString(),
 		LoadedEnemyDefinitions.Num());
 
@@ -517,10 +579,16 @@ void ALastFPSRoomEncounterRuntime::HandleEnemyDefinitionPreloadCompleted()
 
 void ALastFPSRoomEncounterRuntime::CancelEnemyDefinitionPreload()
 {
-	if (EnemyDefinitionLoadHandle.IsValid())
+	if (EnemyDefinitionAssetLoadHandle.IsValid())
 	{
-		EnemyDefinitionLoadHandle->CancelHandle();
-		EnemyDefinitionLoadHandle.Reset();
+		EnemyDefinitionAssetLoadHandle->CancelHandle();
+		EnemyDefinitionAssetLoadHandle.Reset();
+	}
+
+	if (EnemyPawnClassLoadHandle.IsValid())
+	{
+		EnemyPawnClassLoadHandle->CancelHandle();
+		EnemyPawnClassLoadHandle.Reset();
 	}
 }
 
@@ -531,14 +599,17 @@ bool ALastFPSRoomEncounterRuntime::ResolveLoadedEnemyDefinitions()
 		: EnemyDefinitionAssets)
 	{
 		ULastFPSCharacterDefinition* Definition = DefinitionAsset.Get();
-		if (!Definition || !Definition->PawnClass)
+		UClass* PawnClass = Definition ? Definition->PawnClass.Get() : nullptr;
+		if (!PawnClass
+			|| !PawnClass->IsChildOf(ALastFPSCharacterBase::StaticClass()))
 		{
 			UE_LOG(
 				LogLastFPSRoomEncounter,
 				Error,
-				TEXT("[%s] 적 Character Definition 또는 PawnClass가 유효하지 않습니다: %s"),
+				TEXT("[%s] 적 Character Definition의 PawnClass가 로드되지 않았거나 LastFPSCharacterBase 파생 클래스가 아닙니다: Definition=%s, PawnClass=%s"),
 				*EncounterId.ToString(),
-				*DefinitionAsset.ToString());
+				*DefinitionAsset.ToString(),
+				*GetNameSafe(PawnClass));
 			return false;
 		}
 
@@ -842,7 +913,8 @@ ALastFPSCharacterBase* ALastFPSRoomEncounterRuntime::SpawnEnemy(
 	const int32 SpawnIndex)
 {
 	UWorld* World = GetWorld();
-	if (!Definition.PawnClass || !World)
+	UClass* PawnClass = Definition.PawnClass.Get();
+	if (!PawnClass || !World)
 	{
 		UE_LOG(
 			LogLastFPSRoomEncounter,
@@ -860,7 +932,7 @@ ALastFPSCharacterBase* ALastFPSRoomEncounterRuntime::SpawnEnemy(
 		World->GetSubsystem<ULastFPSActorPoolSubsystem>())
 	{
 		SpawnedPawn = Cast<APawn>(Pool->AcquireActorByClass(
-			Definition.PawnClass.LoadSynchronous(),
+			PawnClass,
 			SpawnTransform,
 			this,
 			nullptr));
@@ -869,7 +941,7 @@ ALastFPSCharacterBase* ALastFPSRoomEncounterRuntime::SpawnEnemy(
 	if (!SpawnedPawn)
 	{
 		SpawnedPawn = World->SpawnActorDeferred<APawn>(
-			Definition.PawnClass.LoadSynchronous(),
+			PawnClass,
 			SpawnTransform,
 			this,
 			nullptr,

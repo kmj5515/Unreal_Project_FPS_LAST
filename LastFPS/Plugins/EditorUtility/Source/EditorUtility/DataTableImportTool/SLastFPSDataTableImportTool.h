@@ -1,11 +1,16 @@
 #pragma once
 
 #include "DataTableImportTool/LastFPSDataTableImportService.h"
+#include "Engine/DataTable.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Widgets/SCompoundWidget.h"
 
+class IStructureDetailsView;
 class SEditableTextBox;
+template<typename OptionType> class SComboBox;
 class STextBlock;
 class SVerticalBox;
+class FStructOnScope;
 
 class SLastFPSDataTableImportTool : public SCompoundWidget
 {
@@ -28,10 +33,19 @@ private:
 	FReply ImportSelectedClicked();
 	FReply ImportWorkbookClicked();
 	FReply AddMappingClicked(FName SheetName);
+	FReply PreviewSheetClicked(FName SheetName);
+	FReply ShowCurrentDataClicked();
+	FReply ShowExcelPreviewClicked();
 	void DirectoryCommitted(const FText& NewText, ETextCommit::Type CommitType);
 	void SheetCheckChanged(ECheckBoxState NewState, FName SheetName);
 	ECheckBoxState GetSheetCheckState(FName SheetName) const;
 	FText GetWorkbookHeaderText() const;
+	FText GetPreviewHeaderText() const;
+	TSharedRef<SWidget> GeneratePreviewRowWidget(TSharedPtr<FName> RowName) const;
+	void PreviewRowSelectionChanged(TSharedPtr<FName> RowName, ESelectInfo::Type SelectInfo);
+	void RebuildDataTablePreview(bool bUseExcelValues);
+	void RefreshPreviewRows();
+	void ClearDataTablePreview(const FText& Message);
 	void SetStatus(const FText& Message);
 	void AppendImportLog(const TArray<FLastFPSDataTableImportLogEntry>& Entries);
 
@@ -44,4 +58,14 @@ private:
 	TSharedPtr<SVerticalBox> SheetListBox;
 	TSharedPtr<STextBlock> WorkbookHeaderText;
 	TSharedPtr<STextBlock> StatusText;
+	TSharedPtr<STextBlock> PreviewHeaderText;
+	TSharedPtr<STextBlock> PreviewMessageText;
+	TSharedPtr<SComboBox<TSharedPtr<FName>>> PreviewRowComboBox;
+	TSharedPtr<IStructureDetailsView> PreviewDetailsView;
+	TSharedPtr<FStructOnScope> PreviewRowData;
+	TArray<TSharedPtr<FName>> PreviewRowNames;
+	TSharedPtr<FName> SelectedPreviewRow;
+	TStrongObjectPtr<UDataTable> PreviewDataTable;
+	FName PreviewSheetName;
+	bool bShowingExcelValues = false;
 };

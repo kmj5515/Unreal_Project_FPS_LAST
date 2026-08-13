@@ -5,7 +5,6 @@
 #include "Localization/LastFPSLocalization.h"
 #include "Quest/LastFPSQuestSubsystem.h"
 #include "UI/HUD/Audio/LastFPSRadioAudioPlayer.h"
-#include "UI/HUD/Audio/LastFPSRadioAudioSettings.h"
 
 void ULastFPSRadioTransmissionWidget::NativeConstruct()
 {
@@ -53,7 +52,6 @@ void ULastFPSRadioTransmissionWidget::NativeDestruct()
 
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().ClearTimer(TypingTimerHandle);
 		World->GetTimerManager().ClearTimer(DisplayDurationTimerHandle);
 	}
 
@@ -65,8 +63,6 @@ void ULastFPSRadioTransmissionWidget::NativeDestruct()
 
 	TransmissionQueue.Reset();
 	CurrentTransmission = FLastFPSRadioTransmissionData();
-	FullDialogueString.Reset();
-	CurrentCharIndex = 0;
 	bIsPlaying = false;
 
 	Super::NativeDestruct();
@@ -99,7 +95,6 @@ void ULastFPSRadioTransmissionWidget::QueueRadioTransmissions(const TArray<FLast
 
 void ULastFPSRadioTransmissionWidget::ProcessNextTransmission()
 {
-	GetWorld()->GetTimerManager().ClearTimer(TypingTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(DisplayDurationTimerHandle);
 
 	if (TransmissionQueue.IsEmpty())
@@ -132,12 +127,9 @@ void ULastFPSRadioTransmissionWidget::ProcessNextTransmission()
 		SpeakerNameText->SetColorAndOpacity(FSlateColor(CurrentTransmission.SpeakerColor));
 	}
 
-	FullDialogueString = CurrentTransmission.DialogueText.ToString();
-	CurrentCharIndex = 0;
-
 	if (DialogueText)
 	{
-		DialogueText->SetText(FText::GetEmpty());
+		DialogueText->SetText(CurrentTransmission.DialogueText);
 	}
 
 	if (RadioAudioPlayer)
@@ -151,61 +143,30 @@ void ULastFPSRadioTransmissionWidget::ProcessNextTransmission()
 
 	BP_OnRadioTransmissionStarted(CurrentTransmission);
 
-	const ULastFPSRadioAudioSettings* RadioSettings = ULastFPSRadioAudioSettings::Get();
-	const float TypingSpeedScale = RadioSettings ? RadioSettings->TypingSpeedScale : 1.0f;
-	const float EffectiveTypingSpeed = CurrentTransmission.TypingSpeed * TypingSpeedScale;
-	if (EffectiveTypingSpeed > KINDA_SMALL_NUMBER)
-	{
-		GetWorld()->GetTimerManager().SetTimer(
-			TypingTimerHandle,
-			this,
-			&ULastFPSRadioTransmissionWidget::StartTypingNextChar,
-			EffectiveTypingSpeed,
-			true);
-	}
-	else
-	{
-		if (DialogueText)
-		{
-			DialogueText->SetText(FText::FromString(FullDialogueString));
-		}
-		const float Duration = CurrentTransmission.DisplayDuration > KINDA_SMALL_NUMBER ? CurrentTransmission.DisplayDuration : 4.0f;
-		GetWorld()->GetTimerManager().SetTimer(
-			DisplayDurationTimerHandle,
-			this,
-			&ULastFPSRadioTransmissionWidget::FinishCurrentTransmission,
-			Duration,
-			false);
-	}
+	const float Duration = CalculateDisplayDuration();
+	GetWorld()->GetTimerManager().SetTimer(
+		DisplayDurationTimerHandle,
+		this,
+		&ULastFPSRadioTransmissionWidget::FinishCurrentTransmission,
+		Duration,
+		false);
 }
 
-void ULastFPSRadioTransmissionWidget::StartTypingNextChar()
+float ULastFPSRadioTransmissionWidget::CalculateDisplayDuration() const
 {
-	CurrentCharIndex++;
-	if (CurrentCharIndex > FullDialogueString.Len())
-	{
-		GetWorld()->GetTimerManager().ClearTimer(TypingTimerHandle);
+	constexpr float DefaultDisplayDurationSeconds = 4.0f;
+	const float ConfiguredDuration = CurrentTransmission.DisplayDuration > KINDA_SMALL_NUMBER
+		? CurrentTransmission.DisplayDuration
+		: DefaultDisplayDurationSeconds;
+	const float SafeCharactersPerSecond = FMath::Max(ReadingCharactersPerSecond, 1.0f);
+	const float ReadingDuration = static_cast<float>(CurrentTransmission.DialogueText.ToString().Len()) / SafeCharactersPerSecond
+		+ FMath::Max(ReadingCompletionHoldSeconds, 0.0f);
 
-		const float Duration = CurrentTransmission.DisplayDuration > KINDA_SMALL_NUMBER ? CurrentTransmission.DisplayDuration : 4.0f;
-		GetWorld()->GetTimerManager().SetTimer(
-			DisplayDurationTimerHandle,
-			this,
-			&ULastFPSRadioTransmissionWidget::FinishCurrentTransmission,
-			Duration,
-			false);
-		return;
-	}
-
-	if (DialogueText)
-	{
-		const FString SubStr = FullDialogueString.Left(CurrentCharIndex);
-		DialogueText->SetText(FText::FromString(SubStr));
-	}
+	return FMath::Max(ConfiguredDuration, ReadingDuration);
 }
 
 void ULastFPSRadioTransmissionWidget::FinishCurrentTransmission()
 {
-	GetWorld()->GetTimerManager().ClearTimer(TypingTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(DisplayDurationTimerHandle);
 
 	// 라디오 음성 적용을 다시 시작할 때 종료 신호 호출도 함께 복원한다.

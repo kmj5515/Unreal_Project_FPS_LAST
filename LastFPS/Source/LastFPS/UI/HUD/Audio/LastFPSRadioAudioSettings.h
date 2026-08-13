@@ -32,10 +32,6 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Voice", meta=(ClampMin="0.0", UIMin="0.0", UIMax="2.0"))
 	float VoiceVolume = 1.0f;
 
-	/** 대사별 TypingSpeed에 곱하는 전역 배율. 1보다 작을수록 글자가 더 빠르게 출력된다. */
-	UPROPERTY(Config, EditAnywhere, Category="Subtitle", meta=(ClampMin="0.1", ClampMax="2.0", UIMin="0.5", UIMax="1.5"))
-	float TypingSpeedScale = 0.75f;
-
 	UPROPERTY(Config, EditAnywhere, Category="Filter", meta=(ClampMin="20.0", ClampMax="20000.0", Units="Hz"))
 	float HighPassCutoffFrequency = 300.0f;
 

@@ -118,6 +118,11 @@ protected:
      */
     void ApplyEquipmentWeaponLoadout();
 
+    /**
+     * 전투 맵인지 확인하고 펫 클래스가 지정되어 있으면 펫을 소환합니다.
+     */
+    void TrySpawnPet();
+
     void Move(const FInputActionValue& Value);
     void ClearMoveInput(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
@@ -273,6 +278,14 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category="Input")
     TObjectPtr<ULastFPSInputConfig> InputConfig;
+
+    // 소환할 펫 클래스
+    UPROPERTY(EditDefaultsOnly, Category="Pet")
+    TSubclassOf<class ALastFPSPet> PetClass;
+
+    // 현재 소환된 펫 인스턴스
+    UPROPERTY(Transient)
+    TObjectPtr<class ALastFPSPet> SpawnedPet;
 
 private:
     TWeakObjectPtr<UObject> ActiveCameraEffectOwner;

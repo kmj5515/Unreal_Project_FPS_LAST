@@ -5,6 +5,7 @@
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
 #include "Game/LastFPSGameModeBase.h"
 #include "Inventory/LastFPSEquipmentSubsystem.h"
+#include "Character/LastFPSPet.h"
 #include "Blueprint/UserWidget.h"
 #include "Input/LastFPSInputConfig.h"
 #include "Utility/LastFPSTags.h"
@@ -99,6 +100,7 @@ void ALastFPSHero::PossessedBy(AController* NewController)
 	BindSpeedBoostCameraTag();
 	EnsureDefaultInputMapping();
 	ApplyEquipmentWeaponLoadout();
+	TrySpawnPet();
 }
 
 void ALastFPSHero::ApplyEquipmentWeaponLoadout()
@@ -138,6 +140,44 @@ void ALastFPSHero::ApplyEquipmentWeaponLoadout()
 	}
 
 	WeaponComponent->SetWeaponLoadout(SlotDefinitions);
+}
+
+void ALastFPSHero::TrySpawnPet()
+{
+	if (!HasAuthority() || !PetClass)
+	{
+		return;
+	}
+
+	const ALastFPSGameModeBase* GameMode =
+		GetWorld() ? GetWorld()->GetAuthGameMode<ALastFPSGameModeBase>() : nullptr;
+		
+	// 배틀(전투)이 가능한 씬인지 체크
+	if (!GameMode || !GameMode->ShouldEquipWeaponLoadout())
+	{
+		return;
+	}
+
+	if (!SpawnedPet)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Owner = this;
+		SpawnParams.Instigator = this;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+		// 영웅 왼쪽에서 스폰
+		FVector SpawnLocation = GetActorLocation() + (GetActorRightVector() * -150.f);
+		SpawnedPet = GetWorld()->SpawnActor<ALastFPSPet>(PetClass, SpawnLocation, GetActorRotation(), SpawnParams);
+		if (SpawnedPet)
+		{
+			if (!SpawnedPet->GetController())
+			{
+				SpawnedPet->SpawnDefaultController();
+			}
+			// AIController가 Possess 시 Owner를 덮어쓰므로 별도 변수에 주인 보관
+			SpawnedPet->SetOwnerHero(this);
+		}
+	}
 }
 
 void ALastFPSHero::PawnClientRestart()

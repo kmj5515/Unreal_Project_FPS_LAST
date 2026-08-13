@@ -1049,7 +1049,15 @@ bool ALastFPSPlayerController::ExecuteNPCQuestOption(const FLastFPSNPCQuestOptio
 	switch (Option.Type)
 	{
 	case ELastFPSNPCQuestOptionType::Accept:
-		return Acceptable.Contains(Option.QuestId) && Quest->AcceptQuest(Option.QuestId);
+		if (!Acceptable.Contains(Option.QuestId) || !Quest->AcceptQuest(Option.QuestId))
+		{
+			return false;
+		}
+
+		// 의뢰인과 나눈 수락 대화가 같은 NPC를 대상으로 한 첫 TalkToNPC 목표라면
+		// 별도의 두 번째 클릭을 요구하지 않고 이번 상호작용으로 바로 반영한다.
+		Quest->NotifyTalkedToNPCForQuest(Option.QuestId, NPC->NPCRowName);
+		return true;
 
 	case ELastFPSNPCQuestOptionType::Report:
 		if (!Reportable.Contains(Option.QuestId)

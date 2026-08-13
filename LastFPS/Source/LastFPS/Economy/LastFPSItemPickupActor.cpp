@@ -1,6 +1,7 @@
 #include "Economy/LastFPSItemPickupActor.h"
 
 #include "Character/LastFPSHero.h"
+#include "Character/LastFPSPet.h"
 #include "Data/Tables/LastFPSItemData.h"
 #include "Economy/LastFPSEconomySubsystem.h"
 #include "Game/LastFPSPlayerState.h"
@@ -271,6 +272,21 @@ void ALastFPSItemPickupActor::HandleLanded()
             break;
         }
     }
+
+    // 펫도 함께 체크
+    if (!IsActorBeingDestroyed() && bLanded)
+    {
+        TArray<AActor*> OverlappingPets;
+        OverlapSphere->GetOverlappingActors(OverlappingPets, ALastFPSPet::StaticClass());
+        for (AActor* Actor : OverlappingPets)
+        {
+            TryGrant(Actor);
+            if (IsActorBeingDestroyed() || !bLanded)
+            {
+                break;
+            }
+        }
+    }
 }
 
 void ALastFPSItemPickupActor::PlaySpawnFX()
@@ -329,6 +345,14 @@ void ALastFPSItemPickupActor::TryGrant(AActor* OtherActor)
     }
 
     ALastFPSHero* Hero = Cast<ALastFPSHero>(OtherActor);
+    if (!Hero)
+    {
+        if (ALastFPSPet* Pet = Cast<ALastFPSPet>(OtherActor))
+        {
+            Hero = Cast<ALastFPSHero>(Pet->GetOwnerHero());
+        }
+    }
+    
     if (!Hero || ItemRowId.IsNone() || Count <= 0)
     {
         return;

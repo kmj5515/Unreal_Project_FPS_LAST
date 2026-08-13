@@ -49,21 +49,26 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category="LastFPS|Radio")
 	void BP_OnRadioTransmissionEnded();
 
+	/** 음성이 없는 라디오 문장을 읽는 데 필요한 초당 문자 수 기준이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Radio|Readability", meta=(ClampMin="1.0"))
+	float ReadingCharactersPerSecond = 12.0f;
+
+	/** 문장을 모두 읽은 뒤 화면에 추가로 유지하는 시간이다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Radio|Readability", meta=(ClampMin="0.0", Units="s"))
+	float ReadingCompletionHoldSeconds = 1.5f;
+
 private:
 	UFUNCTION()
 	void HandleQuestRadioTransmission(const TArray<FLastFPSRadioTransmissionData>& RadioDataArray);
 
 	void ProcessNextTransmission();
-	void StartTypingNextChar();
 	void FinishCurrentTransmission();
+	[[nodiscard]] float CalculateDisplayDuration() const;
 
 	TArray<FLastFPSRadioTransmissionData> TransmissionQueue;
 	FLastFPSRadioTransmissionData CurrentTransmission;
-	FString FullDialogueString;
-	int32 CurrentCharIndex = 0;
 	bool bIsPlaying = false;
 
-	FTimerHandle TypingTimerHandle;
 	FTimerHandle DisplayDurationTimerHandle;
 
 	UPROPERTY(Transient)

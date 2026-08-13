@@ -26,6 +26,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	const TArray<FLastFPSRadioTransmissionData>&,
 	RadioDataArray);
 
+/** 무전 강제 종료 요청 브로드캐스트 — 시퀀스 종료/스킵 시 남아있는 자막을 지운다. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLastFPSRadioTransmissionStop);
+
 /**
  * 화면 마커 대상 1건 — 진행중 퀘스트의 안내 가능한 목표를 월드 좌표로 노출.
  * 거리(m)는 플레이어 위치에 따라 매 프레임 바뀌므로 여기 담지 않고 HUD 위젯이 계산한다.
@@ -336,6 +339,10 @@ public:
 	/** HUD 무전 위젯이 준비되기 전에 발생한 요청 중 가장 최신 묶음을 전달한다. */
 	void FlushPendingRadioTransmissions();
 
+	/** 라디오 송출을 즉시 모두 취소하고 자막을 지우도록 UI에 방송한다. */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest|Radio")
+	void StopAllRadioTransmissions();
+
 	// ── 위치 마커 등록소 (ReachLocation 위치 소스 / HUD 공용) ─────────
 
 	/** 위치 마커 등록 (ULastFPSObjectiveMarkerComponent 가 BeginPlay 에서 호출). */
@@ -395,6 +402,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category="LastFPS|Quest|Radio")
 	FOnLastFPSRadioTransmission OnRadioTransmission;
+
+	UPROPERTY(BlueprintAssignable, Category="LastFPS|Quest|Radio")
+	FOnLastFPSRadioTransmissionStop OnRadioTransmissionStop;
 
 protected:
 	/** 정확한 영속 월드와 자동 진행할 퀘스트 ID 매핑 (DefaultGame.ini 로 확장 가능) */

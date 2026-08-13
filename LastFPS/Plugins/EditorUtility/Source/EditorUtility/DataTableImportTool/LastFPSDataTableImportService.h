@@ -55,6 +55,12 @@ public:
 		const FString& CsvFileName,
 		const FSoftObjectPath& TargetAssetPath,
 		FText& OutError);
+	/** 원본 에셋을 변경하지 않고 현재 DT 또는 Excel 반영 예정값의 transient 복사본을 만든다. */
+	static class UDataTable* CreateDataTablePreview(
+		const FLastFPSDataTableImportWorkbookInfo& Workbook,
+		FName SheetName,
+		bool bUseExcelValues,
+		FText& OutError);
 	static FString GetExcelDirectory();
 	static FString GetCsvDirectory();
 

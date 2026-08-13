@@ -271,6 +271,33 @@ namespace
 		return true;
 	}
 
+	bool ConvertSheetForPreview(
+		const FLastFPSDataTableImportWorkbookInfo& Workbook,
+		const FLastFPSDataTableImportMapping& Mapping,
+		FString& OutCleanCsvPath,
+		FText& OutError)
+	{
+		const FString PreviewDirectory = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DataTableImport/Preview"));
+		IFileManager::Get().MakeDirectory(*PreviewDirectory, true);
+
+		const FString FileStem = FString::Printf(
+			TEXT("%08x_%08x"),
+			GetTypeHash(Workbook.WorkbookPath),
+			GetTypeHash(Mapping.SheetName));
+		const FString PreviewCsvPath = FPaths::Combine(PreviewDirectory, FileStem + TEXT(".csv"));
+		OutCleanCsvPath = FPaths::Combine(PreviewDirectory, FileStem + TEXT("_clean.csv"));
+
+		const TArray<FString> Arguments = {
+			TEXT("--project-dir"), FPaths::ProjectDir(),
+			TEXT("convert"),
+			TEXT("--workbook"), Workbook.WorkbookPath,
+			TEXT("--sheet"), Mapping.SheetName.ToString(),
+			TEXT("--output"), PreviewCsvPath,
+			TEXT("--clean-output"), OutCleanCsvPath
+		};
+		return ExecutePython(Arguments, OutError);
+	}
+
 	bool SaveImportedAsset(UObject* Asset, FText& OutError)
 	{
 		UEditorAssetSubsystem* AssetSubsystem = GEditor
@@ -556,7 +583,8 @@ bool FLastFPSDataTableImportService::ScanWorkbooks(
 
 			Sheet.State = ELastFPSDataTableImportSheetState::Ready;
 			Sheet.StateMessage = LOCTEXT("ReadySheet", "임포트 가능");
-			const FString CsvPath = FPaths::Combine(ExcelDirectory, Sheet.CsvFileName);
+			// 커밋용 CSV는 Excel 원본 폴더가 아니라 설정된 CSV 산출물 폴더에 저장된다.
+			const FString CsvPath = FPaths::Combine(GetCsvDirectory(), Sheet.CsvFileName);
 			const FDateTime CsvModifiedTime = IFileManager::Get().GetTimeStamp(*CsvPath);
 			Workbook.bModifiedSinceImport |= !IFileManager::Get().FileExists(*CsvPath)
 				|| Workbook.ModifiedTime > CsvModifiedTime;
@@ -690,6 +718,83 @@ bool FLastFPSDataTableImportService::AddRegistryMapping(
 	}
 	OutError = FText::GetEmpty();
 	return true;
+}
+
+UDataTable* FLastFPSDataTableImportService::CreateDataTablePreview(
+	const FLastFPSDataTableImportWorkbookInfo& Workbook,
+	const FName SheetName,
+	const bool bUseExcelValues,
+	FText& OutError)
+{
+	const FLastFPSDataTableImportSheetInfo* Sheet = Workbook.Sheets.FindByPredicate(
+		[SheetName](const FLastFPSDataTableImportSheetInfo& Candidate)
+		{
+			return Candidate.SheetName == SheetName;
+		});
+	if (!Sheet || Sheet->State != ELastFPSDataTableImportSheetState::Ready)
+	{
+		OutError = LOCTEXT("PreviewSheetUnavailable", "미리보기 가능한 등록 시트를 찾지 못했습니다.");
+		return nullptr;
+	}
+
+	FText RegistryError;
+	ULastFPSDataTableImportRegistry* Registry = LoadRegistry(RegistryError);
+	const FLastFPSDataTableImportMapping* Mapping = Registry
+		? Registry->FindMapping(Workbook.WorkbookName, SheetName)
+		: nullptr;
+	if (!Mapping)
+	{
+		OutError = Registry ? LOCTEXT("PreviewMappingMissing", "미리보기 대상 매핑을 찾지 못했습니다.") : RegistryError;
+		return nullptr;
+	}
+
+	UDataTable* SourceTable = Cast<UDataTable>(Mapping->TargetAsset.LoadSynchronous());
+	if (!SourceTable || !SourceTable->GetRowStruct())
+	{
+		OutError = FText::Format(
+			LOCTEXT("PreviewTargetNotDataTable", "연결된 대상이 유효한 DataTable이 아닙니다: {0}"),
+			FText::FromString(Mapping->TargetAsset.ToString()));
+		return nullptr;
+	}
+
+	UDataTable* PreviewTable = DuplicateObject<UDataTable>(SourceTable, GetTransientPackage());
+	if (!PreviewTable)
+	{
+		OutError = LOCTEXT("PreviewDuplicateFailed", "DataTable 미리보기 복사본을 만들지 못했습니다.");
+		return nullptr;
+	}
+	PreviewTable->SetFlags(RF_Transient);
+
+	if (bUseExcelValues)
+	{
+		FString CleanCsvPath;
+		if (!ConvertSheetForPreview(Workbook, *Mapping, CleanCsvPath, OutError))
+		{
+			return nullptr;
+		}
+
+		FString RawCsvText;
+		if (!FFileHelper::LoadFileToString(RawCsvText, *CleanCsvPath))
+		{
+			OutError = FText::Format(
+				LOCTEXT("PreviewCsvReadFailed", "미리보기 CSV를 읽지 못했습니다: {0}"),
+				FText::FromString(CleanCsvPath));
+			return nullptr;
+		}
+
+		const FString CsvText = FillEmptyStructCells(RawCsvText, PreviewTable->GetRowStruct());
+		const TArray<FString> Problems = PreviewTable->CreateTableFromCSVString(CsvText);
+		if (!Problems.IsEmpty())
+		{
+			OutError = FText::Format(
+				LOCTEXT("PreviewCsvValidationFailed", "Excel 예정값을 DataTable로 해석하지 못했습니다: {0}"),
+				FText::FromString(FString::Join(Problems, TEXT(" | "))));
+			return nullptr;
+		}
+	}
+
+	OutError = FText::GetEmpty();
+	return PreviewTable;
 }
 
 #undef LOCTEXT_NAMESPACE

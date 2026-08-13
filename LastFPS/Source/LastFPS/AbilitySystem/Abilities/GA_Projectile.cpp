@@ -149,7 +149,7 @@ void UGA_Projectile::SpawnProjectile()
         (CachedAimTarget - Hero->GetActorLocation()).GetSafeNormal();
     const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
     LaunchRequest.BaseDamageOverride = BalanceData && BalanceData->Damage > 0.f
-        ? BalanceData->Damage + GetEquippedWeaponBaseDamage()
+        ? BalanceData->Damage
         : 0.f;
     LastFPSProjectileLaunch::SpawnProjectile(LaunchRequest);
 }

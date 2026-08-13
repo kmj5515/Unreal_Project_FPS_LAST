@@ -103,7 +103,8 @@ private:
 
 	void StartEncounter();
 	void BeginEnemyDefinitionPreload();
-	void HandleEnemyDefinitionPreloadCompleted();
+	void HandleEnemyDefinitionAssetsLoaded();
+	void HandleEnemyPawnClassesLoaded();
 	void CancelEnemyDefinitionPreload();
 	bool ResolveLoadedEnemyDefinitions();
 	void ScheduleNextWave();
@@ -251,6 +252,7 @@ private:
 	bool bEncounterStarted = false;
 	bool bWaveSpawning = false;
 	bool bLoggedSpawnProjectionFailure = false;
-	TSharedPtr<FStreamableHandle> EnemyDefinitionLoadHandle;
+	TSharedPtr<FStreamableHandle> EnemyDefinitionAssetLoadHandle;
+	TSharedPtr<FStreamableHandle> EnemyPawnClassLoadHandle;
 	TSharedPtr<FStreamableHandle> BarrierPresentationLoadHandle;
 };

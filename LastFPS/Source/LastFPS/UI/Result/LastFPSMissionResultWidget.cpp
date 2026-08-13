@@ -10,10 +10,12 @@
 #include "UI/Framework/LastFPSPopupTags.h"
 #include "UI/Inventory/LastFPSItemSlotWidget.h"
 
+#include "Containers/Ticker.h"
 #include "Components/Image.h"
 #include "Components/PanelWidget.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "Components/Widget.h"
 #include "Components/WrapBox.h"
 #include "Engine/DataTable.h"
 #include "Engine/GameInstance.h"
@@ -66,6 +68,11 @@ void ULastFPSMissionResultWidget::HandleConfirmClicked()
 
 void ULastFPSMissionResultWidget::SetupResult(const FLastFPSMissionResult& InResult)
 {
+	if (In_Animation)
+	{
+		PlayAnimation(In_Animation);
+	}
+	
 	RefreshHeader(InResult);
 	RefreshScore(InResult);
 	RefreshCombatStats(InResult.CombatStats);

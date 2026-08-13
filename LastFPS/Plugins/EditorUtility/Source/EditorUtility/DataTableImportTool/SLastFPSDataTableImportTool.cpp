@@ -2,22 +2,29 @@
 
 #include "AssetRegistry/AssetData.h"
 #include "ContentBrowserModule.h"
+#include "DetailsViewArgs.h"
 #include "DesktopPlatformModule.h"
 #include "Engine/DataTable.h"
 #include "Framework/Application/SlateApplication.h"
 #include "IContentBrowserSingleton.h"
 #include "IDesktopPlatform.h"
+#include "IDetailsView.h"
+#include "IStructureDetailsView.h"
 #include "Internationalization/StringTable.h"
 #include "Misc/Paths.h"
 #include "Modules/ModuleManager.h"
+#include "PropertyEditorModule.h"
 #include "Settings/LastFPSDataTableImportSettings.h"
 #include "Styling/AppStyle.h"
+#include "UObject/StructOnScope.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Input/SComboBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SScrollBox.h"
+#include "Widgets/Layout/SSplitter.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -42,6 +49,28 @@ namespace
 
 void SLastFPSDataTableImportTool::Construct(const FArguments& InArgs)
 {
+	FPropertyEditorModule& PropertyEditorModule =
+		FModuleManager::LoadModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
+	FDetailsViewArgs DetailsViewArgs;
+	DetailsViewArgs.bAllowSearch = true;
+	DetailsViewArgs.bHideSelectionTip = true;
+	DetailsViewArgs.bShowObjectLabel = false;
+	DetailsViewArgs.bShowOptions = false;
+	DetailsViewArgs.bShowPropertyMatrixButton = false;
+
+	FStructureDetailsViewArgs StructureViewArgs;
+	StructureViewArgs.bShowObjects = false;
+	StructureViewArgs.bShowAssets = true;
+	StructureViewArgs.bShowClasses = true;
+	StructureViewArgs.bShowInterfaces = false;
+	PreviewDetailsView = PropertyEditorModule.CreateStructureDetailView(
+		DetailsViewArgs,
+		StructureViewArgs,
+		nullptr,
+		LOCTEXT("PreviewRowValue", "행 값"));
+	PreviewDetailsView->GetDetailsView()->SetIsPropertyEditingEnabledDelegate(
+		FIsPropertyEditingEnabled::CreateLambda([]() { return false; }));
+
 	ChildSlot
 	[
 		SNew(SBorder)
@@ -106,7 +135,11 @@ void SLastFPSDataTableImportTool::Construct(const FArguments& InArgs)
 				+ SHorizontalBox::Slot()
 				.FillWidth(1.f)
 				[
-					SNew(SVerticalBox)
+					SNew(SSplitter)
+					+ SSplitter::Slot()
+					.Value(0.42f)
+					[
+						SNew(SVerticalBox)
 					+ SVerticalBox::Slot()
 					.AutoHeight()
 					.Padding(0.f, 0.f, 0.f, 6.f)
@@ -148,6 +181,91 @@ void SLastFPSDataTableImportTool::Construct(const FArguments& InArgs)
 							SNew(SButton)
 							.Text(LOCTEXT("ImportWorkbook", "워크북 전체 임포트"))
 							.OnClicked(this, &SLastFPSDataTableImportTool::ImportWorkbookClicked)
+						]
+					]
+					]
+					+ SSplitter::Slot()
+					.Value(0.58f)
+					[
+						SNew(SBorder)
+						.Padding(8.f)
+						.BorderImage(FAppStyle::GetBrush(TEXT("Brushes.Panel")))
+						[
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(0.f, 0.f, 0.f, 6.f)
+							[
+								SAssignNew(PreviewHeaderText, STextBlock)
+								.Text(this, &SLastFPSDataTableImportTool::GetPreviewHeaderText)
+								.Font(FAppStyle::GetFontStyle(TEXT("HeadingExtraSmall")))
+							]
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(0.f, 0.f, 0.f, 6.f)
+							[
+								SNew(SHorizontalBox)
+								+ SHorizontalBox::Slot()
+								.AutoWidth()
+								.Padding(0.f, 0.f, 6.f, 0.f)
+								[
+									SNew(SButton)
+									.Text(LOCTEXT("ShowCurrentData", "현재 DT"))
+									.ToolTipText(LOCTEXT("ShowCurrentDataTooltip", "현재 저장된 DataTable 값을 표시합니다."))
+									.IsEnabled_Lambda([this]() { return !PreviewSheetName.IsNone(); })
+									.ButtonColorAndOpacity_Lambda([this]()
+									{
+										return !bShowingExcelValues ? FLinearColor(0.20f, 0.35f, 0.55f) : FLinearColor::White;
+									})
+									.OnClicked(this, &SLastFPSDataTableImportTool::ShowCurrentDataClicked)
+								]
+								+ SHorizontalBox::Slot()
+								.AutoWidth()
+								[
+									SNew(SButton)
+									.Text(LOCTEXT("ShowExcelPreview", "Excel 예정값"))
+									.ToolTipText(LOCTEXT("ShowExcelPreviewTooltip", "원본을 수정하지 않고 Excel 임포트 예정값을 변환해 표시합니다."))
+									.IsEnabled_Lambda([this]() { return !PreviewSheetName.IsNone(); })
+									.ButtonColorAndOpacity_Lambda([this]()
+									{
+										return bShowingExcelValues ? FLinearColor(0.20f, 0.35f, 0.55f) : FLinearColor::White;
+									})
+									.OnClicked(this, &SLastFPSDataTableImportTool::ShowExcelPreviewClicked)
+								]
+							]
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(0.f, 0.f, 0.f, 6.f)
+							[
+								SAssignNew(PreviewRowComboBox, SComboBox<TSharedPtr<FName>>)
+								.OptionsSource(&PreviewRowNames)
+								.OnGenerateWidget(this, &SLastFPSDataTableImportTool::GeneratePreviewRowWidget)
+								.OnSelectionChanged(this, &SLastFPSDataTableImportTool::PreviewRowSelectionChanged)
+								.Content()
+								[
+									SNew(STextBlock)
+									.Text_Lambda([this]()
+									{
+										return SelectedPreviewRow.IsValid()
+											? FText::FromName(*SelectedPreviewRow)
+											: LOCTEXT("NoPreviewRow", "행을 선택하세요");
+									})
+								]
+							]
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(0.f, 0.f, 0.f, 4.f)
+							[
+								SAssignNew(PreviewMessageText, STextBlock)
+								.Text(LOCTEXT("PreviewGuide", "시트의 '미리보기'를 눌러 DataTable 값을 확인하세요."))
+								.AutoWrapText(true)
+								.ColorAndOpacity(FSlateColor::UseSubduedForeground())
+							]
+							+ SVerticalBox::Slot()
+							.FillHeight(1.f)
+							[
+								PreviewDetailsView->GetWidget().ToSharedRef()
+							]
 						]
 					]
 				]
@@ -248,6 +366,9 @@ void SLastFPSDataTableImportTool::SelectWorkbook(const int32 WorkbookIndex)
 {
 	SelectedWorkbookIndex = Workbooks.IsValidIndex(WorkbookIndex) ? WorkbookIndex : INDEX_NONE;
 	SelectedSheets.Reset();
+	PreviewSheetName = NAME_None;
+	bShowingExcelValues = false;
+	ClearDataTablePreview(LOCTEXT("PreviewSelectSheet", "시트의 '미리보기'를 눌러 DataTable 값을 확인하세요."));
 	// 제외·미등록·잘못된 매핑은 선택 단계부터 차단해 서비스에 모호한 임포트 요청이 전달되지 않게 한다.
 	if (Workbooks.IsValidIndex(SelectedWorkbookIndex))
 	{
@@ -326,7 +447,165 @@ TSharedRef<SWidget> SLastFPSDataTableImportTool::BuildSheetRow(const FLastFPSDat
 			.OnClicked(this, &SLastFPSDataTableImportTool::AddMappingClicked, Sheet.SheetName)
 		];
 	}
+	else if (Sheet.State == ELastFPSDataTableImportSheetState::Ready)
+	{
+		Row->AddSlot().AutoWidth().Padding(6.f, 0.f, 0.f, 0.f)
+		[
+			SNew(SButton)
+			.Text(LOCTEXT("PreviewSheet", "미리보기"))
+			.ToolTipText(LOCTEXT("PreviewSheetTooltip", "연결된 DataTable의 현재 값과 Excel 임포트 예정값을 확인합니다."))
+			.OnClicked(this, &SLastFPSDataTableImportTool::PreviewSheetClicked, Sheet.SheetName)
+		];
+	}
 	return SNew(SBorder).Padding(5.f).BorderImage(FAppStyle::GetBrush(TEXT("Brushes.Recessed")))[Row];
+}
+
+FReply SLastFPSDataTableImportTool::PreviewSheetClicked(const FName SheetName)
+{
+	PreviewSheetName = SheetName;
+	RebuildDataTablePreview(false);
+	return FReply::Handled();
+}
+
+FReply SLastFPSDataTableImportTool::ShowCurrentDataClicked()
+{
+	RebuildDataTablePreview(false);
+	return FReply::Handled();
+}
+
+FReply SLastFPSDataTableImportTool::ShowExcelPreviewClicked()
+{
+	RebuildDataTablePreview(true);
+	return FReply::Handled();
+}
+
+FText SLastFPSDataTableImportTool::GetPreviewHeaderText() const
+{
+	if (PreviewSheetName.IsNone())
+	{
+		return LOCTEXT("DataTablePreviewHeader", "DataTable 미리보기");
+	}
+	return FText::Format(
+		bShowingExcelValues
+			? LOCTEXT("ExcelPreviewHeader", "{0} · Excel 예정값")
+			: LOCTEXT("CurrentPreviewHeader", "{0} · 현재 DT"),
+		FText::FromName(PreviewSheetName));
+}
+
+TSharedRef<SWidget> SLastFPSDataTableImportTool::GeneratePreviewRowWidget(const TSharedPtr<FName> RowName) const
+{
+	return SNew(STextBlock).Text(RowName.IsValid() ? FText::FromName(*RowName) : FText::GetEmpty());
+}
+
+void SLastFPSDataTableImportTool::PreviewRowSelectionChanged(
+	const TSharedPtr<FName> RowName,
+	ESelectInfo::Type SelectInfo)
+{
+	(void)SelectInfo;
+	SelectedPreviewRow = RowName;
+	PreviewRowData.Reset();
+	PreviewDetailsView->SetStructureData(nullptr);
+
+	UDataTable* Table = PreviewDataTable.Get();
+	if (!Table || !RowName.IsValid() || RowName->IsNone() || !Table->GetRowStruct())
+	{
+		return;
+	}
+
+	const uint8* SourceRow = Table->FindRowUnchecked(*RowName);
+	if (!SourceRow)
+	{
+		return;
+	}
+
+	PreviewRowData = MakeShared<FStructOnScope>(Table->GetRowStruct());
+	Table->GetRowStruct()->CopyScriptStruct(PreviewRowData->GetStructMemory(), SourceRow);
+	PreviewDetailsView->SetCustomName(FText::FromName(*RowName));
+	PreviewDetailsView->SetStructureData(PreviewRowData);
+}
+
+void SLastFPSDataTableImportTool::RebuildDataTablePreview(const bool bUseExcelValues)
+{
+	bShowingExcelValues = bUseExcelValues;
+	if (!Workbooks.IsValidIndex(SelectedWorkbookIndex) || PreviewSheetName.IsNone())
+	{
+		ClearDataTablePreview(LOCTEXT("PreviewWorkbookUnavailable", "미리보기할 워크북과 시트를 먼저 선택하세요."));
+		return;
+	}
+
+	FText Error;
+	UDataTable* NewPreview = FLastFPSDataTableImportService::CreateDataTablePreview(
+		Workbooks[SelectedWorkbookIndex],
+		PreviewSheetName,
+		bUseExcelValues,
+		Error);
+	if (!NewPreview)
+	{
+		ClearDataTablePreview(Error);
+		return;
+	}
+
+	PreviewDataTable.Reset(NewPreview);
+	RefreshPreviewRows();
+	if (PreviewMessageText)
+	{
+		PreviewMessageText->SetText(FText::Format(
+			bUseExcelValues
+				? LOCTEXT("ExcelPreviewReady", "Excel 예정값 · {0}행 · 구조체 {1}")
+				: LOCTEXT("CurrentPreviewReady", "현재 저장값 · {0}행 · 구조체 {1}"),
+			FText::AsNumber(PreviewRowNames.Num()),
+			NewPreview->GetRowStruct()->GetDisplayNameText()));
+	}
+}
+
+void SLastFPSDataTableImportTool::RefreshPreviewRows()
+{
+	PreviewRowData.Reset();
+	PreviewDetailsView->SetStructureData(nullptr);
+	SelectedPreviewRow.Reset();
+	PreviewRowNames.Reset();
+
+	if (UDataTable* Table = PreviewDataTable.Get())
+	{
+		for (const FName RowName : Table->GetRowNames())
+		{
+			PreviewRowNames.Add(MakeShared<FName>(RowName));
+		}
+	}
+
+	if (PreviewRowComboBox)
+	{
+		PreviewRowComboBox->RefreshOptions();
+		if (!PreviewRowNames.IsEmpty())
+		{
+			PreviewRowComboBox->SetSelectedItem(PreviewRowNames[0]);
+		}
+		else
+		{
+			PreviewRowComboBox->ClearSelection();
+		}
+	}
+}
+
+void SLastFPSDataTableImportTool::ClearDataTablePreview(const FText& Message)
+{
+	PreviewRowData.Reset();
+	if (PreviewDetailsView)
+	{
+		PreviewDetailsView->SetStructureData(nullptr);
+	}
+	SelectedPreviewRow.Reset();
+	PreviewRowNames.Reset();
+	PreviewDataTable.Reset();
+	if (PreviewRowComboBox)
+	{
+		PreviewRowComboBox->RefreshOptions();
+		PreviewRowComboBox->ClearSelection();
+	}
+	if (PreviewMessageText)
+	{
+		PreviewMessageText->SetText(Message);
+	}
 }
 
 FReply SLastFPSDataTableImportTool::BrowseDirectoryClicked()

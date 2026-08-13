@@ -32,7 +32,7 @@ Common.Format.IndexedLabel,{0} {1},라벨과 순번 표시 형식
 Common.Format.Percent,{0}%,정수 퍼센트 표시 형식
 Common.Format.DistanceMeters,{0}m,미터 거리 표시 형식
 Common.Distance.UnknownMeters,??m,알 수 없는 거리 표시
-Common.Format.PositiveValue,0,양수 값 표시 형식
+Common.Format.PositiveValue,+{0},양수 값 표시 형식
 Common.Format.Range,{0} ~ {1},최솟값과 최댓값 표시 형식
 Common.Format.Seconds,{0}s,초 단위 표시 형식
 Common.Format.Multiplier,x{0},배율 표시 형식
@@ -120,7 +120,7 @@ Enum.ELastFPSEquipmentStat.MoveSpeed,이동속도,장비 스탯: 이동속도
 Equipment.EmptyModule,모듈이 없습니다.,
 Equipment.EmptyEquipment,장비가 없습니다.,
 Enum.ELastFPSQuestType.Main,메인 임무,퀘스트 분류: 메인
-Enum.ELastFPSQuestType.Side,서브 임무,퀘스트 분류: 서브
+Quest.Tracker.GoToNPCFormat,{0}에게 가기,HUD 퀘스트 트래커: 미수락 메인 퀘스트 제공 NPC 안내
 Quest.Tracker.Empty,진행중인 임무가 없습니다,HUD 퀘스트 트래커: 진행중 퀘스트 없음
 Quest.Action.Accept,수락,퀘스트 수락 버튼
 Quest.Action.Cancel,거절,퀘스트 거절/취소 버튼
@@ -150,3 +150,4 @@ Quest.NPCButton.Quest_Capture,기지 점령,Quest_Capture NPC 상호작용 퀘�
 Quest.Reward.PurchaseRefundFormat,구매액 환급 +{0},퀘스트 구매액 환급 표시 형식
 Quest.Reward.CompletionBonusFormat,완료 보너스 +{0},퀘스트 고정 완료 보너스 표시 형식
 Quest.NPCButton.Q_Elevator_Deploy,궤도 엘리베이터,Q_Elevator_Deploy NPC 상호작용 퀘스트 버튼 문구
+Battle.OrbitalElevator.DisplayName,궤도 엘리베이터,궤도 엘리베이터 전투 목적지 표시 이름

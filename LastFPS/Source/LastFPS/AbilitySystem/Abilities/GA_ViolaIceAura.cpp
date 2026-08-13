@@ -463,7 +463,7 @@ FLastFPSDamageRange UGA_ViolaIceAura::GetEffectiveDamageRange() const
 	const FLastFPSSkillBalanceData* BalanceData = GetSkillBalanceData();
 	return BalanceData && BalanceData->Damage > 0.f
 		? LastFPSDamage::MakeDamageRange(
-			BalanceData->Damage + GetEquippedWeaponBaseDamage(),
+			BalanceData->Damage,
 			DamageRange.DamageElement)
 		: DamageRange;
 }

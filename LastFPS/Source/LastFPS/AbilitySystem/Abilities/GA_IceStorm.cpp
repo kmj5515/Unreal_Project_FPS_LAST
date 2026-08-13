@@ -410,7 +410,7 @@ FLastFPSAreaEffectConfig UGA_IceStorm::BuildAreaConfig() const
 	if (BalanceData->Damage > 0.f)
 	{
 		Config.DamageRange = LastFPSDamage::MakeDamageRange(
-			BalanceData->Damage + GetEquippedWeaponBaseDamage(),
+			BalanceData->Damage,
 			AreaConfig.DamageRange.DamageElement);
 	}
 	return Config;

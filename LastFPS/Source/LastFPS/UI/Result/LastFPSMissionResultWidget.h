@@ -48,7 +48,10 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_ElapsedTime;
-
+	
+	UPROPERTY(Transient, meta=(BindWidgetAnimOptional))
+	TObjectPtr<UWidgetAnimation> In_Animation;
+	
 	/** 재화 보상 */
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UTextBlock> TB_Credits;

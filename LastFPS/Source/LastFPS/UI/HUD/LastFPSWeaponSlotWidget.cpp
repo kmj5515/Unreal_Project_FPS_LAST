@@ -33,7 +33,7 @@ void ULastFPSWeaponSlotWidget::SetupSlot(
 		const TSoftObjectPtr<UTexture2D>* Icon = nullptr;
 		if (Definition)
 		{
-			Icon = &Definition->Icon;
+			Icon = bUseHUDIcon ? &Definition->Icon : &Definition->HUDWeaponSlotIcon;
 		}
 
 		if (Icon && !Icon->IsNull())

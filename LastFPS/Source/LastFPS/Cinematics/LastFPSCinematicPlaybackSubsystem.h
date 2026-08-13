@@ -30,7 +30,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
  * 클라이언트 로컬 표시 전용이라 복제하지 않는다. 각 머신이 자기 화면을 소유한다.
  */
 UCLASS()
-class LASTFPS_API ULastFPSCinematicPlaybackSubsystem : public UWorldSubsystem
+class LASTFPS_API ULastFPSCinematicPlaybackSubsystem : public UTickableWorldSubsystem
 {
 	GENERATED_BODY()
 
@@ -63,6 +63,11 @@ public:
 	FOnLastFPSCinematicFinished OnCinematicFinished;
 
 	virtual void Deinitialize() override;
+
+	//~ Begin UTickableWorldSubsystem Interface
+	virtual void Tick(float DeltaTime) override;
+	virtual TStatId GetStatId() const override;
+	//~ End UTickableWorldSubsystem Interface
 
 private:
 	/** 요청의 맵 조건이 현재 월드와 맞는가. 조건이 비어 있으면 항상 참. */
@@ -99,4 +104,7 @@ private:
 
 	/** 요청 수락(로드 대기 포함)부터 종료까지 참. 슬롯 점유 판정의 단일 소스다. */
 	bool bSlotOccupied = false;
+
+	/** 이벤트 마커 트리거 처리를 위한 이전 프레임 번호 */
+	FFrameNumber LastFrameNumber;
 };

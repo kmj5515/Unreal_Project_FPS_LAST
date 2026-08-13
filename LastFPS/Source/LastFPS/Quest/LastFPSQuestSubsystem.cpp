@@ -1033,6 +1033,16 @@ void ULastFPSQuestSubsystem::TriggerRadioTransmissions(const TArray<FLastFPSRadi
 	PendingRadioTransmissions = RadioDataArray;
 }
 
+void ULastFPSQuestSubsystem::StopAllRadioTransmissions()
+{
+	PendingRadioTransmissions.Reset();
+	
+	if (OnRadioTransmissionStop.IsBound())
+	{
+		OnRadioTransmissionStop.Broadcast();
+	}
+}
+
 void ULastFPSQuestSubsystem::TriggerRadioByIds(const TArray<FName>& RadioIds)
 {
 	TArray<FLastFPSRadioTransmissionData> Transmissions;
@@ -1761,6 +1771,23 @@ void ULastFPSQuestSubsystem::GetTrackedQuests(TArray<FLastFPSTrackedQuest>& OutQ
 	Tracked.QuestId = DisplayQuestId;
 	Tracked.Title = Row->Title;
 	Tracked.Type = Row->Type;
+
+	// 미수락 메인 퀘스트는 실제 목표를 미리 노출하지 않고, 수락을 위해 찾아갈 의뢰인만 안내한다.
+	// NPC 머리 위 마커가 위치 안내를 전담하므로 트래커 스냅샷에는 월드 좌표를 중복 제공하지 않는다.
+	if (State->Status == ELastFPSQuestStatus::NotStarted && !Row->QuestGiverNPC.IsNone())
+	{
+		FLastFPSTrackedObjective& Snapshot = Tracked.Objectives.AddDefaulted_GetRef();
+		Snapshot.Label = FText::Format(
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuestTrackerGoToNPCFormat),
+			GetQuestGiverDisplayName(DisplayQuestId));
+		Snapshot.Type = ELastFPSObjectiveType::TalkToNPC;
+		Snapshot.Progress = 0;
+		Snapshot.RequiredCount = 1;
+		Snapshot.bCompleted = false;
+		Snapshot.bHasGuidanceLocation = false;
+		return;
+	}
+
 	Tracked.Objectives.Reserve(Row->Objectives.Num());
 
 	ForEachDisplayObjective(*Row, *State,

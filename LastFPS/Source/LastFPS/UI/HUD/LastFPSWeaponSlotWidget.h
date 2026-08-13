@@ -51,7 +51,10 @@ protected:
 	/** 비활성 슬롯을 흐리게 보여 활성 슬롯이 눈에 띄게 한다. */
 	UPROPERTY(EditDefaultsOnly, Category="HUD|Weapon Slot", meta=(ClampMin="0.0", ClampMax="1.0"))
 	float InactiveOpacity = 0.45f;
-
+	
+	
+	UPROPERTY(EditDefaultsOnly,Category="HUD|Weapon Slot")
+	bool bUseHUDIcon;
 private:
 	/** 슬롯 내용이 바뀌거나 위젯이 제거될 때 이전 비동기 아이콘 요청을 취소하기 위해 보관한다. */
 	TSharedPtr<FStreamableHandle> IconLoadHandle;

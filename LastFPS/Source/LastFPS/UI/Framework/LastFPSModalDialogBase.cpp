@@ -2,6 +2,7 @@
 
 #include "UI/Framework/LastFPSPrimaryGameLayout.h"
 
+#include "Animation/WidgetAnimation.h"
 #include "Components/TextBlock.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
@@ -11,6 +12,8 @@
 #include "PrimaryGameLayout.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogLastFPSModalDialog, Log, All);
 
 ULastFPSModalDialogBase::ULastFPSModalDialogBase()
 	: Super()
@@ -67,6 +70,7 @@ void ULastFPSModalDialogBase::NativeOnActivated()
 {
 	Super::NativeOnActivated();
 
+	CancelOutAnimationFallback();
 	bWaitingForOutAnimation = false;
 	SetIsEnabled(true);
 
@@ -91,6 +95,7 @@ void ULastFPSModalDialogBase::NativeOnActivated()
 
 void ULastFPSModalDialogBase::NativeOnDeactivated()
 {
+	CancelOutAnimationFallback();
 	bWaitingForOutAnimation = false;
 
 	if (!bResultCompleted && PendingResultCallback.IsBound())
@@ -136,6 +141,7 @@ void ULastFPSModalDialogBase::OnAnimationFinished_Implementation(
 
 	if (bWaitingForOutAnimation && Animation == OutAnimation)
 	{
+		CancelOutAnimationFallback();
 		bWaitingForOutAnimation = false;
 		DeactivateWidget();
 	}
@@ -188,5 +194,59 @@ void ULastFPSModalDialogBase::DeactivateWithAnimation()
 	{
 		StopAnimation(InAnimation);
 	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(
+			LogLastFPSModalDialog,
+			Warning,
+			TEXT("모달 '%s'의 종료 애니메이션을 재생할 월드가 없어 즉시 비활성화합니다. Animation=%s"),
+			*GetNameSafe(this),
+			*GetNameSafe(OutAnimation));
+		bWaitingForOutAnimation = false;
+		DeactivateWidget();
+		return;
+	}
+
+	const float AnimationDuration = FMath::Max(
+		0.0f,
+		OutAnimation->GetEndTime() - OutAnimation->GetStartTime());
+	const float FallbackDelay = FMath::Max(
+		KINDA_SMALL_NUMBER,
+		AnimationDuration + FMath::Max(0.0f, OutAnimationFallbackPaddingSeconds));
+	World->GetTimerManager().SetTimer(
+		OutAnimationFallbackTimerHandle,
+		this,
+		&ThisClass::HandleOutAnimationFallbackElapsed,
+		FallbackDelay,
+		false);
 	PlayAnimation(OutAnimation);
+}
+
+void ULastFPSModalDialogBase::CancelOutAnimationFallback()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(OutAnimationFallbackTimerHandle);
+	}
+	OutAnimationFallbackTimerHandle.Invalidate();
+}
+
+void ULastFPSModalDialogBase::HandleOutAnimationFallbackElapsed()
+{
+	OutAnimationFallbackTimerHandle.Invalidate();
+	if (!bWaitingForOutAnimation)
+	{
+		return;
+	}
+
+	UE_LOG(
+		LogLastFPSModalDialog,
+		Warning,
+		TEXT("모달 '%s'의 종료 애니메이션 완료 이벤트가 오지 않아 안전 타이머로 비활성화합니다. Animation=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(OutAnimation));
+	bWaitingForOutAnimation = false;
+	DeactivateWidget();
 }
