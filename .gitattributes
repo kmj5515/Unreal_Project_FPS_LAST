@@ -1,0 +1,3 @@
+# cmd.exe 는 CRLF 로 줄을 나눈다. LF 로 커밋되면 배치 파일이 실행 중 깨진다.
+*.bat text eol=crlf
+*.cmd text eol=crlf

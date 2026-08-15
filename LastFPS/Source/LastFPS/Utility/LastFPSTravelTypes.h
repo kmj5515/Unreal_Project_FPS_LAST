@@ -17,9 +17,14 @@ enum class ELastFPSTravelDestination : uint8
 UENUM(BlueprintType)
 enum class ELastFPSTravelEntryType : uint8
 {
-	None, 
+	None,
 	LocalDestination,
 	QuickPlayBattle,
+	/**
+	 * 파티 대기 맵을 리슨 서버로 열고, 방장이 시작할 때 전투 맵으로 이동하는 요청이다.
+	 * 세션 검색을 쓰는 QuickPlayBattle과 달리 직접 접속 구조에서 사용한다.
+	 */
+	PartyRoomBattle,
 };
 
 /** UI가 이동 구현을 알지 않고 전달하는 안정적인 요청 데이터다. */
@@ -41,7 +46,7 @@ struct LASTFPS_API FLastFPSTravelEntryRequest
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Travel"
 		,meta=(AllowedTypes="BattleDefinition",
-		EditCondition="Type == ELastFPSTravelEntryType::QuickPlayBattle",
+		EditCondition="Type == ELastFPSTravelEntryType::QuickPlayBattle || Type == ELastFPSTravelEntryType::PartyRoomBattle",
 			EditConditionHides))
 	FPrimaryAssetId BattleDefinitionId;
 };

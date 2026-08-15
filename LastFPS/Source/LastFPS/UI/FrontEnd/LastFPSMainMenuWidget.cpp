@@ -3,6 +3,7 @@
 #include "Game/LastFPSGameInstance.h"
 #include "Game/LastFPSPlayerController.h"
 #include "Localization/LastFPSLocalization.h"
+#include "Network/LastFPSMasterLobbyClientSubsystem.h"
 #include "UI/Framework/LastFPSButtonBase.h"
 #include "UI/Framework/LastFPSUITags.h"
 
@@ -15,6 +16,10 @@ void ULastFPSMainMenuWidget::NativeConstruct()
 	if (Button_Start)
 	{
 		Button_Start->OnClicked().AddUObject(this, &ULastFPSMainMenuWidget::HandleStartClicked);
+	}
+	if (Button_MasterLobby)
+	{
+		Button_MasterLobby->OnClicked().AddUObject(this, &ULastFPSMainMenuWidget::HandleMasterLobbyClicked);
 	}
 	if (Button_Settings)
 	{
@@ -32,6 +37,21 @@ void ULastFPSMainMenuWidget::HandleStartClicked()
 	{
 		GI->RequestTravelToCharacterSelect();
 	}
+}
+
+void ULastFPSMainMenuWidget::HandleMasterLobbyClicked()
+{
+	ULastFPSMasterLobbyClientSubsystem* MasterLobby =
+		GetGameInstance() ? GetGameInstance()->GetSubsystem<ULastFPSMasterLobbyClientSubsystem>() : nullptr;
+
+	if (!MasterLobby)
+	{
+		return;
+	}
+
+	// 실패 사유는 서브시스템이 LogMasterLobby로 남긴다.
+	// TODO: ST_Localize에 접속 실패 문구를 추가한 뒤 여기에서 ShowNotice로 사용자에게도 알린다.
+	MasterLobby->ConnectToMasterLobby();
 }
 
 void ULastFPSMainMenuWidget::HandleSettingsClicked()

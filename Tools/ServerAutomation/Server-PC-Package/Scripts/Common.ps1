@@ -1,4 +1,4 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 function Get-PackageRoot { return Split-Path -Parent $PSScriptRoot }
@@ -30,11 +30,45 @@ function Get-MaintenanceFlagPath { return Join-Path (Get-RuntimeDirectory) 'main
 function Assert-ServerConfig
 {
     param([Parameter(Mandatory = $true)]$Config)
-    if ([string]::IsNullOrWhiteSpace([string]$Config.ExecutablePath) -or
-        ([string]$Config.ExecutablePath).Contains('D:\LastFPSServer'))
+    if ([string]::IsNullOrWhiteSpace([string]$Config.ExecutablePath))
     {
         throw "Set 'ExecutablePath' in Server.config.psd1 before running this script."
     }
+    # LobbyMap이 비어 있으면 맵 없는 URL로 서버가 기동돼 원인 파악이 어려워진다.
+    if ([string]::IsNullOrWhiteSpace([string]$Config.LobbyMap))
+    {
+        throw "Set 'LobbyMap' in Server.config.psd1 before running this script."
+    }
+    if ([int]$Config.GamePort -le 0 -or [int]$Config.GamePort -gt 65535)
+    {
+        throw "Set a valid 'GamePort' (1-65535) in Server.config.psd1."
+    }
+}
+
+# 설정에 없는 키를 StrictMode에서 안전하게 읽는다.
+function Get-ConfigValue
+{
+    param(
+        [Parameter(Mandatory = $true)]$Config,
+        [Parameter(Mandatory = $true)][string]$Key,
+        $Default = $null
+    )
+    if ($Config.ContainsKey($Key)) { return $Config[$Key] }
+    return $Default
+}
+
+# 설정 파일의 상대 경로는 모두 패키지 폴더 기준으로 해석한다.
+function Resolve-PackageRelativePath
+{
+    param([Parameter(Mandatory = $true)][string]$ConfiguredPath)
+    if ([System.IO.Path]::IsPathRooted($ConfiguredPath)) { return $ConfiguredPath }
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageRoot) $ConfiguredPath))
+}
+
+function Resolve-ServerExecutablePath
+{
+    param([Parameter(Mandatory = $true)][string]$ConfiguredPath)
+    return Resolve-PackageRelativePath -ConfiguredPath $ConfiguredPath
 }
 
 function Get-TrackedServerProcess

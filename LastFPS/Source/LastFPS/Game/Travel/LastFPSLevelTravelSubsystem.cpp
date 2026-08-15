@@ -18,6 +18,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Localization/LastFPSLocalization.h"
 #include "Misc/PackageName.h"
+#include "Network/LastFPSMasterLobbySettings.h"
 #include "Online/OnlineSessionNames.h"
 #include "Quest/LastFPSQuestSubsystem.h"
 #include "TimerManager.h"
@@ -180,6 +181,20 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::RequestTravel(
 			Request.BattleDefinitionId);
 	}
 
+	case ELastFPSTravelEntryType::PartyRoomBattle:
+	{
+		const UGameInstance* GameInstance = GetGameInstance();
+		if (const ULastFPSEquipmentSubsystem* Equipment =
+			GameInstance ? GameInstance->GetSubsystem<ULastFPSEquipmentSubsystem>() : nullptr;
+			!Equipment || !Equipment->HasEquippedWeapon())
+		{
+			return ELastFPSTravelRequestResult::MissingRequiredWeapon;
+		}
+		return TravelToPartyRoom(
+			LocalPlayerController,
+			Request.BattleDefinitionId);
+	}
+
 	default:
 		FailRequest(
 			ELastFPSTravelRequestResult::InvalidDefinition,
@@ -188,10 +203,24 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::RequestTravel(
 	}
 }
 
+namespace
+{
+	/**
+	 * BattleDefinition을 소비하는 요청인지 판별한다. 퀘스트 조건과 잠금 아이콘은
+	 * 이동 수단이 아니라 전투 정의에 붙는 규칙이므로, 진입 방식이 늘어날 때마다
+	 * 조건을 각자 고쳐 쓰지 않도록 한곳에서 판단한다.
+	 */
+	bool UsesBattleDefinition(const ELastFPSTravelEntryType Type)
+	{
+		return Type == ELastFPSTravelEntryType::QuickPlayBattle
+			|| Type == ELastFPSTravelEntryType::PartyRoomBattle;
+	}
+}
+
 bool ULastFPSLevelTravelSubsystem::IsTravelRequestUnlocked(
 	const FLastFPSTravelEntryRequest& Request) const
 {
-	if (Request.Type != ELastFPSTravelEntryType::QuickPlayBattle)
+	if (!UsesBattleDefinition(Request.Type))
 	{
 		return true;
 	}
@@ -228,7 +257,7 @@ bool ULastFPSLevelTravelSubsystem::IsTravelRequestUnlocked(
 TSoftObjectPtr<UTexture2D> ULastFPSLevelTravelSubsystem::GetTravelLockedIcon(
 	const FLastFPSTravelEntryRequest& Request) const
 {
-	if (Request.Type != ELastFPSTravelEntryType::QuickPlayBattle)
+	if (!UsesBattleDefinition(Request.Type))
 	{
 		return TSoftObjectPtr<UTexture2D>();
 	}
@@ -354,6 +383,54 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::TravelToMap(
 		}));
 
 	UE_LOG(LogLastFPSLevelTravel, Log, TEXT("로컬 맵 이동 예약: %s"), *PackageName);
+	return ELastFPSTravelRequestResult::Accepted;
+}
+
+ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::TravelToPartyRoom(
+	APlayerController* LocalPlayerController,
+	const FPrimaryAssetId BattleDefinitionId)
+{
+	if (!IsValid(LocalPlayerController) || !LocalPlayerController->IsLocalController())
+	{
+		FailRequest(
+			ELastFPSTravelRequestResult::InvalidPlayer,
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuickPlayInvalidPlayer));
+		return ELastFPSTravelRequestResult::InvalidPlayer;
+	}
+
+	if (!BattleDefinitionId.IsValid()
+		|| BattleDefinitionId.PrimaryAssetType != ULastFPSBattleDefinition::PrimaryAssetType)
+	{
+		FailRequest(
+			ELastFPSTravelRequestResult::InvalidAssetId,
+			FText::Format(
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::QuickPlayInvalidDefinitionId),
+				FText::FromString(BattleDefinitionId.ToString())));
+		return ELastFPSTravelRequestResult::InvalidAssetId;
+	}
+
+	// 대기 맵 경로는 마스터 로비의 방 개설과 같은 설정을 본다. 두 진입점이 서로 다른
+	// 경로를 들고 있으면 맵 이름이 바뀔 때 한쪽만 갱신돼 존재하지 않는 맵을 연다.
+	const ULastFPSMasterLobbySettings* LobbySettings = GetDefault<ULastFPSMasterLobbySettings>();
+	const FString PartyRoomMapPath = LobbySettings->HostedRoomMap.GetLongPackageName();
+	if (PartyRoomMapPath.IsEmpty())
+	{
+		UE_LOG(LogLastFPSLevelTravel, Error,
+			TEXT("파티 대기 맵으로 이동할 수 없습니다: HostedRoomMap이 비었거나 경로가 올바르지 않습니다. Value=%s"),
+			*LobbySettings->HostedRoomMap.ToString());
+		FailRequest(
+			ELastFPSTravelRequestResult::AssetNotFound,
+			FText::Format(
+				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::BattleMapInvalid),
+				FText::FromString(LobbySettings->HostedRoomMap.ToString())));
+		return ELastFPSTravelRequestResult::AssetNotFound;
+	}
+
+	const FString Url = FString::Printf(
+		TEXT("%s?listen?BattleDef=%s"), *PartyRoomMapPath, *BattleDefinitionId.ToString());
+
+	UE_LOG(LogLastFPSLevelTravel, Log, TEXT("파티 대기 맵으로 이동합니다: %s"), *Url);
+	LocalPlayerController->ClientTravel(Url, TRAVEL_Absolute);
 	return ELastFPSTravelRequestResult::Accepted;
 }
 

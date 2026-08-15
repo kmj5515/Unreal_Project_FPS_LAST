@@ -451,18 +451,31 @@ ULastFPSModalDialogBase* ULastFPSPopupSubsystem::PushPopupInternal(
 
 	UPrimaryGameLayout* RootLayout =
 		UPrimaryGameLayout::GetPrimaryGameLayout(GetLocalPlayer());
-	if (!RootLayout)
+		
+	ULastFPSModalDialogBase* Popup = nullptr;
+	if (RootLayout)
+	{
+		Popup = RootLayout->PushWidgetToLayerStack<ULastFPSModalDialogBase>(LastFPSUITags::Layer_Modal(), LoadedClass);
+	}
+	else
 	{
 		UE_LOG(
 			LogLastFPSPopup,
 			Warning,
-			TEXT("PrimaryGameLayout이 준비되지 않아 팝업을 열 수 없습니다: %s"),
+			TEXT("PrimaryGameLayout이 준비되지 않아 Viewport에 직접 팝업을 엽니다: %s"),
 			*PopupTag.ToString());
-		return nullptr;
+			
+		if (APlayerController* PC = GetLocalPlayer()->GetPlayerController(GetWorld()))
+		{
+			Popup = CreateWidget<ULastFPSModalDialogBase>(PC, LoadedClass);
+			if (Popup)
+			{
+				Popup->AddToViewport(100);
+				Popup->ActivateWidget();
+			}
+		}
 	}
 
-	ULastFPSModalDialogBase* Popup =
-		RootLayout->PushWidgetToLayerStack<ULastFPSModalDialogBase>(LastFPSUITags::Layer_Modal(), LoadedClass);
 	if (Popup)
 	{
 		ActivePopups.FindOrAdd(PopupTag).Add(Popup);

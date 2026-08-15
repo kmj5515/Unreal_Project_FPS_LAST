@@ -84,6 +84,13 @@
 .agents/
 .claude/
 
+# 패키징 산출물. 각각 2.9GB 규모이고 빌드로 언제든 다시 만들 수 있다.
+# Deploy_Server 아래 Server-PC-Package/Server.config.psd1은 그 PC 전용 설정이라
+# 산출물과 함께 무시된다. 설정 원본은 Tools/ServerAutomation/Server-PC-Package에 있다.
+/PackagedClient/
+/Deploy_Server/
+/ServerBuilds/
+
 # Local Unreal SOLID harness notes
 Docs/UnrealSOLIDHarness/
 

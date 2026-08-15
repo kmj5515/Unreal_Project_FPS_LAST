@@ -614,7 +614,16 @@ void ULoadingScreenManager::StopBlockingInput()
 void ULoadingScreenManager::ChangePerformanceSettings(bool bEnabingLoadingScreen)
 {
 	UGameInstance* LocalGameInstance = GetGameInstance();
+	if (!LocalGameInstance)
+	{
+		return;
+	}
+
 	UGameViewportClient* GameViewportClient = LocalGameInstance->GetGameViewportClient();
+	if (!GameViewportClient)
+	{
+		return;
+	}
 
 	FShaderPipelineCache::SetBatchMode(bEnabingLoadingScreen ? FShaderPipelineCache::BatchMode::Fast : FShaderPipelineCache::BatchMode::Background);
 

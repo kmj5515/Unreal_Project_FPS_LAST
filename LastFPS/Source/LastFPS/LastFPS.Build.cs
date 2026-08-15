@@ -23,7 +23,9 @@ public class LastFPS : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
 			"NetCore", "Slate", "SlateCore", "CommonLoadingScreen", "RenderCore", "RHI",
-			"OnlineBase", "OnlineSubsystem"
+			"OnlineBase", "OnlineSubsystem",
+			// 마스터 로비 방 등록/하트비트용 Online Beacon
+			"OnlineSubsystemUtils"
 		});
 
 		// Uncomment if you are using online features

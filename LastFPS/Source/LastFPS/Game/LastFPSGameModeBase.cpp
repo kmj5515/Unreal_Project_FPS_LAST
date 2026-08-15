@@ -558,7 +558,18 @@ void ALastFPSGameModeBase::SpawnDropsForDeath(const ALastFPSCharacterBase& DeadC
         return;
     }
 
-    const FVector Center = DeadCharacter.GetActorLocation();
+    FVector Center = DeadCharacter.GetActorLocation();
+
+    // 트레이스로 바닥 위치 찾기 (아이템이 공중에 뜨지 않도록)
+    FHitResult HitResult;
+    FCollisionQueryParams QueryParams;
+    QueryParams.AddIgnoredActor(&DeadCharacter);
+    if (World->LineTraceSingleByChannel(HitResult, Center, Center - FVector(0.f, 0.f, 1000.f), ECC_Visibility, QueryParams))
+    {
+        // 바닥에서 살짝 위로 띄워서 소환 (아이템이 바닥에 묻히거나 스폰 실패하는 것 방지)
+        Center = HitResult.Location + FVector(0.f, 0.f, 50.f);
+    }
+
     for (int32 Index = 0; Index < Total; ++Index)
     {
         const FLastFPSDropEntry& Entry = RolledEntries[Index];
@@ -570,16 +581,24 @@ void ALastFPSGameModeBase::SpawnDropsForDeath(const ALastFPSCharacterBase& DeadC
 
         const FVector LaunchOffset = Center - SpawnTransform.GetLocation();
 
-        // 사망한 적은 곧 풀로 반환되므로 픽업의 Owner 가 될 수 없다.
+        // 드랍 연출 픽업은 순환재사용되므로 여기서 Owner 나 Instigator 를 넘기지 않는다.
         LastFPSActorPool::AcquireOrSpawnDeferred<ALastFPSItemPickupActor>(
             *World,
             Entry.PickupClass,
             SpawnTransform,
             nullptr,
             nullptr,
-            [RowId = Entry.ItemRowId, Count = Entry.Count, LaunchOffset](ALastFPSItemPickupActor& Pickup)
+            [RowId = Entry.ItemRowId, Count = Entry.Count, LaunchOffset, PickupClass = Entry.PickupClass](ALastFPSItemPickupActor& Pickup)
             {
-                Pickup.InitializePickup(RowId, Count, LaunchOffset);
+                FName FinalRowId = RowId;
+                if (FinalRowId.IsNone() && PickupClass)
+                {
+                    if (const ALastFPSItemPickupActor* CDO = PickupClass->GetDefaultObject<ALastFPSItemPickupActor>())
+                    {
+                        FinalRowId = CDO->ItemRowId;
+                    }
+                }
+                Pickup.InitializePickup(FinalRowId, Count, LaunchOffset);
             });
     }
 }

@@ -168,8 +168,11 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Display")
     FString CharacterNickname;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Character")
+    UPROPERTY(ReplicatedUsing=OnRep_CharacterDefinition, Transient)
     TObjectPtr<ULastFPSCharacterDefinition> CharacterDefinition;
+
+    UFUNCTION()
+    void OnRep_CharacterDefinition();
 
     /** 서버가 적용한 정의의 분류 태그를 클라이언트 HUD에서도 조회하기 위한 읽기 전용 복제 캐시다. */
     UPROPERTY(Replicated)
@@ -209,6 +212,14 @@ protected:
 	FTimerHandle CombatEngagedTimerHandle;
 
 private:
+    /**
+     * 서버가 해석한 정의를 복제 멤버로 확정한다.
+     * 시뮬레이티드 프록시는 GameMode 와 Controller 에 접근할 수 없어
+     * ResolveCharacterDefinition() 의 대체 경로가 모두 실패한다.
+     * 서버가 값을 확정해 복제하지 않으면 프록시에서 메시와 AnimBP 가 적용되지 않는다.
+     */
+    void CommitCharacterDefinitionOnAuthority();
+
     UFUNCTION()
     void OnRep_IsInCombat();
 

@@ -65,6 +65,16 @@ public:
 		APlayerController* LocalPlayerController,
 		FPrimaryAssetId BattleDefinitionId);
 
+	/**
+	 * 파티 대기 맵을 리슨 서버로 열어 파티원을 모은다.
+	 * 실제 전투 맵 이동은 대기실의 GameMode가 BattleDef를 해석해 수행하므로
+	 * 여기서는 전투 맵을 알 필요가 없다.
+	 */
+	UFUNCTION(BlueprintCallable, Category="LastFPS|Travel")
+	ELastFPSTravelRequestResult TravelToPartyRoom(
+		APlayerController* LocalPlayerController,
+		FPrimaryAssetId BattleDefinitionId);
+
 	UFUNCTION(BlueprintPure, Category="LastFPS|Travel")
 	bool ResolveMapPackageName(FPrimaryAssetId MapId, FString& OutPackageName) const;
 

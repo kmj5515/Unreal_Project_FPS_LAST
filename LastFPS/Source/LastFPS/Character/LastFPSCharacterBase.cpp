@@ -40,6 +40,7 @@ ALastFPSCharacterBase::ALastFPSCharacterBase()
 void ALastFPSCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(ALastFPSCharacterBase, CharacterDefinition);
     DOREPLIFETIME(ALastFPSCharacterBase, bIsInCombat);
     DOREPLIFETIME(ALastFPSCharacterBase, ReplicatedClassificationTags);
 }
@@ -431,7 +432,30 @@ void ALastFPSCharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void ALastFPSCharacterBase::PossessedBy(AController* NewController)
 {
     Super::PossessedBy(NewController);
+    // InitAbilitySystem() 이 비주얼 적용까지 수행하므로 정의 확정이 먼저 와야 한다.
+    CommitCharacterDefinitionOnAuthority();
     InitAbilitySystem();
+}
+
+void ALastFPSCharacterBase::CommitCharacterDefinitionOnAuthority()
+{
+    // 스폰 시점에 정의를 받은 캐릭터(적 등)는 이미 확정돼 있으므로 건드리지 않는다.
+    if (!HasAuthority() || CharacterDefinition)
+    {
+        return;
+    }
+
+    const ULastFPSCharacterDefinition* ResolvedDefinition = ResolveCharacterDefinition();
+    if (!ResolvedDefinition)
+    {
+        return;
+    }
+
+    // 정의는 조회 전용으로 노출돼 해석 경로 전체가 const 포인터를 반환한다.
+    // 대상은 런타임에 변경하지 않는 데이터 애셋이고 여기서도 값을 수정하지 않으므로,
+    // 복제 프로퍼티에 담기 위한 const 제거를 이 지점으로 한정한다.
+    SetCharacterDefinitionForSpawn(const_cast<ULastFPSCharacterDefinition*>(ResolvedDefinition));
+    ForceNetUpdate();
 }
 
 void ALastFPSCharacterBase::OnRep_PlayerState()
@@ -666,5 +690,13 @@ void ALastFPSCharacterBase::ApplyDefaultEffects()
         FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(EffectClass, 1.f, Context);
         if (Spec.IsValid())
             ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+    }
+}
+
+void ALastFPSCharacterBase::OnRep_CharacterDefinition()
+{
+    if (CharacterDefinition)
+    {
+        ApplyCharacterVisuals(CharacterDefinition);
     }
 }

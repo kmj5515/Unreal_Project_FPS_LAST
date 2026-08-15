@@ -186,6 +186,11 @@ void ALastFPSPlayerController::BeginPlay()
         return;
     }
 
+    // Party 맵(또는 이전 맵)에서 수동으로 설정한 UI Only 상태가 남아서 
+    // 뷰포트의 인풋이 막히는 것을 방지하기 위해 초기화합니다.
+    SetShowMouseCursor(false);
+    SetInputMode(FInputModeGameOnly());
+
     ULocalPlayer* LocalPlayer = GetLocalPlayer();
     if (ULastFPSPopupSubsystem* PopupSubsystem = LocalPlayer
         ? LocalPlayer->GetSubsystem<ULastFPSPopupSubsystem>()
