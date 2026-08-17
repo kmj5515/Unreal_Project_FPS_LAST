@@ -65,7 +65,8 @@ private:
 
     // 로컬 클라이언트: 사운드 + 머즐플래시 즉시 재생 (클라이언트 예측)
     void LocalFire(UWeaponComponent* Weapon);
-    void StopFireMontage() const;
+    /** ASC 를 통해 정지시켜야 복제되므로 const 가 아니다(ASC 가 비const 어빌리티 포인터를 요구한다). */
+    void StopFireMontage();
 
     // 서버 전용: LineTrace 히트 판정 + 데미지 GE 적용 + VFX 투사체 스폰
     UWeaponComponent* GetWeaponComponent() const;

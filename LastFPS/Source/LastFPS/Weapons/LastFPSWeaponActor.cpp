@@ -88,6 +88,26 @@ void ALastFPSWeaponActor::InitializeWeapon(USkeletalMesh* InMesh, ULastFPSWeapon
     WeaponDefinition = InDefinition ? InDefinition : DefaultWeaponDefinition.Get();
     WeaponMeshAsset = InMesh ? InMesh : GetDefaultWeaponMesh();
     OnRep_WeaponMeshAsset();
+    CacheFireEffectAssets();
+}
+
+void ALastFPSWeaponActor::OnRep_WeaponDefinition()
+{
+    CacheFireEffectAssets();
+}
+
+void ALastFPSWeaponActor::CacheFireEffectAssets()
+{
+    // 소프트 참조는 패키징 빌드에서 로드되어 있지 않으므로 Get()이 null을 반환한다.
+    // 장착 시점에 한 번 로드해 하드 참조로 잡아 두고, 발사 시에는 캐시만 사용한다.
+    if (!WeaponDefinition || GetNetMode() == NM_DedicatedServer)
+    {
+        return;
+    }
+
+    CachedFireSound = WeaponDefinition->FireSound.LoadSynchronous();
+    CachedMuzzleFlashEffect = WeaponDefinition->MuzzleFlashEffect.LoadSynchronous();
+    CachedFireAnimation = WeaponDefinition->FireAnimation.LoadSynchronous();
 }
 
 USkeletalMesh* ALastFPSWeaponActor::GetDefaultWeaponMesh() const
@@ -176,12 +196,12 @@ void ALastFPSWeaponActor::PlayFireEffects(FName SocketName) const
         return;
     }
 
-    if (USoundBase* FireSound = WeaponDefinition->FireSound.Get())
+    if (CachedFireSound)
     {
-        UGameplayStatics::SpawnSoundAttached(FireSound, WeaponMesh, SocketName);
+        UGameplayStatics::SpawnSoundAttached(CachedFireSound, WeaponMesh, SocketName);
     }
 
-    if (UParticleSystem* MuzzleFlashEffect = WeaponDefinition->MuzzleFlashEffect.Get())
+    if (UParticleSystem* MuzzleFlashEffect = CachedMuzzleFlashEffect)
     {
         UGameplayStatics::SpawnEmitterAttached(
             MuzzleFlashEffect,
@@ -195,7 +215,7 @@ void ALastFPSWeaponActor::PlayFireEffects(FName SocketName) const
 
 void ALastFPSWeaponActor::PlayFireAnimation()
 {
-    UAnimationAsset* Animation = WeaponDefinition ? WeaponDefinition->FireAnimation.Get() : FireAnimation.Get();
+    UAnimationAsset* Animation = WeaponDefinition ? CachedFireAnimation.Get() : FireAnimation.Get();
     const float PlayRate = WeaponDefinition ? WeaponDefinition->AnimationPlayRate : WeaponAnimationPlayRate;
     if (WeaponMesh && Animation)
     {

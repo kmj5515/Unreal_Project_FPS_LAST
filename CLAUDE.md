@@ -10,6 +10,17 @@
 - 사용자가 `/스킬이름` 형태로 지정하면 반드시 그 스킬을 호출한다.
 - 관련 스킬이 없다고 판단해 스킬을 사용하지 않은 경우에는, 그 이유를 답변에 명시한다.
 
+### 코드 작업 순서 (graphify → UE 스킬 → ponytail)
+
+코드를 읽거나 수정하는 모든 요청은 아래 순서를 따른다.
+
+1. **파악**: `graphify-out/`이 있으므로 `mcp__graphify__*`(query_graph, get_neighbors, get_pr_impact 등)로 대상 코드의 위치와 영향 범위를 먼저 확인한다. 광범위 grep보다 우선한다.
+2. **설계**: 도메인에 맞는 `ue-*` 스킬을 Skill 도구로 호출해 해당 규칙을 로드한 뒤 방안을 정한다. (GAS→`ue-gameplay-abilities`, 복제→`ue-networking-replication`, DataAsset/Table→`ue-data-assets-tables`, 스트리밍/트래블→`ue-world-level-streaming` 등)
+3. **구현**: ponytail 원칙으로 최소 구현한다. 1·2단계에서 확인한 기존 공통 구조를 재사용하고, 새 추상화·설정·파일 추가는 그것 없이 불가능할 때만 한다.
+
+ponytail은 "적게 쓴다"는 규칙이지 "적게 읽는다"가 아니다. 1·2단계를 건너뛰고 짧은 diff부터 내지 않는다.
+UE 스킬 규칙과 ponytail이 충돌하면 UE 스킬(및 이 문서의 설계 원칙)이 우선한다.
+
 ## 프로젝트 환경
 
 - 이 프로젝트는 Unreal Engine 5.7 이상을 기준으로 한다.

@@ -75,9 +75,9 @@ Travel.Status.MainMenu,메인 메뉴로 이동 중...,메인 메뉴 이동 상�
 Travel.Status.CharacterSelect,캐릭터 선택으로 이동 중...,캐릭터 선택 이동 상태
 Travel.Status.Hub,허브로 이동 중...,허브 이동 상태
 Travel.Status.Generic,맵 이동 중...,일반 맵 이동 상태
-Travel.Map.MainMenu,Main Menu,메인 메뉴 맵 표시 이름
-Travel.Map.CharacterSelect,Character Select,캐릭터 선택 맵 표시 이름
-Travel.Map.Hub,Hub,허브 맵 표시 이름
+Travel.Map.MainMenu,궤도 관제소,메인 메뉴 맵 표시 이름
+Travel.Map.CharacterSelect,출격 준비실,캐릭터 선택 맵 표시 이름
+Travel.Map.Hub,제 7 전진기지,허브 맵 표시 이름
 Travel.Error.UnsupportedEntryType,지원하지 않는 이동 요청입니다.,지원하지 않는 이동 요청 오류
 Travel.Error.InvalidMapId,맵 Primary Asset ID가 올바르지 않습니다: {0},잘못된 맵 ID 오류
 Travel.Error.MapNotFound,등록된 맵을 찾을 수 없습니다: {0},맵 검색 실패 오류

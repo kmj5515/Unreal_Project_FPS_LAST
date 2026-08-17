@@ -8,6 +8,7 @@
 
 class ALastFPSProjectile;
 class ALastFPSWeaponActor;
+struct FStreamableHandle;
 class AActor;
 class ACharacter;
 class AWeaponPickupActor;
@@ -87,7 +88,10 @@ public:
 
     UFUNCTION(BlueprintCallable, Category="Weapon|Reload")
     void RestoreMagazineToWeapon();
-    void FireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
+    void FireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, bool bAimingDownSights, TSubclassOf<UGameplayEffect> DamageEffectClass);
+
+    /** 지금 발사하면 적용될 퍼짐 반각(도). 상태를 바꾸지 않으므로 크로스헤어 등 표시용으로 안전하다. */
+    float GetCurrentSpreadHalfAngleDegrees(bool bAimingDownSights) const;
 
     UFUNCTION(BlueprintCallable, Category="Weapon|IK")
     bool GetLeftHandIKTransform(USkeletalMeshComponent* CharacterMesh, FName RelativeToBoneName, FTransform& OutTransform) const;
@@ -160,6 +164,9 @@ public:
 
     UFUNCTION(BlueprintPure, Category="Weapon|Ammo")
     int32 GetCurrentReserveAmmo() const { return CurrentReserveAmmo; }
+
+    /** 예비 탄약을 가득 채우기까지 남은 양. 0 이면 보급해도 들어가지 않는다. */
+    int32 GetMissingReserveAmmo() const { return FMath::Max(0, StartingReserveAmmo - CurrentReserveAmmo); }
 
     UFUNCTION(BlueprintPure, Category="Weapon|Ammo")
     bool HasReserveAmmo() const { return CurrentReserveAmmo > 0; }
@@ -264,10 +271,17 @@ public:
     void Server_UnequipWeapon();
 
     UFUNCTION(Server, Reliable)
-    void Server_FireFromClientAim(FVector_NetQuantize ClientMuzzleLocation, FVector_NetQuantize ClientCameraLocation, FVector_NetQuantizeNormal ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
+    // 디버그 드로잉 여부는 서버가 자기 설정(bDrawServerShotDebug)으로 판단한다.
+    // 클라이언트가 서버의 디버그 렌더링을 켜게 두지 않는다.
+    void Server_FireFromClientAim(FVector_NetQuantize ClientMuzzleLocation, FVector_NetQuantize ClientCameraLocation, FVector_NetQuantizeNormal ClientAimDirection, bool bAimingDownSights, TSubclassOf<UGameplayEffect> DamageEffectClass);
 
     UFUNCTION(Client, Reliable)
     void ClientCorrectMagazineAmmo(int32 ServerMagazineAmmo);
+
+    // 발사 연출은 어빌리티가 소유 클라이언트에서만 재생하므로(GA_BasicShoot::Fire),
+    // 다른 클라이언트에게는 서버가 전파해야 총구 화염과 발사음이 보인다.
+    UFUNCTION(NetMulticast, Unreliable)
+    void Multicast_PlayFireEffects();
 
     UFUNCTION(Server, Reliable)
     void Server_RequestWeaponSlot(int32 SlotIndex);
@@ -275,6 +289,13 @@ public:
     // 에디터에서 테스트할 픽업 BP 클래스 지정
     UPROPERTY(EditDefaultsOnly, Category="Weapon|Debug")
     TSubclassOf<AWeaponPickupActor> TestPickupClass;
+
+    // 서버 히트스캔 궤적을 서버 화면에 그린다. 리슨 서버/PIE 진단용.
+    UPROPERTY(EditDefaultsOnly, Category="Weapon|Debug")
+    bool bDrawServerShotDebug = false;
+
+    UPROPERTY(EditDefaultsOnly, Category="Weapon|Debug", meta=(ClampMin="0.0", ClampMax="5.0", Units="s"))
+    float ServerShotDebugDuration = 1.f;
     
 protected:
     virtual void BeginPlay() override;
@@ -293,6 +314,12 @@ private:
 
     UFUNCTION()
     void OnRep_WeaponDefinition();
+
+    /** OnRep_WeaponDefinition 의 실제 본문. 소프트 참조가 상주한 뒤에 실행한다. */
+    void ApplyReplicatedWeaponDefinition();
+
+    /** 복제로 받은 정의의 장착 참조를 비동기로 상주시키는 핸들이다. */
+    TSharedPtr<FStreamableHandle> WeaponDefinitionPreloadHandle;
 
     /**
      * 슬롯 구성. 소유 클라이언트에만 복제한다 — HUD 표기와 예비 탄약은 본인에게만 필요한 정보이고,
@@ -343,13 +370,20 @@ private:
     void ApplyAnimLayerClass(TSubclassOf<UAnimInstance> AnimLayerClass) const;
     TSubclassOf<UAnimInstance> ResolveCurrentAnimLayerClass() const;
 
+    /** 소유 캐릭터의 AnimInstance 가 재생성되면 현재 무기 기준으로 애님 레이어를 다시 링크한다. */
+    void HandleOwnerAnimInstanceRecreated();
+
     void AttachWeaponToOwner(ALastFPSWeaponActor* WeaponActor);
     void ApplyWeaponVisibilityOverride();
     ALastFPSWeaponActor* SpawnWeaponActor(USkeletalMesh* NewMesh, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass, ULastFPSWeaponDefinition* Definition = nullptr);
     void DestroyCurrentWeapon();
-    void HandleFireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
+    void HandleFireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, bool bAimingDownSights, TSubclassOf<UGameplayEffect> DamageEffectClass);
     // 서버 권한에서 산탄 한 발(펠릿 하나)의 히트 판정·투사체 스폰·데미지 적용을 수행한다. 방향만 다를 뿐 나머지 맥락은 발사 1회 내에서 공유한다.
-    void FireSinglePelletFromServer(ACharacter& Character, const FVector& TraceStart, const FVector& MuzzleLocation, const FVector& PelletDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration);
+    void FireSinglePelletFromServer(ACharacter& Character, const FVector& TraceStart, const FVector& MuzzleLocation, const FVector& PelletDirection, TSubclassOf<UGameplayEffect> DamageEffectClass);
+    // 경과 시간만큼 감쇠시킨 현재 누적 확산(도). 상태는 건드리지 않는다.
+    float PeekSpreadBloomDegrees() const;
+    // 발사 1회분 누적 확산을 반영하고 그 발사에 적용할 총 퍼짐 반각(도)을 돌려준다.
+    float ConsumeSpreadHalfAngleForShot(bool bAimingDownSights);
     bool ValidateClientMuzzleLocation(const FVector& ClientMuzzleLocation) const;
     FVector ResolveValidatedTraceStart(const ACharacter& Character, const FVector& ClientCameraLocation) const;
     bool TryConsumeServerFirePermission();
@@ -384,5 +418,17 @@ private:
     int32 PelletsPerShot = 1;
     // 산탄 퍼짐 원뿔의 반각(도). 0이면 퍼짐 없이 조준 방향으로 곧게 나간다.
     float SpreadHalfAngleDegrees = 0.f;
+    // ADS 조준 중 퍼짐 반각에 곱할 배율. 1이면 허리사격과 동일하다.
+    float SpreadADSMultiplier = 1.f;
+    // 연사 누적 확산 설정(도, 도, 도/초). PerShot이 0이면 누적 확산이 비활성이다.
+    float SpreadBloomPerShotDegrees = 0.f;
+    float SpreadBloomMaxDegrees = 0.f;
+    float SpreadBloomRecoveryPerSecond = 0.f;
+    // 누적 확산 런타임 상태. Tick 없이 마지막 갱신 시각과의 경과로 감쇠를 계산한다.
+    float SpreadBloomDegrees = 0.f;
+    float SpreadBloomUpdatedTimeSeconds = 0.f;
     bool bHasFiredAimRecoil = false;
+
+    /** 소유 캐릭터의 AnimInstance 재생성 알림 구독. EndPlay 에서 반드시 해제한다. */
+    FDelegateHandle AnimInstanceRecreatedHandle;
 };

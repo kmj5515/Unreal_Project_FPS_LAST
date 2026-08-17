@@ -4,6 +4,7 @@
 #include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
 #include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Economy/LastFPSEconomySubsystem.h"
+#include "Game/LastFPSGameStateBase.h"
 #include "Game/LastFPSPlayerController.h"
 #include "Data/Tables/LastFPSRoomEncounterData.h"
 #include "Encounter/LastFPSRoomEncounterSubsystem.h"
@@ -183,6 +184,7 @@ void ULastFPSQuestSubsystem::Deinitialize()
 	// 등록한 델리게이트 리스트에서 정확히 해제한다 (Initialize 는 OnWorldInitializedActors 에 등록).
 	FWorldDelegates::OnWorldInitializedActors.Remove(OnWorldInitHandle);
 	UnbindEncounterEvents();
+	UnbindPartyQuestState();
 	PendingRadioTransmissions.Reset();
 	EncounterMarkers.Reset();
 
@@ -299,6 +301,271 @@ void ULastFPSQuestSubsystem::UnbindEncounterEvents()
 			&ULastFPSQuestSubsystem::NotifyEncounterCleared);
 	}
 	BoundEncounterSubsystem.Reset();
+}
+
+// ── 파티 공용 진행 (GameState 가 진행 숫자를 소유) ─────────────────────
+
+void ULastFPSQuestSubsystem::HandleGameStateSet(AGameStateBase* GameState)
+{
+	BindPartyQuestState(GameState);
+}
+
+void ULastFPSQuestSubsystem::BindPartyQuestState(AGameStateBase* GameState)
+{
+	ALastFPSGameStateBase* PartyState = Cast<ALastFPSGameStateBase>(GameState);
+	if (!PartyState || BoundPartyQuestState.Get() == PartyState)
+	{
+		return;
+	}
+
+	if (ALastFPSGameStateBase* Previous = BoundPartyQuestState.Get())
+	{
+		Previous->OnSharedQuestProgressChanged.Remove(PartyQuestProgressHandle);
+	}
+	PartyQuestProgressHandle = PartyState->OnSharedQuestProgressChanged.AddUObject(
+		this, &ULastFPSQuestSubsystem::HandleSharedQuestProgressChanged);
+	PartyRadioHandle = PartyState->OnSharedRadioChanged.AddUObject(
+		this, &ULastFPSQuestSubsystem::HandleSharedRadioChanged);
+	BoundPartyQuestState = PartyState;
+
+	// 늦게 합류한 파티원은 구독 시점에 이미 쌓여 있던 진행과 무전을 한 번에 받아야 한다.
+	// (구독보다 복제가 먼저 도착했을 수 있어 OnRep 을 기다리지 않고 현재 값을 직접 읽는다.)
+	HandleSharedQuestProgressChanged();
+	HandleSharedRadioChanged();
+}
+
+void ULastFPSQuestSubsystem::UnbindPartyQuestState()
+{
+	if (ALastFPSGameStateBase* PartyState = BoundPartyQuestState.Get())
+	{
+		PartyState->OnSharedQuestProgressChanged.Remove(PartyQuestProgressHandle);
+		PartyState->OnSharedRadioChanged.Remove(PartyRadioHandle);
+	}
+	if (UWorld* World = PartyQuestBoundWorld.Get())
+	{
+		World->GameStateSetEvent.Remove(GameStateSetHandle);
+	}
+	BoundPartyQuestState.Reset();
+	PartyQuestBoundWorld.Reset();
+	PartyQuestProgressHandle.Reset();
+	PartyRadioHandle.Reset();
+	GameStateSetHandle.Reset();
+
+	// 송출 번호는 GameState 수명과 같다 — 새 월드의 1번 송출을 이미 들은 것으로 오인하지 않게 되돌린다.
+	LastPlayedRadioSerial = -1;
+}
+
+ALastFPSGameStateBase* ULastFPSQuestSubsystem::GetPartyQuestState() const
+{
+	return BoundPartyQuestState.Get();
+}
+
+bool ULastFPSQuestSubsystem::IsPartyQuest(const FName QuestId) const
+{
+	// 현재 전투 맵에 매핑된 던전 퀘스트만 파티 공용이다. 허브 퀘스트는 개인 진행을 유지한다.
+	return GetPartyQuestState() != nullptr && IsQuestMappedToCurrentMap(QuestId);
+}
+
+bool ULastFPSQuestSubsystem::HasPartyAuthority() const
+{
+	const ALastFPSGameStateBase* PartyState = GetPartyQuestState();
+	return PartyState && PartyState->HasAuthority();
+}
+
+bool ULastFPSQuestSubsystem::WritePartyProgress(
+	const FName QuestId,
+	const FLastFPSQuestData& Def,
+	const int32 ObjectiveIndex,
+	const int32 Value,
+	const bool bAbsolute)
+{
+	ALastFPSGameStateBase* PartyState = GetPartyQuestState();
+	if (!PartyState
+		|| !PartyState->HasAuthority()
+		|| !Def.Objectives.IsValidIndex(ObjectiveIndex))
+	{
+		return false;
+	}
+
+	return PartyState->Auth_ApplySharedQuestProgress(
+		QuestId,
+		ObjectiveIndex,
+		Def.Objectives.Num(),
+		Value,
+		bAbsolute,
+		ResolveObjectiveRequiredCount(Def.Objectives[ObjectiveIndex]));
+}
+
+bool ULastFPSQuestSubsystem::ReportPartyProgress(
+	const FName QuestId,
+	const FLastFPSQuestData& Def,
+	const int32 ObjectiveIndex,
+	const int32 Progress)
+{
+	if (HasPartyAuthority())
+	{
+		return WritePartyProgress(QuestId, Def, ObjectiveIndex, Progress, /*bAbsolute=*/true);
+	}
+
+	// 이미 파티 진행이 더 높으면 보고할 게 없다 — 위치 폴 주기마다 같은 RPC 를 쏘지 않도록 끊는다.
+	const ALastFPSGameStateBase* PartyState = GetPartyQuestState();
+	const TArray<int32>* Shared = PartyState
+		? PartyState->FindSharedQuestProgress(QuestId)
+		: nullptr;
+	if (Shared && Shared->IsValidIndex(ObjectiveIndex) && (*Shared)[ObjectiveIndex] >= Progress)
+	{
+		return false;
+	}
+
+	const UGameInstance* GameInstance = GetGameInstance();
+	if (ALastFPSPlayerController* PC = GameInstance
+		? Cast<ALastFPSPlayerController>(GameInstance->GetFirstLocalPlayerController())
+		: nullptr)
+	{
+		PC->Server_ReportPartyQuestProgress(QuestId, ObjectiveIndex, Progress);
+	}
+	return false;
+}
+
+void ULastFPSQuestSubsystem::Auth_ReportPartyObjectiveProgress(
+	const FName QuestId,
+	const int32 ObjectiveIndex,
+	const int32 Progress)
+{
+	if (!HasPartyAuthority() || !IsPartyQuest(QuestId))
+	{
+		return;
+	}
+
+	const FLastFPSQuestData* Def = FindQuest(QuestId);
+	if (Def && WritePartyProgress(QuestId, *Def, ObjectiveIndex, Progress, /*bAbsolute=*/true))
+	{
+		HandleSharedQuestProgressChanged();
+	}
+}
+
+void ULastFPSQuestSubsystem::Auth_NotifyPartyObjectiveKill(const FGameplayTag EnemyTag)
+{
+	if (!EnemyTag.IsValid() || !HasPartyAuthority())
+	{
+		return;
+	}
+
+	FLastFPSObjectiveEvent Event;
+	Event.Type = ELastFPSObjectiveType::KillTarget;
+	Event.Tag = EnemyTag;
+
+	// 로컬 상태 반영과 브로드캐스트는 GameState 갱신 콜백이 맡으므로 여기서 하지 않는다.
+	ApplyObjectiveEventToActive(Event, /*bPartyScope=*/true);
+}
+
+void ULastFPSQuestSubsystem::HandleSharedQuestProgressChanged()
+{
+	const ALastFPSGameStateBase* PartyState = GetPartyQuestState();
+	if (!PartyState)
+	{
+		return;
+	}
+
+	bool bChanged = false;
+	for (const FName QuestId : CurrentMapQuestIds)
+	{
+		const TArray<int32>* Shared = PartyState->FindSharedQuestProgress(QuestId);
+		FLastFPSQuestRuntimeState* State = RuntimeStates.Find(QuestId);
+		const FLastFPSQuestData* Def = FindQuest(QuestId);
+		if (!Shared || !State || !Def || State->Status != ELastFPSQuestStatus::InProgress)
+		{
+			continue;
+		}
+
+		State->Progress.SetNum(Def->Objectives.Num());
+		for (int32 i = 0; i < Def->Objectives.Num(); ++i)
+		{
+			if (!Shared->IsValidIndex(i))
+			{
+				continue;
+			}
+
+			const int32 PreviousProgress = State->Progress[i];
+			const int32 NewProgress = (*Shared)[i];
+			if (NewProgress == PreviousProgress)
+			{
+				continue;
+			}
+
+			State->Progress[i] = NewProgress;
+			bChanged = true;
+			NotifyObjectiveCompleted(
+				Def->Objectives[i],
+				PreviousProgress,
+				NewProgress,
+				ResolveObjectiveRequiredCount(Def->Objectives[i]));
+		}
+
+		bChanged |= CheckCompletion(QuestId, *State, *Def);
+	}
+
+	if (bChanged)
+	{
+		ProcessQuestTransitions();
+		BroadcastStateChanged();
+	}
+}
+
+void ULastFPSQuestSubsystem::Auth_BroadcastPartyRadio(const TArray<FName>& RadioIds)
+{
+	if (RadioIds.IsEmpty())
+	{
+		return;
+	}
+
+	ALastFPSGameStateBase* PartyState = GetPartyQuestState();
+	if (!PartyState || !PartyState->HasAuthority())
+	{
+		// 파티 GameState 가 없는 단독 플레이는 로컬 재생이 전부다.
+		// 권위가 없는데 여기 도달했다면 호출부가 서버 판정을 빠뜨린 것이라 재생하지 않는다.
+		if (!PartyState)
+		{
+			TriggerRadioByIds(RadioIds);
+		}
+		return;
+	}
+
+	PartyState->Auth_BroadcastSharedRadio(RadioIds);
+	// 서버에서는 OnRep 이 돌지 않으므로 복제 수신 측과 같은 경로로 직접 재생한다(리슨 서버 호스트용).
+	HandleSharedRadioChanged();
+}
+
+void ULastFPSQuestSubsystem::HandleSharedRadioChanged()
+{
+	const ALastFPSGameStateBase* PartyState = GetPartyQuestState();
+	if (!PartyState)
+	{
+		return;
+	}
+
+	// 같은 송출을 두 번 재생하지 않는다 — 구독 직후 직접 읽기와 OnRep 이 겹칠 수 있다.
+	const int32 Serial = PartyState->GetSharedRadioSerial();
+	if (Serial <= 0 || Serial == LastPlayedRadioSerial)
+	{
+		return;
+	}
+	LastPlayedRadioSerial = Serial;
+
+	TriggerRadioByIds(PartyState->GetSharedRadioIds());
+}
+
+bool ULastFPSQuestSubsystem::ApplyObjectiveEvent(const FLastFPSObjectiveEvent& Event)
+{
+	// 개인 퀘스트는 각 머신이 로컬로 누적한다.
+	const bool bChanged = ApplyObjectiveEventToActive(Event, /*bPartyScope=*/false);
+
+	// 파티 공용 퀘스트는 권위 머신만 누적한다 — 모든 머신이 쓰면 같은 이벤트가 중복 집계된다.
+	if (HasPartyAuthority())
+	{
+		ApplyObjectiveEventToActive(Event, /*bPartyScope=*/true);
+	}
+	return bChanged;
 }
 
 
@@ -743,6 +1010,10 @@ bool ULastFPSQuestSubsystem::RecomputeProgress(FName QuestId, FLastFPSQuestRunti
 
 	const FLastFPSObjectiveEvalContext Ctx = MakeEvalContext();
 
+	// 파티 공용 목표는 각 머신이 자기 폰 기준으로 관측만 하고, 확정은 권위가 한다.
+	// (도달·획득처럼 로컬에서만 판정되는 목표를 파티에 반영하는 유일한 경로)
+	const bool bParty = IsPartyQuest(QuestId);
+
 	bool bChanged = false;
 	for (int32 i = 0; i < Def.Objectives.Num(); ++i)
 	{
@@ -762,7 +1033,17 @@ bool ULastFPSQuestSubsystem::RecomputeProgress(FName QuestId, FLastFPSQuestRunti
 			{
 				NewProgress = FMath::Max(NewProgress, PreviousProgress);
 			}
-			if (PreviousProgress != NewProgress)
+			if (bParty)
+			{
+				// ponytail: 파티 진행은 파티원 관측의 최댓값으로만 올라간다. 그래서 AcquireItem 처럼
+				// 원래 되돌아갈 수 있는 목표도 파티 공용일 때는 단조가 된다(아이템을 소비해도 유지).
+				// 던전 목표는 사실형이라 문제 없고, 되돌림이 필요한 파티 목표가 생기면 그때 분리한다.
+				if (NewProgress > PreviousProgress)
+				{
+					bChanged |= ReportPartyProgress(QuestId, Def, i, NewProgress);
+				}
+			}
+			else if (PreviousProgress != NewProgress)
 			{
 				State.Progress[i] = NewProgress;
 				bChanged = true;
@@ -794,6 +1075,12 @@ bool ULastFPSQuestSubsystem::RecomputeAllActive()
 		{
 			bAnyChanged |= RecomputeProgress(Pair.Key, Pair.Value, *Def);
 		}
+	}
+
+	// 권위 머신에서 파티 진행이 올라갔다면 순회를 마친 뒤에 반영한다(반영 중 RuntimeStates 가 바뀐다).
+	if (bAnyChanged && HasPartyAuthority())
+	{
+		HandleSharedQuestProgressChanged();
 	}
 	return bAnyChanged;
 }
@@ -863,12 +1150,15 @@ void ULastFPSQuestSubsystem::HandleLocationPoll()
 	}
 }
 
-bool ULastFPSQuestSubsystem::ApplyObjectiveEventToActive(const FLastFPSObjectiveEvent& Event)
+bool ULastFPSQuestSubsystem::ApplyObjectiveEventToActive(
+	const FLastFPSObjectiveEvent& Event,
+	const bool bPartyScope)
 {
 	bool bAnyChanged = false;
 	for (TPair<FName, FLastFPSQuestRuntimeState>& Pair : RuntimeStates)
 	{
-		if (Pair.Value.Status != ELastFPSQuestStatus::InProgress)
+		if (Pair.Value.Status != ELastFPSQuestStatus::InProgress
+			|| IsPartyQuest(Pair.Key) != bPartyScope)
 		{
 			continue;
 		}
@@ -876,6 +1166,12 @@ bool ULastFPSQuestSubsystem::ApplyObjectiveEventToActive(const FLastFPSObjective
 		{
 			bAnyChanged |= ApplyEventToQuest(Pair.Key, Pair.Value, *Def, Event);
 		}
+	}
+
+	// 순회가 끝난 뒤에 반영한다 — 반영 중 다음 퀘스트가 수락되면 RuntimeStates 가 바뀌기 때문이다.
+	if (bPartyScope && bAnyChanged)
+	{
+		HandleSharedQuestProgressChanged();
 	}
 	return bAnyChanged;
 }
@@ -887,6 +1183,10 @@ bool ULastFPSQuestSubsystem::ApplyEventToQuest(
 	const FLastFPSObjectiveEvent& Event)
 {
 	State.Progress.SetNum(Def.Objectives.Num());
+
+	// 파티 공용 퀘스트의 진행 숫자는 GameState 가 소유한다. 여기서는 권위 머신이 GameState 에 기록만
+	// 하고, 로컬 상태는 복제 콜백(HandleSharedQuestProgressChanged)에서 한 곳으로만 갱신한다.
+	const bool bParty = IsPartyQuest(QuestId);
 
 	bool bChanged = false;
 	for (int32 i = 0; i < Def.Objectives.Num(); ++i)
@@ -901,19 +1201,26 @@ bool ULastFPSQuestSubsystem::ApplyEventToQuest(
 		const ILastFPSObjectiveTracker* Tracker = GetTracker(Obj.Type);
 		if (Tracker && Tracker->MatchesEvent(Event, Obj))
 		{
-			const int32 CurrentProgress = State.Progress[i];
-			const int32 CandidateProgress = Event.bSetAbsoluteProgress
-				? Event.Count
-				: CurrentProgress + Event.Count;
-			const int32 NewProgress = FMath::Clamp(
-				CandidateProgress,
-				0,
-				RequiredCount);
-			if (NewProgress != CurrentProgress)
+			if (bParty)
 			{
-				State.Progress[i] = NewProgress;
-				bChanged = true;
-				NotifyObjectiveCompleted(Obj, CurrentProgress, NewProgress, RequiredCount);
+				bChanged |= WritePartyProgress(QuestId, Def, i, Event.Count, Event.bSetAbsoluteProgress);
+			}
+			else
+			{
+				const int32 CurrentProgress = State.Progress[i];
+				const int32 CandidateProgress = Event.bSetAbsoluteProgress
+					? Event.Count
+					: CurrentProgress + Event.Count;
+				const int32 NewProgress = FMath::Clamp(
+					CandidateProgress,
+					0,
+					RequiredCount);
+				if (NewProgress != CurrentProgress)
+				{
+					State.Progress[i] = NewProgress;
+					bChanged = true;
+					NotifyObjectiveCompleted(Obj, CurrentProgress, NewProgress, RequiredCount);
+				}
 			}
 		}
 
@@ -921,6 +1228,12 @@ bool ULastFPSQuestSubsystem::ApplyEventToQuest(
 		{
 			break;
 		}
+	}
+
+	// 파티 공용 퀘스트의 로컬 상태 갱신과 완료 판정은 GameState 반영 시점 한 곳에서만 한다.
+	if (bParty)
+	{
+		return bChanged;
 	}
 
 	bChanged |= CheckCompletion(QuestId, State, Def);
@@ -937,7 +1250,9 @@ void ULastFPSQuestSubsystem::NotifyObjectiveKill(FGameplayTag EnemyTag)
 	Event.Type = ELastFPSObjectiveType::KillTarget;
 	Event.Tag = EnemyTag;
 
-	bool bChanged = ApplyObjectiveEventToActive(Event);
+	// 처치 통지는 킬러 소유 클라에만 오므로 개인 퀘스트 전용이다.
+	// 파티 합산은 서버가 Auth_NotifyPartyObjectiveKill 로 따로 받는다(대상이 배타적이라 중복 없음).
+	bool bChanged = ApplyObjectiveEventToActive(Event, /*bPartyScope=*/false);
 	bChanged |= ProcessQuestTransitions();
 	if (bChanged)
 	{
@@ -958,7 +1273,7 @@ void ULastFPSQuestSubsystem::NotifyEncounterCleared(FName EncounterId)
 	Event.Count = MAX_int32;
 	Event.bSetAbsoluteProgress = true;
 
-	bool bChanged = ApplyObjectiveEventToActive(Event);
+	bool bChanged = ApplyObjectiveEvent(Event);
 	bChanged |= ProcessQuestTransitions();
 	if (bChanged)
 	{
@@ -976,7 +1291,7 @@ void ULastFPSQuestSubsystem::NotifyTaggedObjective(ELastFPSObjectiveType Type, F
 	Event.Type = Type;
 	Event.Tag = Tag;
 
-	bool bChanged = ApplyObjectiveEventToActive(Event);
+	bool bChanged = ApplyObjectiveEvent(Event);
 	bChanged |= ProcessQuestTransitions();
 	if (bChanged)
 	{
@@ -1002,7 +1317,7 @@ void ULastFPSQuestSubsystem::NotifyEncounterProgress(
 	Event.Count = FMath::Min(DefeatedEnemyCount, TotalEnemyCount);
 	Event.bSetAbsoluteProgress = true;
 
-	bool bChanged = ApplyObjectiveEventToActive(Event);
+	bool bChanged = ApplyObjectiveEvent(Event);
 	bChanged |= ProcessQuestTransitions();
 	if (bChanged)
 	{
@@ -1086,6 +1401,13 @@ void ULastFPSQuestSubsystem::HandlePostWorldInitialization(const FActorsInitiali
 		BindEncounterEvents(*Params.World);
 		ScanObjectivePaths(*Params.World);
 		AcceptDungeonQuestForMap(*Params.World);
+		// 파티 공용 진행 구독은 자동 수락 뒤에 — CurrentMapQuestIds 가 정해져야 대상 판정이 선다.
+		// 클라이언트는 GameState 가 복제로 늦게 도착하므로 GameStateSetEvent 로도 받는다.
+		UnbindPartyQuestState();
+		PartyQuestBoundWorld = Params.World;
+		GameStateSetHandle = Params.World->GameStateSetEvent.AddUObject(
+			this, &ULastFPSQuestSubsystem::HandleGameStateSet);
+		BindPartyQuestState(Params.World->GetGameState());
 		// 맵이 바뀌면 퀘스트 범위 판정도 달라지므로 마커 표시 캐시를 다시 잡는다.
 		RebuildNPCMarkerCache();
 	}
@@ -1130,7 +1452,7 @@ void ULastFPSQuestSubsystem::NotifyTalkedToNPC(FName NPCRowName)
 	FLastFPSObjectiveEvent Event;
 	Event.Type = ELastFPSObjectiveType::TalkToNPC;
 	Event.Id = NPCRowName;
-	bool bChanged = ApplyObjectiveEventToActive(Event);
+	bool bChanged = ApplyObjectiveEvent(Event);
 
 	bChanged |= ProcessQuestTransitions();
 	if (bChanged)
@@ -2465,6 +2787,15 @@ void ULastFPSQuestSubsystem::AcceptDungeonQuestForMap(UWorld& World)
 		// 반복 임무는 재입장할 때마다 새로 시작한다. 상태 전이가 단조라 초기화하지 않으면
 		// 두 번째 입장부터 Claimed 로 남아 목표도 브리핑도 나오지 않는다.
 		ResetRepeatableQuest(TargetQuestId);
+
+		// 이 전투 맵에 들어왔다는 사실 자체가 던전 임무의 시작 조건이다. 파티에 늦게 합류한 플레이어는
+		// 허브 선행 사슬을 진행하지 않아 이 임무가 Locked 로 남고, 그러면 자동 수락이 조용히 실패해
+		// 임무도 HUD 도 비며 복제된 파티 진행까지 "InProgress 가 아님"을 이유로 버려진다.
+		if (FLastFPSQuestRuntimeState* LockedState = RuntimeStates.Find(TargetQuestId);
+			LockedState && LockedState->Status == ELastFPSQuestStatus::Locked)
+		{
+			LockedState->Status = ELastFPSQuestStatus::NotStarted;
+		}
 
 		const ELastFPSQuestStatus Status = GetStatus(TargetQuestId);
 		if (Status == ELastFPSQuestStatus::NotStarted)

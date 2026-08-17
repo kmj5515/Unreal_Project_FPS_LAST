@@ -88,9 +88,17 @@ void ALastFPSProjectile::InitializeGameplayProjectile(
     SourceActor = InSourceActor;
     ImpactRules = InImpactRules;
     LegacyEffectsOnHit = InLegacyEffectsOnHit;
-    VisualData = InVisualData;
     BaseDamageOverride = FMath::Max(InBaseDamageOverride, 0.f);
-    ApplyVisualData();
+
+    if (HasAuthority() && GetIsReplicated())
+    {
+        Multicast_ApplyVisualData(InVisualData);
+    }
+    else
+    {
+        SetVisualDataLocal(InVisualData);
+    }
+
     ApplyFlightAudio(InAudioSettings);
     EnableGameplayCollision(InCollisionSettings);
     SetGameplayLifeSpan(DefaultGameplayLifeSpan);
@@ -362,6 +370,18 @@ void ALastFPSProjectile::ApplyVisualData()
     }
 }
 
+void ALastFPSProjectile::SetVisualDataLocal(ULastFPSProjectileVisualData* InVisualData)
+{
+    VisualData = InVisualData;
+    ApplyVisualData();
+}
+
+void ALastFPSProjectile::Multicast_ApplyVisualData_Implementation(
+    ULastFPSProjectileVisualData* InVisualData)
+{
+    SetVisualDataLocal(InVisualData);
+}
+
 void ALastFPSProjectile::AddRenderWarmupEffectComponents()
 {
     ClearRenderWarmupComponents();
@@ -448,6 +468,34 @@ void ALastFPSProjectile::StopFlightAudio()
     SetFlightAudioLocal(nullptr, 1.f, 1.f);
 }
 
+void ALastFPSProjectile::StopTrail()
+{
+    if (HasAuthority() && GetIsReplicated())
+    {
+        Multicast_StopTrail();
+        return;
+    }
+
+    StopTrailLocal();
+}
+
+void ALastFPSProjectile::Multicast_StopTrail_Implementation()
+{
+    StopTrailLocal();
+}
+
+void ALastFPSProjectile::StopTrailLocal()
+{
+    if (TrailNiagara)
+    {
+        TrailNiagara->DeactivateImmediate();
+    }
+    if (TrailParticle)
+    {
+        TrailParticle->DeactivateSystem();
+    }
+}
+
 void ALastFPSProjectile::Multicast_ApplyFlightAudio_Implementation(
     USoundBase* FlightSound,
     const float VolumeMultiplier,
@@ -494,6 +542,26 @@ void ALastFPSProjectile::PlayImpactFeedback(const FHitResult& ImpactResult)
         }
     }
 
+    if (HasAuthority() && GetIsReplicated())
+    {
+        Multicast_PlayImpactFeedback(ImpactLocation, ImpactRotation);
+        return;
+    }
+
+    PlayImpactFeedbackLocal(ImpactLocation, ImpactRotation);
+}
+
+void ALastFPSProjectile::Multicast_PlayImpactFeedback_Implementation(
+    const FVector ImpactLocation,
+    const FRotator ImpactRotation)
+{
+    PlayImpactFeedbackLocal(ImpactLocation, ImpactRotation);
+}
+
+void ALastFPSProjectile::PlayImpactFeedbackLocal(
+    const FVector& ImpactLocation,
+    const FRotator& ImpactRotation)
+{
     if (VisualData && VisualData->ImpactNiagaraSystem)
     {
         UNiagaraFunctionLibrary::SpawnSystemAtLocation(
@@ -586,14 +654,7 @@ void ALastFPSProjectile::OnReleasedToPool_Implementation()
         ProjectileMovement->StopMovementImmediately();
         ProjectileMovement->Deactivate();
     }
-    if (TrailNiagara)
-    {
-        TrailNiagara->DeactivateImmediate();
-    }
-    if (TrailParticle)
-    {
-        TrailParticle->DeactivateSystem();
-    }
+    StopTrail();
 }
 
 void ALastFPSProjectile::OnPrepareForPoolRenderWarmup_Implementation()

@@ -147,7 +147,8 @@ protected:
 private:
 	void StartEventTasks();
 	bool PlayIceStormMontage();
-	void StopIceStormMontage() const;
+	/** ASC 를 통해 정지시켜야 복제되므로 const 가 아니다(ASC 가 비const 어빌리티 포인터를 요구한다). */
+	void StopIceStormMontage();
 	bool JumpToMontageSection(FName SectionName) const;
 	bool CacheAimTarget();
 	FVector GetCameraAimDirection(const ALastFPSHero* Hero) const;

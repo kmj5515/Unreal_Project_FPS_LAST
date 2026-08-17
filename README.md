@@ -365,8 +365,28 @@ LastFPS/
 | `MatchTimerText` | 매치 남은 시간 (선택) |
 | Hero BP `CharacterNickname` | 킬피드 표시명 (비우면 플랫폼 이름) |
 | `WBP_SkillCooldownSlot_Q` / `E` / `F` | `WBP_SkillCooldownSlot` ×3 (Parent: `LastFPSSkillCooldownSlotWidget`, Is Variable) |
+| `WBP_StatusEffectList` | 버프·디버프 아이콘 목록 (`WBP_StatusSlotList` 배치, Is Variable) |
 
 **스킬 슬롯:** `WBP_SkillCooldownSlot` (Parent `LastFPSSkillCooldownSlotWidget`) — `SkillIcon` Brush에 `MI_000` 등 지정, 스칼라 `CoolDownRemainingPercent`는 C++가 `Remaining/Duration`으로 갱신. `CooldownText`, `KeyLabel` 선택. Overlay 불필요.
+
+**상태이상 목록:** `WBP_StatusSlotList` (Parent `LastFPSStatusEffectListWidget`) — 변수명을 반드시 `WBP_StatusEffectList` 로 두어야 `ULastFPSHUDWidget` 이 ASC 를 연결한다. 내부 `StatusEffectContainer`(Horizontal/Wrap Box)와 `StatusEffectIconWidgetClass`(=`WBP_StatusSlot`)만 채우면 되고, 개별 아이콘은 C++ 가 생성·제거한다.
+
+**상태이상 슬롯:** `WBP_StatusSlot` (Parent `LastFPSStatusEffectIconWidget`) — `StatusIcon`(Image, 아이콘 머티리얼), `StackText`(선택), `CategoryBackground`(선택, 아이콘 뒤 프레임 Image) 을 둔다. 행의 `Category` 에 따라 C++ 가 `CategoryBackground` 의 브러시 텍스처를 갈아끼운다(브러시 크기는 저작값 유지).
+
+슬롯 디테일 패널 `HUD|Status Effect` > `CategoryBackgroundTextures` 에 카테고리별 프레임을 지정한다. 항목이 없는 카테고리는 WBP 저작 브러시를 그대로 쓴다.
+
+| Category | 프레임 텍스처 |
+|---|---|
+| `Buff` | `/Game/Assets/Art/UI/Texture/T_StatusFrame_Green_66` |
+| `Debuff` | `/Game/Assets/Art/UI/Texture/T_StatusFrame_Blue_66` |
+
+**상태이상 추가 절차 (코드 수정 없음):** 표시할 상태는 전부 `DT_StatusData`(`FLastFPSStatusEffectUIData`) 행으로만 정의한다. GE 가 `Status.*` 태그를 부여하고, 같은 태그를 `StatusTag` 로 갖는 행이 있으면 HUD 에 자동으로 뜬다.
+
+| 행 | StatusTag | 부여 주체 |
+|---|---|---|
+| `Freeze` | `Status.Freeze` | `GE_StatusFreeze` |
+| `MovementSlow` | `Status.Movement.Slow` | `GE_StatusSlow` |
+| `MovementSpeedBoost` | `Status.Movement.SpeedBoost` | `GE_MoveSpeedBuff` (E 스킬 `GA_SkillMoveBoost`) |
 
 ### WBP_Loading (맵 전환 로딩 화면)
 로비↔매치 `ServerTravel` 시 `ULastFPSGameInstance`가 전체 화면 로딩 UI를 표시합니다.

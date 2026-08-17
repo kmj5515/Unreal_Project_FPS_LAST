@@ -13,6 +13,8 @@
 
 class UDataTable;
 class USceneComponent;
+class AGameStateBase;
+class ALastFPSGameStateBase;
 class ULastFPSEconomySubsystem;
 class ULastFPSRoomEncounterSubsystem;
 struct FLastFPSPurchaseReceipt;
@@ -175,7 +177,12 @@ struct FLastFPSDungeonQuestMapping
  * 완료/수령은 단조 전이(NotStarted→InProgress→Completed→Claimed)로만 바뀌며, 보상은
  * Completed→Claimed 전이에서 EconomySubsystem 으로 딱 1회 지급한다(중복지급 래치).
  *
- * 범위 메모: 아웃게임 로컬(무복제) 가정 — Economy 와 동일. SaveGame 영속화는 추후.
+ * 범위 메모: 허브/개인 퀘스트는 로컬(무복제) — Economy 와 동일. SaveGame 영속화는 추후.
+ *
+ * 파티 공용 퀘스트(현재 전투 맵에 매핑된 던전 퀘스트)만 예외로, 목표 진행 숫자의 소유권이
+ * ALastFPSGameStateBase 로 넘어간다. 서브시스템은 각 머신에서 정의 해석·완료 판정·보상만 담당하고
+ * 숫자는 복제된 값을 그대로 반영한다 — 그래야 파티원이 서로 다른 진행을 보지 않는다.
+ * 보상은 완료 상태가 각 머신에 복제된 뒤 각자 지급하므로 파티원 전원이 1회씩 받는다.
  */
 UCLASS(Config=Game)
 class LASTFPS_API ULastFPSQuestSubsystem : public UGameInstanceSubsystem
@@ -267,9 +274,22 @@ public:
 
 	// ── 외부 이벤트 통지 (목표 진행 push) ────────────────────────────
 
-	/** 처치 통지 — 서버 사망 브릿지가 오너 클라에서 호출. KillTarget 목표를 누적. */
+	/** 처치 통지 — 서버 사망 브릿지가 오너 클라에서 호출. 개인 퀘스트의 KillTarget 목표만 누적. */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
 	void NotifyObjectiveKill(FGameplayTag EnemyTag);
+
+	/**
+	 * 서버 전용 — 파티 공용 퀘스트의 KillTarget 목표를 누적한다.
+	 * 처치 통지는 킬러 소유 클라에만 가므로 파티 합산은 서버가 직접 받아 GameState 에 쌓아야 한다.
+	 * NotifyObjectiveKill 과 대상 범위가 서로 배타적이라 리슨 서버에서도 중복 집계되지 않는다.
+	 */
+	void Auth_NotifyPartyObjectiveKill(FGameplayTag EnemyTag);
+
+	/**
+	 * 클라이언트가 로컬로 관측한 파티 공용 목표 진행을 서버가 반영한다.
+	 * 도달·획득처럼 각 머신에서만 판정되는 목표의 유일한 상향 경로다.
+	 */
+	void Auth_ReportPartyObjectiveProgress(FName QuestId, int32 ObjectiveIndex, int32 Progress);
 
 	/** 점령 완료 통지 — 월드 점령존이 오너 클라에서 호출. CaptureZone 목표를 누적. */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest")
@@ -313,6 +333,14 @@ public:
 	/** FName 배열로 지정된 무전 대사를 RadioTable 에서 조회하여 HUD 자막 위젯으로 전송한다. */
 	UFUNCTION(BlueprintCallable, Category="LastFPS|Quest|Radio")
 	void TriggerRadioByIds(const TArray<FName>& RadioIds);
+
+	/**
+	 * 서버 전용 — 파티 전원이 들어야 하는 무전을 GameState 복제 상태로 송출한다.
+	 * 트리거 구역 무전처럼 한 명이 밟으면 파티 전체에 알려야 하는 대사가 대상이며,
+	 * 복제 상태로 남으므로 나중에 합류한 파티원도 접속 시점에 최신 묶음을 듣는다.
+	 * 파티 GameState 가 없으면(단독 플레이) 로컬 재생으로 떨어진다.
+	 */
+	void Auth_BroadcastPartyRadio(const TArray<FName>& RadioIds);
 
 	/**
 	 * NPC 대화 데이터를 무전 자막으로 재생한다 — 대사 출력 채널을 자막 하나로 통일하기 위한 다리.
@@ -577,10 +605,67 @@ private:
 	/** 한 퀘스트의 pull형 진행을 절대상태에서 재계산. 완료 도달 시 Completed 로 단조 승격. 변경 시 true. */
 	bool RecomputeProgress(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def);
 
-	/** 외부 이벤트를 진행중 퀘스트들에 적용(push형 목표 누적). 변경 시 true(브로드캐스트/연쇄는 호출부). */
-	bool ApplyObjectiveEventToActive(const FLastFPSObjectiveEvent& Event);
+	/**
+	 * 외부 이벤트를 진행중 퀘스트들에 적용(push형 목표 누적). 변경 시 true(브로드캐스트/연쇄는 호출부).
+	 * bPartyScope 로 대상을 파티 공용/개인 중 한쪽으로만 한정해, 양쪽에 도달하는 이벤트(멀티캐스트로
+	 * 오는 인카운터 등)가 같은 머신에서 두 번 집계되는 것을 막는다.
+	 */
+	bool ApplyObjectiveEventToActive(const FLastFPSObjectiveEvent& Event, bool bPartyScope);
 	/** 한 퀘스트에 이벤트 적용. 변경 시 true. */
 	bool ApplyEventToQuest(FName QuestId, FLastFPSQuestRuntimeState& State, const FLastFPSQuestData& Def, const FLastFPSObjectiveEvent& Event);
+
+	/**
+	 * 모든 머신에 도달하는 이벤트의 공용 진입점 — 개인 퀘스트는 로컬에 적용하고,
+	 * 파티 공용 퀘스트는 권위 머신에서만 적용해 GameState 로 보낸다.
+	 */
+	bool ApplyObjectiveEvent(const FLastFPSObjectiveEvent& Event);
+
+	// ── 파티 공용 진행 (GameState 소유) ─────────────────────────────
+
+	/** 현재 전투 맵의 파티 공용 퀘스트인가 — 진행 숫자를 GameState 가 소유하는 대상. */
+	bool IsPartyQuest(FName QuestId) const;
+
+	/** 파티 공용 진행을 소유한 GameState. 아직 복제되지 않았으면 nullptr. */
+	ALastFPSGameStateBase* GetPartyQuestState() const;
+
+	/** 이 머신이 파티 공용 진행을 기록할 권위를 갖는가(서버 또는 스탠드얼론). */
+	bool HasPartyAuthority() const;
+
+	/** 파티 공용 목표 진행을 GameState 에 기록한다(권위 머신 전용). 변경 시 true. */
+	bool WritePartyProgress(
+		FName QuestId,
+		const FLastFPSQuestData& Def,
+		int32 ObjectiveIndex,
+		int32 Value,
+		bool bAbsolute);
+
+	/**
+	 * 로컬로 관측한 파티 목표 진행을 권위로 올린다(권위: 직접 기록, 클라: PlayerController 서버 RPC).
+	 * 권위 머신에서 실제로 기록이 바뀐 경우에만 true — 클라의 보고는 항상 false 다.
+	 */
+	bool ReportPartyProgress(FName QuestId, const FLastFPSQuestData& Def, int32 ObjectiveIndex, int32 Progress);
+
+	/** 복제된 파티 공용 진행을 로컬 런타임 상태에 반영하고 완료 판정까지 잇는다. */
+	void HandleSharedQuestProgressChanged();
+
+	/** 복제된 파티 공용 무전을 로컬에서 재생한다. 같은 송출은 일련번호로 걸러 두 번 재생하지 않는다. */
+	void HandleSharedRadioChanged();
+
+	/** GameState 가 준비되면 파티 공용 진행 델리게이트를 구독한다. */
+	void BindPartyQuestState(AGameStateBase* GameState);
+	void UnbindPartyQuestState();
+
+	void HandleGameStateSet(AGameStateBase* GameState);
+
+	TWeakObjectPtr<ALastFPSGameStateBase> BoundPartyQuestState;
+	/** GameStateSetEvent 를 등록한 월드 — 해제 대상을 정확히 찾기 위해 보관한다. */
+	TWeakObjectPtr<UWorld> PartyQuestBoundWorld;
+	FDelegateHandle PartyQuestProgressHandle;
+	FDelegateHandle PartyRadioHandle;
+	FDelegateHandle GameStateSetHandle;
+
+	/** 이미 재생한 파티 무전 송출 번호. -1 은 이 월드에서 아직 아무것도 재생하지 않음. */
+	int32 LastPlayedRadioSerial = -1;
 
 	/**
 	 * 모든 목표 충족 시 Completed 로 단조 승격. 승격했으면 true.

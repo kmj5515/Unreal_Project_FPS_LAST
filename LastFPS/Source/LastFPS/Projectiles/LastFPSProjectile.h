@@ -93,15 +93,19 @@ private:
     void ExecuteImpactRules(AActor* HitActor, const FHitResult& ImpactResult);
     void ApplyEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> EffectClass);
     void ApplyVisualData();
+    void SetVisualDataLocal(ULastFPSProjectileVisualData* InVisualData);
     void ClearRenderWarmupComponents();
     void AddRenderWarmupEffectComponents();
     void ApplyFlightAudio(const FLastFPSProjectileAudioSettings* AudioSettings);
     void StopFlightAudio();
+    void StopTrail();
+    void StopTrailLocal();
     void SetFlightAudioLocal(
         USoundBase* FlightSound,
         float VolumeMultiplier,
         float PitchMultiplier);
     void PlayImpactFeedback(const FHitResult& ImpactResult);
+    void PlayImpactFeedbackLocal(const FVector& ImpactLocation, const FRotator& ImpactRotation);
     void FinishProjectile();
 
     UFUNCTION(NetMulticast, Reliable)
@@ -109,6 +113,20 @@ private:
         USoundBase* FlightSound,
         float VolumeMultiplier,
         float PitchMultiplier);
+
+    // 투사체는 서버만 스폰·초기화하므로 비주얼 변형을 클라이언트에 직접 전달해야 한다.
+    // 풀에서 같은 VisualData로 재사용될 때도 트레일이 다시 켜져야 하므로
+    // 복제 프로퍼티(OnRep) 대신 멀티캐스트를 쓴다.
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_ApplyVisualData(ULastFPSProjectileVisualData* InVisualData);
+
+    // 풀 반환은 서버에서만 일어나므로, 클라이언트에 트레일이 켜진 채 남지 않게 함께 끈다.
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_StopTrail();
+
+    // 임팩트 판정은 서버 권한에서만 나오므로 연출도 서버가 뿌려준다.
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_PlayImpactFeedback(FVector ImpactLocation, FRotator ImpactRotation);
 
     UPROPERTY()
     TObjectPtr<AActor> SourceActor;

@@ -102,9 +102,16 @@ private:
 	void FailEncounter();
 
 	void StartEncounter();
+
+	/**
+	 * 배리어가 닫히기 전에 뒤처진 파티원을 트리거 지점으로 옮긴다.
+	 * 인카운터는 한 명만 트리거를 밟아도 시작되므로, 이 처리가 없으면 나머지가 방 밖에 갇힌다.
+	 */
+	void GatherPlayersIntoRoom();
 	void BeginEnemyDefinitionPreload();
 	void HandleEnemyDefinitionAssetsLoaded();
 	void HandleEnemyPawnClassesLoaded();
+	void BeginEnemyWeaponDependencyPreload();
 	void CancelEnemyDefinitionPreload();
 	bool ResolveLoadedEnemyDefinitions();
 	void ScheduleNextWave();
@@ -240,6 +247,9 @@ private:
 	float SpawnDelayAfterVFX = 0.f;
 	int32 MaxSpawnedActorsPerFrame = 1;
 	int32 RemainingEnemyMarkerThreshold = 3;
+
+	/** 이 거리보다 멀리 있는 파티원만 입구로 모은다. 0 이하면 모으지 않는다. */
+	float GatherPlayersBeyondDistance = 0.f;
 	int32 ActiveWaveIndex = INDEX_NONE;
 	int32 NextSpawnUnitIndex = 0;
 	int32 SpawnedCountInCurrentUnit = 0;
@@ -254,5 +264,6 @@ private:
 	bool bLoggedSpawnProjectionFailure = false;
 	TSharedPtr<FStreamableHandle> EnemyDefinitionAssetLoadHandle;
 	TSharedPtr<FStreamableHandle> EnemyPawnClassLoadHandle;
+	TSharedPtr<FStreamableHandle> EnemyWeaponDependencyLoadHandle;
 	TSharedPtr<FStreamableHandle> BarrierPresentationLoadHandle;
 };

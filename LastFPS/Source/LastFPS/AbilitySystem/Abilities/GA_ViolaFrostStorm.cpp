@@ -17,7 +17,9 @@
 UGA_ViolaFrostStorm::UGA_ViolaFrostStorm()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
+	// ServerInitiated 는 로컬 예측이 없어 입력부터 몽타주·VFX 시작까지 왕복 지연이 그대로 얹힌다.
+	// 영역 이펙트 스폰은 SpawnFrostStorm 의 HasAuthority 검사로 서버 권한을 유지한다.
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 	CooldownGameplayEffectClass = ULastFPSGE_Cooldown::StaticClass();
 	bDrawDebug = true;
 

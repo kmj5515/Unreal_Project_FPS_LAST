@@ -191,6 +191,27 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Preview|Lighting", meta=(EditCondition="bIsolateStageLighting"))
 	FLightingChannels StageLightingChannels;
 
+	/**
+	 * 라이팅 채널이 막지 못하는 경로까지 시점 카메라에서 끊는다.
+	 *
+	 * 채널은 직접광만 가른다. 자동 노출은 레벨 전체를 보고 계산하고, Lumen GI·반사는 채널을 아예
+	 * 무시한다. 그래서 채널만으로는 레벨 시간대나 실내외에 따라 무대 밝기가 계속 흔들린다.
+	 * 시점 카메라의 포스트프로세스는 레벨 볼륨 위에 덮이므로, 여기서 잠그면 무대가 밝기를 단독으로 소유한다.
+	 */
+	UPROPERTY(EditAnywhere, Category="Preview|Lighting", meta=(EditCondition="bIsolateStageLighting"))
+	bool bIsolateStageExposure = true;
+
+	/**
+	 * 잠글 노출값(EV100). 최소·최대를 같은 값으로 묶어 노출이 움직이지 않게 한다.
+	 *
+	 * 이 프로젝트는 r.DefaultFeature.AutoExposure.ExtendDefaultLuminanceRange 가 켜져 있어
+	 * 노출 최소·최대가 광도(cd/m²)가 아니라 EV100 으로 해석된다. 값이 작을수록 어두운 씬을
+	 * 가정하므로 화면은 밝아진다. 1 처럼 낮게 두면 대상이 하얗게 탄다.
+	 * 기본 7 은 무대 조명이 대상에 만드는 조도(약 100lux) 기준이다. 조명 강도를 올리면 이 값도 함께 올린다.
+	 */
+	UPROPERTY(EditAnywhere, Category="Preview|Lighting", meta=(EditCondition="bIsolateStageExposure", ClampMin="0.0", ClampMax="20.0"))
+	float StageFixedExposureEV100 = 7.f;
+
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<USceneComponent> RootScene;
 
@@ -248,6 +269,9 @@ private:
 
 	/** 무대와 자식 액터의 배경·조명을 전용 라이팅 채널로 통일한다. */
 	void ApplyStageLightingIsolation();
+
+	/** 시점 카메라의 노출과 GI·반사를 레벨에서 떼어낸다. 라이팅 채널이 못 막는 경로를 여기서 막는다. */
+	void ApplyViewLightingIsolation() const;
 
 	/**
 	 * 활성 시점의 위치를 각 자리의 애님 인스턴스에 알린다.

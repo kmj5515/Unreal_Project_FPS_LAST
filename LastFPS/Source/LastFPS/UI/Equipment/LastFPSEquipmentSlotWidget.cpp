@@ -59,7 +59,8 @@ void ULastFPSEquipmentSlotWidget::SetEquipped(const FLastFPSItemData& InItem, co
 
 			if (InItem.ItemType == ELastFPSItemType::Weapon && !InItem.WeaponDefinition.IsNull())
 			{
-				// 장비 무기 슬롯은 HUD와 동일한 캡처 아이콘을 쓴다. 그 아이콘 경로는 무기 정의만 알고 있어
+				// 장비 무기 슬롯은 무기 정의의 범용 Icon(캡처 렌더)을 쓴다. HUD 슬롯은 별도의
+				// HUDWeaponSlotIcon 을 쓰므로 여기서 그쪽을 참조하지 않는다. 아이콘 경로는 무기 정의만 알고 있어
 				// 정의를 먼저 받아야 하는데, 정의가 SkeletalMesh 등을 하드 참조해 동기 로드하면
 				// 화면을 여는 프레임이 슬롯 수만큼 멈춘다.
 				IconLoadHandle = LastFPSIconLoader::RequestWeaponIcon(

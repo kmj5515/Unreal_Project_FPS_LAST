@@ -234,39 +234,32 @@ bool UGA_IceStorm::PlayIceStormMontage()
 		return false;
 	}
 
-	UAnimInstance* AnimInstance = Hero->GetMesh()->GetAnimInstance();
-	if (!AnimInstance)
+	// AnimInstance 직접 재생은 ASC 의 RepAnimMontageInfo 를 타지 않아 다른 플레이어 화면에서
+	// 시전 동작이 보이지 않는다. 섹션 점프도 같은 경로로 복제된다.
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (!ASC)
 	{
 		return false;
 	}
 
-	const float PlayedDuration = AnimInstance->Montage_Play(IceStormMontage, MontagePlayRate);
-	if (PlayedDuration <= 0.f)
-	{
-		return false;
-	}
-
-	if (!CastSectionName.IsNone())
-	{
-		AnimInstance->Montage_JumpToSection(CastSectionName, IceStormMontage);
-	}
-
-	return true;
+	const float PlayedDuration = ASC->PlayMontage(
+		this,
+		GetCurrentActivationInfo(),
+		IceStormMontage,
+		MontagePlayRate,
+		CastSectionName);
+	return PlayedDuration > 0.f;
 }
 
-void UGA_IceStorm::StopIceStormMontage() const
+void UGA_IceStorm::StopIceStormMontage()
 {
-	const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
-	if (!IceStormMontage || !Hero || !Hero->GetMesh())
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (!ASC || !ASC->IsAnimatingAbility(this))
 	{
 		return;
 	}
 
-	UAnimInstance* AnimInstance = Hero->GetMesh()->GetAnimInstance();
-	if (AnimInstance && AnimInstance->Montage_IsPlaying(IceStormMontage))
-	{
-		AnimInstance->Montage_Stop(CancelMontageBlendOutTime, IceStormMontage);
-	}
+	ASC->CurrentMontageStop(CancelMontageBlendOutTime);
 }
 
 bool UGA_IceStorm::JumpToMontageSection(FName SectionName) const
@@ -276,19 +269,13 @@ bool UGA_IceStorm::JumpToMontageSection(FName SectionName) const
 		return false;
 	}
 
-	const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
-	if (!IceStormMontage || !Hero || !Hero->GetMesh())
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (!ASC || !IceStormMontage || ASC->GetCurrentMontage() != IceStormMontage)
 	{
 		return false;
 	}
 
-	UAnimInstance* AnimInstance = Hero->GetMesh()->GetAnimInstance();
-	if (!AnimInstance || !AnimInstance->Montage_IsPlaying(IceStormMontage))
-	{
-		return false;
-	}
-
-	AnimInstance->Montage_JumpToSection(SectionName, IceStormMontage);
+	ASC->CurrentMontageJumpToSection(SectionName);
 	return true;
 }
 

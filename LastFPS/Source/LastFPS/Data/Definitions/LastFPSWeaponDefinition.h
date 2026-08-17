@@ -213,4 +213,12 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|Scope")
     FLastFPSWeaponScopeSettings Scope;
 
+    /**
+     * 장착 시점에 UWeaponComponent 가 즉시 해석해야 하는 소프트 참조 경로다.
+     * 장착 경로는 이 값들을 동기 로드하므로, 스폰 전에 미리 상주시켜 게임 스레드 스톨을 없앤다.
+     */
+    void GatherEquipDependencyPaths(TArray<FSoftObjectPath>& OutPaths) const;
+
+    /** 위 경로가 전부 이미 메모리에 있으면 true. 동기 로드 없이 장착해도 되는지 판단한다. */
+    bool AreEquipDependenciesResident() const;
 };

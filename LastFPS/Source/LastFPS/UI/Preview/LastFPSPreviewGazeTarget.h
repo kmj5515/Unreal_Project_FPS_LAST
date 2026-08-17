@@ -31,4 +31,16 @@ public:
 	 */
 	UFUNCTION(BlueprintNativeEvent, Category="Preview")
 	void SetPreviewGazeTarget(const FVector& GazeWorldLocation, float GazeAlpha);
+
+	/**
+	 * 이 자리에 무기가 붙어 있는지 알린다. 무장/비무장 대기 자세를 나누는 데 쓴다.
+	 *
+	 * 무기 메시는 캐릭터가 아니라 무대 액터가 소유하고 소켓으로만 매달리므로, 애님 인스턴스가
+	 * 자기 컴포넌트를 뒤져서는 알 수 없다. 무대가 아는 사실이니 무대가 넘긴다.
+	 *
+	 * 무대는 어떤 무기인지 알리지 않는다. 무기 종류마다 자세를 나누려면 그 지식은 무기 정의가
+	 * 들고 있어야 하고, 여기에 무기 목록이 들어오면 무기가 늘 때마다 이 계약이 흔들린다.
+	 */
+	UFUNCTION(BlueprintNativeEvent, Category="Preview")
+	void SetPreviewEquippedWeapon(bool bHasEquippedWeapon);
 };

@@ -1,5 +1,6 @@
 #include "UI/HUD/LastFPSStatusEffectIconWidget.h"
 
+#include "Components/Border.h"
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
@@ -23,6 +24,22 @@ void ULastFPSStatusEffectIconWidget::InitializeStatusEffect(
 {
 	StatusEffectData = InData;
 	SetToolTipText(InData.Description.IsEmpty() ? InData.DisplayName : InData.Description);
+
+	if (CategoryBackground)
+	{
+		// 브러시 크기는 WBP 저작값을 유지한다(bMatchSize=false). 텍스처 스트리밍은 UImage가 처리한다.
+		// IsNull() 은 경로 유무만 보므로 로드 여부는 보장하지 않는다. Get() 으로 읽으면 아직 로드되지
+		// 않은 정상 경로에서 nullptr 브러시가 되어, 카테고리 색(버프=초록) 대신 흰 사각형이 남는다.
+		// ponytail: 프레임 텍스처가 작아 동기 로드로 둔다. 히칭이 보이면 아이콘처럼 비동기 핸들로 옮길 것.
+		if (const TSoftObjectPtr<UTexture2D>* CategoryFrame = CategoryBackgroundTextures.Find(InData.Category);
+			CategoryFrame && !CategoryFrame->IsNull())
+		{
+			if (UTexture2D* CategoryTexture = CategoryFrame->LoadSynchronous())
+			{
+				CategoryBackground->SetBrushFromTexture(CategoryTexture);
+			}
+		}
+	}
 
 	if (StatusIcon)
 	{

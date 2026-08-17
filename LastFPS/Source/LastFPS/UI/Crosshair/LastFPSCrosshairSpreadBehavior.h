@@ -12,6 +12,10 @@ class APawn;
  * SetLayerTransform은 레이어의 기본 변환을 덮어쓰는 절대값 방식이므로,
  * BeginBehavior에서 에셋의 기본 변환을 캐시한 뒤 "기본 위치 + 방향 × 스프레드"로 적용한다.
  *
+ * bDriveFromWeaponSpread가 켜져 있으면 기본 벌어짐·ADS 수렴·연사 누적을 자체 px 수치 대신
+ * WeaponComponent의 실제 탄퍼짐 반각을 화면 px로 투영해 사용한다. 크로스헤어와 탄착이 어긋나지
+ * 않게 하려면 이쪽이 기본이고, 아래 px 수치들은 무기가 없을 때의 폴백으로 남는다.
+ *
  * 연사 누적 벌어짐(발사마다 가산·상한 클램프·시간 감쇠)은 고정 커브인 ecs 애니메이션으로
  * 표현할 수 없고, 위젯 틱 순서상 Behavior가 애니메이션의 레이어 변환을 덮어쓰므로
  * NotifyWeaponFired 누적값으로 여기서 처리한다. ecs 애니메이션(FireAnimationName)은
@@ -61,9 +65,20 @@ protected:
     UPROPERTY(EditAnywhere, Category="Spread", meta=(ClampMin="0.0"))
     float MovementSpeedThreshold = 10.f;
 
-    /** ADS 중 스프레드 배율 (0=완전 수렴) */
+    /** ADS 중 스프레드 배율 (0=완전 수렴). 무기 퍼짐 연동 시에는 무기 데이터의 ADS 배율이 대신 적용된다. */
     UPROPERTY(EditAnywhere, Category="Spread", meta=(ClampMin="0.0", ClampMax="1.0"))
     float AdsSpreadMultiplier = 0.3f;
+
+    /**
+     * 무기의 실제 탄퍼짐 반각을 화면 px로 투영해 기본 벌어짐으로 사용한다.
+     * 끄면 BaseSpreadPx/AdsSpreadMultiplier/FireSpread* 의 표시 전용 수치만 쓴다(기존 동작).
+     */
+    UPROPERTY(EditAnywhere, Category="Spread|Weapon")
+    bool bDriveFromWeaponSpread = true;
+
+    /** 투영값 보정 배율 — 조준선 두께나 아트 여백 때문에 딱 맞지 않을 때 눈으로 맞추는 손잡이 */
+    UPROPERTY(EditAnywhere, Category="Spread|Weapon", meta=(ClampMin="0.0"))
+    float WeaponSpreadPxScale = 1.f;
 
     /** 목표 스프레드로의 보간 속도 */
     UPROPERTY(EditAnywhere, Category="Spread", meta=(ClampMin="0.01"))
@@ -81,12 +96,17 @@ protected:
     UPROPERTY(EditAnywhere, Category="Spread|Fire", meta=(ClampMin="0.01"))
     float FireSpreadRecoverSpeed = 9.f;
 
-    /** 목표 스프레드 계산. 파생 C++ 클래스가 조건을 확장할 수 있는 유일한 지점 */
-    virtual float CalculateTargetSpreadPx(const APawn& Pawn) const;
+    /**
+     * 목표 스프레드 계산. 파생 C++ 클래스가 조건을 확장할 수 있는 유일한 지점.
+     * FireBloomPx는 표시 전용 연사 누적분이며, 무기 퍼짐 연동 시에는 무기가 이미 누적을 갖고 있어 무시된다.
+     */
+    virtual float CalculateTargetSpreadPx(const APawn& Pawn, float FireBloomPx) const;
 
 private:
     void ApplySpreadToLayers(float SpreadPx);
     APawn* ResolveOwningPawnSafe() const;
+    /** 무기 퍼짐 반각(도)을 화면 px로 투영. 무기가 없거나 연동이 꺼져 있으면 음수를 돌려준다. */
+    float CalculateWeaponSpreadPx(const APawn& Pawn) const;
 
     /** 에셋에 정의된 레이어 기본 변환 캐시 — 절대값 교체 방식 보정용 */
     struct FCachedLayerBase

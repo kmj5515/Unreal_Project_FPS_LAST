@@ -30,10 +30,11 @@ void ULastFPSWeaponSlotWidget::SetupSlot(
 	{
 		LastFPSIconLoader::CancelRequest(IconLoadHandle);
 
+		// HUD 전용 아이콘이 있으면 그것을, 없으면 범용 Icon 을 쓴다(무기 정의에 기술된 대체 규칙).
 		const TSoftObjectPtr<UTexture2D>* Icon = nullptr;
 		if (Definition)
 		{
-			Icon = bUseHUDIcon ? &Definition->Icon : &Definition->HUDWeaponSlotIcon;
+			Icon = Definition->HUDWeaponSlotIcon.IsNull() ? &Definition->Icon : &Definition->HUDWeaponSlotIcon;
 		}
 
 		if (Icon && !Icon->IsNull())

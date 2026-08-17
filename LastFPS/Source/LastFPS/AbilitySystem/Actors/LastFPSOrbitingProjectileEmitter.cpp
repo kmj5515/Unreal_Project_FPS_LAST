@@ -12,6 +12,7 @@
 #include "Pooling/LastFPSActorPoolSubsystem.h"
 #include "Projectiles/LastFPSProjectileAimUtility.h"
 #include "TimerManager.h"
+#include "Utility/LastFPSCombatAffiliation.h"
 #include "Engine/OverlapResult.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -384,6 +385,12 @@ AActor* ALastFPSOrbitingProjectileEmitter::FindBestTargetActor(
 bool ALastFPSOrbitingProjectileEmitter::IsValidTargetActor(const AActor* TargetActor) const
 {
 	if (!TargetActor || TargetActor == SourceCharacter || TargetActor == this || TargetActor == GetOwner())
+	{
+		return false;
+	}
+
+	// 조준 단계에서 아군을 제외한다. 임팩트 단계에서 데미지는 막히지만 연출과 발사가 낭비된다.
+	if (LastFPSCombatAffiliation::AreFriendlyActors(SourceCharacter.Get(), TargetActor))
 	{
 		return false;
 	}

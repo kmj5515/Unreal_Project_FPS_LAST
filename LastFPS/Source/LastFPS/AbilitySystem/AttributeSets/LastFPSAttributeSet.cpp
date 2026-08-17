@@ -226,7 +226,7 @@ void ULastFPSAttributeSet::HandleDamageEffect(const FGameplayEffectModCallbackDa
     // HP가 0에 도달하면 사망 훅 1회 호출 (PlayerState 유무와 무관 — 드랍/미션/퀘스트 등 구독자에게 브로드캐스트).
     // 처치 목표(KillTarget) 통지도 HandleDeath 내부에서 GameInstance 퀘스트 서브시스템으로 직접 나간다.
     if (TargetChar && NewHealth <= KINDA_SMALL_NUMBER && ActualDamage > 0.f)
-        TargetChar->HandleDeath();
+        TargetChar->HandleDeath(AttackerPS != VictimPS ? AttackerPS : nullptr);
 
     if (!VictimPS)
         return;

@@ -1,5 +1,6 @@
 #include "AbilitySystem/Abilities/GA_Reload.h"
 
+#include "AbilitySystemComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Character/Components/WeaponComponent.h"
@@ -52,6 +53,7 @@ void UGA_Reload::ActivateAbility(
     }
 
     Hero->SetCombatState(EMMCombatState::Reloading);
+    ReloadWeaponSlot = Weapon->GetActiveWeaponSlot();
 
     const float ConfiguredReloadDuration = Weapon->GetReloadDuration();
     const float ReloadDuration = ConfiguredReloadDuration > 0.f
@@ -62,12 +64,16 @@ void UGA_Reload::ActivateAbility(
     Weapon->NotifyReloadStarted();
     bReloadUINotified = true;
 
-    if (ReloadMontage && Hero->GetMesh())
+    // AnimInstance 직접 재생은 ASC 의 RepAnimMontageInfo 를 타지 않아 다른 플레이어 화면에서
+    // 장전 동작이 보이지 않는다. 완료 판정은 아래 서버 타이머가 그대로 담당한다.
+    if (ReloadMontage)
     {
-        if (UAnimInstance* AnimInstance = Hero->GetMesh()->GetAnimInstance())
+        if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
         {
             const float DurationMatchedPlayRate = ReloadMontage->GetPlayLength() / ReloadDuration;
-            AnimInstance->Montage_Play(
+            ASC->PlayMontage(
+                this,
+                ActivationInfo,
                 ReloadMontage,
                 FMath::Max(DurationMatchedPlayRate * MontagePlayRate, 0.01f));
         }
@@ -100,11 +106,19 @@ void UGA_Reload::FinishReload()
     {
         if (UWeaponComponent* Weapon = Hero->GetWeaponComponent())
         {
-            Weapon->CompleteReload();
+            // 어빌리티가 이미 끝난 뒤(원격 완료 통보 경로)에도 이 타이머는 살아 있다.
+            // 그동안 무기를 바꿨다면 다른 무기의 탄창을 채우게 되므로 시작 슬롯과 같을 때만 채운다.
+            if (Weapon->GetActiveWeaponSlot() == ReloadWeaponSlot)
+            {
+                Weapon->CompleteReload();
+            }
         }
     }
 
-    EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
+    if (IsActive())
+    {
+        EndAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo(), true, false);
+    }
 }
 
 void UGA_Reload::EndAbility(
@@ -114,9 +128,20 @@ void UGA_Reload::EndAbility(
     bool bReplicateEndAbility,
     bool bWasCancelled)
 {
+    // 원격 클라이언트의 완료 통보(ServerEndAbility)는 서버 타이머보다 항상 먼저 도착한다.
+    // 서버 타이머는 활성화 RPC가 도착한 뒤에 시작하므로 왕복 지연만큼 늦게 만료된다.
+    // 그 통보로 타이머를 지우면 서버 탄창이 갱신되지 않아, 다음 발사에서 서버 값(0)으로 되돌아간다.
+    // 취소가 아니라면 서버 타이머를 남겨 두고 장전 완료는 서버 시간으로 판정한다(클라이언트가 장전을 앞당길 수 없다).
+    const AActor* Avatar = GetAvatarActorFromActorInfo();
+    const bool bKeepAuthorityReloadTimer =
+        !bWasCancelled && !bReloadCompleted && Avatar && Avatar->HasAuthority();
+
     if (UWorld* World = GetWorld())
     {
-        World->GetTimerManager().ClearTimer(ReloadTimerHandle);
+        if (!bKeepAuthorityReloadTimer)
+        {
+            World->GetTimerManager().ClearTimer(ReloadTimerHandle);
+        }
     }
 
     if (ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo()))

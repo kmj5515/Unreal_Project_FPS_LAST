@@ -358,6 +358,71 @@ ULastFPSWeaponDefinition* ULastFPSEquipmentSubsystem::GetWeaponDefinitionForSlot
 	return Item->WeaponDefinition.LoadSynchronous();
 }
 
+ULastFPSWeaponDefinition* ULastFPSEquipmentSubsystem::FindWeaponDefinitionForItem(const FName ItemRowId) const
+{
+	const FLastFPSItemData* Item = FindItem(ItemRowId);
+	if (!Item || Item->WeaponDefinition.IsNull())
+	{
+		return nullptr;
+	}
+
+	// 장착 시점에는 무기를 즉시 들어야 하므로 동기 로드를 감수한다(GetWeaponDefinitionForSlot 와 동일 계약).
+	return Item->WeaponDefinition.LoadSynchronous();
+}
+
+TArray<FLastFPSEquippedSlot> ULastFPSEquipmentSubsystem::BuildEquippedSlots() const
+{
+	TArray<FLastFPSEquippedSlot> Slots;
+
+	for (int32 TypeIndex = 0; TypeIndex < static_cast<int32>(ELastFPSEquipmentSlotType::Count); ++TypeIndex)
+	{
+		const ELastFPSEquipmentSlotType SlotType = static_cast<ELastFPSEquipmentSlotType>(TypeIndex);
+		const int32 SlotCount = GetSlotCount(SlotType);
+		for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex)
+		{
+			const FName ItemRowId = GetEquippedItem(SlotType, SlotIndex);
+			if (ItemRowId.IsNone())
+			{
+				// 빈 슬롯은 보낼 이유가 없다. 무기는 SlotIndex 로 주/보조를 구분하므로 인덱스를 함께 담는다.
+				continue;
+			}
+
+			FLastFPSEquippedSlot& Entry = Slots.AddDefaulted_GetRef();
+			Entry.SlotType = SlotType;
+			Entry.SlotIndex = SlotIndex;
+			Entry.ItemRowId = ItemRowId;
+		}
+	}
+
+	return Slots;
+}
+
+bool ULastFPSEquipmentSubsystem::IsSubmittedSlotWellFormed(const FLastFPSEquippedSlot& Entry) const
+{
+	if (Entry.ItemRowId.IsNone()
+		|| Entry.SlotIndex < 0
+		|| Entry.SlotIndex >= GetSlotCount(Entry.SlotType))
+	{
+		return false;
+	}
+
+	const FLastFPSItemData* Item = FindItem(Entry.ItemRowId);
+	return Item && Item->ItemType == GetAcceptedItemType(Entry.SlotType);
+}
+
+FLastFPSEquipmentStatTotals ULastFPSEquipmentSubsystem::ComputeTotalsForSlots(
+	const TArray<FLastFPSEquippedSlot>& Slots) const
+{
+	FLastFPSEquipmentStatTotals Totals;
+
+	for (const FLastFPSEquippedSlot& Entry : Slots)
+	{
+		AccumulateSlotStats(Entry.SlotType, Entry.ItemRowId, Totals);
+	}
+
+	return Totals;
+}
+
 bool ULastFPSEquipmentSubsystem::HasEquippedWeapon() const
 {
 	for (int32 SlotIndex = 0; SlotIndex < WeaponSlots.Num(); ++SlotIndex)
@@ -488,17 +553,12 @@ FLastFPSEquipmentStatTotals ULastFPSEquipmentSubsystem::ComputeTotalsWithCandida
 	return Totals;
 }
 
-void ULastFPSEquipmentSubsystem::ApplyToAbilitySystem(UAbilitySystemComponent* ASC) const
+FActiveGameplayEffectHandle ULastFPSEquipmentSubsystem::ApplyStatTotalsToAbilitySystem(
+	UAbilitySystemComponent* ASC, const FLastFPSEquipmentStatTotals& Bonus) const
 {
-	if (!ASC)
+	if (!ASC || !Bonus.HasAny())
 	{
-		return;
-	}
-
-	const FLastFPSEquipmentStatTotals Bonus = ComputeTotals();
-	if (!Bonus.HasAny())
-	{
-		return;
+		return FActiveGameplayEffectHandle();
 	}
 
 	// 런타임 Infinite GE 하나에 모든 카테고리 보정을 담아 베이스 스탯 위에 얹는다.
@@ -533,11 +593,11 @@ void ULastFPSEquipmentSubsystem::ApplyToAbilitySystem(UAbilitySystemComponent* A
 
 	if (GE->Modifiers.Num() == 0)
 	{
-		return;
+		return FActiveGameplayEffectHandle();
 	}
 
 	FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
-	ASC->ApplyGameplayEffectToSelf(GE, 1.f, Context);
+	return ASC->ApplyGameplayEffectToSelf(GE, 1.f, Context);
 }
 
 void ULastFPSEquipmentSubsystem::ValidateEquipmentReferences() const

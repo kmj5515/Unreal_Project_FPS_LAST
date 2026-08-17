@@ -295,6 +295,21 @@ private:
     void BindCinematicEvents();
     void UnbindCinematicEvents();
 
+    /** 맵 UI 규칙을 소유한 GameState. 클라이언트에서는 아직 복제되지 않았으면 nullptr. */
+    const class ALastFPSGameStateBase* GetMapUIRulesOwner() const;
+
+    /**
+     * 규칙 복제는 이 위젯 생성보다 늦을 수 있다. 구독해 두고 도착하면 표시를 다시 적용한다.
+     * GameState 자체가 아직 없으면 짧은 주기로 구독을 재시도한다.
+     */
+    void BindMapUIRulesEvents();
+    void UnbindMapUIRulesEvents();
+    void HandleMapUIRulesChanged();
+
+    FDelegateHandle MapUIRulesChangedHandle;
+    TWeakObjectPtr<const ALastFPSGameStateBase> BoundMapUIRulesGameState;
+    FTimerHandle MapUIRulesBindRetryTimerHandle;
+
     UFUNCTION()
     void HandleCinematicStarted(bool bSkippable);
 

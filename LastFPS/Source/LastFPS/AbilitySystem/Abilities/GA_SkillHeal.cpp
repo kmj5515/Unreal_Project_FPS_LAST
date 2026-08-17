@@ -8,7 +8,9 @@
 UGA_SkillHeal::UGA_SkillHeal()
 {
     InstancingPolicy   = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-    NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerInitiated;
+    // 예측으로 쿨다운 GE 가 즉시 걸려 HUD 스킬 아이콘이 왕복 지연 없이 반응한다.
+    // 서버가 거절하면 예측 키에 묶인 회복·쿨다운이 함께 롤백된다.
+    NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
     HealEffect = ULastFPSGE_HealInstant::StaticClass();
     CooldownGameplayEffectClass = ULastFPSGE_Cooldown::StaticClass();

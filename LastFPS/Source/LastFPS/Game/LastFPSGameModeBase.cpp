@@ -120,6 +120,15 @@ void ALastFPSGameModeBase::InitGameState()
             : FGameplayTagContainer();
         LastFPSGameState->SetDestinationContextTags(ContextTags);
         LastFPSGameState->SetDestinationContentSet(DestinationContentSet);
+
+        // 규칙 소유는 GameMode 에 그대로 두고 값만 복제한다.
+        // GameMode 는 서버에만 존재해 클라이언트가 직접 읽을 수 없기 때문이다.
+        FLastFPSMapUIRules UIRules;
+        UIRules.InitialScreenTag = InitialScreenTag;
+        UIRules.EscMenuScreenTag = EscMenuScreenTag;
+        UIRules.bShowQuestTracker = bShowQuestTracker;
+        UIRules.bShowCombatHUD = bShowCombatHUD;
+        LastFPSGameState->Auth_SetMapUIRules(UIRules);
     }
 
     // 실패 구독은 콘텐츠 로딩과 무관한 책임이다 — 아래 조기 반환에 가려지지 않도록 먼저 건다.

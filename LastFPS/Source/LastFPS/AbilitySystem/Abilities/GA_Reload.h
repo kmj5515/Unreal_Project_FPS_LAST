@@ -39,6 +39,9 @@ private:
     void FinishReload();
 
     FTimerHandle ReloadTimerHandle;
+    // 리로드를 시작한 슬롯. 서버 타이머는 어빌리티 종료 후에도 살아남으므로,
+    // 그 사이 무기가 바뀌었으면 새 무기의 탄창을 채우지 않도록 확인한다.
+    int32 ReloadWeaponSlot = INDEX_NONE;
     bool bReloadCompleted = false;
     // 리로드 UI 시작/종료 알림을 정확히 한 쌍으로 맞추기 위한 플래그다. 시작 알림을 보낸 경우에만 종료 알림을 보낸다.
     bool bReloadUINotified = false;

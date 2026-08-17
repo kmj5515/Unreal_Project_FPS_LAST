@@ -8,6 +8,7 @@
 #include "Components/SceneComponent.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
 #include "Data/Definitions/LastFPSEncounterObjectiveDefinition.h"
+#include "Data/Definitions/LastFPSEnemyDefinition.h"
 #include "Encounter/LastFPSTimedObjectiveComponent.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
@@ -19,6 +20,8 @@
 #include "Encounter/LastFPSRoomSpawnPresentationComponent.h"
 #include "Encounter/LastFPSRoomEncounterSubsystem.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
+#include "Utility/LastFPSPawnTeleport.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
 #include "NavigationSystem.h"
@@ -96,6 +99,7 @@ void ALastFPSRoomEncounterRuntime::InitializeEncounter(
 	BarrierPresentationSettings = InProfile.BarrierPresentation;
 	MaxSpawnedActorsPerFrame = FMath::Max(InProfile.MaxSpawnedActorsPerFrame, 1);
 	RemainingEnemyMarkerThreshold = FMath::Max(InProfile.RemainingEnemyMarkerThreshold, 0);
+	GatherPlayersBeyondDistance = FMath::Max(InProfile.GatherPlayersBeyondDistance, 0.f);
 	SpawnPresentationComponent->Configure(InEncounterData.SpawnVFX);
 	ConfigureBarrierPresentation();
 
@@ -266,10 +270,85 @@ void ALastFPSRoomEncounterRuntime::StartEncounter()
 		return;
 	}
 
+	// 배리어를 닫기 전에 모은다. 닫은 뒤에 옮기면 빈 자리 탐색이 배리어 콜리전에 막혀
+	// 파티원이 벽 안에 끼거나 이동 자체가 실패할 수 있다.
+	GatherPlayersIntoRoom();
+
 	SetBarrierActive(true);
 	CreateObjectives();
 	StartObjectives();
 	ScheduleNextWave();
+}
+
+void ALastFPSRoomEncounterRuntime::GatherPlayersIntoRoom()
+{
+	if (!HasAuthority() || GatherPlayersBeyondDistance <= 0.f || !IsValid(TriggerVolume))
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	// 트리거는 방 입구에 있으므로 그 지점이 "안쪽"의 기준이 된다.
+	// 별도의 방 볼륨을 요구하면 레벨 작업이 늘어나므로 이미 있는 트리거를 그대로 쓴다.
+	const FVector GatherLocation = TriggerVolume->GetActorLocation();
+	const float GatherDistanceSquared =
+		GatherPlayersBeyondDistance * GatherPlayersBeyondDistance;
+
+	int32 GatheredCount = 0;
+	for (FConstPlayerControllerIterator Iterator = World->GetPlayerControllerIterator();
+		Iterator;
+		++Iterator)
+	{
+		APlayerController* PlayerController = Iterator->Get();
+		APawn* Pawn = PlayerController ? PlayerController->GetPawn() : nullptr;
+		if (!IsValid(Pawn))
+		{
+			continue;
+		}
+
+		// 죽은 폰은 곧 리스폰되므로 옮겨도 의미가 없다.
+		if (const ALastFPSCharacterBase* Character = Cast<ALastFPSCharacterBase>(Pawn);
+			Character && !Character->IsAlive())
+		{
+			continue;
+		}
+
+		if (FVector::DistSquared(Pawn->GetActorLocation(), GatherLocation)
+			<= GatherDistanceSquared)
+		{
+			continue;
+		}
+
+		// 회전은 유지한다. 시야까지 돌리면 순간이동 자체보다 더 혼란스럽다.
+		const FTransform Destination(Pawn->GetActorRotation(), GatherLocation);
+		if (!LastFPSPawnTeleport::TeleportPawnTo(*Pawn, Destination))
+		{
+			UE_LOG(
+				LogLastFPSRoomEncounter,
+				Warning,
+				TEXT("[%s] 파티원을 인카운터 입구로 옮기지 못했습니다: Pawn=%s"),
+				*EncounterId.ToString(),
+				*GetNameSafe(Pawn));
+			continue;
+		}
+
+		++GatheredCount;
+	}
+
+	if (GatheredCount > 0)
+	{
+		UE_LOG(
+			LogLastFPSRoomEncounter,
+			Log,
+			TEXT("[%s] 배리어가 닫히기 전에 파티원 %d명을 입구로 모았습니다."),
+			*EncounterId.ToString(),
+			GatheredCount);
+	}
 }
 
 void ALastFPSRoomEncounterRuntime::CreateObjectives()
@@ -486,8 +565,10 @@ void ALastFPSRoomEncounterRuntime::HandleEnemyDefinitionAssetsLoaded()
 {
 	LoadedEnemyDefinitions.Reset();
 
-	TArray<FSoftObjectPath> PawnClassPaths;
-	PawnClassPaths.Reserve(EnemyDefinitionAssets.Num());
+	// PawnClass 만이 아니라 스폰 직후 동기 해석되는 참조(AIProfile·스탯·비주얼·어빌리티 세트·
+	// 초기 무기 정의)를 모두 상주시킨다. 하나라도 빠지면 그 지점에서 게임 스레드가 멈춘다.
+	TArray<FSoftObjectPath> SpawnDependencyPaths;
+	SpawnDependencyPaths.Reserve(EnemyDefinitionAssets.Num() * 4);
 	for (const TSoftObjectPtr<ULastFPSCharacterDefinition>& DefinitionAsset
 		: EnemyDefinitionAssets)
 	{
@@ -521,12 +602,12 @@ void ALastFPSRoomEncounterRuntime::HandleEnemyDefinitionAssetsLoaded()
 		}
 
 		LoadedEnemyDefinitions.AddUnique(Definition);
-		PawnClassPaths.AddUnique(PawnClassPath);
+		Definition->GatherSpawnDependencyPaths(SpawnDependencyPaths);
 	}
 
 	// 이미 메모리에 있는 클래스도 핸들이 수명을 고정하도록 항상 로드를 요청한다.
 	EnemyPawnClassLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
-		PawnClassPaths,
+		SpawnDependencyPaths,
 		FStreamableDelegate::CreateUObject(
 			this,
 			&ALastFPSRoomEncounterRuntime::HandleEnemyPawnClassesLoaded),
@@ -571,10 +652,37 @@ void ALastFPSRoomEncounterRuntime::HandleEnemyPawnClassesLoaded()
 		*EncounterId.ToString(),
 		LoadedEnemyDefinitions.Num());
 
+	BeginEnemyWeaponDependencyPreload();
+
 	if (HasAuthority() && bStartRequested)
 	{
 		StartEncounter();
 	}
+}
+
+void ALastFPSRoomEncounterRuntime::BeginEnemyWeaponDependencyPreload()
+{
+	// 무기 정의는 앞 단계에서야 로드되므로, 그 안의 장착 참조는 여기서 따로 요청한다.
+	// 인카운터 시작을 막지 않는 후속 로드다. 제때 끝나지 않으면 장착 경로의 동기 로드가 받아낸다.
+	TArray<FSoftObjectPath> WeaponPaths;
+	for (const TObjectPtr<ULastFPSCharacterDefinition>& Definition : LoadedEnemyDefinitions)
+	{
+		if (const ULastFPSEnemyDefinition* EnemyDefinition =
+			Cast<ULastFPSEnemyDefinition>(Definition))
+		{
+			EnemyDefinition->GatherInitialWeaponDependencyPaths(WeaponPaths);
+		}
+	}
+
+	if (WeaponPaths.IsEmpty())
+	{
+		return;
+	}
+
+	EnemyWeaponDependencyLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+		WeaponPaths,
+		FStreamableDelegate(),
+		FStreamableManager::AsyncLoadHighPriority);
 }
 
 void ALastFPSRoomEncounterRuntime::CancelEnemyDefinitionPreload()
@@ -589,6 +697,12 @@ void ALastFPSRoomEncounterRuntime::CancelEnemyDefinitionPreload()
 	{
 		EnemyPawnClassLoadHandle->CancelHandle();
 		EnemyPawnClassLoadHandle.Reset();
+	}
+
+	if (EnemyWeaponDependencyLoadHandle.IsValid())
+	{
+		EnemyWeaponDependencyLoadHandle->CancelHandle();
+		EnemyWeaponDependencyLoadHandle.Reset();
 	}
 }
 
@@ -819,7 +933,13 @@ void ALastFPSRoomEncounterRuntime::ScheduleNextSpawnBatch()
 	}
 
 	const float SpawnInterval = FMath::Max(Waves[ActiveWaveIndex].SpawnInterval, 0.f);
-	if (SpawnInterval <= KINDA_SMALL_NUMBER)
+
+	// SpawnInterval 은 배치가 시작되는 간격이다. 한 배치는 SpawnNextQueuedEnemy 에서 VFX 를 재생하고
+	// SpawnDelayAfterVFX 만큼 기다린 뒤 실제로 스폰되므로, 그 지연을 빼지 않으면 두 값이 더해져
+	// 데이터에 적힌 간격보다 웨이브가 훨씬 길어진다(0.35 로 적고 실제로는 1.15 초로 동작).
+	// 연출 지연이 간격보다 길면 연출이 간격을 지배한다.
+	const float RemainingInterval = FMath::Max(SpawnInterval - SpawnDelayAfterVFX, 0.f);
+	if (RemainingInterval <= KINDA_SMALL_NUMBER)
 	{
 		SequentialSpawnTimerHandle = GetWorldTimerManager().SetTimerForNextTick(
 			this,
@@ -831,7 +951,7 @@ void ALastFPSRoomEncounterRuntime::ScheduleNextSpawnBatch()
 		SequentialSpawnTimerHandle,
 		this,
 		&ALastFPSRoomEncounterRuntime::SpawnNextQueuedEnemy,
-		SpawnInterval,
+		RemainingInterval,
 		false);
 }
 

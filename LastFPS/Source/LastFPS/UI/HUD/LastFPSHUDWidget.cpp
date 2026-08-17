@@ -34,7 +34,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/UserWidget.h"
 #include "EasyCrosshairSystem/ecsCrosshairEditorAsset.h"
-#include "Game/LastFPSGameModeBase.h"
+#include "Game/LastFPSGameStateBase.h"
 #include "Game/LastFPSPlayerState.h"
 #include "Character/LastFPSHero.h"
 #include "Character/Components/LastFPSGrapplingTargetingComponent.h"
@@ -131,11 +131,12 @@ void ULastFPSHUDWidget::ApplyCombatHUDVisibility()
 
     // "어떤 맵에서 전투 UI 를 띄우는가"는 맵별 규칙이라 GameMode 가 소유한다.
     // HUD 가 레벨 이름이나 태그로 직접 판단하면 맵이 늘 때마다 HUD 를 고쳐야 한다.
-    const UWorld* World = GetWorld();
-    const ALastFPSGameModeBase* GameMode = World ? World->GetAuthGameMode<ALastFPSGameModeBase>() : nullptr;
+    // 다만 GameMode 는 서버에만 존재하므로 복제된 GameState 값을 읽는다.
+    const ALastFPSGameStateBase* GameState = GetMapUIRulesOwner();
 
-    // GameMode 를 못 찾는 경우(클라이언트 등)에는 숨기지 않는다. 전투 중에 UI 가 사라지는 쪽이 더 나쁘다.
-    const bool bShowCombat = !GameMode || GameMode->ShouldShowCombatHUD();
+    // 규칙이 아직 도착하지 않았으면 숨기지 않는다. 전투 중에 UI 가 사라지는 쪽이 더 나쁘다.
+    const bool bShowCombat =
+        !GameState || !GameState->HasMapUIRules() || GameState->GetMapUIRules().bShowCombatHUD;
 
     BottomLayer->SetVisibility(
         bShowCombat ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
@@ -148,12 +149,13 @@ void ULastFPSHUDWidget::ApplyQuestHUDVisibility()
         return;
     }
 
-    // 전투 HUD 와 같은 이유로 맵별 규칙은 GameMode 가 소유한다.
-    // 다만 기본값이 "숨김"이라 GameMode 를 못 찾으면 띄우지 않는다.
+    // 전투 HUD 와 같은 이유로 맵별 규칙은 GameMode 가 소유하고, 값은 GameState 로 복제된다.
+    // 기본값이 "숨김"이라 규칙이 도착하기 전에는 띄우지 않는다.
     // 퀘스트가 없는 맵(메인 메뉴 등)에 빈 패널이 뜨는 쪽이 더 나쁘기 때문이다.
-    const UWorld* World = GetWorld();
-    const ALastFPSGameModeBase* GameMode = World ? World->GetAuthGameMode<ALastFPSGameModeBase>() : nullptr;
-    const bool bShowQuestHUD = GameMode && GameMode->ShouldShowQuestTracker();
+    // 규칙이 늦게 도착하면 OnMapUIRulesChanged 구독이 이 함수를 다시 부른다.
+    const ALastFPSGameStateBase* GameState = GetMapUIRulesOwner();
+    const bool bShowQuestHUD =
+        GameState && GameState->HasMapUIRules() && GameState->GetMapUIRules().bShowQuestTracker;
 
     const ESlateVisibility QuestHUDVisibility =
         bShowQuestHUD ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed;
@@ -174,6 +176,7 @@ void ULastFPSHUDWidget::NativeConstruct()
 
     ApplyCombatHUDVisibility();
     ApplyQuestHUDVisibility();
+    BindMapUIRulesEvents();
     BindCinematicEvents();
 
     if (!CrosshairPresenter)
@@ -193,6 +196,70 @@ void ULastFPSHUDWidget::NativeConstruct()
                 RetryTimerHandle, this, &ULastFPSHUDWidget::RetryInitialize, 0.1f, true);
         }
     }
+}
+
+const ALastFPSGameStateBase* ULastFPSHUDWidget::GetMapUIRulesOwner() const
+{
+    const UWorld* World = GetWorld();
+    return World ? World->GetGameState<ALastFPSGameStateBase>() : nullptr;
+}
+
+void ULastFPSHUDWidget::BindMapUIRulesEvents()
+{
+    const ALastFPSGameStateBase* GameState = GetMapUIRulesOwner();
+    if (!GameState)
+    {
+        // 클라이언트에서는 GameState 복제가 이 위젯 생성보다 늦을 수 있다. 생길 때까지만 재시도한다.
+        if (UWorld* World = GetWorld())
+        {
+            World->GetTimerManager().SetTimer(
+                MapUIRulesBindRetryTimerHandle,
+                this,
+                &ULastFPSHUDWidget::BindMapUIRulesEvents,
+                0.1f,
+                true);
+        }
+        return;
+    }
+
+    if (BoundMapUIRulesGameState.Get() == GameState)
+    {
+        return;
+    }
+
+    UnbindMapUIRulesEvents();
+    BoundMapUIRulesGameState = GameState;
+    MapUIRulesChangedHandle =
+        const_cast<ALastFPSGameStateBase*>(GameState)->OnMapUIRulesChanged.AddUObject(
+            this,
+            &ULastFPSHUDWidget::HandleMapUIRulesChanged);
+
+    // 구독 전에 이미 도착한 규칙이 있으면 지금 반영한다.
+    HandleMapUIRulesChanged();
+}
+
+void ULastFPSHUDWidget::UnbindMapUIRulesEvents()
+{
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(MapUIRulesBindRetryTimerHandle);
+    }
+
+    if (const ALastFPSGameStateBase* GameState = BoundMapUIRulesGameState.Get();
+        GameState && MapUIRulesChangedHandle.IsValid())
+    {
+        const_cast<ALastFPSGameStateBase*>(GameState)->OnMapUIRulesChanged.Remove(
+            MapUIRulesChangedHandle);
+    }
+
+    MapUIRulesChangedHandle.Reset();
+    BoundMapUIRulesGameState.Reset();
+}
+
+void ULastFPSHUDWidget::HandleMapUIRulesChanged()
+{
+    ApplyCombatHUDVisibility();
+    ApplyQuestHUDVisibility();
 }
 
 void ULastFPSHUDWidget::BindCinematicEvents()
@@ -280,6 +347,7 @@ void ULastFPSHUDWidget::SetCinematicUIHidden(const bool bHidden)
 
 void ULastFPSHUDWidget::NativeDestruct()
 {
+    UnbindMapUIRulesEvents();
     UnbindCinematicEvents();
 
     if (ALastFPSPlayerState* PlayerState = BoundPlayerState.Get())

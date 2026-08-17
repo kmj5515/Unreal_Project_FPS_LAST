@@ -19,6 +19,8 @@
 #include "Sound/SoundBase.h"
 #include "Camera/CameraShakeBase.h"
 #include "DrawDebugHelpers.h"
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Camera/PlayerCameraManager.h"
@@ -64,6 +66,13 @@ void UWeaponComponent::BeginPlay()
 
     SetComponentTickEnabled(false);
 
+    // 메시나 AnimBP 가 교체되면 링크한 애님 레이어가 사라지므로 재링크 알림을 구독한다.
+    if (ALastFPSCharacterBase* OwnerCharacter = Cast<ALastFPSCharacterBase>(GetOwner()))
+    {
+        AnimInstanceRecreatedHandle = OwnerCharacter->OnAnimInstanceRecreated.AddUObject(
+            this, &UWeaponComponent::HandleOwnerAnimInstanceRecreated);
+    }
+
     if (GetOwner() && GetOwner()->HasAuthority())
     {
         if (WeaponDefinition)
@@ -80,13 +89,33 @@ void UWeaponComponent::BeginPlay()
             OnWeaponEquippedChanged.Broadcast(false);
         }
     }
-    // 클라이언트는 OnRep_CurrentWeapon에서 attach + 브로드캐스트
+    else
+    {
+        // 클라이언트는 무기 부착·브로드캐스트를 OnRep 에 맡기지만, 애님 레이어 링크만은 여기서 한 번 수행한다.
+        // RepNotify 는 복제 값이 CDO 기본값과 다를 때만 호출되므로, 무기를 들지 않은 상태에서는
+        // 어떤 OnRep 도 발화하지 않아 레이어가 영영 링크되지 않는다(레퍼런스 포즈 = T 포즈 노출).
+        ApplyAnimLayerClass(ResolveCurrentAnimLayerClass());
+    }
 }
 
 void UWeaponComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    if (AnimInstanceRecreatedHandle.IsValid())
+    {
+        if (ALastFPSCharacterBase* OwnerCharacter = Cast<ALastFPSCharacterBase>(GetOwner()))
+        {
+            OwnerCharacter->OnAnimInstanceRecreated.Remove(AnimInstanceRecreatedHandle);
+        }
+        AnimInstanceRecreatedHandle.Reset();
+    }
+
     ApplyRestoreMagazineVisual();
     Super::EndPlay(EndPlayReason);
+}
+
+void UWeaponComponent::HandleOwnerAnimInstanceRecreated()
+{
+    ApplyAnimLayerClass(ResolveCurrentAnimLayerClass());
 }
 
 bool UWeaponComponent::CanFire() const
@@ -565,7 +594,7 @@ void UWeaponComponent::ApplyRestoreMagazineVisual()
     HiddenMagazineBoneName = NAME_None;
 }
 
-void UWeaponComponent::FireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration)
+void UWeaponComponent::FireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, bool bAimingDownSights, TSubclassOf<UGameplayEffect> DamageEffectClass)
 {
     // 예측 차감으로 마지막 탄이 0이 된 직후에도 서버 발사 요청은 전달되어야 한다.
     if (!HasWeapon())
@@ -575,21 +604,76 @@ void UWeaponComponent::FireFromClientAim(const FVector& ClientMuzzleLocation, co
 
     if (GetOwner() && GetOwner()->HasAuthority())
     {
-        HandleFireFromClientAim(ClientMuzzleLocation, ClientCameraLocation, ClientAimDirection, DamageEffectClass, bDrawDebugShot, DebugShotDuration);
+        HandleFireFromClientAim(ClientMuzzleLocation, ClientCameraLocation, ClientAimDirection, bAimingDownSights, DamageEffectClass);
         return;
     }
 
-    Server_FireFromClientAim(ClientMuzzleLocation, ClientCameraLocation, ClientAimDirection.GetSafeNormal(), DamageEffectClass, bDrawDebugShot, DebugShotDuration);
+    // 원격 클라이언트에서는 서버의 누적 확산을 볼 수 없으므로 같은 규칙으로 로컬 사본을 굴린다.
+    // 크로스헤어 표시 전용이며 탄착에는 영향을 주지 않는다.
+    ConsumeSpreadHalfAngleForShot(bAimingDownSights);
+
+    Server_FireFromClientAim(ClientMuzzleLocation, ClientCameraLocation, ClientAimDirection.GetSafeNormal(), bAimingDownSights, DamageEffectClass);
 }
 
-void UWeaponComponent::Server_FireFromClientAim_Implementation(FVector_NetQuantize ClientMuzzleLocation, FVector_NetQuantize ClientCameraLocation, FVector_NetQuantizeNormal ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration)
+float UWeaponComponent::PeekSpreadBloomDegrees() const
 {
-    HandleFireFromClientAim(ClientMuzzleLocation, ClientCameraLocation, FVector(ClientAimDirection).GetSafeNormal(), DamageEffectClass, bDrawDebugShot, DebugShotDuration);
+    if (SpreadBloomDegrees <= 0.f || SpreadBloomRecoveryPerSecond <= 0.f)
+    {
+        return FMath::Max(SpreadBloomDegrees, 0.f);
+    }
+
+    const UWorld* World = GetWorld();
+    if (!World)
+    {
+        return SpreadBloomDegrees;
+    }
+
+    // Tick 없이 마지막 발사 이후 경과 시간만큼 선형 감쇠시킨다. 발사 시점에만 평가하면 충분하다.
+    const float ElapsedSeconds = FMath::Max(World->GetTimeSeconds() - SpreadBloomUpdatedTimeSeconds, 0.f);
+    return FMath::Max(SpreadBloomDegrees - SpreadBloomRecoveryPerSecond * ElapsedSeconds, 0.f);
+}
+
+float UWeaponComponent::GetCurrentSpreadHalfAngleDegrees(const bool bAimingDownSights) const
+{
+    const float AimScale = bAimingDownSights ? FMath::Max(SpreadADSMultiplier, 0.f) : 1.f;
+    return (FMath::Max(SpreadHalfAngleDegrees, 0.f) + PeekSpreadBloomDegrees()) * AimScale;
+}
+
+float UWeaponComponent::ConsumeSpreadHalfAngleForShot(const bool bAimingDownSights)
+{
+    // 이번 발사에는 "누적된 만큼"만 적용하고, 가산분은 다음 발사부터 반영한다.
+    // 첫 발이 항상 정확하고 연사가 이어질수록 벌어지는 표준적인 블룸 동작이다.
+    const float ShotSpreadDegrees = GetCurrentSpreadHalfAngleDegrees(bAimingDownSights);
+
+    const UWorld* World = GetWorld();
+    SpreadBloomDegrees = FMath::Min(
+        PeekSpreadBloomDegrees() + FMath::Max(SpreadBloomPerShotDegrees, 0.f),
+        FMath::Max(SpreadBloomMaxDegrees, 0.f));
+    SpreadBloomUpdatedTimeSeconds = World ? World->GetTimeSeconds() : 0.f;
+
+    return ShotSpreadDegrees;
+}
+
+void UWeaponComponent::Server_FireFromClientAim_Implementation(FVector_NetQuantize ClientMuzzleLocation, FVector_NetQuantize ClientCameraLocation, FVector_NetQuantizeNormal ClientAimDirection, bool bAimingDownSights, TSubclassOf<UGameplayEffect> DamageEffectClass)
+{
+    HandleFireFromClientAim(ClientMuzzleLocation, ClientCameraLocation, FVector(ClientAimDirection).GetSafeNormal(), bAimingDownSights, DamageEffectClass);
 }
 
 void UWeaponComponent::ClientCorrectMagazineAmmo_Implementation(const int32 ServerMagazineAmmo)
 {
     SetCurrentMagazineAmmo(ServerMagazineAmmo);
+}
+
+void UWeaponComponent::Multicast_PlayFireEffects_Implementation()
+{
+    // 데디케이티드 서버는 연출을 재생하지 않고, 쏜 본인은 이미 로컬에서 재생했다.
+    const APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    if (GetNetMode() == NM_DedicatedServer || !OwnerPawn || OwnerPawn->IsLocallyControlled())
+    {
+        return;
+    }
+
+    PlayFireEffects();
 }
 
 bool UWeaponComponent::GetLeftHandIKTransform(USkeletalMeshComponent* CharacterMesh, FName RelativeToBoneName, FTransform& OutTransform) const
@@ -629,17 +713,23 @@ bool UWeaponComponent::GetLeftHandIKJointTargetLocation(
 
 void UWeaponComponent::TestEquipWeapon()
 {
+#if !UE_BUILD_SHIPPING
     Server_TestEquipWeapon();
+#endif
 }
 
 void UWeaponComponent::Server_TestEquipWeapon_Implementation()
 {
+    // 클라이언트가 임의로 무기 픽업을 스폰하지 못하도록 시프핑 빌드에서는 동작하지 않는다.
+    // (인카운터 클리어 치트와 같은 방식으로 선언은 남기고 본문만 제외한다.)
+#if !UE_BUILD_SHIPPING
     if (!TestPickupClass) return;
 
     ACharacter* Owner = Cast<ACharacter>(GetOwner());
     if (!Owner) return;
 
     GetWorld()->SpawnActor<AWeaponPickupActor>(TestPickupClass, Owner->GetActorLocation(), FRotator::ZeroRotator);
+#endif
 }
 
 void UWeaponComponent::EquipWeapon(USkeletalMesh* NewMesh, EMMWeaponType NewType, TSubclassOf<UAnimInstance> NewAnimLayer, TSubclassOf<ALastFPSWeaponActor> NewWeaponActorClass)
@@ -867,18 +957,8 @@ void UWeaponComponent::ApplyWeaponDefinition(ULastFPSWeaponDefinition* NewDefini
     ResetPendingAimRecoil();
     ResetAimRecoilSequence();
 
-    if (NewDefinition)
-    {
-        NewDefinition->SkeletalMesh.LoadSynchronous();
-        NewDefinition->WeaponActorClass.LoadSynchronous();
-        NewDefinition->ProjectileClass.LoadSynchronous();
-        NewDefinition->AnimLayerClass.LoadSynchronous();
-        NewDefinition->FireAnimation.LoadSynchronous();
-        NewDefinition->FireSound.LoadSynchronous();
-        NewDefinition->MuzzleFlashEffect.LoadSynchronous();
-        NewDefinition->FireCameraShakeClass.LoadSynchronous();
-    }
-
+    // 소프트 참조 로드는 ApplyWeaponDefinitionValues 가 담당한다.
+    // (서버 장착 경로와 클라이언트 OnRep 경로가 같은 로드 규칙을 쓰게 하기 위함이다.)
     WeaponDefinition = NewDefinition;
     const bool bHasRequiredWeaponData = ApplyWeaponDefinitionValues(NewDefinition);
 
@@ -916,17 +996,32 @@ bool UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
     // 밸런스 행이 없으면 단일탄으로 되돌려, 데이터를 지정하지 않은 무기가 샷건 설정을 물려받지 않게 한다.
     PelletsPerShot = 1;
     SpreadHalfAngleDegrees = 0.f;
+    SpreadADSMultiplier = 1.f;
+    SpreadBloomPerShotDegrees = 0.f;
+    SpreadBloomMaxDegrees = 0.f;
+    SpreadBloomRecoveryPerSecond = 0.f;
+    // 무기가 바뀌면 이전 무기의 연사 누적을 물려받지 않는다.
+    SpreadBloomDegrees = 0.f;
+    SpreadBloomUpdatedTimeSeconds = 0.f;
 
     if (!NewDefinition)
     {
         return false;
     }
 
-    WeaponSkeletalMesh = NewDefinition->SkeletalMesh.Get();
+    // 클라이언트는 복제된 정의 애셋만 받을 뿐 그 소프트 참조까지 로드되어 있지 않다.
+    // Get() 으로 읽으면 전부 null 이 되어, 복제로 받은 WeaponAnimLayerClass 마저 null 로 덮여
+    // 무기 애님 레이어가 링크되지 않는다. 장착 시점에 즉시 필요한 참조라 동기 로드한다.
+    NewDefinition->FireAnimation.LoadSynchronous();
+    NewDefinition->FireSound.LoadSynchronous();
+    NewDefinition->MuzzleFlashEffect.LoadSynchronous();
+    NewDefinition->FireCameraShakeClass.LoadSynchronous();
+
+    WeaponSkeletalMesh = NewDefinition->SkeletalMesh.LoadSynchronous();
     WeaponType = NewDefinition->WeaponType;
-    WeaponAnimLayerClass = NewDefinition->AnimLayerClass.Get();
-    WeaponActorClass = NewDefinition->WeaponActorClass.Get();
-    ProjectileClass = NewDefinition->ProjectileClass.Get();
+    WeaponAnimLayerClass = NewDefinition->AnimLayerClass.LoadSynchronous();
+    WeaponActorClass = NewDefinition->WeaponActorClass.LoadSynchronous();
+    ProjectileClass = NewDefinition->ProjectileClass.LoadSynchronous();
     MuzzleSocketName = NewDefinition->MuzzleSocketName;
     AttachSocketName = NewDefinition->AttachSocketName;
     LeftHandIKSocketName = NewDefinition->LeftHandIKSocketName;
@@ -964,6 +1059,18 @@ bool UWeaponComponent::ApplyWeaponDefinitionValues(const ULastFPSWeaponDefinitio
     SpreadHalfAngleDegrees = FMath::Max(
         BalanceData->GetParameter(LastFPSGameplayTags::Weapon_Parameter_SpreadHalfAngle, 0.f),
         0.f);
+    SpreadADSMultiplier = FMath::Max(
+        BalanceData->GetParameter(LastFPSGameplayTags::Weapon_Parameter_SpreadADSMultiplier, 1.f),
+        0.f);
+    SpreadBloomPerShotDegrees = FMath::Max(
+        BalanceData->GetParameter(LastFPSGameplayTags::Weapon_Parameter_SpreadBloomPerShot, 0.f),
+        0.f);
+    SpreadBloomMaxDegrees = FMath::Max(
+        BalanceData->GetParameter(LastFPSGameplayTags::Weapon_Parameter_SpreadBloomMax, 0.f),
+        0.f);
+    SpreadBloomRecoveryPerSecond = FMath::Max(
+        BalanceData->GetParameter(LastFPSGameplayTags::Weapon_Parameter_SpreadBloomRecovery, 0.f),
+        0.f);
     return true;
 }
 
@@ -991,6 +1098,39 @@ void UWeaponComponent::OnRep_WeaponType()
 }
 
 void UWeaponComponent::OnRep_WeaponDefinition()
+{
+    // 클라이언트는 복제로 정의 애셋만 받을 뿐 그 안의 소프트 참조는 미로드다.
+    // 그대로 적용하면 ApplyWeaponDefinitionValues 가 메시·애님 레이어·프로젝타일까지 동기 로드해
+    // 프레임을 통째로 막는다. 적이 스트리밍으로 들어오는 구간에서 애니메이션이 멈추는 원인이다.
+    // 상주하지 않았으면 비동기로 받아 두고 완료 시점에 본문을 실행한다.
+    if (WeaponDefinition && !WeaponDefinition->AreEquipDependenciesResident())
+    {
+        TArray<FSoftObjectPath> RequiredPaths;
+        WeaponDefinition->GatherEquipDependencyPaths(RequiredPaths);
+
+        TWeakObjectPtr<UWeaponComponent> WeakThis(this);
+        WeaponDefinitionPreloadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+            RequiredPaths,
+            FStreamableDelegate::CreateLambda(
+                [WeakThis]()
+                {
+                    if (UWeaponComponent* Component = WeakThis.Get())
+                    {
+                        Component->ApplyReplicatedWeaponDefinition();
+                    }
+                }),
+            FStreamableManager::AsyncLoadHighPriority);
+        if (WeaponDefinitionPreloadHandle.IsValid())
+        {
+            return;
+        }
+        // 요청 자체가 실패하면 무기가 영원히 적용되지 않는다. 기존 동기 경로로 떨어뜨린다.
+    }
+
+    ApplyReplicatedWeaponDefinition();
+}
+
+void UWeaponComponent::ApplyReplicatedWeaponDefinition()
 {
     ApplyRestoreMagazineVisual();
     ResetPendingAimRecoil();
@@ -1191,7 +1331,7 @@ void UWeaponComponent::DestroyCurrentWeapon()
     }
 }
 
-void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, TSubclassOf<UGameplayEffect> DamageEffectClass, bool bDrawDebugShot, float DebugShotDuration)
+void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocation, const FVector& ClientCameraLocation, const FVector& ClientAimDirection, bool bAimingDownSights, TSubclassOf<UGameplayEffect> DamageEffectClass)
 {
     ACharacter* Character = Cast<ACharacter>(GetOwner());
     UWorld* World = GetWorld();
@@ -1219,6 +1359,9 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
         return;
     }
 
+    // 방아쇠 1회당 한 번만 전파한다(펠릿 단위가 아니다).
+    Multicast_PlayFireEffects();
+
     const FVector MuzzleLocation = ValidateClientMuzzleLocation(ClientMuzzleLocation)
         ? ClientMuzzleLocation
         : GetMuzzleTransform().GetLocation();
@@ -1228,13 +1371,16 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
     // 방아쇠 1회 = 탄약 1발 소비(위에서 TryConsumeServerFirePermission으로 이미 처리).
     // 그 1발 안에서 PelletsPerShot개의 산탄을 각각 원뿔 퍼짐 방향으로 발사한다.
     const int32 PelletCount = FMath::Max(PelletsPerShot, 1);
-    const float SpreadHalfAngleRad = FMath::DegreesToRadians(FMath::Max(SpreadHalfAngleDegrees, 0.f));
+    // ADS 여부는 소유 클라이언트만 알고 있어 발사 요청에 실려 온다. 조준 방향 자체가 이미 클라이언트 값이므로 신뢰 경계는 그대로다.
+    // 실제 탄착은 서버 권한 값으로만 결정된다(클라이언트 누적분은 크로스헤어 표시용).
+    const float SpreadHalfAngleRad = FMath::DegreesToRadians(ConsumeSpreadHalfAngleForShot(bAimingDownSights));
 
     for (int32 PelletIndex = 0; PelletIndex < PelletCount; ++PelletIndex)
     {
-        // 첫 펠릿은 조준 중심으로 곧게 보내 조준 신뢰도를 확보하고, 나머지는 원뿔 안에서 무작위로 퍼뜨린다.
-        // 단일탄(PelletCount==1)이거나 퍼짐이 0이면 항상 중심 방향이라 기존 단일탄 동작과 동일하다.
-        const FVector PelletDirection = (PelletIndex == 0 || SpreadHalfAngleRad <= 0.f)
+        // 산탄(PelletCount>1)은 첫 펠릿을 조준 중심으로 보내 조준 신뢰도를 확보한다.
+        // 단발 무기는 중심 고정 예외를 두지 않아야 퍼짐 값이 실제 탄착에 반영된다.
+        const bool bIsCenterPellet = (PelletCount > 1 && PelletIndex == 0);
+        const FVector PelletDirection = (bIsCenterPellet || SpreadHalfAngleRad <= 0.f)
             ? AimDirection
             : FMath::VRandCone(AimDirection, SpreadHalfAngleRad);
 
@@ -1243,9 +1389,7 @@ void UWeaponComponent::HandleFireFromClientAim(const FVector& ClientMuzzleLocati
             TraceStart,
             MuzzleLocation,
             PelletDirection,
-            DamageEffectClass,
-            bDrawDebugShot,
-            DebugShotDuration);
+            DamageEffectClass);
     }
 }
 
@@ -1254,9 +1398,7 @@ void UWeaponComponent::FireSinglePelletFromServer(
     const FVector& TraceStart,
     const FVector& MuzzleLocation,
     const FVector& PelletDirection,
-    TSubclassOf<UGameplayEffect> DamageEffectClass,
-    bool bDrawDebugShot,
-    float DebugShotDuration)
+    TSubclassOf<UGameplayEffect> DamageEffectClass)
 {
     UWorld* World = GetWorld();
     if (!World)
@@ -1284,10 +1426,10 @@ void UWeaponComponent::FireSinglePelletFromServer(
     const FVector AimTarget = bHit ? HitResult.ImpactPoint : TraceEnd;
     const FRotator ProjectileRotation = (AimTarget - MuzzleLocation).Rotation();
 
-    if (bDrawDebugShot)
+    if (bDrawServerShotDebug)
     {
         const float SafeDebugDuration = FMath::Clamp(
-            DebugShotDuration,
+            ServerShotDebugDuration,
             0.f,
             MaximumServerDebugShotDurationSeconds);
         DrawDebugLine(World, TraceStart, TraceEnd, FColor::Red, false, SafeDebugDuration, 0, 1.f);
@@ -1463,7 +1605,7 @@ int32 UWeaponComponent::Auth_AddReserveAmmo(const int32 Amount)
         return 0;
     }
 
-    const int32 AddedAmmo = FMath::Min(Amount, FMath::Max(0, StartingReserveAmmo - CurrentReserveAmmo));
+    const int32 AddedAmmo = FMath::Min(Amount, GetMissingReserveAmmo());
     if (AddedAmmo > 0)
     {
         SetCurrentReserveAmmo(CurrentReserveAmmo + AddedAmmo);

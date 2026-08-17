@@ -136,6 +136,12 @@ void ULastFPSEnemyHealthBarWidget::RefreshDisplayDuration(const float DisplayDur
 
 void ULastFPSEnemyHealthBarWidget::ReleaseFromEnemy()
 {
+    // 대상을 잃은 위젯도 매 프레임 이 경로로 들어오므로, 이미 정리가 끝난 상태면 즉시 빠진다.
+    if (!TrackedEnemy.IsValid() && GetVisibility() == ESlateVisibility::Collapsed)
+    {
+        return;
+    }
+
     UnbindFromEnemy();
     RemainingDisplayTime = 0.f;
     CurrentHealth = 0.f;
@@ -156,8 +162,9 @@ bool ULastFPSEnemyHealthBarWidget::UpdateTrackedEnemy(
     const FLastFPSEnemyHealthBarSettings& Settings)
 {
     ALastFPSCharacterBase* Enemy = TrackedEnemy.Get();
-    if (!IsValid(Enemy) || !Enemy->IsAlive())
+    if (!IsValid(Enemy) || !Enemy->IsAlive() || Enemy->IsHidden())
     {
+        // 액터 풀로 반납된 적은 살아 있는 채로 숨겨지므로 사망 판정만으로는 걸러지지 않는다.
         ReleaseFromEnemy();
         return false;
     }
@@ -183,7 +190,7 @@ bool ULastFPSEnemyHealthBarWidget::UpdateFixedHUDTarget(
     const FLastFPSEnemyHealthBarSettings& Settings)
 {
     ALastFPSCharacterBase* Enemy = TrackedEnemy.Get();
-    if (!IsValid(Enemy) || !Enemy->IsAlive())
+    if (!IsValid(Enemy) || !Enemy->IsAlive() || Enemy->IsHidden())
     {
         ReleaseFromEnemy();
         return false;

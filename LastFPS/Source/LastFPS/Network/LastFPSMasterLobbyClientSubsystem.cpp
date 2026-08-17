@@ -86,6 +86,11 @@ bool ULastFPSMasterLobbyClientSubsystem::ConnectToMasterLobby()
 	return true;
 }
 
+void ULastFPSMasterLobbyClientSubsystem::SetPendingBattleDefinition(FPrimaryAssetId BattleDefinitionId)
+{
+	PendingBattleDefinition = BattleDefinitionId;
+}
+
 bool ULastFPSMasterLobbyClientSubsystem::BeginHostingRoom(const FString& RoomName, int32 MaxPlayers)
 {
 	const ULastFPSMasterLobbySettings* Settings = GetDefault<ULastFPSMasterLobbySettings>();
@@ -116,7 +121,16 @@ bool ULastFPSMasterLobbyClientSubsystem::BeginHostingRoom(const FString& RoomNam
 	PendingMaxPlayers = MaxPlayers > 0 ? MaxPlayers : Settings->DefaultRoomMaxPlayers;
 	bHostingRequested = true;
 
-	const FString TravelUrl = FString::Printf(TEXT("%s?listen"), *RoomMapPath);
+	FString TravelUrl = FString::Printf(TEXT("%s?listen"), *RoomMapPath);
+	if (PendingBattleDefinition.IsValid())
+	{
+		// 대기실 GameMode가 이 옵션으로 전투 맵을 정한다. 없으면 DefaultBattleMap으로 폴백한다.
+		TravelUrl += FString::Printf(TEXT("?BattleDef=%s"), *PendingBattleDefinition.ToString());
+
+		// 다음 방 개설이 지난 선택을 물려받지 않도록 실어 보낸 즉시 비운다.
+		PendingBattleDefinition = FPrimaryAssetId();
+	}
+
 	UE_LOG(LogMasterLobby, Log, TEXT("방 개설: 리슨 서버로 이동한다. Url=%s, Name=%s"), *TravelUrl, *PendingRoomName);
 
 	PC->ClientTravel(TravelUrl, TRAVEL_Absolute);

@@ -98,11 +98,15 @@ void UGA_Projectile::ActivateAbility(
         AbilityEndEventTask->ReadyForActivation();
     }
 
-    if (ProjectileData->CastMontage && Hero->GetMesh())
+    // AnimInstance 직접 재생은 ASC 의 RepAnimMontageInfo 를 타지 않아 다른 플레이어 화면에서
+    // 투척 동작이 보이지 않는다.
+    if (ProjectileData->CastMontage)
     {
-        if (UAnimInstance* AnimInstance = Hero->GetMesh()->GetAnimInstance())
+        if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
         {
-            const float PlayedDuration = AnimInstance->Montage_Play(
+            ASC->PlayMontage(
+                this,
+                ActivationInfo,
                 ProjectileData->CastMontage,
                 ProjectileData->MontagePlayRate);
         }

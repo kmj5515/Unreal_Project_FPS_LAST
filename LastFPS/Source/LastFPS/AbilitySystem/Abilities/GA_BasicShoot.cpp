@@ -210,9 +210,8 @@ void UGA_BasicShoot::Fire()
         Weapon->GetMuzzleTransform().GetLocation(),
         CameraLocation,
         AimRotation.Vector(),
-        DamageEffectClass,
-        ShouldDrawDebug(),
-        GetDebugDrawTime());
+        Hero->GetIsADS(),
+        DamageEffectClass);
 
     Weapon->ApplyFireAimRecoil(Hero->GetIsADS());
 
@@ -264,38 +263,28 @@ void UGA_BasicShoot::LocalFire(UWeaponComponent* Weapon)
         FireMontage = HipFireMontage;
     }
 
-    if (FireMontage)
+    // AnimInstance 로 직접 재생하면 ASC 의 RepAnimMontageInfo 를 타지 않아 시뮬레이티드 프록시에서
+    // 재생되지 않는다. 다른 플레이어 화면에서 사격 애니메이션이 통째로 빠지므로 ASC 를 통해 재생한다.
+    if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
     {
-        if (UAnimInstance* AnimInstance = Hero->GetMesh()->GetAnimInstance())
+        if (FireMontage)
         {
-            AnimInstance->Montage_Play(FireMontage);
+            ASC->PlayMontage(this, GetCurrentActivationInfo(), FireMontage, 1.f);
         }
     }
 }
 
-void UGA_BasicShoot::StopFireMontage() const
+void UGA_BasicShoot::StopFireMontage()
 {
-    const ALastFPSHero* Hero = Cast<ALastFPSHero>(GetAvatarActorFromActorInfo());
-    if (!Hero || !Hero->GetMesh())
+    // 재생을 ASC 로 옮겼으므로 정지도 ASC 로 해야 한다. 그래야 정지도 복제된다.
+    // 이 어빌리티가 재생 중인 몽타주만 멈추므로 Hip/ADS 를 따로 검사할 필요가 없다.
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+    if (!ASC || !ASC->IsAnimatingAbility(this))
     {
         return;
     }
 
-    UAnimInstance* AnimInstance = Hero->GetMesh()->GetAnimInstance();
-    if (!AnimInstance)
-    {
-        return;
-    }
-
-    if (HipFireMontage && AnimInstance->Montage_IsPlaying(HipFireMontage))
-    {
-        AnimInstance->Montage_Stop(CancelMontageBlendOutTime, HipFireMontage);
-    }
-
-    if (ADSFireMontage && ADSFireMontage != HipFireMontage && AnimInstance->Montage_IsPlaying(ADSFireMontage))
-    {
-        AnimInstance->Montage_Stop(CancelMontageBlendOutTime, ADSFireMontage);
-    }
+    ASC->CurrentMontageStop(CancelMontageBlendOutTime);
 }
 
 void UGA_BasicShoot::FinishAbility()

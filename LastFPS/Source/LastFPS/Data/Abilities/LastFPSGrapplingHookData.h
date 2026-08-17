@@ -79,10 +79,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Grappling Hook|Movement")
 	TObjectPtr<UCurveVector> PathOffsetCurve;
 
-	/** 실제 시간 0~1을 이동 진행률 0~1로 변환해 가속과 감속을 제어한다. */
+	/**
+	 * 실제 시간 0~1을 이동 진행률 0~1로 변환해 가속과 감속을 제어한다. 비우면 선형 진행이다.
+	 * 기본값을 코드에 박지 않는다. C++ 기본값과 같은 값은 데이터 에셋에 직렬화되지 않아
+	 * 쿠커가 참조를 볼 수 없고, 패키지에서 커브가 빠져 선형 진행으로 떨어진다.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Grappling Hook|Movement")
-	TSoftObjectPtr<UCurveFloat> MovementProgressCurve = TSoftObjectPtr<UCurveFloat>(
-		FSoftObjectPath(TEXT("/Game/Data/Curves/CF_GrappleMovementProgress.CF_GrappleMovementProgress")));
+	TSoftObjectPtr<UCurveFloat> MovementProgressCurve;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Grappling Hook|Movement")
 	ELastFPSGrappleFinishVelocityMode FinishVelocityMode = ELastFPSGrappleFinishVelocityMode::Clamp;

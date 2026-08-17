@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "UObject/PrimaryAssetId.h"
 #include "LastFPSMasterLobbyClientSubsystem.generated.h"
 
 class ALastFPSMasterLobbyBeaconClient;
@@ -27,6 +28,15 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "LastFPS|MasterLobby")
 	bool ConnectToMasterLobby();
+
+	/**
+	 * 다음에 개설할 방이 사용할 전투 정의를 예약한다.
+	 * 맵 화면에서 목적지를 고른 뒤 마스터 로비를 거쳐 방을 여는 흐름에서,
+	 * 고른 전투가 로비 경유 중에 사라지지 않도록 GameInstance 수명에 보관한다.
+	 * 예약하지 않으면 대기실이 DefaultBattleMap으로 폴백한다.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "LastFPS|MasterLobby")
+	void SetPendingBattleDefinition(FPrimaryAssetId BattleDefinitionId);
 
 	/**
 	 * 방을 개설한다. 호스트 맵을 리슨 서버로 연 뒤 Beacon으로 마스터 로비에 등록한다.
@@ -69,6 +79,9 @@ private:
 	FString PendingRoomName;
 	int32 PendingMaxPlayers = 4;
 	bool bHostingRequested = false;
+
+	// 방 개설 URL에 실어 보낼 전투 정의다. 실어 보낸 즉시 비운다.
+	FPrimaryAssetId PendingBattleDefinition;
 
 	FDelegateHandle PostLoadMapHandle;
 	FTimerHandle PlayerCountTimerHandle;

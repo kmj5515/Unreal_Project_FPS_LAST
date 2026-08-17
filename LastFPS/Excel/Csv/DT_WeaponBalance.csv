@@ -1,5 +1,5 @@
 ﻿---,Damage,FireInterval,AimTraceRange,DamageElement,MagazineCapacity,StartingReserveAmmo,ReloadDuration,Parameters
 Rifle,800,0.1,7000,Physical,40,320,2.2,()
-Sniper,6000,0.8,14000,Physical,5,50,3,()
+Sniper,6000,0.5,14000,Physical,5,50,3,()
 Bazooka,18000,1,10000,Physical,1,17,3.5,()
-ShotGun,700,0.75,2500,Physical,10,70,2.6,"(((TagName=""Weapon.Parameter.PelletCount""), 8.000000),((TagName=""Weapon.Parameter.SpreadHalfAngle""), 4.000000))"
+ShotGun,700,0.35,2500,Physical,10,70,2.6,"(((TagName=""Weapon.Parameter.PelletCount""), 8.000000),((TagName=""Weapon.Parameter.SpreadHalfAngle""), 4.000000))"

@@ -122,6 +122,16 @@ public:
 		meta=(ClampMin="0", UIMin="0", UIMax="10"))
 	int32 RemainingEnemyMarkerThreshold = 3;
 
+	/**
+	 * 인카운터는 파티원 한 명만 트리거를 밟아도 시작되고 그 즉시 배리어가 닫힌다.
+	 * 뒤처진 파티원은 그대로 두면 방에 들어오지 못하므로 시작 시점에 트리거 지점으로 모은다.
+	 * 이 거리보다 멀리 있는 파티원만 옮긴다 — 이미 방 안에 들어온 사람까지 입구로 되돌리지 않기 위한 값이다.
+	 * 0 이하이면 모으지 않는다(파티원이 알아서 들어와야 하는 맵을 위해 남겨둔 도피구).
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Encounter|Barrier",
+		meta=(ClampMin="0.0", UIMin="0.0", Units="cm"))
+	float GatherPlayersBeyondDistance = 1200.f;
+
 	virtual void CollectRequiredPaths(TArray<FSoftObjectPath>& OutPaths) const override;
 
 	bool IsConfigurationValid(FString& OutFailureReason) const;

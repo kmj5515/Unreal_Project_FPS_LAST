@@ -25,4 +25,13 @@ public:
 	TSoftObjectPtr<ULastFPSWeaponDefinition> InitialWeaponDefinition;
 
 	virtual void GiveToAbilitySystem(UAbilitySystemComponent* ASC) const override;
+
+	virtual void GatherSpawnDependencyPaths(TArray<FSoftObjectPath>& OutPaths) const override;
+
+	/**
+	 * 초기 무기 정의가 이미 로드된 경우에만, 그 무기가 장착 시점에 동기 해석하는 참조를 모은다.
+	 * 무기 정의 자체가 소프트 참조라 GatherSpawnDependencyPaths 단계에서는 아직 알 수 없다.
+	 * 프리로드 2단계에서 호출한다.
+	 */
+	void GatherInitialWeaponDependencyPaths(TArray<FSoftObjectPath>& OutPaths) const;
 };

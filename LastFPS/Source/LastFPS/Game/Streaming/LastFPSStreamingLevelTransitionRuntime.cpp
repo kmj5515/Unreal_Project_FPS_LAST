@@ -17,6 +17,7 @@
 #include "Engine/TriggerBox.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
+#include "Utility/LastFPSPawnTeleport.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
@@ -122,7 +123,7 @@ void ALastFPSStreamingLevelTransitionRuntime::EndPlay(
 	LoadedDelayedEnemyDefinition = nullptr;
 	LoadedArrivalContainmentMesh = nullptr;
 	LoadedArrivalContainmentMaterial = nullptr;
-	PendingPawn.Reset();
+	PendingPawns.Reset();
 	SpawnedDelayedEnemy.Reset();
 	Super::EndPlay(EndPlayReason);
 }
@@ -153,7 +154,21 @@ void ALastFPSStreamingLevelTransitionRuntime::HandleTriggerOverlap(
 		return;
 	}
 
-	PendingPawn = Pawn;
+	// 트리거는 한 번 밟히면 닫히므로, 밟은 사람만 옮기면 나머지 파티원은 목적지로 갈 수단이 없다.
+	// 전환은 파티 단위 이동이라 이 시점의 플레이어 폰 전체를 대상으로 잡는다.
+	PendingPawns.Reset();
+	if (const UWorld* World = GetWorld())
+	{
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			if (APawn* PlayerPawn = It->IsValid() ? It->Get()->GetPawn() : nullptr)
+			{
+				PendingPawns.AddUnique(PlayerPawn);
+			}
+		}
+	}
+	PendingPawns.AddUnique(Pawn);
+
 	bTransitionRequested = true;
 	if (IsValid(TriggerVolume))
 	{
@@ -485,10 +500,80 @@ void ALastFPSStreamingLevelTransitionRuntime::
 		return;
 	}
 
+	BeginDelayedEnemySpawnDependencyPreload();
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
+	BeginDelayedEnemySpawnDependencyPreload()
+{
+	if (!LoadedDelayedEnemyDefinition)
+	{
+		return;
+	}
+
+	// PawnClass 뿐 아니라 AIProfile·스탯·비주얼·어빌리티 세트·초기 무기 정의까지 함께 상주시킨다.
+	// 이 중 하나라도 비어 있으면 스폰 경로가 동기 로드로 떨어져 게임 스레드가 멈춘다.
+	TArray<FSoftObjectPath> RequiredPaths;
+	LoadedDelayedEnemyDefinition->GatherSpawnDependencyPaths(RequiredPaths);
+	if (RequiredPaths.IsEmpty())
+	{
+		HandleDelayedEnemySpawnDependenciesLoaded();
+		return;
+	}
+
+	// 이미 메모리에 있는 애셋도 핸들이 수명을 고정하도록 항상 요청한다.
+	DelayedEnemySpawnDependencyLoadHandle =
+		UAssetManager::GetStreamableManager().RequestAsyncLoad(
+			RequiredPaths,
+			FStreamableDelegate::CreateUObject(
+				this,
+				&ThisClass::HandleDelayedEnemySpawnDependenciesLoaded),
+			FStreamableManager::AsyncLoadHighPriority);
+	if (!DelayedEnemySpawnDependencyLoadHandle.IsValid())
+	{
+		UE_LOG(
+			LogLastFPSStreamingTransition,
+			Error,
+			TEXT("[%s] 지연 적 스폰 의존 애셋의 비동기 로드를 시작하지 못했습니다: Definition=%s"),
+			*Route.RouteId.ToString(),
+			*GetNameSafe(LoadedDelayedEnemyDefinition));
+		HandleDelayedEnemySpawnDependenciesLoaded();
+	}
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
+	HandleDelayedEnemySpawnDependenciesLoaded()
+{
+	BeginDelayedEnemyWeaponDependencyPreload();
+
 	if (HasAuthority() && bDelayedEnemySpawnDue)
 	{
 		SpawnDelayedEnemy();
 	}
+}
+
+void ALastFPSStreamingLevelTransitionRuntime::
+	BeginDelayedEnemyWeaponDependencyPreload()
+{
+	if (!LoadedDelayedEnemyDefinition)
+	{
+		return;
+	}
+
+	// 무기 정의는 앞 단계에서야 로드되므로, 그 안의 장착 참조는 여기서 따로 요청한다.
+	// 스폰을 막지 않는 후속 로드다. 제때 끝나지 않으면 장착 경로의 동기 로드가 받아낸다.
+	TArray<FSoftObjectPath> WeaponPaths;
+	LoadedDelayedEnemyDefinition->GatherInitialWeaponDependencyPaths(WeaponPaths);
+	if (WeaponPaths.IsEmpty())
+	{
+		return;
+	}
+
+	DelayedEnemyWeaponDependencyLoadHandle =
+		UAssetManager::GetStreamableManager().RequestAsyncLoad(
+			WeaponPaths,
+			FStreamableDelegate(),
+			FStreamableManager::AsyncLoadHighPriority);
 }
 
 void ALastFPSStreamingLevelTransitionRuntime::
@@ -498,6 +583,18 @@ void ALastFPSStreamingLevelTransitionRuntime::
 	{
 		DelayedEnemyContentLoadHandle->CancelHandle();
 		DelayedEnemyContentLoadHandle.Reset();
+	}
+
+	if (DelayedEnemySpawnDependencyLoadHandle.IsValid())
+	{
+		DelayedEnemySpawnDependencyLoadHandle->CancelHandle();
+		DelayedEnemySpawnDependencyLoadHandle.Reset();
+	}
+
+	if (DelayedEnemyWeaponDependencyLoadHandle.IsValid())
+	{
+		DelayedEnemyWeaponDependencyLoadHandle->CancelHandle();
+		DelayedEnemyWeaponDependencyLoadHandle.Reset();
 	}
 }
 
@@ -676,8 +773,7 @@ void ALastFPSStreamingLevelTransitionRuntime::
 void ALastFPSStreamingLevelTransitionRuntime::
 	CompletePendingPawnTransition()
 {
-	APawn* Pawn = PendingPawn.Get();
-	if (!Pawn)
+	if (PendingPawns.IsEmpty())
 	{
 		return;
 	}
@@ -688,44 +784,48 @@ void ALastFPSStreamingLevelTransitionRuntime::
 		return;
 	}
 
-	if (!Pawn->TeleportTo(
-		DestinationTransform.GetLocation(),
-		DestinationTransform.Rotator(),
-		false,
-		true))
+	// 이동 제한은 옮겨진 파티원 전원에게 새로 건다.
+	ReleaseArrivalHold();
+
+	int32 MovedCount = 0;
+	bool bArrivalHoldStarted = false;
+	for (const TWeakObjectPtr<APawn>& PendingPawn : PendingPawns)
 	{
-		UE_LOG(
-			LogLastFPSStreamingTransition,
-			Error,
-			TEXT("[%s] 플레이어 이동에 실패했습니다: Pawn=%s"),
-			*Route.RouteId.ToString(),
-			*GetNameSafe(Pawn));
-		return;
+		APawn* Pawn = PendingPawn.Get();
+		if (!Pawn)
+		{
+			continue;
+		}
+
+		if (!TeleportPawnToDestination(*Pawn, DestinationTransform))
+		{
+			UE_LOG(
+				LogLastFPSStreamingTransition,
+				Error,
+				TEXT("[%s] 플레이어 이동에 실패했습니다: Pawn=%s"),
+				*Route.RouteId.ToString(),
+				*GetNameSafe(Pawn));
+			continue;
+		}
+
+		++MovedCount;
+		bArrivalHoldStarted |= BeginArrivalHold(*Pawn);
 	}
 
-	if (ACharacter* Character = Cast<ACharacter>(Pawn))
+	PendingPawns.Reset();
+	if (MovedCount <= 0)
 	{
-		if (UCharacterMovementComponent* Movement =
-			Character->GetCharacterMovement())
-		{
-			Movement->StopMovementImmediately();
-		}
-	}
-	if (AController* Controller = Pawn->GetController())
-	{
-		Controller->SetControlRotation(DestinationTransform.Rotator());
+		return;
 	}
 
 	UE_LOG(
 		LogLastFPSStreamingTransition,
 		Log,
-		TEXT("[%s] 플레이어를 스트리밍 목적지로 이동했습니다: Pawn=%s, Level=%s"),
+		TEXT("[%s] 플레이어 %d명을 스트리밍 목적지로 이동했습니다: Level=%s"),
 		*Route.RouteId.ToString(),
-		*GetNameSafe(Pawn),
+		MovedCount,
 		*Route.DestinationLevel.ToString());
-	PendingPawn.Reset();
-	const bool bArrivalHoldStarted =
-		BeginArrivalHold(*Pawn);
+
 	Multicast_NotifyTransitionArrived(
 		DestinationTransform.GetLocation(),
 		DestinationTransform.Rotator());
@@ -733,6 +833,15 @@ void ALastFPSStreamingLevelTransitionRuntime::
 	{
 		ScheduleDelayedEnemySpawn();
 	}
+}
+
+bool ALastFPSStreamingLevelTransitionRuntime::TeleportPawnToDestination(
+	APawn& Pawn,
+	const FTransform& DestinationTransform) const
+{
+	// 빈 자리 탐색·관성 정리·컨트롤 회전 맞춤은 룸 인카운터의 파티원 모으기와 동일한 절차라
+	// LastFPSPawnTeleport 로 모아 두었다.
+	return LastFPSPawnTeleport::TeleportPawnTo(Pawn, DestinationTransform);
 }
 
 bool ALastFPSStreamingLevelTransitionRuntime::BeginArrivalHold(
@@ -754,14 +863,15 @@ bool ALastFPSStreamingLevelTransitionRuntime::BeginArrivalHold(
 		return false;
 	}
 
-	ReleaseArrivalHold();
-	HeldCharacter = Character;
-	PreviousMovementMode = static_cast<uint8>(
+	FHeldCharacter& Held = HeldCharacters.AddDefaulted_GetRef();
+	Held.Character = Character;
+	Held.MovementMode = static_cast<uint8>(
 		Movement->MovementMode.GetValue());
-	PreviousCustomMovementMode = Movement->CustomMovementMode;
+	Held.CustomMovementMode = Movement->CustomMovementMode;
 	Movement->StopMovementImmediately();
 	Movement->DisableMovement();
 
+	// 파티원이 같은 순간에 도착하므로 타이머는 1개만 돌리고 해제는 전원 일괄로 한다.
 	GetWorldTimerManager().SetTimer(
 		ArrivalHoldTimerHandle,
 		this,
@@ -782,20 +892,26 @@ void ALastFPSStreamingLevelTransitionRuntime::ReleaseArrivalHold()
 {
 	GetWorldTimerManager().ClearTimer(ArrivalHoldTimerHandle);
 
-	ACharacter* Character = HeldCharacter.Get();
-	HeldCharacter.Reset();
-	if (!Character)
-	{
-		return;
-	}
+	// 순회 중 이동 모드 복구가 다른 콜백을 부를 수 있어 목록을 먼저 비운다.
+	TArray<FHeldCharacter> Released = MoveTemp(HeldCharacters);
+	HeldCharacters.Reset();
 
-	if (UCharacterMovementComponent* Movement =
-		Character->GetCharacterMovement();
-		Movement && Movement->MovementMode == MOVE_None)
+	for (const FHeldCharacter& Held : Released)
 	{
-		Movement->SetMovementMode(
-			static_cast<EMovementMode>(PreviousMovementMode),
-			PreviousCustomMovementMode);
+		ACharacter* Character = Held.Character.Get();
+		if (!Character)
+		{
+			continue;
+		}
+
+		if (UCharacterMovementComponent* Movement =
+			Character->GetCharacterMovement();
+			Movement && Movement->MovementMode == MOVE_None)
+		{
+			Movement->SetMovementMode(
+				static_cast<EMovementMode>(Held.MovementMode),
+				Held.CustomMovementMode);
+		}
 	}
 }
 
@@ -863,9 +979,51 @@ void ALastFPSStreamingLevelTransitionRuntime::SpawnDelayedEnemy()
 		return;
 	}
 
-	if (!LoadedDelayedEnemyDefinition->PawnClass
-		|| !LoadedDelayedEnemyDefinition->PawnClass->IsChildOf(
-			ALastFPSEnemyCharacter::StaticClass()))
+	// 소프트 클래스는 미로드 상태에서 Get() 이 null 이다. 에디터는 참조된 에셋이 이미
+	// 메모리에 있어 통과하지만 패키징 빌드에서는 여기서 걸려 보스가 생성되지 않았다.
+	// 동기 로드는 전투 중 게임 스레드를 몇 프레임 막으므로, 프리로드를 기다렸다가
+	// 완료 콜백(HandleDelayedEnemySpawnDependenciesLoaded)이 이 함수를 다시 부르게 한다.
+	// bDelayedEnemySpawnDue 가 이미 true 라 재진입 시 그대로 이어진다.
+	UClass* PawnClass = LoadedDelayedEnemyDefinition->PawnClass.Get();
+	if (!PawnClass)
+	{
+		if (DelayedEnemySpawnDependencyLoadHandle.IsValid()
+			&& !DelayedEnemySpawnDependencyLoadHandle->HasLoadCompleted())
+		{
+			UE_LOG(
+				LogLastFPSStreamingTransition,
+				Log,
+				TEXT("[%s] 지연 적 생성 시점까지 PawnClass 로드가 끝나지 않아 완료를 기다립니다."),
+				*Route.RouteId.ToString());
+			return;
+		}
+
+		// 여기까지 왔다는 건 비동기 경로가 실패했다는 뜻이다(요청 자체가 시작되지 못했거나 취소됨).
+		// 이 보스가 끝내 생성되지 않으면 Room.Boss 인카운터가 완료되지 않고, 그 인카운터가 소유한
+		// 배리어가 영영 열리지 않아 파티 전원이 방에 갇힌다. 한 프레임 끊기는 편이 갇히는 것보다 낫다.
+		// 최후 수단이므로 한 번만 시도하고, 그래도 실패하면 설정이 깨진 것이라 포기한다.
+		UE_LOG(
+			LogLastFPSStreamingTransition,
+			Warning,
+			TEXT("[%s] 지연 적 PawnClass 비동기 로드가 실패해 동기 로드로 대체합니다: Definition=%s"),
+			*Route.RouteId.ToString(),
+			*GetNameSafe(LoadedDelayedEnemyDefinition));
+
+		PawnClass = LoadedDelayedEnemyDefinition->PawnClass.LoadSynchronous();
+		if (!PawnClass)
+		{
+			UE_LOG(
+				LogLastFPSStreamingTransition,
+				Error,
+				TEXT("[%s] 지연 적 PawnClass를 동기 로드로도 해석하지 못했습니다: Definition=%s, PawnClass=%s"),
+				*Route.RouteId.ToString(),
+				*GetNameSafe(LoadedDelayedEnemyDefinition),
+				*LoadedDelayedEnemyDefinition->PawnClass.ToString());
+			return;
+		}
+	}
+
+	if (!PawnClass->IsChildOf(ALastFPSEnemyCharacter::StaticClass()))
 	{
 		UE_LOG(
 			LogLastFPSStreamingTransition,
@@ -873,7 +1031,7 @@ void ALastFPSStreamingLevelTransitionRuntime::SpawnDelayedEnemy()
 			TEXT("[%s] 지연 적 정의의 PawnClass가 ALastFPSEnemyCharacter가 아닙니다: Definition=%s, PawnClass=%s"),
 			*Route.RouteId.ToString(),
 			*GetNameSafe(LoadedDelayedEnemyDefinition),
-			*GetNameSafe(LoadedDelayedEnemyDefinition->PawnClass.Get()));
+			*LoadedDelayedEnemyDefinition->PawnClass.ToString());
 		return;
 	}
 
@@ -895,7 +1053,7 @@ void ALastFPSStreamingLevelTransitionRuntime::SpawnDelayedEnemy()
 		World->GetSubsystem<ULastFPSActorPoolSubsystem>())
 	{
 		SpawnedPawn = Cast<APawn>(Pool->AcquireActorByClass(
-			LoadedDelayedEnemyDefinition->PawnClass.LoadSynchronous(),
+			PawnClass,
 			SpawnTransform,
 			this,
 			nullptr));
@@ -904,7 +1062,7 @@ void ALastFPSStreamingLevelTransitionRuntime::SpawnDelayedEnemy()
 	if (!SpawnedPawn)
 	{
 		SpawnedPawn = World->SpawnActorDeferred<APawn>(
-			LoadedDelayedEnemyDefinition->PawnClass.LoadSynchronous(),
+			PawnClass,
 			SpawnTransform,
 			this,
 			nullptr,

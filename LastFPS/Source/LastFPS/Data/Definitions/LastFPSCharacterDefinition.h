@@ -77,4 +77,11 @@ public:
 	 * 어빌리티 부여는 서버 권한이 필요해 ALastFPSCharacterBase 에서 처리한다.
 	 */
 	virtual void GiveToAbilitySystem(UAbilitySystemComponent* ASC) const;
+
+	/**
+	 * 스폰 경로가 즉시 필요로 하는 소프트 참조 경로다.
+	 * 이 경로들이 미리 상주해 있지 않으면 스폰 시점에 동기 로드로 떨어져 게임 스레드가 멈춘다.
+	 * 파생 정의는 Super 를 호출한 뒤 자기 참조를 덧붙인다.
+	 */
+	virtual void GatherSpawnDependencyPaths(TArray<FSoftObjectPath>& OutPaths) const;
 };

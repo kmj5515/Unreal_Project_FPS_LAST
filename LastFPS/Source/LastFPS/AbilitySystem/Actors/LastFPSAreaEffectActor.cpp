@@ -11,6 +11,7 @@
 #include "Net/UnrealNetwork.h"
 #include "NiagaraComponent.h"
 #include "Pooling/LastFPSActorPoolSubsystem.h"
+#include "Utility/LastFPSCombatAffiliation.h"
 #include "Utility/LastFPSDamageCalculation.h"
 
 ALastFPSAreaEffectActor::ALastFPSAreaEffectActor()
@@ -60,6 +61,8 @@ void ALastFPSAreaEffectActor::InitializeAreaEffect(
 	SourceActor = InSourceActor;
 	SourceASC = InSourceASC;
 	AreaConfig = InAreaConfig;
+	// 같은 설정으로 재시전해도 복제 dirty 판정이 서도록 시퀀스를 올린다. 상세는 헤더 주석 참고.
+	AreaConfig.ActivationSequence = ++AreaActivationSequence;
 	if (HasActorBegunPlay())
 	{
 		StartAreaEffect();
@@ -219,6 +222,13 @@ void ALastFPSAreaEffectActor::ApplyAreaEffects()
 
 	for (AActor* TargetActor : TargetActors)
 	{
+		// 오버랩은 진영을 구분하지 않는다. 아군 제외는 여기서만 걸린다.
+		if (AreaConfig.bIgnoreFriendlyTargets
+			&& LastFPSCombatAffiliation::AreFriendlyActors(SourceActor.Get(), TargetActor))
+		{
+			continue;
+		}
+
 		if (!DoesTargetPassShape(TargetActor))
 		{
 			continue;

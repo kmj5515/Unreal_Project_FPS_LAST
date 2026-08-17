@@ -1,6 +1,8 @@
 #include "UI/Crosshair/LastFPSCrosshairSpreadBehavior.h"
 
 #include "Character/LastFPSCharacterBase.h"
+#include "Character/Components/WeaponComponent.h"
+#include "Character/Interfaces/LastFPSWeaponUser.h"
 
 #include "EasyCrosshairSystem/ecsCrosshairEditorAsset.h"
 #include "EasyCrosshairSystem/ecsCrosshairWidget.h"
@@ -8,6 +10,8 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Blueprint/WidgetLayoutLibrary.h"
+#include "Camera/PlayerCameraManager.h"
 #include "HAL/PlatformTime.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LastFPSCrosshairSpreadBehavior)
@@ -81,7 +85,7 @@ void ULastFPSCrosshairSpreadBehavior::Tick()
     FireSpreadPx = FMath::FInterpTo(FireSpreadPx, 0.f, DeltaSeconds, FireSpreadRecoverSpeed);
 
     const APawn* Pawn = ResolveOwningPawnSafe();
-    const float TargetSpreadPx = (Pawn ? CalculateTargetSpreadPx(*Pawn) : BaseSpreadPx) + FireSpreadPx;
+    const float TargetSpreadPx = Pawn ? CalculateTargetSpreadPx(*Pawn, FireSpreadPx) : BaseSpreadPx + FireSpreadPx;
 
     CurrentSpreadPx = FMath::FInterpTo(CurrentSpreadPx, TargetSpreadPx, DeltaSeconds, InterpSpeed);
 
@@ -100,14 +104,58 @@ void ULastFPSCrosshairSpreadBehavior::NotifyWeaponFired()
     FireSpreadPx = FMath::Min(FireSpreadPx + FireSpreadAddPx, FireSpreadMaxPx);
 }
 
-float ULastFPSCrosshairSpreadBehavior::CalculateTargetSpreadPx(const APawn& Pawn) const
+float ULastFPSCrosshairSpreadBehavior::CalculateWeaponSpreadPx(const APawn& Pawn) const
 {
-    float TargetSpreadPx = BaseSpreadPx;
+    if (!bDriveFromWeaponSpread)
+    {
+        return -1.f;
+    }
+
+    const ILastFPSWeaponUser* WeaponUser = Cast<ILastFPSWeaponUser>(&Pawn);
+    const UWeaponComponent* Weapon = WeaponUser ? WeaponUser->GetWeaponComponent() : nullptr;
+    if (!Weapon)
+    {
+        return -1.f;
+    }
+
+    const ALastFPSCharacterBase* LastFPSCharacter = Cast<ALastFPSCharacterBase>(&Pawn);
+    const bool bIsADS = LastFPSCharacter && LastFPSCharacter->GetIsADS();
+    const float HalfAngleRad = FMath::DegreesToRadians(Weapon->GetCurrentSpreadHalfAngleDegrees(bIsADS));
+    if (HalfAngleRad <= 0.f)
+    {
+        return 0.f;
+    }
+
+    const APlayerController* PlayerController = Cast<APlayerController>(Pawn.GetController());
+    const APlayerCameraManager* CameraManager = PlayerController ? PlayerController->PlayerCameraManager : nullptr;
+    const UWorld* World = Pawn.GetWorld();
+    if (!CameraManager || !World)
+    {
+        return -1.f;
+    }
+
+    // 수평 FOV의 절반이 화면 절반 너비에 대응하므로, 탄퍼짐 반각을 같은 비율로 환산한다.
+    const float HalfFovRad = FMath::DegreesToRadians(FMath::Clamp(CameraManager->GetFOVAngle(), 1.f, 179.f) * 0.5f);
+    const float DpiScale = FMath::Max(UWidgetLayoutLibrary::GetViewportScale(World), KINDA_SMALL_NUMBER);
+    // 레이어 변환은 Slate 단위이므로 뷰포트 px를 DPI 스케일로 나눠 맞춘다.
+    const float HalfWidthSlate = UWidgetLayoutLibrary::GetViewportSize(World).X * 0.5f / DpiScale;
+
+    return HalfWidthSlate * FMath::Tan(HalfAngleRad) / FMath::Tan(HalfFovRad) * WeaponSpreadPxScale;
+}
+
+float ULastFPSCrosshairSpreadBehavior::CalculateTargetSpreadPx(const APawn& Pawn, const float FireBloomPx) const
+{
+    // 무기 연동이 되면 기본 벌어짐·ADS 수렴·연사 누적은 무기의 실제 퍼짐 각도가 대신한다.
+    // 이동/낙하 가산분은 탄도에 반영되지 않는 표시 전용 값이라 연동 여부와 무관하게 유지한다.
+    const float WeaponSpreadPx = CalculateWeaponSpreadPx(Pawn);
+    const bool bWeaponDriven = WeaponSpreadPx >= 0.f;
+
+    float StateSpreadPx = bWeaponDriven ? 0.f : BaseSpreadPx + FireBloomPx;
 
     const FVector Velocity = Pawn.GetVelocity();
     if (FVector(Velocity.X, Velocity.Y, 0.f).Size() > MovementSpeedThreshold)
     {
-        TargetSpreadPx += MoveSpreadPx;
+        StateSpreadPx += MoveSpreadPx;
     }
 
     if (const ACharacter* Character = Cast<ACharacter>(&Pawn))
@@ -115,17 +163,17 @@ float ULastFPSCrosshairSpreadBehavior::CalculateTargetSpreadPx(const APawn& Pawn
         if (const UCharacterMovementComponent* Movement = Character->GetCharacterMovement();
             Movement && Movement->IsFalling())
         {
-            TargetSpreadPx += JumpSpreadPx;
+            StateSpreadPx += JumpSpreadPx;
         }
     }
 
     if (const ALastFPSCharacterBase* LastFPSCharacter = Cast<ALastFPSCharacterBase>(&Pawn);
         LastFPSCharacter && LastFPSCharacter->GetIsADS())
     {
-        TargetSpreadPx *= AdsSpreadMultiplier;
+        StateSpreadPx *= AdsSpreadMultiplier;
     }
 
-    return TargetSpreadPx;
+    return (bWeaponDriven ? WeaponSpreadPx : 0.f) + StateSpreadPx;
 }
 
 void ULastFPSCrosshairSpreadBehavior::ApplySpreadToLayers(const float SpreadPx)

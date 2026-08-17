@@ -10,10 +10,17 @@
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SExpandableArea.h"
+#include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Text/STextBlock.h"
 
 namespace
 {
+	// 도구 패널 본문이 스크롤 없이 표시되길 기대하는 기준 높이(px).
+	float ToolPanelBodyDesiredHeight()
+	{
+		return 520.f;
+	}
+
 	FLinearColor ToolBackplateColor()
 	{
 		return FLinearColor(0.015f, 0.016f, 0.018f, 0.96f);
@@ -268,10 +275,22 @@ namespace LastFPSEditorWidgets
 			]
 
 			+ SVerticalBox::Slot()
-			.AutoHeight()
+			.FillHeight(1.f)
 			.Padding(0.f, 5.f, 0.f, 0.f)
 			[
-				BodyContent
+				SNew(SScrollBox)
+
+				+ SScrollBox::Slot()
+				.FillSize(1.f)
+				[
+					// 본문의 희망 높이를 고정해 두면 패널이 이보다 크면 늘어나고(FillSize),
+					// 작아지면 줄어들지 않고 스크롤된다.
+					SNew(SBox)
+					.HeightOverride(ToolPanelBodyDesiredHeight())
+					[
+						BodyContent
+					]
+				]
 			]);
 	}
 

@@ -35,6 +35,9 @@ protected:
 	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
+	/** 드래그를 놓으면 원래 각도로 되돌린다. */
+	virtual void NativeTick(const FGeometry& InGeometry, float InDeltaTime) override;
+
 	/** 보관된 무기 정의/아이템으로 왼쪽 스탯 패널 채우기. */
 	void PopulateStats();
 
@@ -44,6 +47,10 @@ protected:
 	/** 드래그 픽셀당 회전 각도(도). */
 	UPROPERTY(EditDefaultsOnly, Category="Preview")
 	float RotationSpeed = 0.4f;
+
+	/** 놓았을 때 원래 각도로 돌아가는 보간 속도. 0 이면 그 자리에 멈춘다. */
+	UPROPERTY(EditDefaultsOnly, Category="Preview", meta=(ClampMin="0.0"))
+	float ReturnInterpSpeed = 8.f;
 
 	// ── 왼쪽 능력치 패널 (Designer 바인딩) ──
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional)) 
@@ -84,4 +91,7 @@ protected:
 	bool bHoldingPreviewStage = false;
 
 	bool bDragging = false;
+
+	/** 드래그로 원래 각도에서 벗어난 누적 각도(도). 무대는 절대 각도를 모르므로 여기서 들고 있는다. */
+	float DraggedYaw = 0.f;
 };

@@ -7,6 +7,7 @@
 #include "Hub/ILastFPSInteractable.h"
 #include "Hub/LastFPSNPCTypes.h"
 #include "Quest/LastFPSNPCQuestOption.h"
+#include "Data/Tables/LastFPSEquipmentStatTypes.h"
 #include "UI/Result/LastFPSMissionResultTypes.h"
 #include "LastFPSPlayerController.generated.h"
 
@@ -17,6 +18,7 @@ class ULastFPSCharacterDefinition;
 class ULastFPSCharacterRoster;
 class ULastFPSHUDWidget;
 class ULastFPSDialogueWidget;
+class ULastFPSEquipmentSubsystem;
 class ULastFPSNPCInteractionWidget;
 class UInputAction;
 struct FInputActionInstance;
@@ -154,6 +156,14 @@ public:
     UFUNCTION(Client, Reliable)
     void ClientReturnToHub();
 
+    /**
+     * 클라이언트가 로컬로만 판정 가능한 파티 공용 목표(도달·획득)의 진행을 서버에 보고한다.
+     * 서버는 파티 공용 퀘스트인지 다시 확인한 뒤 최댓값으로만 반영하므로, 잘못된 값이 와도
+     * 진행이 되돌아가거나 요구량을 넘지 않는다.
+     */
+    UFUNCTION(Server, Reliable, WithValidation)
+    void Server_ReportPartyQuestProgress(FName QuestId, int32 ObjectiveIndex, int32 Progress);
+
 protected:
     // 진입/ESC 화면 태그는 GameMode가 소유 → BeginPlay에 읽어와 캐시한다.
     // (맵별 차이를 GameMode가 가지므로 PlayerController는 1개로 공유 가능)
@@ -194,7 +204,10 @@ protected:
     // ── 내부 ────────────────────────────────────────────────────────
 
     /** GameMode에서 진입/ESC 화면 태그를 읽어 캐시 (BeginPlay) */
-    void CacheUIConfigFromGameMode();
+    /** 복제된 맵 UI 규칙을 캐시한다. 아직 도착하지 않았으면 false. */
+    bool CacheUIConfigFromGameState();
+    void ScheduleInitialScreenRetry();
+    void ClearInitialScreenRetry();
 
     /** 진입 화면 열기 — PrimaryGameLayout 준비될 때까지 재시도 */
     UFUNCTION()
@@ -241,6 +254,22 @@ protected:
 
     UFUNCTION()
     void OnRep_SelectedCharacterIndex();
+
+    // ── 장비 구성 서버 제출 ──────────────────────────────────────────
+    // 장비는 GameInstance 서브시스템(= 로컬 플레이어 소유)에만 있어 서버가 직접 읽으면
+    // 리슨 서버에서는 호스트 장비가, 데디케이티드에서는 빈 장비가 전원에게 적용된다.
+    // 소유 클라이언트가 아이템 행 ID 만 제출하고, 스탯은 서버가 데이터 테이블에서 다시 계산한다.
+
+    ULastFPSEquipmentSubsystem* GetLocalEquipmentSubsystem() const;
+    void BindEquipmentSubmission();
+    void UnbindEquipmentSubmission();
+    void SubmitEquipmentLoadoutToServer();
+
+    UFUNCTION()
+    void HandleLocalEquipmentChanged(ELastFPSEquipmentSlotType SlotType, int32 SlotIndex);
+
+    UFUNCTION(Server, Reliable)
+    void Server_SubmitEquippedSlots(const TArray<FLastFPSEquippedSlot>& Slots);
 
     // ── 홀드 인터랙션 ────────────────────────────────────────────────
     // G를 누르고 있는 동안 게이지가 차오르고(InteractHoldDuration), 가득 차면 발동.

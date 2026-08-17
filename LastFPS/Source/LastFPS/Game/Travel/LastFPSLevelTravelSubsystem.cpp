@@ -18,7 +18,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Localization/LastFPSLocalization.h"
 #include "Misc/PackageName.h"
-#include "Network/LastFPSMasterLobbySettings.h"
+#include "Network/LastFPSMasterLobbyClientSubsystem.h"
 #include "Online/OnlineSessionNames.h"
 #include "Quest/LastFPSQuestSubsystem.h"
 #include "TimerManager.h"
@@ -409,28 +409,34 @@ ELastFPSTravelRequestResult ULastFPSLevelTravelSubsystem::TravelToPartyRoom(
 		return ELastFPSTravelRequestResult::InvalidAssetId;
 	}
 
-	// 대기 맵 경로는 마스터 로비의 방 개설과 같은 설정을 본다. 두 진입점이 서로 다른
-	// 경로를 들고 있으면 맵 이름이 바뀔 때 한쪽만 갱신돼 존재하지 않는 맵을 연다.
-	const ULastFPSMasterLobbySettings* LobbySettings = GetDefault<ULastFPSMasterLobbySettings>();
-	const FString PartyRoomMapPath = LobbySettings->HostedRoomMap.GetLongPackageName();
-	if (PartyRoomMapPath.IsEmpty())
+	// 여기서 대기 맵을 직접 열면 마스터 로비에 방이 등록되지 않아 파티원이 찾을 수 없다.
+	// 방 개설과 Beacon 등록은 마스터 로비 경유 흐름이 소유하므로, 고른 전투만 넘기고 로비로 보낸다.
+	ULastFPSMasterLobbyClientSubsystem* MasterLobby = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<ULastFPSMasterLobbyClientSubsystem>()
+		: nullptr;
+	if (!MasterLobby)
 	{
 		UE_LOG(LogLastFPSLevelTravel, Error,
-			TEXT("파티 대기 맵으로 이동할 수 없습니다: HostedRoomMap이 비었거나 경로가 올바르지 않습니다. Value=%s"),
-			*LobbySettings->HostedRoomMap.ToString());
+			TEXT("파티 대기실로 이동할 수 없습니다: 마스터 로비 서브시스템이 없습니다."));
 		FailRequest(
-			ELastFPSTravelRequestResult::AssetNotFound,
-			FText::Format(
-				FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::BattleMapInvalid),
-				FText::FromString(LobbySettings->HostedRoomMap.ToString())));
-		return ELastFPSTravelRequestResult::AssetNotFound;
+			ELastFPSTravelRequestResult::SessionUnavailable,
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::BattleSessionUnavailable));
+		return ELastFPSTravelRequestResult::SessionUnavailable;
 	}
 
-	const FString Url = FString::Printf(
-		TEXT("%s?listen?BattleDef=%s"), *PartyRoomMapPath, *BattleDefinitionId.ToString());
+	MasterLobby->SetPendingBattleDefinition(BattleDefinitionId);
+	if (!MasterLobby->ConnectToMasterLobby())
+	{
+		// 실패 사유는 서브시스템이 이미 상세히 남긴다.
+		MasterLobby->SetPendingBattleDefinition(FPrimaryAssetId());
+		FailRequest(
+			ELastFPSTravelRequestResult::SessionUnavailable,
+			FLastFPSLocalization::GetUIText(LastFPSUIStringKeys::BattleSessionUnavailable));
+		return ELastFPSTravelRequestResult::SessionUnavailable;
+	}
 
-	UE_LOG(LogLastFPSLevelTravel, Log, TEXT("파티 대기 맵으로 이동합니다: %s"), *Url);
-	LocalPlayerController->ClientTravel(Url, TRAVEL_Absolute);
+	UE_LOG(LogLastFPSLevelTravel, Log,
+		TEXT("마스터 로비를 거쳐 파티 대기실로 이동합니다: BattleDef=%s"), *BattleDefinitionId.ToString());
 	return ELastFPSTravelRequestResult::Accepted;
 }
 

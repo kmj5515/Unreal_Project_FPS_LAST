@@ -372,6 +372,27 @@ void ALastFPSItemPickupActor::TryGrant(AActor* OtherActor)
     FinishPickup();
 }
 
+bool ALastFPSItemPickupActor::CanGrantTo(const ALastFPSHero& Hero) const
+{
+    if (!ItemRowId.IsNone() && Count > 0)
+    {
+        return true;
+    }
+
+    if (HealEffectClass && Hero.GetHealth() < Hero.GetMaxHealth())
+    {
+        return true;
+    }
+
+    if (ReserveAmmoAmount > 0)
+    {
+        const UWeaponComponent* WeaponComponent = Hero.GetWeaponComponent();
+        return WeaponComponent && WeaponComponent->GetMissingReserveAmmo() > 0;
+    }
+
+    return false;
+}
+
 bool ALastFPSItemPickupActor::TryGrantItem(ALastFPSHero& Hero) const
 {
     if (ItemRowId.IsNone() || Count <= 0)

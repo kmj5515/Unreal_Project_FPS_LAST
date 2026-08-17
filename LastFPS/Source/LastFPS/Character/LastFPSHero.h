@@ -40,9 +40,6 @@ public:
     virtual void PawnClientRestart() override;
     virtual void OnRep_PlayerState() override;
 
-    UFUNCTION(NetMulticast, Unreliable)
-    void Multicast_PlayWeaponFireEffects();
-
     UPROPERTY(BlueprintAssignable, Category="LastFPS|Aiming")
     FLastFPSHeroAimingChanged OnAimingChanged;
 
@@ -113,10 +110,13 @@ protected:
     void EnsureDefaultInputMapping();
 
     /**
-     * 맵 규칙에 따라 EquipmentSubsystem 의 무기 로드아웃을 WeaponComponent 에 반영한다(서버 권한).
+     * 맵 규칙에 따라 PlayerState 에 확정된 무기 로드아웃을 WeaponComponent 에 반영한다(서버 권한).
      * 전투 맵이 아니면 맨손 상태로 되돌린다.
      */
     void ApplyEquipmentWeaponLoadout();
+
+    /** 소유 클라이언트가 장비를 다시 제출하면 무기도 함께 갱신한다. */
+    virtual void OnEquipmentLoadoutRefreshed() override;
 
     /**
      * 전투 맵인지 확인하고 펫 클래스가 지정되어 있으면 펫을 소환합니다.
@@ -304,6 +304,10 @@ private:
 
     float ActiveAimSensitivityScale = 1.f;
 
+    /** 설정 슬라이더 0.0 / 1.0 이 매핑되는 룩 입력 배율 범위 (X=최소, Y=최대) */
+    UPROPERTY(EditDefaultsOnly, Category="Aim", meta=(AllowPrivateAccess="true"))
+    FVector2D UserSensitivityScaleRange = FVector2D(0.25f, 2.f);
+
     FVector2D CachedMoveInput = FVector2D::ZeroVector;
     FRotator LocomotionDirectionBaseRotation = FRotator::ZeroRotator;
     bool bHasMoveInputAction = false;
@@ -346,6 +350,8 @@ private:
 	void UpdateSpeedBoostCameraOffset(float EffectiveMoveSpeed);
 	void RefreshCameraTargets();
 	void RefreshAimSensitivity();
+	/** 유저 설정(0~1 정규화) → 실제 룩 입력 배율. 설정 변경 즉시 반영되도록 매 입력마다 조회한다. */
+	float ResolveUserSensitivityScale() const;
 	float ResolveAimInterpSpeed() const;
 
     void HandleAbilityInput(const FInputActionValue& value, FGameplayTag InputID);

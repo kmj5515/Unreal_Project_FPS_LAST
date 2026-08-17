@@ -20,7 +20,7 @@ protected:
 		const FGameplayAbilityActorInfo* ActorInfo,
 		FGameplayAbilityActivationInfo ActivationInfo) const override;
 
-	/** 아바타가 확정된 시점에 쿨다운 신원을 한 번 해석해 캐시한다. */
+	/** 아바타가 바뀌면 캐시를 버린다. 캐릭터가 달라지면 쿨다운 신원도 달라지기 때문이다. */
 	virtual void OnAvatarSet(
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilitySpec& Spec) override;
@@ -49,10 +49,19 @@ protected:
 
 private:
 	/**
+	 * 아직 해석하지 못했으면 지금 해석해 캐시한다.
+	 *
+	 * 아바타 확정 시점에 한 번만 해석하면, 캐릭터 정의 복제가 어빌리티 부여보다 늦게 도착하는
+	 * 클라이언트에서 캐시가 영구히 빈 채로 남는다. 그래서 필요한 시점마다 다시 시도한다.
+	 */
+	void EnsureCooldownIdentity() const;
+
+	/**
 	 * GetCooldownTags 가 포인터를 돌려주므로 주소가 안정적인 인스턴스 저장이 필요하다.
 	 * 모든 어빌리티가 InstancedPerActor 라 인스턴스 멤버로 충분하다.
+	 * const 조회 경로에서 늦게 채워지므로 mutable 이다.
 	 */
-	FGameplayTagContainer CachedCooldownTags;
+	mutable FGameplayTagContainer CachedCooldownTags;
 
-	float CachedCooldownSeconds = 0.f;
+	mutable float CachedCooldownSeconds = 0.f;
 };

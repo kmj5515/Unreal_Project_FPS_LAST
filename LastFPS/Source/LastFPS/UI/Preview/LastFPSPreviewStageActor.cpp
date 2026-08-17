@@ -5,6 +5,7 @@
 #include "Components/LightComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/Scene.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -607,6 +608,44 @@ void ALastFPSPreviewStageActor::ApplyStageLightingIsolation()
 			}
 		}
 	}
+
+	ApplyViewLightingIsolation();
+}
+
+void ALastFPSPreviewStageActor::ApplyViewLightingIsolation() const
+{
+	if (!bIsolateStageExposure)
+	{
+		return;
+	}
+
+	for (ULastFPSPreviewViewComponent* View : Views)
+	{
+		if (!View)
+		{
+			continue;
+		}
+
+		FPostProcessSettings& ViewSettings = View->PostProcessSettings;
+
+		// 최소·최대를 같은 값으로 묶으면 어떤 자동 노출 방식이든 그 값에 고정된다.
+		// 단위는 EV100 이다(위 StageFixedExposureEV100 주석 참고).
+		ViewSettings.bOverride_AutoExposureMinBrightness = true;
+		ViewSettings.bOverride_AutoExposureMaxBrightness = true;
+		ViewSettings.AutoExposureMinBrightness = StageFixedExposureEV100;
+		ViewSettings.AutoExposureMaxBrightness = StageFixedExposureEV100;
+
+		// 레벨 노출 보정이 그대로 얹히면 위에서 고정한 의미가 없다.
+		ViewSettings.bOverride_AutoExposureBias = true;
+		ViewSettings.AutoExposureBias = 0.f;
+
+		// Lumen 은 라이팅 채널을 무시하므로 레벨 GI·반사가 무대까지 새어 든다. 무대는 배치한
+		// 조명만으로 완결돼야 하니 여기서 끊는다.
+		ViewSettings.bOverride_DynamicGlobalIlluminationMethod = true;
+		ViewSettings.DynamicGlobalIlluminationMethod = EDynamicGlobalIlluminationMethod::None;
+		ViewSettings.bOverride_ReflectionMethod = true;
+		ViewSettings.ReflectionMethod = EReflectionMethod::None;
+	}
 }
 
 void ALastFPSPreviewStageActor::RefreshAlignment()
@@ -651,10 +690,24 @@ void ALastFPSPreviewStageActor::PushGazeTarget()
 		}
 
 		UAnimInstance* AnimInstance = PoseMesh->GetAnimInstance();
-		if (AnimInstance && AnimInstance->Implements<ULastFPSPreviewGazeTarget>())
+		if (!AnimInstance || !AnimInstance->Implements<ULastFPSPreviewGazeTarget>())
 		{
-			ILastFPSPreviewGazeTarget::Execute_SetPreviewGazeTarget(AnimInstance, GazeLocation, GazeAlpha);
+			continue;
 		}
+
+		ILastFPSPreviewGazeTarget::Execute_SetPreviewGazeTarget(AnimInstance, GazeLocation, GazeAlpha);
+
+		// 메시가 비어 있는 부속 컴포넌트는 다음 대상을 위해 남겨 둔 빈 그릇이라 무장으로 치지 않는다.
+		bool bHasWeapon = false;
+		for (const USkeletalMeshComponent* AttachmentMesh : SlotRuntime.Attachments)
+		{
+			if (AttachmentMesh && AttachmentMesh->GetSkeletalMeshAsset())
+			{
+				bHasWeapon = true;
+				break;
+			}
+		}
+		ILastFPSPreviewGazeTarget::Execute_SetPreviewEquippedWeapon(AnimInstance, bHasWeapon);
 	}
 }
 

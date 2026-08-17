@@ -76,6 +76,14 @@ private:
 	void HideArrivalContainment();
 	void BeginDelayedEnemyContentPreload();
 	void HandleDelayedEnemyContentLoaded();
+
+	/**
+	 * 정의 에셋만 로드하면 PawnClass(TSoftClassPtr) 는 미로드로 남는다.
+	 * 스폰 시점의 동기 로드 히치를 없애려고 정의 로드 직후 클래스까지 미리 받아 둔다.
+	 */
+	void BeginDelayedEnemySpawnDependencyPreload();
+	void HandleDelayedEnemySpawnDependenciesLoaded();
+	void BeginDelayedEnemyWeaponDependencyPreload();
 	void CancelDelayedEnemyContentPreload();
 	void RequestDestinationVisibility();
 	bool ResolveDestinationTransform(FTransform& OutTransform) const;
@@ -83,6 +91,12 @@ private:
 	void UpdateEncounterObjectiveMarker();
 	void UnregisterEncounterObjectiveMarker();
 	void CompletePendingPawnTransition();
+
+	/** 목적지에서 폰끼리 겹치지 않도록 자리를 찾아 이동시킨다. 실패하면 false. */
+	bool TeleportPawnToDestination(
+		APawn& Pawn,
+		const FTransform& DestinationTransform) const;
+
 	bool BeginArrivalHold(APawn& Pawn);
 	void HandleArrivalHoldFinished();
 	void ReleaseArrivalHold();
@@ -119,16 +133,31 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInterface> LoadedArrivalContainmentMaterial;
 
-	TWeakObjectPtr<APawn> PendingPawn;
-	TWeakObjectPtr<ACharacter> HeldCharacter;
+	/**
+	 * 도착 이동 제한이 걸린 캐릭터 1명과 그 직전 이동 모드.
+	 * 파티원마다 걷기/낙하 등 직전 상태가 다를 수 있어 해제할 값을 개별로 들고 있는다.
+	 */
+	struct FHeldCharacter
+	{
+		TWeakObjectPtr<ACharacter> Character;
+		uint8 MovementMode = 0;
+		uint8 CustomMovementMode = 0;
+	};
+
+	/**
+	 * 이 전환으로 이동시킬 플레이어 폰 전체.
+	 * 트리거를 밟은 1명만 옮기면 나머지 파티원은 닫힌 트리거 앞에 남아 목적지로 갈 수단이 없다.
+	 */
+	TArray<TWeakObjectPtr<APawn>> PendingPawns;
+	TArray<FHeldCharacter> HeldCharacters;
 	TWeakObjectPtr<ALastFPSEnemyCharacter> SpawnedDelayedEnemy;
 	TSharedPtr<FStreamableHandle> ArrivalContainmentLoadHandle;
 	TSharedPtr<FStreamableHandle> DelayedEnemyContentLoadHandle;
+	TSharedPtr<FStreamableHandle> DelayedEnemySpawnDependencyLoadHandle;
+	TSharedPtr<FStreamableHandle> DelayedEnemyWeaponDependencyLoadHandle;
 	FTimerHandle DelayedEnemySpawnTimerHandle;
 	FTimerHandle ArrivalHoldTimerHandle;
 	FTimerHandle ArrivalContainmentTimerHandle;
-	uint8 PreviousMovementMode = 0;
-	uint8 PreviousCustomMovementMode = 0;
 	bool bDestinationLoaded = false;
 	bool bDelayedEnemySpawnScheduled = false;
 	bool bDelayedEnemySpawnDue = false;

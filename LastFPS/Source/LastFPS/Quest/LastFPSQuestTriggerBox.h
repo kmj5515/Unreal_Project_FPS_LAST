@@ -44,5 +44,9 @@ protected:
 	bool bTriggerOnce = true;
 
 private:
+	/** 로컬 플레이어의 도달 통지를 이미 보냈는가 (머신별 상태). */
 	bool bAlreadyTriggered = false;
+
+	/** 서버가 파티 무전을 이미 송출했는가 (서버에서만 의미 있음). */
+	bool bRadioBroadcast = false;
 };

@@ -99,3 +99,6 @@ LastFPS/Content/Editor/BattleScenarios/**
 LastFPS/Plugins/UnrealMCP/
 LastFPS/.mcp.json
 .claude/settings.local.json
+
+# graphify 지식 그래프 산출물 및 AST 캐시 (재생성 가능)
+graphify-out/

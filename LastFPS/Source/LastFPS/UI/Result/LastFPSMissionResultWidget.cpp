@@ -63,7 +63,10 @@ bool ULastFPSMissionResultWidget::NativeOnHandleBackAction()
 
 void ULastFPSMissionResultWidget::HandleConfirmClicked()
 {
+	// CompleteDialog 는 결과 콜백만 실행하고 위젯을 닫지 않는다.
+	// 닫지 않으면 OnDeactivated 가 발생하지 않아, 여기에 묶인 후속 작업(허브 귀환)이 통째로 유실된다.
 	CompleteDialog(ECommonMessagingResult::Confirmed);
+	DeactivateWithAnimation();
 }
 
 void ULastFPSMissionResultWidget::SetupResult(const FLastFPSMissionResult& InResult)

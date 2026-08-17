@@ -42,12 +42,6 @@ void ULastFPSStreamingLevelTransitionSubsystem::OnWorldBeginPlay(
 		return;
 	}
 
-	TArray<AActor*> TriggerActors;
-	UGameplayStatics::GetAllActorsOfClass(
-		&InWorld,
-		ATriggerBox::StaticClass(),
-		TriggerActors);
-
 	int32 InitializedRouteCount = 0;
 	for (const FLastFPSStreamingLevelTransitionRoute* Route : Routes)
 	{
@@ -68,66 +62,142 @@ void ULastFPSStreamingLevelTransitionSubsystem::OnWorldBeginPlay(
 			continue;
 		}
 
-		ATriggerBox* TriggerVolume = nullptr;
-		for (AActor* TriggerActor : TriggerActors)
+		if (!TryConfigureRoute(InWorld, *Route))
 		{
-			if (TriggerActor
-				&& TriggerActor->ActorHasTag(Route->TriggerMarkerTag)
-				&& TriggerActor->ActorHasTag(Route->TriggerRouteTag))
-			{
-				TriggerVolume = Cast<ATriggerBox>(TriggerActor);
-				break;
-			}
-		}
-
-		if (!TriggerVolume)
-		{
-			UE_LOG(
-				LogLastFPSStreamingTransitionSubsystem,
-				Error,
-				TEXT("[%s] 전환 TriggerBox를 찾을 수 없습니다: Marker=%s, RouteTag=%s"),
-				*Route->RouteId.ToString(),
-				*Route->TriggerMarkerTag.ToString(),
-				*Route->TriggerRouteTag.ToString());
+			// 트리거가 아직 스트리밍되지 않았을 수 있다. 서브레벨이 들어오면 다시 시도한다.
+			PendingRoutes.AddUnique(Route);
 			continue;
 		}
 
-		const FName RuntimeName = MakeUniqueObjectName(
-			&InWorld,
-			ALastFPSStreamingLevelTransitionRuntime::StaticClass(),
-			FName(*FString::Printf(
-				TEXT("StreamingTransitionRuntime_%s"),
-				*Route->RouteId.ToString())));
-		FActorSpawnParameters SpawnParameters;
-		SpawnParameters.Name = RuntimeName;
-		SpawnParameters.SpawnCollisionHandlingOverride =
-			ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		SpawnParameters.bDeferConstruction = true;
-
-		ALastFPSStreamingLevelTransitionRuntime* Runtime =
-			InWorld.SpawnActor<ALastFPSStreamingLevelTransitionRuntime>(
-				ALastFPSStreamingLevelTransitionRuntime::StaticClass(),
-				FTransform::Identity,
-				SpawnParameters);
-		if (!Runtime)
-		{
-			UE_LOG(
-				LogLastFPSStreamingTransitionSubsystem,
-				Error,
-				TEXT("[%s] 스트리밍 전환 런타임을 생성하지 못했습니다."),
-				*Route->RouteId.ToString());
-			continue;
-		}
-
-		Runtime->ConfigureRoute(*Route, *TriggerVolume);
-		Runtime->FinishSpawning(FTransform::Identity);
 		++InitializedRouteCount;
+	}
+
+	if (!PendingRoutes.IsEmpty() && !LevelAddedHandle.IsValid())
+	{
+		LevelAddedHandle = FWorldDelegates::LevelAddedToWorld.AddUObject(
+			this,
+			&ULastFPSStreamingLevelTransitionSubsystem::HandleLevelAddedToWorld);
 	}
 
 	UE_LOG(
 		LogLastFPSStreamingTransitionSubsystem,
 		Log,
-		TEXT("스트리밍 레벨 전환 경로 %d개를 초기화했습니다: World=%s"),
+		TEXT("스트리밍 전환 경로 %d개를 구성했습니다. 트리거 대기 중: %d개"),
 		InitializedRouteCount,
-		*InWorld.GetName());
+		PendingRoutes.Num());
+}
+
+void ULastFPSStreamingLevelTransitionSubsystem::HandleLevelAddedToWorld(
+	ULevel* InLevel,
+	UWorld* InWorld)
+{
+	UWorld* OwningWorld = GetWorld();
+	if (!InLevel || !InWorld || InWorld != OwningWorld || PendingRoutes.IsEmpty())
+	{
+		return;
+	}
+
+	for (int32 Index = PendingRoutes.Num() - 1; Index >= 0; --Index)
+	{
+		const FLastFPSStreamingLevelTransitionRoute* Route = PendingRoutes[Index];
+		if (!Route || TryConfigureRoute(*OwningWorld, *Route))
+		{
+			PendingRoutes.RemoveAt(Index);
+		}
+	}
+
+	if (PendingRoutes.IsEmpty())
+	{
+		StopWaitingForPendingRoutes();
+	}
+}
+
+void ULastFPSStreamingLevelTransitionSubsystem::StopWaitingForPendingRoutes()
+{
+	if (LevelAddedHandle.IsValid())
+	{
+		FWorldDelegates::LevelAddedToWorld.Remove(LevelAddedHandle);
+		LevelAddedHandle.Reset();
+	}
+}
+
+void ULastFPSStreamingLevelTransitionSubsystem::Deinitialize()
+{
+	StopWaitingForPendingRoutes();
+	PendingRoutes.Reset();
+	Super::Deinitialize();
+}
+
+bool ULastFPSStreamingLevelTransitionSubsystem::TryConfigureRoute(
+	UWorld& InWorld,
+	const FLastFPSStreamingLevelTransitionRoute& Route)
+{
+	// 스트리밍으로 새 레벨이 들어올 때마다 다시 훑어야 하므로 여기서 수집한다.
+	TArray<AActor*> TriggerActors;
+	UGameplayStatics::GetAllActorsOfClass(
+		&InWorld,
+		ATriggerBox::StaticClass(),
+		TriggerActors);
+
+	ATriggerBox* TriggerVolume = nullptr;
+	for (AActor* TriggerActor : TriggerActors)
+	{
+		if (TriggerActor
+			&& TriggerActor->ActorHasTag(Route.TriggerMarkerTag)
+			&& TriggerActor->ActorHasTag(Route.TriggerRouteTag))
+		{
+			TriggerVolume = Cast<ATriggerBox>(TriggerActor);
+			break;
+		}
+	}
+
+	if (!TriggerVolume)
+	{
+		UE_LOG(
+			LogLastFPSStreamingTransitionSubsystem,
+			Warning,
+			TEXT("[%s] 전환 TriggerBox가 아직 없습니다. 서브레벨 스트리밍을 기다립니다: Marker=%s, RouteTag=%s"),
+			*Route.RouteId.ToString(),
+			*Route.TriggerMarkerTag.ToString(),
+			*Route.TriggerRouteTag.ToString());
+		return false;
+	}
+
+	const FName RuntimeName = MakeUniqueObjectName(
+		&InWorld,
+		ALastFPSStreamingLevelTransitionRuntime::StaticClass(),
+		FName(*FString::Printf(
+			TEXT("StreamingTransitionRuntime_%s"),
+			*Route.RouteId.ToString())));
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Name = RuntimeName;
+	SpawnParameters.SpawnCollisionHandlingOverride =
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SpawnParameters.bDeferConstruction = true;
+
+	ALastFPSStreamingLevelTransitionRuntime* Runtime =
+		InWorld.SpawnActor<ALastFPSStreamingLevelTransitionRuntime>(
+			ALastFPSStreamingLevelTransitionRuntime::StaticClass(),
+			FTransform::Identity,
+			SpawnParameters);
+	if (!Runtime)
+	{
+		UE_LOG(
+			LogLastFPSStreamingTransitionSubsystem,
+			Error,
+			TEXT("[%s] 스트리밍 전환 런타임을 생성하지 못했습니다."),
+			*Route.RouteId.ToString());
+		return false;
+	}
+
+	Runtime->ConfigureRoute(Route, *TriggerVolume);
+	Runtime->FinishSpawning(FTransform::Identity);
+
+	UE_LOG(
+		LogLastFPSStreamingTransitionSubsystem,
+		Log,
+		TEXT("[%s] 스트리밍 전환 경로를 구성했습니다: Trigger=%s"),
+		*Route.RouteId.ToString(),
+		*GetNameSafe(TriggerVolume));
+	return true;
 }

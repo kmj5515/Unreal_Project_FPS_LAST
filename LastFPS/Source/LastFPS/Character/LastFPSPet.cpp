@@ -120,6 +120,8 @@ void ALastFPSPet::OnRep_PetState()
 
 void ALastFPSPet::UpdateMovement(float DeltaTime)
 {
+    ALastFPSHero* Hero = Cast<ALastFPSHero>(OwnerHero.Get());
+
     // 워프 거리 체크 (주인 기준)
     if (AActor* HeroActor = OwnerHero.Get())
     {
@@ -133,8 +135,11 @@ void ALastFPSPet::UpdateMovement(float DeltaTime)
                 + (HeroRight * FollowOffset.Y)
                 + FVector(0.f, 0.f, FollowOffset.Z);
             
-            SetActorLocation(WarpLoc);
-            
+            // 순간이동임을 CMC와 클라이언트 스무딩에 알려야 한다.
+            // SetActorLocation은 bJustTeleported를 세우지 않아 시뮬레이티드 프록시가
+            // 워프 거리를 보간해버린다(펫이 맵을 가로질러 미끄러짐).
+            TeleportTo(WarpLoc, GetActorRotation());
+
             if (AAIController* AICon = Cast<AAIController>(GetController()))
             {
                 AICon->StopMovement();
@@ -147,8 +152,9 @@ void ALastFPSPet::UpdateMovement(float DeltaTime)
         }
     }
 
-    // 타겟 유효성 검사 (액터 파괴 뿐만 아니라 풀(Pool)에 반환되어 비활성화된 경우도 체크)
-    if (!TargetItem.IsValid() || TargetItem->IsActorBeingDestroyed() || TargetItem->ItemRowId.IsNone())
+    // 타겟 유효성 검사 (액터 파괴, 풀(Pool) 반환, 그리고 주인에게 더는 지급되지 않는 픽업)
+    if (!TargetItem.IsValid() || TargetItem->IsActorBeingDestroyed()
+        || !Hero || !TargetItem->CanGrantTo(*Hero))
     {
         TargetItem = nullptr;
 
@@ -255,15 +261,9 @@ void ALastFPSPet::UpdateMovement(float DeltaTime)
             PetState = NewState;
         }
 
-        // 언리얼 기본 회전이 먹히지 않을 경우를 대비한 강제 부드러운 회전 로직
-        if (GetVelocity().SizeSquared() > 10.f)
-        {
-            FRotator TargetRot = GetVelocity().Rotation();
-            TargetRot.Pitch = 0.f;
-            TargetRot.Roll = 0.f;
-            FRotator NewRot = FMath::RInterpTo(GetActorRotation(), TargetRot, DeltaTime, 8.f);
-            SetActorRotation(NewRot);
-        }
+        // 회전은 CMC의 bOrientRotationToMovement에 맡긴다.
+        // 서버에서 매 틱 SetActorRotation으로 덮으면 양자화된 복제 회전과
+        // 클라이언트 로컬 회전이 서로 싸워 떨림이 생긴다. 속도 조절은 RotationRate로 한다.
     }
     else
     {
@@ -284,6 +284,13 @@ void ALastFPSPet::FindNextTarget()
 {
     TargetItem = nullptr;
 
+    // 주인이 없으면 지급 대상이 없으므로 탐색 자체가 의미 없다.
+    const ALastFPSHero* Hero = Cast<ALastFPSHero>(OwnerHero.Get());
+    if (!Hero)
+    {
+        return;
+    }
+
     TArray<FOverlapResult> Overlaps;
     FCollisionObjectQueryParams ObjectParams;
     // PickupObjectChannel (ECC_GameTraceChannel1) 만 검출
@@ -299,7 +306,7 @@ void ALastFPSPet::FindNextTarget()
     {
         if (ALastFPSItemPickupActor* Item = Cast<ALastFPSItemPickupActor>(Result.GetActor()))
         {
-            if (Item->IsActorBeingDestroyed() || Item->ItemRowId.IsNone())
+            if (Item->IsActorBeingDestroyed() || !Item->CanGrantTo(*Hero))
             {
                 continue;
             }

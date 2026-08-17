@@ -134,15 +134,17 @@ void ULastFPSEnemyHealthPresenter::ReleaseEnemyHealthBarFor(const ALastFPSCharac
 
 void ULastFPSEnemyHealthPresenter::Tick(float DeltaTime)
 {
+    // IsAvailable() 로 걸러내면 대상이 파괴된 순간 갱신에서 빠져 마지막 체력 표시가 화면에 그대로 남는다.
+    // 정리 책임이 갱신 함수 안에 있으므로 빈 위젯도 통과시킨다(내부에서 즉시 빠져나온다).
     for (ULastFPSEnemyHealthBarWidget* Widget : EnemyHealthBarPool)
     {
-        if (Widget && !Widget->IsAvailable())
+        if (Widget)
         {
             Widget->UpdateTrackedEnemy(DeltaTime, Settings);
         }
     }
 
-    if (BossHealthBar && !BossHealthBar->IsAvailable())
+    if (BossHealthBar)
     {
         BossHealthBar->UpdateFixedHUDTarget(DeltaTime, Settings);
     }

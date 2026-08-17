@@ -57,8 +57,23 @@ private:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon", meta=(AllowPrivateAccess="true"))
     TObjectPtr<ULastFPSWeaponDefinition> DefaultWeaponDefinition;
 
-    UPROPERTY(Replicated)
+    UFUNCTION()
+    void OnRep_WeaponDefinition();
+
+    void CacheFireEffectAssets();
+
+    UPROPERTY(ReplicatedUsing=OnRep_WeaponDefinition)
     TObjectPtr<ULastFPSWeaponDefinition> WeaponDefinition;
+
+    // 로드된 발사 연출 에셋의 하드 참조. GC로 언로드되지 않도록 유지한다.
+    UPROPERTY(Transient)
+    TObjectPtr<USoundBase> CachedFireSound;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UParticleSystem> CachedMuzzleFlashEffect;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UAnimationAsset> CachedFireAnimation;
 
     UPROPERTY(ReplicatedUsing=OnRep_WeaponMeshAsset)
     TObjectPtr<USkeletalMesh> WeaponMeshAsset;

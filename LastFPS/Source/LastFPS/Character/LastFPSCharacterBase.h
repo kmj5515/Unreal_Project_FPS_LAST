@@ -12,6 +12,8 @@
 class UAbilitySystemComponent;
 class ULastFPSAttributeSet;
 class ULastFPSCharacterDefinition;
+class ULastFPSCharacterVisualData;
+struct FStreamableHandle;
 class UGameplayEffect;
 class UGameplayAbility;
 class UCameraShakeBase;
@@ -19,9 +21,13 @@ class ULastFPSStatusAnimationComponent;
 class ULastFPSStatusOverlayComponent;
 class USoundBase;
 class APlayerState;
+class ALastFPSPlayerState;
 
 class ALastFPSCharacterBase;
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnLastFPSCharacterDeath, ALastFPSCharacterBase* /*DeadChar*/);
+
+/** 캐릭터 메시의 AnimInstance 가 새로 만들어졌음을 알린다. */
+DECLARE_MULTICAST_DELEGATE(FOnLastFPSCharacterAnimInstanceRecreated);
 
 UCLASS(Abstract)
 class LASTFPS_API ALastFPSCharacterBase
@@ -110,11 +116,25 @@ public:
     void SetLastDamageImpulseDirection(const FVector& Direction);
     const FVector& GetLastDamageImpulseDirection() const { return LastDamageImpulseDirection; }
 
-    // 서버: HP 0 도달 시 1회 호출되는 사망 훅. 래치되어 중복 호출은 무시된다.
-    void HandleDeath();
+    /**
+     * 서버: HP 0 도달 시 1회 호출되는 사망 훅. 래치되어 중복 호출은 무시된다.
+     * @param KillerPlayerState 처치한 플레이어. 퀘스트 진행을 그 소유 클라이언트에 통지하는 데 쓴다.
+     *                          환경 피해 등 가해자가 없으면 null.
+     */
+    void HandleDeath(ALastFPSPlayerState* KillerPlayerState = nullptr);
+
+    /** 서버: PlayerState 의 장비 구성이 갱신됐을 때 폰 스탯을 다시 맞춘다. */
+    void Auth_RefreshEquipmentLoadout();
 
     // 서버 사망 시 브로드캐스트. 드랍/미션 등이 구독한다.
     FOnLastFPSCharacterDeath OnDeath;
+
+    /**
+     * 스켈레탈 메시나 AnimBP 교체로 AnimInstance 가 재생성된 직후 브로드캐스트한다.
+     * LinkAnimClassLayers 로 연결한 애님 레이어는 AnimInstance 와 함께 사라지므로,
+     * 레이어를 소유한 컴포넌트가 이 시점에 다시 링크해야 레퍼런스 포즈가 노출되지 않는다.
+     */
+    FOnLastFPSCharacterAnimInstanceRecreated OnAnimInstanceRecreated;
 
     /**
      * 이 캐릭터의 정의. 아웃게임 UI 가 표시용 데이터(시각 데이터 등)를 읽을 때도 쓴다.
@@ -140,6 +160,18 @@ protected:
     virtual void OnMoveSpeedChanged(const FOnAttributeChangeData& Data);
     virtual float ResolveMaxWalkSpeed(float AttributeMoveSpeed) const;
     void ApplyCharacterVisuals(const ULastFPSCharacterDefinition* Definition);
+
+    /** VisualData 가 상주한 뒤 실제 메시·AnimBP 를 교체하는 본문이다. */
+    void ApplyCharacterVisualsInternal(const ULastFPSCharacterVisualData* VisualData);
+
+    /** 비주얼 애셋 비동기 로드 핸들. 로드 중 정의가 바뀌면 콜백에서 걸러낸다. */
+    TSharedPtr<FStreamableHandle> VisualDataLoadHandle;
+
+    /** 서버: PlayerState 가 소유한 장비 구성으로 보정 GE 를 다시 적용한다(이전 GE 제거 포함). */
+    void ApplyEquipmentStats();
+
+    /** 서버: 장비 구성 갱신 후 스탯 외 반영이 필요한 파생 클래스가 재정의한다(무기 로드아웃 등). */
+    virtual void OnEquipmentLoadoutRefreshed();
     void ClearCombatEngaged();
     virtual void OnCombatEngagedChanged();
 
@@ -167,6 +199,16 @@ protected:
     /** BP/에디터에서 캐릭터별 닉네임 지정. 비어 있으면 GetPlayerName() */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LastFPS|Display")
     FString CharacterNickname;
+
+    /**
+     * 레벨에 직접 배치하거나 BP 기본값으로 종류를 고정하는 캐릭터의 정의다.
+     * 복제 멤버 CharacterDefinition 은 Transient 라 저작 값을 담을 수 없고,
+     * 배치형 캐릭터는 PlayerState·PlayerController 해석 경로가 모두 실패하므로
+     * 이 저작 값이 없으면 정의 없이 스폰되어 스탯과 비주얼이 적용되지 않는다.
+     * 런타임에 정의를 지정받는 캐릭터(인카운터 스폰 등)는 비워 둔다.
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LastFPS|Character")
+    TSoftObjectPtr<ULastFPSCharacterDefinition> AuthoredCharacterDefinition;
 
     UPROPERTY(ReplicatedUsing=OnRep_CharacterDefinition, Transient)
     TObjectPtr<ULastFPSCharacterDefinition> CharacterDefinition;

@@ -46,6 +46,13 @@ public:
 
     void InitializePickup(FName InItemRowId, int32 InCount, FVector InLaunchStartOffset);
 
+    /**
+     * 이 히어로에게 지금 지급될 수단이 하나라도 있는지.
+     * 아이템·체력·탄약 픽업이 이 클래스를 공유하므로 외부는 ItemRowId 단독으로 판단하면 안 되고,
+     * 체력·탄약이 이미 가득한 픽업은 밟아도 소비되지 않으므로 여기서 걸러야 한다.
+     */
+    bool CanGrantTo(const ALastFPSHero& Hero) const;
+
     virtual void OnAcquiredFromPool_Implementation() override;
     virtual void OnReleasedToPool_Implementation() override;
     virtual void OnPrepareForPoolRenderWarmup_Implementation() override;

@@ -6,6 +6,8 @@
 #include "Character/Components/LastFPSStatusAnimationComponent.h"
 #include "Character/Components/LastFPSStatusOverlayComponent.h"
 #include "Data/Characters/LastFPSCharacterVisualData.h"
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Data/Definitions/LastFPSCharacterDefinition.h"
 #include "Game/LastFPSPlayerState.h"
@@ -182,6 +184,13 @@ const ULastFPSCharacterDefinition* ALastFPSCharacterBase::ResolveCharacterDefini
         return LastPC->GetSelectedCharacterDefinition();
     }
 
+    // 플레이어 선택 경로가 모두 실패한 뒤에만 저작 값을 쓴다.
+    // (선택된 캐릭터가 있는 플레이어 폰에서 BP 기본값이 선택을 덮지 않도록 마지막 순서에 둔다.)
+    if (!AuthoredCharacterDefinition.IsNull())
+    {
+        return AuthoredCharacterDefinition.LoadSynchronous();
+    }
+
     return nullptr;
 }
 
@@ -192,23 +201,71 @@ void ALastFPSCharacterBase::ApplyCharacterVisuals(const ULastFPSCharacterDefinit
         return;
     }
 
+    // VisualData 는 스켈레탈 메시와 AnimBP 를 하드 참조로 물고 있어 로드 비용이 크다.
+    // 동기 로드하면 다른 플레이어가 시야에 들어오는 순간 게임 스레드가 통째로 멈춘다.
+    // 이미 메모리에 있으면 그대로 적용하고, 아니면 받아 둔 뒤 적용한다.
+    if (ULastFPSCharacterVisualData* LoadedVisualData = Definition->VisualData.Get())
+    {
+        ApplyCharacterVisualsInternal(LoadedVisualData);
+        return;
+    }
+
+    TWeakObjectPtr<ALastFPSCharacterBase> WeakThis(this);
+    TWeakObjectPtr<const ULastFPSCharacterDefinition> WeakDefinition(Definition);
+    VisualDataLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+        Definition->VisualData.ToSoftObjectPath(),
+        FStreamableDelegate::CreateLambda(
+            [WeakThis, WeakDefinition]()
+            {
+                ALastFPSCharacterBase* Character = WeakThis.Get();
+                const ULastFPSCharacterDefinition* ResolvedDefinition = WeakDefinition.Get();
+                if (!Character || !ResolvedDefinition)
+                {
+                    return;
+                }
+
+                // 로드 중에 정의가 교체됐다면 낡은 비주얼을 덮어씌우지 않는다.
+                if (Character->ResolveCharacterDefinition() != ResolvedDefinition)
+                {
+                    return;
+                }
+
+                Character->ApplyCharacterVisualsInternal(ResolvedDefinition->VisualData.Get());
+            }),
+        FStreamableManager::AsyncLoadHighPriority);
+}
+
+void ALastFPSCharacterBase::ApplyCharacterVisualsInternal(
+    const ULastFPSCharacterVisualData* VisualData)
+{
     USkeletalMeshComponent* MeshComp = GetMesh();
-    if (!MeshComp)
+    if (!MeshComp || !VisualData)
     {
         return;
     }
 
-    if (ULastFPSCharacterVisualData* VisualData = Definition->VisualData.LoadSynchronous())
-    {
-        if (VisualData->SkeletalMesh)
-        {
-            MeshComp->SetSkeletalMesh(VisualData->SkeletalMesh);
-        }
+    // 메시·AnimBP 교체는 AnimInstance 를 다시 만든다. 실제로 바뀐 경우에만 재생성되므로
+    // 구독자에게 헛된 재링크를 요구하지 않도록 변경 여부를 먼저 판단한다.
+    const bool bMeshChanged =
+        VisualData->SkeletalMesh != nullptr
+        && MeshComp->GetSkeletalMeshAsset() != VisualData->SkeletalMesh.Get();
+    const bool bAnimClassChanged =
+        VisualData->AnimClass != nullptr
+        && MeshComp->GetAnimClass() != VisualData->AnimClass.Get();
 
-        if (VisualData->AnimClass)
-        {
-            MeshComp->SetAnimInstanceClass(VisualData->AnimClass);
-        }
+    if (bMeshChanged)
+    {
+        MeshComp->SetSkeletalMesh(VisualData->SkeletalMesh);
+    }
+
+    if (bAnimClassChanged)
+    {
+        MeshComp->SetAnimInstanceClass(VisualData->AnimClass);
+    }
+
+    if (bMeshChanged || bAnimClassChanged)
+    {
+        OnAnimInstanceRecreated.Broadcast();
     }
 }
 
@@ -351,7 +408,7 @@ void ALastFPSCharacterBase::SetLastDamageImpulseDirection(const FVector& Directi
     LastDamageImpulseDirection = Direction.GetSafeNormal2D();
 }
 
-void ALastFPSCharacterBase::HandleDeath()
+void ALastFPSCharacterBase::HandleDeath(ALastFPSPlayerState* KillerPlayerState)
 {
     if (!HasAuthority() || bHasDied)
         return;
@@ -359,15 +416,58 @@ void ALastFPSCharacterBase::HandleDeath()
     bHasDied = true;
     OnDeath.Broadcast(this);
 
-    // 처치 목표(KillTarget) 통지 — 퀘스트 진행은 레벨 이동에도 유지되는 GameInstance 서브시스템이 소유하므로
-    // PlayerState 를 거치지 않고 여기서 직접 통지한다. QuestKillTag 가 비면(플레이어/아군) 서브시스템이 무시한다.
-    if (UGameInstance* GI = GetGameInstance())
+    // 처치 목표(KillTarget) 통지 — 퀘스트 진행은 GameInstance 서브시스템이 소유하므로 프로세스마다 하나뿐이다.
+    // 서버에서 직접 올리면 리슨 서버 호스트의 진행만 쌓이고 원격 플레이어는 아무것도 받지 못한다.
+    // 킬러의 PlayerState 를 거쳐 그 소유 클라이언트에서 올린다. QuestKillTag 가 비면 서브시스템이 무시한다.
+    if (KillerPlayerState)
     {
-        if (ULastFPSQuestSubsystem* Quest = GI->GetSubsystem<ULastFPSQuestSubsystem>())
-        {
-            Quest->NotifyObjectiveKill(QuestKillTag);
-        }
+        KillerPlayerState->Auth_NotifyObjectiveKill(QuestKillTag);
     }
+}
+
+void ALastFPSCharacterBase::Auth_RefreshEquipmentLoadout()
+{
+    if (!HasAuthority())
+    {
+        return;
+    }
+
+    ApplyEquipmentStats();
+    OnEquipmentLoadoutRefreshed();
+}
+
+void ALastFPSCharacterBase::OnEquipmentLoadoutRefreshed()
+{
+    // 기본 캐릭터는 스탯만 갖는다. 무기를 드는 파생 클래스가 재정의한다.
+}
+
+void ALastFPSCharacterBase::ApplyEquipmentStats()
+{
+    ALastFPSPlayerState* PS = GetPlayerState<ALastFPSPlayerState>();
+    UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+    if (!HasAuthority() || !PS || !ASC)
+    {
+        // 장비는 플레이어만 갖는다. PlayerState 가 없는 적·NPC 는 정의 스탯만으로 완결된다.
+        return;
+    }
+
+    const UGameInstance* GameInstance = GetGameInstance();
+    const ULastFPSEquipmentSubsystem* Equipment =
+        GameInstance ? GameInstance->GetSubsystem<ULastFPSEquipmentSubsystem>() : nullptr;
+    if (!Equipment)
+    {
+        return;
+    }
+
+    // 재적용 시 이전 GE 를 반드시 제거한다. 남겨두면 장비를 바꿀 때마다 보정이 중첩된다.
+    if (PS->EquipmentStatsHandle.IsValid())
+    {
+        ASC->RemoveActiveGameplayEffect(PS->EquipmentStatsHandle);
+        PS->EquipmentStatsHandle = FActiveGameplayEffectHandle();
+    }
+
+    PS->EquipmentStatsHandle =
+        Equipment->ApplyStatTotalsToAbilitySystem(ASC, Equipment->ComputeTotalsForSlots(PS->GetEquippedSlots()));
 }
 
 void ALastFPSCharacterBase::BeginPlay()
@@ -533,20 +633,27 @@ void ALastFPSCharacterBase::InitAbilitySystem()
 
         if (!bDefaultsAlreadyGranted)
         {
-            if (GM)
+            if (!ResolvedDefinition)
             {
-                GM->ApplyCharacterDefinitionToAbilitySystem(ASC, ResolvedDefinition);
+                // 정의가 없으면 StatData 가 적용되지 않아 AttributeSet 의 C++ 기본값(체력 100)으로 남는다.
+                // 밸런스가 통째로 어긋나는 상황이라 조용히 넘어가지 않는다.
+                UE_LOG(LogTemp, Error,
+                    TEXT("%s: CharacterDefinition 을 해석하지 못해 기본 스탯을 적용하지 못했습니다. "
+                         "레벨 배치 캐릭터라면 AuthoredCharacterDefinition 을 지정하십시오."),
+                    *GetName());
+            }
+            else
+            {
+                // 스탯 적용은 GameMode 종류에 의존하지 않는다.
+                // 정의별 차이는 GiveToAbilitySystem 의 virtual 이 담당하므로
+                // (Hero/Enemy 정의가 override) GameMode 를 거칠 이유가 없고,
+                // ALastFPSGameModeBase 가 아닌 맵에서도 스탯이 그대로 적용된다.
+                ResolvedDefinition->GiveToAbilitySystem(ASC);
             }
 
             // 베이스 스탯 적용 직후, 장착 장비(모듈·리액터·외장 부품) 보정을 Infinite GE 로 얹는다 (서버 권위).
             // EquipmentSubsystem 이 모듈까지 합산하므로 LoadoutSubsystem 을 따로 적용하면 이중 반영된다.
-            if (UGameInstance* GI = GetGameInstance())
-            {
-                if (ULastFPSEquipmentSubsystem* Equipment = GI->GetSubsystem<ULastFPSEquipmentSubsystem>())
-                {
-                    Equipment->ApplyToAbilitySystem(ASC);
-                }
-            }
+            ApplyEquipmentStats();
 
             GiveDefaultAbilities();
             ApplyDefaultEffects();

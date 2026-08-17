@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "ActiveGameplayEffectHandle.h"
 #include "Data/Tables/LastFPSEquipmentStatTypes.h"
 #include "Data/Tables/LastFPSItemData.h"
 #include "LastFPSEquipmentSubsystem.generated.h"
@@ -12,22 +13,8 @@ class ULastFPSEconomySubsystem;
 class ULastFPSLoadoutSubsystem;
 class ULastFPSWeaponDefinition;
 
-/**
- * 장비 슬롯 카테고리.
- *
- * 슬롯 위젯·선택 패널은 이 값 하나만 들고 다니며 동작하고, 카테고리별 규칙(슬롯 수, 허용 아이템 타입,
- * 데이터 테이블)은 서브시스템 내부의 단일 서술 표에서 해석한다. 카테고리를 늘릴 때 UI 코드는 손대지 않는다.
- */
-UENUM(BlueprintType)
-enum class ELastFPSEquipmentSlotType : uint8
-{
-	Weapon            UMETA(DisplayName="무기"),
-	Reactor           UMETA(DisplayName="리액터"),
-	ExternalComponent UMETA(DisplayName="외장 부품"),
-	Module            UMETA(DisplayName="모듈"),
-
-	Count             UMETA(Hidden),
-};
+// ELastFPSEquipmentSlotType 과 FLastFPSEquippedSlot 은 LastFPSEquipmentStatTypes.h 로 옮겼다.
+// (PlayerState 가 이 서브시스템 헤더 전체를 포함하지 않고도 장비 구성을 복제할 수 있게 하기 위함)
 
 /**
  * 장비 구성이 바뀔 때 브로드캐스트한다.
@@ -108,8 +95,32 @@ public:
 	 * 합산 보정을 ASC 에 Infinite GameplayEffect 로 적용 (서버 권위에서 폰 스폰 시 호출).
 	 * 베이스 스탯(ULastFPSCharacterStatData)이 적용된 "뒤"에 호출할 것.
 	 * 모든 장비 카테고리를 하나의 GE 로 합쳐 적용 지점을 단일화한다.
+	 *
+	 * 합계를 인자로 받는 이유: 서버는 자신의 장비가 아니라 각 플레이어가 제출한 구성으로 계산해야 한다.
+	 * 반환한 핸들은 호출자가 보관했다가 재적용 전에 제거해야 보정이 중첩되지 않는다.
 	 */
-	void ApplyToAbilitySystem(UAbilitySystemComponent* ASC) const;
+	FActiveGameplayEffectHandle ApplyStatTotalsToAbilitySystem(
+		UAbilitySystemComponent* ASC, const FLastFPSEquipmentStatTotals& Bonus) const;
+
+	// ── 서버 반영용 (소유 클라이언트 → 서버) ─────────────────────
+	// GameInstance 는 프로세스당 하나뿐이라, 서버가 이 서브시스템을 직접 읽으면
+	// 리슨 서버에서는 모든 플레이어가 호스트의 장비를, 데디케이티드에서는 아무도 장비를 받지 못한다.
+	// 아래 세 함수는 "누구의 장비인지"를 인자로 받아 자신의 슬롯 상태를 읽지 않는다.
+
+	/** 현재 로컬 장비 구성을 서버 제출 형태로 직렬화한다. 소유 클라이언트에서 호출한다. */
+	TArray<FLastFPSEquippedSlot> BuildEquippedSlots() const;
+
+	/** 제출받은 구성으로 스탯 합계를 계산한다. 수치는 서버가 데이터 테이블에서 다시 구한다. */
+	FLastFPSEquipmentStatTotals ComputeTotalsForSlots(const TArray<FLastFPSEquippedSlot>& Slots) const;
+
+	/** 아이템 행에 연결된 무기 정의. 슬롯 상태와 무관하게 조회한다. */
+	ULastFPSWeaponDefinition* FindWeaponDefinitionForItem(FName ItemRowId) const;
+
+	/**
+	 * 제출된 항목이 형식상 유효한지 검사한다. 슬롯 범위와 아이템 타입만 본다.
+	 * 보유 수량은 클라이언트의 Economy 에만 있어 서버가 확인할 수 없다.
+	 */
+	bool IsSubmittedSlotWellFormed(const FLastFPSEquippedSlot& Entry) const;
 
 	UPROPERTY(BlueprintAssignable, Category="LastFPS|Equipment")
 	FOnLastFPSEquipmentChanged OnEquipmentChanged;

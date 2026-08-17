@@ -129,8 +129,11 @@ FReply ULastFPSWeaponPreviewWidget::NativeOnMouseMove(const FGeometry& InGeometr
 {
 	if (bDragging && PreviewStage)
 	{
-		PreviewStage->AddYaw(
-			LastFPSUITags::PreviewSlot_Weapon(), -InMouseEvent.GetCursorDelta().X * RotationSpeed);
+		const float DeltaYaw = -InMouseEvent.GetCursorDelta().X * RotationSpeed;
+		if (PreviewStage->AddYaw(LastFPSUITags::PreviewSlot_Weapon(), DeltaYaw))
+		{
+			DraggedYaw += DeltaYaw;
+		}
 		return FReply::Handled();
 	}
 	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
@@ -144,6 +147,22 @@ FReply ULastFPSWeaponPreviewWidget::NativeOnMouseButtonUp(const FGeometry& InGeo
 		return FReply::Handled().ReleaseMouseCapture();
 	}
 	return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+}
+
+void ULastFPSWeaponPreviewWidget::NativeTick(const FGeometry& InGeometry, const float InDeltaTime)
+{
+	Super::NativeTick(InGeometry, InDeltaTime);
+
+	// 놓은 뒤에만 복귀시킨다. 드래그 중이면 사용자가 잡고 있는 각도가 우선이다.
+	if (bDragging || !PreviewStage || FMath::IsNearlyZero(DraggedYaw))
+	{
+		return;
+	}
+
+	// FInterpTo 는 목표에 충분히 가까우면 정확히 0 을 돌려주므로 잔여 각도가 남지 않는다.
+	const float NextYaw = FMath::FInterpTo(DraggedYaw, 0.f, InDeltaTime, ReturnInterpSpeed);
+	PreviewStage->AddYaw(LastFPSUITags::PreviewSlot_Weapon(), NextYaw - DraggedYaw);
+	DraggedYaw = NextYaw;
 }
 
 void ULastFPSWeaponPreviewWidget::PopulateStats()

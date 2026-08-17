@@ -4,6 +4,8 @@
 #include "Character/Components/WeaponComponent.h"
 #include "Data/Definitions/LastFPSWeaponDefinition.h"
 #include "Game/LastFPSGameModeBase.h"
+#include "Game/LastFPSGameUserSettings.h"
+#include "Game/LastFPSPlayerState.h"
 #include "Inventory/LastFPSEquipmentSubsystem.h"
 #include "Character/LastFPSPet.h"
 #include "Blueprint/UserWidget.h"
@@ -88,7 +90,14 @@ ALastFPSHero::ALastFPSHero()
 void ALastFPSHero::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-    DOREPLIFETIME(ALastFPSHero, CombatState);
+    // CombatState 는 LocalPredicted 어빌리티가 소유 클라와 서버에서 각각 직접 쓰는 값이다.
+    // 그런데 일반 복제 프로퍼티라 예측 롤백 대상이 아니므로, 소유자에게도 보내면 뒤늦게 도착한
+    // 서버의 낡은 값이 OnRep 으로 로컬 예측값을 덮어쓴다. 핑이 튈 때 그 창이 넓어져
+    // (1) Attacking 이 남아 GA_BasicShoot 의 Idle 게이트에 걸려 공격이 씹히고
+    // (2) OnRep_CombatState 가 RefreshMaxWalkSpeed 를 불러 이동 속도가 되돌아가면서
+    //     CMC 가 매 ServerMove 마다 위치를 보정해 러버밴딩이 난다.
+    // 소유자는 자기 예측값을 그대로 쓰고, 표현용으로 값이 필요한 다른 클라에만 보낸다.
+    DOREPLIFETIME_CONDITION(ALastFPSHero, CombatState, COND_SkipOwner);
     DOREPLIFETIME(ALastFPSHero, JumpStartSequence);
     DOREPLIFETIME(ALastFPSHero, bIsSprinting);
 }
@@ -131,15 +140,34 @@ void ALastFPSHero::ApplyEquipmentWeaponLoadout()
 		return;
 	}
 
+	// 장비는 각 플레이어의 GameInstance 에만 있으므로 서브시스템을 직접 읽으면 안 된다.
+	// (리슨 서버에서는 호스트 장비를, 데디케이티드에서는 빈 장비를 모두에게 물린다.)
+	// 소유 클라이언트가 제출해 PlayerState 에 확정된 구성만 신뢰한다.
+	const ALastFPSPlayerState* PS = GetPlayerState<ALastFPSPlayerState>();
+	if (!PS)
+	{
+		return;
+	}
+
 	const int32 SlotCount = Equipment->GetSlotCount(ELastFPSEquipmentSlotType::Weapon);
 	TArray<ULastFPSWeaponDefinition*> SlotDefinitions;
-	SlotDefinitions.Reserve(SlotCount);
-	for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex)
+	SlotDefinitions.AddZeroed(SlotCount);
+	for (const FLastFPSEquippedSlot& Entry : PS->GetEquippedSlots())
 	{
-		SlotDefinitions.Add(Equipment->GetWeaponDefinitionForSlot(SlotIndex));
+		if (Entry.SlotType == ELastFPSEquipmentSlotType::Weapon
+			&& SlotDefinitions.IsValidIndex(Entry.SlotIndex))
+		{
+			SlotDefinitions[Entry.SlotIndex] = Equipment->FindWeaponDefinitionForItem(Entry.ItemRowId);
+		}
 	}
 
 	WeaponComponent->SetWeaponLoadout(SlotDefinitions);
+}
+
+void ALastFPSHero::OnEquipmentLoadoutRefreshed()
+{
+	Super::OnEquipmentLoadoutRefreshed();
+	ApplyEquipmentWeaponLoadout();
 }
 
 void ALastFPSHero::TrySpawnPet()
@@ -668,6 +696,18 @@ void ALastFPSHero::RefreshAimSensitivity()
 		FMath::Max(ZoomRatio * ScopeSettings->ScopeSensitivityMultiplier, KINDA_SMALL_NUMBER);
 }
 
+float ALastFPSHero::ResolveUserSensitivityScale() const
+{
+	const ULastFPSGameUserSettings* UserSettings = ULastFPSGameUserSettings::Get();
+	if (!UserSettings)
+	{
+		return 1.f;
+	}
+
+	return FMath::Lerp(UserSensitivityScaleRange.X, UserSensitivityScaleRange.Y,
+		FMath::Clamp(UserSettings->MouseSensitivity, 0.f, 1.f));
+}
+
 float ALastFPSHero::ResolveAimInterpSpeed() const
 {
 	const FLastFPSWeaponScopeSettings* ScopeSettings =
@@ -851,7 +891,7 @@ void ALastFPSHero::ClearMoveInput(const FInputActionValue& Value)
 
 void ALastFPSHero::Look(const FInputActionValue& Value)
 {
-    const FVector2D LookVector = Value.Get<FVector2D>() * ActiveAimSensitivityScale;
+    const FVector2D LookVector = Value.Get<FVector2D>() * ActiveAimSensitivityScale * ResolveUserSensitivityScale();
     AddControllerYawInput(LookVector.X);
     AddControllerPitchInput(LookVector.Y);
 }
@@ -1235,8 +1275,3 @@ void ALastFPSHero::UpdateAliveCollisionState(bool bAlive)
     }
 }
 
-void ALastFPSHero::Multicast_PlayWeaponFireEffects_Implementation()
-{
-    if (GetNetMode() == NM_DedicatedServer || IsLocallyControlled()) return;
-    if (WeaponComponent) WeaponComponent->PlayFireEffects();
-}

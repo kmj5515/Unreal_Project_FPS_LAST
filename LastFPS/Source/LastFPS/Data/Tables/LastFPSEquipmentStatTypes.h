@@ -33,6 +33,48 @@ enum class ELastFPSEquipmentStat : uint8
 	Count                    UMETA(Hidden),
 };
 
+/**
+ * 장비 슬롯 카테고리.
+ *
+ * 슬롯 위젯·선택 패널은 이 값 하나만 들고 다니며 동작하고, 카테고리별 규칙(슬롯 수, 허용 아이템 타입,
+ * 데이터 테이블)은 ULastFPSEquipmentSubsystem 내부의 단일 서술 표에서 해석한다.
+ *
+ * 서브시스템이 아니라 이 헤더에 두는 이유: 장비 구성을 서버로 복제하는 PlayerState 가 이 열거형만
+ * 필요로 하는데, GameInstanceSubsystem 헤더 전체를 끌어오지 않게 하기 위함이다.
+ */
+UENUM(BlueprintType)
+enum class ELastFPSEquipmentSlotType : uint8
+{
+	Weapon            UMETA(DisplayName="무기"),
+	Reactor           UMETA(DisplayName="리액터"),
+	ExternalComponent UMETA(DisplayName="외장 부품"),
+	Module            UMETA(DisplayName="모듈"),
+
+	Count             UMETA(Hidden),
+};
+
+/**
+ * 장착 슬롯 한 칸의 서버 제출 형태.
+ *
+ * 장비 상태는 소유 클라이언트의 GameInstance 에만 존재하므로, 서버가 폰에 반영하려면
+ * 이 목록을 복제 경로로 받아야 한다. 스탯 값이 아니라 아이템 행 ID 만 담는다.
+ * 서버가 같은 데이터 테이블에서 스탯을 다시 계산해야 클라이언트가 수치를 조작할 수 없다.
+ */
+USTRUCT()
+struct LASTFPS_API FLastFPSEquippedSlot
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	ELastFPSEquipmentSlotType SlotType = ELastFPSEquipmentSlotType::Weapon;
+
+	UPROPERTY()
+	int32 SlotIndex = 0;
+
+	UPROPERTY()
+	FName ItemRowId;
+};
+
 /** 장비 1개가 부여하는 스탯 보정 1건 (가산). 리액터·외장 부품 테이블이 공유한다. */
 USTRUCT(BlueprintType)
 struct LASTFPS_API FLastFPSEquipmentStatMod

@@ -25,9 +25,10 @@
 #include "Encounter/LastFPSRoomEncounterSubsystem.h"
 #include "Game/Loading/LastFPSLoadingProcessSubsystem.h"
 #include "Game/LastFPSGameInstance.h"
-#include "Game/LastFPSGameModeBase.h"
 #include "Game/LastFPSGameStateBase.h"
 #include "Game/LastFPSPlayerState.h"
+#include "Inventory/LastFPSEquipmentSubsystem.h"
+#include "Utility/LastFPSTeamTypes.h"
 #include "EnhancedInputComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "InputAction.h"
@@ -81,6 +82,26 @@ void ALastFPSPlayerController::ClientReturnToHub_Implementation()
 		GetGameInstance<ULastFPSGameInstance>())
 	{
 		LastFPSGameInstance->RequestTravelToHub();
+	}
+}
+
+bool ALastFPSPlayerController::Server_ReportPartyQuestProgress_Validate(
+	const FName QuestId,
+	const int32 ObjectiveIndex,
+	const int32 Progress)
+{
+	// 값의 상한은 서버가 목표 요구량으로 다시 클램프한다. 여기서는 형태만 거른다.
+	return !QuestId.IsNone() && ObjectiveIndex >= 0 && Progress >= 0;
+}
+
+void ALastFPSPlayerController::Server_ReportPartyQuestProgress_Implementation(
+	const FName QuestId,
+	const int32 ObjectiveIndex,
+	const int32 Progress)
+{
+	if (ULastFPSQuestSubsystem* Quest = ULastFPSQuestSubsystem::Get(this))
+	{
+		Quest->Auth_ReportPartyObjectiveProgress(QuestId, ObjectiveIndex, Progress);
 	}
 }
 
@@ -156,7 +177,9 @@ namespace
 #endif
 
 ALastFPSPlayerController::ALastFPSPlayerController()
-    : TeamId(FGenericTeamId::NoTeam)
+    // NoTeam 으로 두면 이 컨트롤러가 가해자인 모든 피해가 "진영 미상"이 되어
+    // 아군 판정을 통과하지 못한다. 즉 플레이어가 아군·펫·수호 목표까지 전부 때릴 수 있다.
+    : TeamId(FGenericTeamId(static_cast<uint8>(ELastFPSTeam::Player)))
 {
     // 액션 ↔ 화면 짝은 PC 블루프린트에서 저작한다. 생성자에서 에셋을 찾으면 C++ 이 콘텐츠 경로에 묶인다.
 }
@@ -206,12 +229,16 @@ void ALastFPSPlayerController::BeginPlay()
         TryPushHUDToUILayout();
     }
 
-    CacheUIConfigFromGameMode();
-
+    // 태그 캐시는 OpenInitialScreen 이 매 시도마다 직접 수행한다(클라이언트는 GameState 복제가 늦다).
     OpenInitialScreen();
     TryBindMenuLayerInputSync();
 
     OnSelectedCharacterIndexChanged(SelectedCharacterIndex);
+
+    // 장비는 각 플레이어의 GameInstance 에만 있어 서버가 직접 읽을 수 없다.
+    // 소유 클라이언트가 접속 직후 한 번, 이후 변경될 때마다 서버로 제출한다.
+    BindEquipmentSubmission();
+    SubmitEquipmentLoadoutToServer();
 
     UGameInstance* GameInstance = GetGameInstance();
     if (ULastFPSLoadingProcessSubsystem* LoadingProcesses = GameInstance
@@ -225,6 +252,8 @@ void ALastFPSPlayerController::BeginPlay()
 
 void ALastFPSPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    UnbindEquipmentSubmission();
+
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearTimer(InitialScreenRetryTimerHandle);
@@ -300,45 +329,68 @@ void ALastFPSPlayerController::CloseScreen(FGameplayTag ScreenTag)
     }
 }
 
-void ALastFPSPlayerController::CacheUIConfigFromGameMode()
+bool ALastFPSPlayerController::CacheUIConfigFromGameState()
 {
-    // "어떤 화면을 띄울지"는 맵 규칙이라 GameMode가 소유 → 여기서 읽어와 캐시.
-    // (네트워크 클라이언트는 GetAuthGameMode가 null → 태그 비어 동작 안 함. standalone/호스트 OK.
-    //  완전 네트워크 대응은 GameState 복제로 추후. TODO)
-    if (const UWorld* World = GetWorld())
+    // "어떤 화면을 띄울지"는 맵 규칙이라 소유는 GameMode 에 두되, GameMode 는 서버에만 존재해
+    // 클라이언트가 직접 읽을 수 없다. 값은 GameState 로 복제되므로 모든 머신이 여기서 읽는다.
+    const UWorld* World = GetWorld();
+    const ALastFPSGameStateBase* GameState =
+        World ? World->GetGameState<ALastFPSGameStateBase>() : nullptr;
+    if (!GameState || !GameState->HasMapUIRules())
     {
-        if (const ALastFPSGameModeBase* GM = World->GetAuthGameMode<ALastFPSGameModeBase>())
-        {
-            InitialScreenTag = GM->GetInitialScreenTag();
-            EscMenuScreenTag = GM->GetEscMenuScreenTag();
-        }
+        return false;
     }
+
+    const FLastFPSMapUIRules& Rules = GameState->GetMapUIRules();
+    InitialScreenTag = Rules.InitialScreenTag;
+    EscMenuScreenTag = Rules.EscMenuScreenTag;
+    return true;
 }
 
-void ALastFPSPlayerController::OpenInitialScreen()
+void ALastFPSPlayerController::ScheduleInitialScreenRetry()
 {
-    if (!InitialScreenTag.IsValid())
-    {
-        return;
-    }
-
-    // PrimaryGameLayout이 준비돼야 push 가능 → 준비될 때까지 재시도.
-    if (UPrimaryGameLayout::GetPrimaryGameLayout(this))
-    {
-        if (UWorld* World = GetWorld())
-        {
-            World->GetTimerManager().ClearTimer(InitialScreenRetryTimerHandle);
-        }
-        OpenScreen(InitialScreenTag);
-        return;
-    }
-
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().SetTimer(
             InitialScreenRetryTimerHandle, this,
             &ALastFPSPlayerController::OpenInitialScreen, 0.1f, true);
     }
+}
+
+void ALastFPSPlayerController::ClearInitialScreenRetry()
+{
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(InitialScreenRetryTimerHandle);
+    }
+}
+
+void ALastFPSPlayerController::OpenInitialScreen()
+{
+    // 클라이언트는 GameState 복제가 이 PlayerController 의 BeginPlay 보다 늦게 도착할 수 있다.
+    // 예전에는 태그가 비면 재시도 없이 반환해, 클라이언트에서 초기 화면이 영영 열리지 않았다.
+    if (!CacheUIConfigFromGameState())
+    {
+        ScheduleInitialScreenRetry();
+        return;
+    }
+
+    // 규칙은 도착했는데 태그가 비어 있으면 이 맵은 초기 화면이 없다는 뜻이다. 재시도를 멈춘다.
+    if (!InitialScreenTag.IsValid())
+    {
+        ClearInitialScreenRetry();
+        return;
+    }
+
+    // PrimaryGameLayout이 준비돼야 push 가능 → 준비될 때까지 재시도.
+    if (UPrimaryGameLayout::GetPrimaryGameLayout(this))
+    {
+        ClearInitialScreenRetry();
+        OpenScreen(InitialScreenTag);
+        return;
+    }
+
+    ScheduleInitialScreenRetry();
 }
 
 // ── HUD (인게임 팀 영역 — 휴면) ─────────────────────────────────────
@@ -1234,4 +1286,56 @@ void ALastFPSPlayerController::ServerSetSelectedCharacterIndex_Implementation(co
 void ALastFPSPlayerController::OnRep_SelectedCharacterIndex()
 {
     OnSelectedCharacterIndexChanged(SelectedCharacterIndex);
+}
+
+ULastFPSEquipmentSubsystem* ALastFPSPlayerController::GetLocalEquipmentSubsystem() const
+{
+    UGameInstance* GameInstance = GetGameInstance();
+    return GameInstance ? GameInstance->GetSubsystem<ULastFPSEquipmentSubsystem>() : nullptr;
+}
+
+void ALastFPSPlayerController::BindEquipmentSubmission()
+{
+    if (ULastFPSEquipmentSubsystem* Equipment = GetLocalEquipmentSubsystem())
+    {
+        Equipment->OnEquipmentChanged.AddUniqueDynamic(
+            this, &ALastFPSPlayerController::HandleLocalEquipmentChanged);
+    }
+}
+
+void ALastFPSPlayerController::UnbindEquipmentSubmission()
+{
+    if (ULastFPSEquipmentSubsystem* Equipment = GetLocalEquipmentSubsystem())
+    {
+        Equipment->OnEquipmentChanged.RemoveDynamic(
+            this, &ALastFPSPlayerController::HandleLocalEquipmentChanged);
+    }
+}
+
+void ALastFPSPlayerController::HandleLocalEquipmentChanged(
+    ELastFPSEquipmentSlotType /*SlotType*/, int32 /*SlotIndex*/)
+{
+    SubmitEquipmentLoadoutToServer();
+}
+
+void ALastFPSPlayerController::SubmitEquipmentLoadoutToServer()
+{
+    if (!IsLocalController())
+    {
+        return;
+    }
+
+    if (const ULastFPSEquipmentSubsystem* Equipment = GetLocalEquipmentSubsystem())
+    {
+        Server_SubmitEquippedSlots(Equipment->BuildEquippedSlots());
+    }
+}
+
+void ALastFPSPlayerController::Server_SubmitEquippedSlots_Implementation(
+    const TArray<FLastFPSEquippedSlot>& Slots)
+{
+    if (ALastFPSPlayerState* LastPS = GetPlayerState<ALastFPSPlayerState>())
+    {
+        LastPS->Auth_SetEquippedSlots(Slots);
+    }
 }
