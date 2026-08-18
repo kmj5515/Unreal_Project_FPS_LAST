@@ -3,6 +3,7 @@
 #include "Data/AssetManagement/LastFPSGameDataSubsystem.h"
 #include "Data/AssetManagement/LastFPSGameDataTags.h"
 #include "Data/Tables/LastFPSItemData.h"
+#include "Data/Tables/LastFPSRarityVisualData.h"
 #include "Data/Tables/LastFPSShopData.h"
 #include "Engine/DataTable.h"
 #include "Engine/GameInstance.h"
@@ -46,6 +47,30 @@ const UDataTable* ULastFPSEconomySubsystem::GetItemTable() const
 bool ULastFPSEconomySubsystem::IsItemTableConfigured() const
 {
 	return GetItemTable() != nullptr;
+}
+
+const FLastFPSRarityVisualData* ULastFPSEconomySubsystem::FindRarityVisual(const ELastFPSItemRarity Rarity) const
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	ULastFPSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULastFPSGameDataSubsystem>() : nullptr;
+	const UDataTable* Table = GameData ? GameData->FindTable(LastFPSGameDataTags::Data_Table_Economy_RarityVisual) : nullptr;
+	if (!Table)
+	{
+		return nullptr;
+	}
+
+	// 등급 수만큼(4행) 훑는다. 행 이름 규약 대신 Rarity 열로 찾으므로 행 이름 오타에 영향받지 않는다.
+	static const FString Context(TEXT("ULastFPSEconomySubsystem::FindRarityVisual"));
+	const FLastFPSRarityVisualData* Found = nullptr;
+	Table->ForeachRow<FLastFPSRarityVisualData>(Context,
+		[Rarity, &Found](const FName&, const FLastFPSRarityVisualData& Row)
+		{
+			if (!Found && Row.Rarity == Rarity)
+			{
+				Found = &Row;
+			}
+		});
+	return Found;
 }
 
 bool ULastFPSEconomySubsystem::HasItemDefinition(FName ItemRowId) const

@@ -55,6 +55,7 @@ void ULastFPSWeaponPreviewWidget::NativeDestruct()
 	// 프리뷰를 닫으면 원래 뷰타깃(폰 카메라 등)으로 복구한다.
 	if (APlayerController* PC = GetOwningPlayer())
 	{
+		PC->bIsUsingStreamingVolumes = true;
 		if (AActor* Prev = PrevViewTarget.Get())
 		{
 			PC->SetViewTarget(Prev);
@@ -107,6 +108,10 @@ void ULastFPSWeaponPreviewWidget::BindPreviewStage()
 			PrevViewTarget = PC->GetViewTarget();
 		}
 		PC->SetViewTarget(PreviewStage);
+
+		// 무대는 레벨 지오메트리를 피해 Z=100000 에 있다. 스트리밍 볼륨은 뷰타깃 위치로 판정하므로
+		// 그대로 두면 프리뷰가 열린 동안 볼륨이 쥐고 있던 서브레벨이 통째로 언로드된다.
+		PC->bIsUsingStreamingVolumes = false;
 	}
 }
 

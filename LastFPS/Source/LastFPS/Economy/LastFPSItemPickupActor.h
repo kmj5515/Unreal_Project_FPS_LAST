@@ -41,6 +41,13 @@ public:
     UPROPERTY(ReplicatedUsing=OnRep_LaunchOffset)
     FVector LaunchStartOffset = FVector::ZeroVector;
 
+    /**
+     * 활성화 일련번호. 풀 재사용 시 클라가 "새 픽업"임을 알 수 있는 유일한 신호다.
+     * 같은 RowId 가 연속으로 재사용되면 OnRep_ItemRowId 가 오지 않으므로 이 값으로 판별한다.
+     */
+    UPROPERTY(ReplicatedUsing=OnRep_ActivationSerial)
+    uint8 ActivationSerial = 0;
+
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void Tick(float DeltaSeconds) override;
 
@@ -126,6 +133,9 @@ private:
     UFUNCTION()
     void OnRep_ItemRowId();
 
+    UFUNCTION()
+    void OnRep_ActivationSerial();
+
     // 발사 연출 시작(전 인스턴스 로컬). 중복 호출/오프셋 0 이면 무시.
     void TryStartLaunch();
 
@@ -141,7 +151,9 @@ private:
 
     ELastFPSItemRarity CachedRarity = ELastFPSItemRarity::Common;
     FLinearColor CachedRarityColor = FLinearColor::White;
-    bool bSpawnFXPlayed = false;
+    // 이미 스폰 FX 를 재생한 활성화 번호(로컬 전용). -1 이면 이번 수명에서 아직 재생하지 않았다.
+    // 레벨 배치 픽업은 ActivationSerial 이 0 으로 유지되므로 초기값을 0 으로 두면 안 된다.
+    int32 PlayedActivationSerial = -1;
 
     FVector MeshRestRelativeLocation = FVector::ZeroVector;
     float LaunchElapsed = 0.f;

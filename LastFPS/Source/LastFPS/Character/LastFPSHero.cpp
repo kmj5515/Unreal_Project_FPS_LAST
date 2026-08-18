@@ -341,7 +341,11 @@ void ALastFPSHero::EnsureDefaultInputMapping()
 		: nullptr;
 	if (Subsystem && !Subsystem->HasMappingContext(DefaultMappingContext))
 	{
-		Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		// 상호작용(G 홀드)이 끝나 컨텍스트가 돌아올 때 아직 눌려 있는 키가 즉시 발동하지 않도록 한다.
+		// 홀드로 진입하는 상호작용 특성상, 이 옵션이 없으면 복귀 프레임에 유령 입력이 들어간다.
+		FModifyContextOptions Options;
+		Options.bIgnoreAllPressedKeysUntilRelease = true;
+		Subsystem->AddMappingContext(DefaultMappingContext, 0, Options);
 	}
 }
 

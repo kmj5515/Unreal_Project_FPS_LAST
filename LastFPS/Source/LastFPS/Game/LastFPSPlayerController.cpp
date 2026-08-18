@@ -999,6 +999,13 @@ void ALastFPSPlayerController::BeginNPCInteraction(
     InteractionSession.DialogueRadioSpeakerColor = InDialogueRadioSpeakerColor;
     InteractionSession.PreviousViewTarget = GetViewTarget();
 
+    // 직전 상호작용의 지연 복구가 남아 있으면 취소한다(연속 상호작용 시 입력이 뒤늦게 풀리는 것 방지).
+    GetWorldTimerManager().ClearTimer(InteractionInputRestoreTimerHandle);
+
+    // 종료 시 되돌릴 시선. 허브가 열린 동안 뷰타깃은 NPC라 컨트롤 회전 변화가 화면에 안 보이므로,
+    // 한 프레임이라도 회전 입력이 새면 복귀 시 엉뚱한 각도에서 시작한다. 각도를 여기서 붙잡아 둔다.
+    InteractionSession.PreviousControlRotation = GetControlRotation();
+
     // 상호작용 UI 모드 진입: 이동/회전 잠금 + 커서 표시(단일 진입점).
     SetInteractionInputMode(true);
 
@@ -1024,8 +1031,24 @@ void ALastFPSPlayerController::EndNPCInteraction()
         Dialogue->DeactivateWidget();
     }
 
-    // 상호작용 UI 모드 종료: 이동/회전 잠금 해제 + 커서 숨김 (Begin과 대칭).
-    SetInteractionInputMode(false);
+    // 진입 전 시선으로 되돌린다. 허브 열림/닫힘 사이에 새어 들어온 회전을 여기서 무효화한다.
+    SetControlRotation(InteractionSession.PreviousControlRotation);
+
+    // 상호작용 UI 모드 종료: 이동/회전 잠금 해제 (Begin과 대칭).
+    // 단, 카메라가 폰으로 블렌드되는 동안에는 입력을 열지 않는다. 블렌드 중 들어온 회전은
+    // 화면에 보이지 않는 상태로 컨트롤 회전만 틀어놓아, 복귀 직후 시점이 튀는 원인이 된다.
+    if (NPCCameraBlendTime > 0.f)
+    {
+        GetWorldTimerManager().SetTimer(
+            InteractionInputRestoreTimerHandle,
+            FTimerDelegate::CreateUObject(this, &ALastFPSPlayerController::SetInteractionInputMode, false),
+            NPCCameraBlendTime,
+            false);
+    }
+    else
+    {
+        SetInteractionInputMode(false);
+    }
 
     // 캐릭터(폰)로 시점 복귀.
     AActor* Target = InteractionSession.PreviousViewTarget.Get();

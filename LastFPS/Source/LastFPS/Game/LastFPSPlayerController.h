@@ -305,6 +305,8 @@ protected:
     FTimerHandle HUDPushRetryTimerHandle;
     FTimerHandle MenuLayerSyncBindRetryTimerHandle;
     FTimerHandle LocalPawnReadyRetryTimerHandle;
+    // 상호작용 종료 시 카메라 블렌드가 끝난 뒤 게임플레이 입력을 되돌리기 위한 타이머.
+    FTimerHandle InteractionInputRestoreTimerHandle;
     bool bHUDWidgetPushed = false;
     bool bMenuLayerSyncBound = false;
 
@@ -337,6 +339,7 @@ protected:
         FLinearColor DialogueRadioSpeakerColor = FLinearColor::White;
         TWeakObjectPtr<ULastFPSNPCInteractionWidget> HubWidget;
         TWeakObjectPtr<ULastFPSDialogueWidget> Dialogue; // orphan 방지용
+        FRotator PreviousControlRotation = FRotator::ZeroRotator; // 진입 전 시선(복귀용)
 
         void Reset()
         {
@@ -348,6 +351,7 @@ protected:
             DialogueRadioSpeakerColor = FLinearColor::White;
             HubWidget.Reset();
             Dialogue.Reset();
+            PreviousControlRotation = FRotator::ZeroRotator;
         }
     };
     FNPCInteractionSession InteractionSession;

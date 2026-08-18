@@ -6,6 +6,7 @@
 
 class UDataTable;
 enum class ELastFPSItemRarity : uint8;
+struct FLastFPSRarityVisualData;
 
 /** 성공한 상점 구매의 불변 영수증. 구매 외 아이템 증가와 퀘스트 판정을 분리하는 데이터 계약이다. */
 struct LASTFPS_API FLastFPSPurchaseReceipt
@@ -77,6 +78,12 @@ public:
 
 	/** DT_ItemData가 GameDataSet을 통해 로드됐는지 반환한다. */
 	bool IsItemTableConfigured() const;
+
+	/**
+	 * 등급의 드랍 연출 행을 조회한다. 테이블이 없거나 해당 등급 행이 없으면 nullptr.
+	 * 등급 데이터의 해석은 이 서브시스템이 소유하므로 픽업 액터는 테이블을 직접 알지 않는다.
+	 */
+	const FLastFPSRarityVisualData* FindRarityVisual(ELastFPSItemRarity Rarity) const;
 
 	/**
 	 * 시작 시 테이블 간 참조 무결성 검사 — 깨진 참조를 에러 로그로 출력한다.

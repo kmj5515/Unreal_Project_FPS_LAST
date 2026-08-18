@@ -5,13 +5,13 @@
 #include "Character/LastFPSHero.h"
 #include "Character/LastFPSPet.h"
 #include "Data/Tables/LastFPSItemData.h"
+#include "Data/Tables/LastFPSRarityVisualData.h"
 #include "Economy/LastFPSEconomySubsystem.h"
 #include "Game/LastFPSPlayerState.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/GameInstance.h"
 #include "GameFramework/RotatingMovementComponent.h"
-#include "Economy/LastFPSRaritySettings.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
@@ -51,12 +51,20 @@ void ALastFPSItemPickupActor::GetLifetimeReplicatedProps(TArray<FLifetimePropert
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(ALastFPSItemPickupActor, ItemRowId);
     DOREPLIFETIME(ALastFPSItemPickupActor, LaunchStartOffset);
+    DOREPLIFETIME(ALastFPSItemPickupActor, ActivationSerial);
 }
 
 void ALastFPSItemPickupActor::OnRep_ItemRowId()
 {
-    bSpawnFXPlayed = false;
     ApplyRarityVisual();
+    PlaySpawnFX();
+}
+
+void ALastFPSItemPickupActor::OnRep_ActivationSerial()
+{
+    // 풀에서 재사용된 픽업. RowId 가 직전과 같아 OnRep_ItemRowId 가 오지 않는 경우가 여기서 걸린다.
+    ApplyRarityVisual();
+    PlaySpawnFX();
 }
 
 void ALastFPSItemPickupActor::ApplyRarityVisual()
@@ -120,8 +128,6 @@ void ALastFPSItemPickupActor::ApplyRarityVisual()
         NumMaterials,
         *EmissiveParameterName.ToString(),
         bParamFoundAnySlot ? TEXT("YES") : TEXT("NO(이름불일치?)"));
-
-    PlaySpawnFX();
 }
 
 void ALastFPSItemPickupActor::BeginPlay()
@@ -144,6 +150,10 @@ void ALastFPSItemPickupActor::ActivatePickup()
 
     // 서버/스탠드얼론: 스폰 시 RowId 가 이미 세팅됨. 순수 클라: OnRep_ItemRowId 가 도착 시 재적용.
     ApplyRarityVisual();
+
+    // 등급 시각화와 분리해서 호출한다. 체력·탄약 픽업은 RowId 가 없어 ApplyRarityVisual 이 조기 반환하므로,
+    // 그 안에서 호출하면 스폰 FX 가 영영 재생되지 않는다(등급은 Common 폴백).
+    PlaySpawnFX();
 
     // 에디터에서 조정한 RotationRate 반영 (생성자 이후 값이 세팅되므로 여기서 적용).
     if (RotatingMovement)
@@ -174,7 +184,7 @@ void ALastFPSItemPickupActor::InitializePickup(
     ItemRowId = InItemRowId;
     Count = FMath::Max(InCount, 1);
     LaunchStartOffset = InLaunchStartOffset;
-    bSpawnFXPlayed = false;
+    ++ActivationSerial; // 값이 반드시 바뀌므로 재사용마다 클라 OnRep 이 보장된다(255 다음 0 도 직전 값과 다르다).
     LaunchElapsed = 0.f;
     bLaunching = false;
     bLaunchResolved = false;
@@ -293,20 +303,26 @@ void ALastFPSItemPickupActor::HandleLanded()
 
 void ALastFPSItemPickupActor::PlaySpawnFX()
 {
-    if (bSpawnFXPlayed || !SpawnVFX || GetNetMode() == NM_DedicatedServer)
+    if (PlayedActivationSerial == (int32)ActivationSerial || !SpawnVFX || GetNetMode() == NM_DedicatedServer)
     {
         return;
     }
 
-    const ULastFPSRaritySettings* Settings = ULastFPSRaritySettings::Get();
-    const FLastFPSRarityVisuals* Visuals = Settings ? Settings->Visuals.Find(CachedRarity) : nullptr;
-    UNiagaraSystem* FX = Visuals ? Visuals->SpawnFX.LoadSynchronous() : nullptr;
+    const UGameInstance* GI = GetGameInstance();
+    const ULastFPSEconomySubsystem* Economy = GI ? GI->GetSubsystem<ULastFPSEconomySubsystem>() : nullptr;
+    const FLastFPSRarityVisualData* Visual = Economy ? Economy->FindRarityVisual(CachedRarity) : nullptr;
+    UNiagaraSystem* FX = Visual ? Visual->SpawnFX.LoadSynchronous() : nullptr;
     if (!FX)
     {
+        // 행 누락(테이블 미등록)과 로드 실패(쿡 누락)를 구분할 수 있도록 경로까지 남긴다.
+        UE_LOG(LogLastFPSPickup, Warning,
+            TEXT("[Pickup] 스폰 FX 재생 실패 — Rarity=%d, 행=%s"),
+            (int32)CachedRarity,
+            Visual ? *Visual->SpawnFX.ToString() : TEXT("없음(DT_RarityVisual 미등록?)"));
         return;
     }
 
-    bSpawnFXPlayed = true;
+    PlayedActivationSerial = (int32)ActivationSerial;
 
     SpawnVFX->SetAsset(FX);
     if (!SpawnFXColorParameterName.IsNone())
@@ -475,7 +491,6 @@ void ALastFPSItemPickupActor::OnAcquiredFromPool_Implementation()
     ItemRowId = NAME_None;
     Count = 1;
     LaunchStartOffset = FVector::ZeroVector;
-    bSpawnFXPlayed = false;
     LaunchElapsed = 0.f;
     bLaunching = false;
     bLaunchResolved = false;
@@ -494,7 +509,6 @@ void ALastFPSItemPickupActor::OnReleasedToPool_Implementation()
     ItemRowId = NAME_None;
     Count = 1;
     LaunchStartOffset = FVector::ZeroVector;
-    bSpawnFXPlayed = false;
     LaunchElapsed = 0.f;
     bLaunching = false;
     bLaunchResolved = false;
