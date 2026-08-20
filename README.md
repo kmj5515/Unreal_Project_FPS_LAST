@@ -3,7 +3,8 @@
 > Unreal Engine 5.7 · C++ · GAS 기반 3인칭 슈팅 게임
 > 허브에서 정비 → 퀘스트 수주 → 던전 인카운터·보스 처치 → 결과·전리품까지 한 판이 온전히 돌아간다.
 
-**개인 프로젝트** — 기획·설계·C++ 구현·데이터 파이프라인·서버 배포 전 영역
+**팀 프로젝트 (프로그래머 2명)** — 전투 · 캐릭터 · 월드 · 개발 툴 담당
+담당 범위와 공동 작업 구분은 기술 문서에 정리했습니다.
 
 📄 **기술 문서: [Docs/Tech/LastFPS-기술문서.md](Docs/Tech/LastFPS-기술문서.md)** ← 설계 의사결정과 근거는 여기에 있습니다.
 
@@ -47,8 +48,7 @@
 
 ### UI · 연출
 
-- **화면 라우팅이 데이터** — `OpenScreen(FGameplayTag)` 단일 진입점 + `ULastFPSScreenRegistry` 행 하나로 화면 추가
-- **HUD는 View / Presenter 10종** — 갱신을 데이터 성격에 맞춤(어트리뷰트 델리게이트 / 태그 이벤트 / 연속값만 틱)
+- **HUD는 View / Presenter 10종** (공동 구현) — 갱신을 데이터 성격에 맞춤(어트리뷰트 델리게이트 / 태그 이벤트 / 연속값만 틱)
 - CommonUI 레이어 5종, 입력 config writer를 PlayerController 하나로 고정
 - Sequencer 기반 컷신, Niagara VFX
 
@@ -79,7 +79,7 @@
 
 | 문서 | 내용 |
 |---|---|
-| **[기술 문서](Docs/Tech/LastFPS-기술문서.md)** | 설계 의사결정 요약 + 영역별 상세 4장 + 부록 (단일 문서) |
+| **[기술 문서](Docs/Tech/LastFPS-기술문서.md)** | 담당 범위 · 시스템별 설계 판단 · 문제 해결 사례 · 회고 (단일 문서) |
 | [에디터 세팅 체크리스트](Docs/Setup-Checklist.md) | 블루프린트 바인딩 규칙 (2026-05 기준 아카이브) |
 | [포트폴리오 영상 기획안](Docs/PortfolioVideo_12min.md) | 12분 영상 구성 |
 
@@ -112,7 +112,7 @@
 `Tools/ServerAutomation/Server-PC-Package/` 가 원본이며 배포 시 `Deploy_Server/`로 복사된다
 (`Deploy_Server/`는 `.gitignore` 제외 대상이므로 스크립트는 `Tools/` 쪽을 볼 것).
 
-상세 파이프라인은 [기술 문서 02장](Docs/Tech/LastFPS-기술문서.md)에 있다.
+상세 내용은 [기술 문서](Docs/Tech/LastFPS-기술문서.md)에 있다.
 
 ---
 

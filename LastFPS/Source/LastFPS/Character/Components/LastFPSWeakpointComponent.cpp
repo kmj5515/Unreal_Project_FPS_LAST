@@ -67,10 +67,6 @@ bool ULastFPSWeakpointComponent::IsWeakpointBone(FName BoneName) const
 
 float ULastFPSWeakpointComponent::HandleHitOnBone(FName HitBoneName, float Damage)
 {
-    // [진단] 임시 로그 — 호출 여부·본 이름·약점 여부·권한 확인. 문제 해결 후 제거.
-    UE_LOG(LogTemp, Warning, TEXT("[Weakpoint] HandleHitOnBone Bone=%s 약점여부=%d Authority=%d"),
-        *HitBoneName.ToString(), IsWeakpointBone(HitBoneName) ? 1 : 0, GetOwner() && GetOwner()->HasAuthority() ? 1 : 0);
-
     if (!GetOwner() || !GetOwner()->HasAuthority())
     {
         return 1.f;
